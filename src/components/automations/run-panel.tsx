@@ -31,16 +31,25 @@ export function RunPanel({ view: initial, connections }: { view: RunView; connec
   const error = again.error ?? judged.error;
 
   return (
-    <div data-testid="run-panel" className="rounded-xl border bg-background">
+    // id + tabIndex: the "Skip to the run" link at the top of the page lands the cursor here (Q70), and the
+    // section is named by the run's own title, so a screen reader announces which run it entered (Q73)
+    <section
+      id="run"
+      tabIndex={-1}
+      aria-labelledby="run-title"
+      data-testid="run-panel"
+      className="rounded-xl border bg-background outline-none"
+    >
       {/* not sticky: a sticky header inside the card covered the section under it at some scroll positions */}
       <header className="rounded-t-xl border-b bg-background px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             {/* the instruction is the run's name: an id means nothing to the person who typed the task */}
-            <h2 className="truncate text-sm font-semibold" title={run.prompt}>
+            <h2 id="run-title" className="truncate text-sm font-semibold" title={run.prompt}>
               {firstLine(run.prompt)}
             </h2>
-            <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+            {/* role=status: this line changes under the poll, and that change is the news a screen reader needs (Q68) */}
+            <p role="status" className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
               <StatusDot tone={result.tone} />
               <span data-testid="outcome">{result.label}</span>
               <span aria-hidden>-</span>
@@ -101,7 +110,8 @@ export function RunPanel({ view: initial, connections }: { view: RunView; connec
 
       <section className="px-4 py-4">
         <h3 className="mb-3 text-xs font-semibold tracking-widest text-muted-foreground uppercase">The plan</h3>
-        <PlanStepper plan={state.plan} terminal={terminal} />
+        {/* the bar may not say "it went well": that is the verdict's job, so the verdict decides its colour (Q67) */}
+        <PlanStepper plan={state.plan} terminal={terminal} verdict={verdict?.verdict ?? null} />
       </section>
 
       <section data-testid="produced" className="border-t px-4 py-4">
@@ -123,13 +133,14 @@ export function RunPanel({ view: initial, connections }: { view: RunView; connec
         type="button"
         onClick={() => setDetails(!details)}
         aria-expanded={details}
-        className="flex w-full items-center justify-between border-t px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/50"
+        // the same focus ring as the run rows and the buttons (Q71); 40 px tall on a phone (Q75)
+        className="flex w-full items-center justify-between border-t px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none max-[899px]:min-h-10"
       >
         Details
         <ChevronDown className={cn("size-4 transition-transform duration-200", details && "rotate-180")} />
       </button>
       {details && <RunDetails view={view} connections={connections} />}
-    </div>
+    </section>
   );
 }
 

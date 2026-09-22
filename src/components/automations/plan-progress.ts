@@ -16,5 +16,9 @@ export function planProgress(
 export type BarTone = "pass" | "warn" | "neutral";
 
 export function barTone(verdict: string | null | undefined, anyDone: boolean): BarTone {
-  return anyDone ? "pass" : "neutral";
+  // nothing actually done - every step skipped, or the run still starting - is never a green bar
+  if (!anyDone) return "neutral";
+  if (verdict === "pass") return "pass";
+  if (verdict === "pass_with_notes") return "warn";
+  return "neutral"; // fail, unknown, or not judged yet: the steps are settled, the result is not good news
 }

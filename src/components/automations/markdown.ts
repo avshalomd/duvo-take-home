@@ -8,7 +8,15 @@ export type Block =
   | { kind: "list"; ordered: boolean; items: Inline[][] };
 
 // One pass, three alternatives: **bold**, `code`, [text](href). Anything else stays plain text.
-const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
+// The href part takes balanced brackets - `(...)` one level deep - so a URL that contains a bracket is consumed
+// whole rather than leaving a stray ")" behind on the page (Q50).
+const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))*)\)/g;
+
+// The href is the model's text, so it is not trusted: only the two schemes a report ever needs become a link.
+// Anything else (javascript:, data:, file:, vbscript:) is shown as the words it linked, with no href at all (Q57).
+function linkable(href: string): boolean {
+  return /^https?:\/\//i.test(href);
+}
 
 export function parseInline(text: string): Inline[] {
   const spans: Inline[] = [];
@@ -17,7 +25,7 @@ export function parseInline(text: string): Inline[] {
     if (m.index > last) spans.push({ text: text.slice(last, m.index) });
     if (m[1] !== undefined) spans.push({ text: m[1], bold: true });
     else if (m[2] !== undefined) spans.push({ text: m[2], code: true });
-    else spans.push({ text: m[3], href: m[4] });
+    else spans.push(linkable(m[4]) ? { text: m[3], href: m[4] } : { text: m[3] });
     last = m.index + m[0].length;
   }
   if (last < text.length) spans.push({ text: text.slice(last) });

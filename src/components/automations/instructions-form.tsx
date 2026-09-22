@@ -34,14 +34,17 @@ export function InstructionsForm() {
 
   return (
     <form
+      id="new-run"
       action={action}
-      className="space-y-2 rounded-xl border bg-background p-3"
+      // scroll-mt clears the sticky header when the header's "New run" link jumps here
+      className="scroll-mt-16 space-y-2 rounded-xl border bg-background p-3"
       onSubmit={() => toast.loading("Starting the agent...", { id: "start-run", duration: 6000 })}
     >
       <div className="flex items-baseline justify-between">
-        <Label htmlFor="prompt" className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-          Instructions
-        </Label>
+        {/* a heading, so a screen reader can jump to it; the label inside keeps the field named (Q73) */}
+        <h2 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+          <Label htmlFor="prompt">Instructions</Label>
+        </h2>
         <kbd className="rounded border px-1 py-0.5 font-mono text-[10px] text-muted-foreground">⌘/Ctrl+Enter to run</kbd>
       </div>
       <Textarea
@@ -80,7 +83,8 @@ function RunButton() {
       type="submit"
       size="sm"
       disabled={pending}
-      className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+      // emerald-700: white on emerald-600 was 3.65:1 (Q64). h-10 under 900px: 28 px is a miss under a thumb (Q75)
+      className="max-[899px]:h-10 max-[899px]:px-4 bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600"
     >
       {pending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
       {pending ? "Starting..." : "Run"}

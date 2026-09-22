@@ -1,21 +1,25 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 // Runs against a dev server on whatever runs the database holds:
 // BASE_URL=http://localhost:3001 npx playwright test e2e/flow.spec.ts
 // It never starts a run, so it creates nothing and cleans nothing up.
-async function openFirstRun(page: Page) {
-  await page.goto("/");
-  await page.getByTestId("runs").getByRole("link").first().click();
+// aria-current is set by the server render, so waiting for it is waiting for the panel to be the row's own run.
+async function openRun(page: Page, row: Locator) {
+  await row.click();
+  await expect(row).toHaveAttribute("aria-current", "true");
   await expect(page.getByTestId("run-panel")).toBeVisible();
   return page.getByTestId("run-panel");
+}
+
+async function openFirstRun(page: Page) {
+  await page.goto("/");
+  return openRun(page, page.getByTestId("runs").getByRole("link").first());
 }
 
 // A run still working has no plan and no verdict yet, so anything about the finished picture opens a finished run.
 async function openFinishedRun(page: Page) {
   await page.goto("/");
-  await page.getByTestId("runs").getByRole("link").filter({ hasText: /Done/ }).first().click();
-  await expect(page.getByTestId("run-panel")).toBeVisible();
-  return page.getByTestId("run-panel");
+  return openRun(page, page.getByTestId("runs").getByRole("link").filter({ hasText: /Done/ }).first());
 }
 
 test("the home page offers the instructions box, the connections with switches and the past runs", async ({ page }) => {
@@ -78,8 +82,14 @@ test("a run is named by its instructions and says how it turned out in plain wor
 
 test("the plan leads the panel as a stepper with a progress line saying how many steps are settled", async ({ page }) => {
   const panel = await openFinishedRun(page);
-  await expect(panel.getByTestId("plan-progress")).toContainText(/\d+ of \d+ steps/);
-  await expect(panel.getByTestId("plan-steps").getByRole("listitem").first()).toBeVisible();
+  const progress = panel.getByTestId("plan-progress");
+  if (await progress.count()) {
+    await expect(progress).toContainText(/\d+ of \d+ steps/);
+    await expect(panel.getByTestId("plan-steps").getByRole("listitem").first()).toBeVisible();
+  } else {
+    // a run the agent never planned says so where the stepper would be, rather than leaving an empty box
+    await expect(panel).toContainText(/never stated a plan/i);
+  }
 });
 
 test("what the run produced is offered as files to download and a readable report", async ({ page }) => {
@@ -223,10 +233,10 @@ test("run rows and the Details toggle carry the same focus-ring token", async ({
 test("each download link names its file and its size", async ({ page }) => {
   await page.goto("/");
   const rows = page.getByTestId("runs").getByRole("link");
+  await expect(rows.first()).toBeVisible(); // the page streams a skeleton first: count() before that is 0
   const count = await rows.count();
   for (let i = 0; i < count; i++) {
-    await rows.nth(i).click();
-    await expect(page.getByTestId("files")).toBeVisible();
+    await openRun(page, rows.nth(i));
     const link = page.getByTestId("files").getByRole("link").first();
     if ((await link.count()) === 0) continue;
     await expect(link).toHaveAccessibleName(/^Download .+ \(\d+(\.\d+)? KB\)$/);
@@ -265,7 +275,9 @@ test.describe("on a phone, the controls are reachable", () => {
     expect(run!.height).toBeGreaterThanOrEqual(40);
 
     // the switch stays small, but its hit area does not: a press 14 px above its middle still lands on it
-    const box = (await page.getByTestId("connections").getByRole("switch").first().boundingBox())!;
+    const toggle = page.getByTestId("connections").getByRole("switch").first();
+    await toggle.scrollIntoViewIfNeeded(); // elementFromPoint reads the viewport, so the switch has to be in it
+    const box = (await toggle.boundingBox())!;
     const role = await page.evaluate(
       (p) => document.elementFromPoint(p.x, p.y)?.closest("[role=switch]")?.getAttribute("role") ?? "",
       { x: box.x + box.width / 2, y: box.y + box.height / 2 - 14 },
@@ -292,7 +304,9 @@ test("a connection switch keeps focus while its change is saved", async ({ page 
   await expect(toggle).toBeEnabled(); // never disabled mid-flight
   await expect(toggle).toBeFocused();
   await expect(toggle).not.toHaveAttribute("aria-checked", before!);
+  await expect(toggle).toHaveAttribute("aria-busy", "true"); // the save is announced instead of disabling the control
 
+  await expect(toggle).toHaveAttribute("aria-busy", "false");
   await page.keyboard.press("Space"); // put the connection back as it was
   await expect(toggle).toHaveAttribute("aria-checked", before!);
 });

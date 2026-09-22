@@ -1,11 +1,19 @@
 import { CircleCheck, CircleDashed, CircleMinus, LoaderCircle } from "lucide-react";
 import type { Plan, PlanStep } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { planProgress } from "./plan-progress";
+import { barTone, planProgress } from "./plan-progress";
 
 // The plan is the hero of the panel: what the agent decided to do, and where it has got to, as a stepper that
 // animates as the run moves. Everything technical about how it did it lives under Details.
-export function PlanStepper({ plan, terminal }: { plan: Plan | null; terminal: boolean }) {
+export function PlanStepper({
+  plan,
+  terminal,
+  verdict,
+}: {
+  plan: Plan | null;
+  terminal: boolean;
+  verdict: string | null;
+}) {
   const progress = planProgress(plan);
 
   if (!plan || !progress) {
@@ -19,6 +27,9 @@ export function PlanStepper({ plan, terminal }: { plan: Plan | null; terminal: b
   const running = plan.steps.find((s) => s.status === "running");
   // a run whose every step was skipped is settled but not successful: a full emerald bar would say the opposite
   const anyDone = plan.steps.some((s) => s.status === "done");
+  const bar = { pass: "bg-emerald-600", warn: "bg-amber-500", neutral: "bg-zinc-400 dark:bg-zinc-500" }[
+    barTone(verdict, anyDone)
+  ];
 
   return (
     <div>
@@ -26,10 +37,8 @@ export function PlanStepper({ plan, terminal }: { plan: Plan | null; terminal: b
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           {/* the width transition is the progress animation: one CSS line, no library */}
           <div
-            className={cn(
-              "h-full rounded-full transition-all duration-700 ease-out",
-              anyDone ? "bg-emerald-500" : "bg-muted-foreground/40",
-            )}
+            data-testid="plan-bar"
+            className={cn("h-full rounded-full transition-all duration-700 ease-out", bar)}
             style={{ width: `${progress.percent}%` }}
           />
         </div>
