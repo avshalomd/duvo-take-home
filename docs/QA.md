@@ -64,3 +64,16 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | Q43 | qa-ux | Details > Verdict says "Not evaluated - the evaluator runs when the agent finishes" on a finished run | "This run was not judged." | minor | ui | fixed (UX, merged 22efdf4) |
 | Q44 | qa-ux | add-a-server errors are fragments; focus stays on body after a failed submit | full sentences, focus the first bad field | minor | ui | fixed (UX, merged 22efdf4) |
 | Q45 | qa-func | `/api/runs/<36 dashes>` returned 500: the id guard accepted any 36 hex-or-dash characters | a strict uuid shape, 404 otherwise | minor | engine | fixed |
+
+## Round 3 (deep QA on the live URL): bug log
+
+| id | source | observed | expected | severity | owner | status |
+|---|---|---|---|---|---|---|
+| Q46 | qa-edge | `NewConnection.url` accepts any scheme and host (`javascript:`, `file:`, `http://localhost:3000`, `http://169.254.169.254/...`); the SDK child fetches it server-side | only http(s), no loopback/link-local/private hosts, readable error | major | main (contracts) | open |
+| Q47 | qa-edge | no rate limit on run creation: 10 runs in 10 min from one client, each up to $1 | a per-IP/per-window cap on starting runs | major | engine | open |
+| Q48 | qa-edge | no authentication: any visitor reads every run, report and file and starts runs | known for a single-user demo; on the roadmap (1e) | minor | main | open (roadmap) |
+| Q49 | qa-edge | on the injection prompt the agent called no tool at all, so the run closed with no plan (the judge failed it) | the plan tool is called before the agent decides anything, even to refuse | minor | engine | open |
+| Q50 | qa-edge | the markdown link regex stops at the first `)`: `[x](javascript:alert(1))` leaves a stray `)` | the whole link consumed (React already neutralises the javascript: href) | minor | ui | open |
+| Q51 | qa-edge | a file named `a"b.csv` is served as `filename="ab.csv"` while the UI shows the original name | the same name, or RFC 5987 `filename*` | minor | engine | open |
+| Q52 | qa-edge | a new connection is created enabled while the toast says "switch it on to give it to the next run" | the toast and the state agree | minor | ui | open |
+| Q53 | qa-edge | raw Zod wording in the UI: "Too big: expected string to have <=40 characters" | the app's own voice | minor | main (contracts) | open |
