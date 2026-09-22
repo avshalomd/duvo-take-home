@@ -58,4 +58,14 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 
 ## Not done, next
 
-_Updated at the end of the hour._
+- Live runs on the deployed URL need `ANTHROPIC_API_KEY` on Vercel and depend on the Agent SDK spawning its
+  subprocess inside a Vercel function; verified locally, not yet verified in production. Seeded runs demo every
+  screen on the live URL either way.
+- The seeded "running" fixture run never finishes (it is a fixture), so its panel keeps polling.
+- `reevaluateRun`'s database path has no integration test (the mapping and the cascade do).
+- Skills the user can define externally, per-turn evaluation, more output kinds, OAuth connections:
+  [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Evaluation results
+
+The evaluator over the ten labelled fixture cases scores 10/10: [docs/EVAL.md](docs/EVAL.md).

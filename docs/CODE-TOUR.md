@@ -36,3 +36,12 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/runs/start.ts` - inserts the run and schedules `runAutomation` in `after()`, so the action returns at once and the loop outlives the response (`maxDuration` 300 on the routes).
 - `src/app/api/runs/[id]/route.ts`, `files/[name]/route.ts` - the panel's poll (run, events, files, verdict, state) and the download with `Content-Disposition: attachment`.
 - `src/lib/eval/reevaluate.ts` (P3, phase B) - `reevaluate(runId, { load, evaluate, save })`: the two Drizzle queries are injected, so the mapping `toEvaluateInput` (last plan event = the plan, deduped tool_call names = toolsUsed, the run's own day as today) is tested without Postgres. `connection_used` became a code check: a connection named in the instructions must appear as `mcp__<key>__*` in the tools used.
+
+## P2 - ui
+
+- `src/app/page.tsx` - one Server Component reads runs, connections and the selected run (`?run=<id>`), derives its state, and renders the left column and the panel. No client fetch on first paint.
+- `src/app/actions.ts` - the Server Actions: `startRun` (Zod, then `redirect` outside the try because redirect throws its own signal), `toggleConnection`, `addConnection`, `reevaluate`. Every action returns its state, so a failure is an alert on the page, never a crash.
+- `src/components/automations/run-panel.tsx`, `use-run-poll.ts`, `poll.ts` - the panel polls `/api/runs/[id]` every 2 s only while the run can still change, validates the payload with Zod and keeps the server render when the payload is off, so a bad response degrades to "no live update", not a broken page.
+- `src/components/automations/format.ts` - tool calls as one-liners; `mcp__deepwiki__read_wiki_structure` reads "DeepWiki: read_wiki_structure" by matching the connection key.
+- `src/components/automations/connections-list.tsx` - the switches and the folded add-a-server form; a token is typed once and never rendered back.
+- `e2e/flow.spec.ts` - the page and the panel on seeded runs, run on :3000 before a deploy.
