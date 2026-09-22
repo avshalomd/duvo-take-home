@@ -25,3 +25,13 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/eval/review.ts`, `review.prompt.ts` - tier two, `extract()` with the Review schema; runs only when Jev says the plan was not followed or is not confident.
 - `src/lib/eval/evaluate.ts` - the cascade. `evaluate(input, { judge, review })` takes its two model calls as arguments so the verdict logic is tested without a network; `evaluateRun` binds the real ones. `unknown` is returned when a judge fails, never `fail`: a broken judge must not mark good work bad.
 - `src/lib/eval/evaluate.eval.test.ts` - the evaluator over `fixtures/llm-cases.json` (EVAL=1), writing `docs/EVAL.md`. 9/10 at merge.
+
+## P1 - engine
+
+- `src/lib/agent/run.ts` - the run loop: `query()` from the Agent SDK with `cwd: runs/<id>`, `settingSources: []` (isolation: no user or repo settings leak into the agent), permissions bypassed but Bash/Edit/Task removed, caps from `AgentLimits`, the enabled connections as http `mcpServers` keyed by `connectionKey()`. Every message becomes a `run_events` row; after the result the .txt/.md/.csv files are copied into `files`, `evaluateRun` runs, and the run is closed with the verdict.
+- `src/lib/agent/plan-tool.ts` - an in-process MCP server (`createSdkMcpServer`) with `set_plan` and `update_step`. The agent must say where it is; the loop records each call as a `plan` event holding the whole plan, so the state at any point is the last plan event.
+- `src/lib/agent/system.prompt.ts` - a generic automation agent: plan first, no questions, text files only, end with a report. No task-specific prompt and no presets.
+- `src/lib/agent/map-message.ts` - `createMapper()` is one mapper per run (it tracks that run's plan and the ids of its plan-tool calls); SDK messages in, zero or more RunEvents out; system messages other than init are dropped.
+- `src/lib/runs/state.ts` - `deriveState(run, events)`, pure: turn = tool calls, last tool with its connection, tools used, connections with `used` from the calls, plan from the last plan event, files from Write calls.
+- `src/lib/runs/start.ts` - inserts the run and schedules `runAutomation` in `after()`, so the action returns at once and the loop outlives the response (`maxDuration` 300 on the routes).
+- `src/app/api/runs/[id]/route.ts`, `files/[name]/route.ts` - the panel's poll (run, events, files, verdict, state) and the download with `Content-Disposition: attachment`.

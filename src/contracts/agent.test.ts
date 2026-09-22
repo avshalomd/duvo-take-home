@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 import { AgentLimits, SetPlanInput, StartRunInput, UpdateStepInput } from "./agent";
 import { Plan, RunEvent } from "./run";
 import { mapMessage } from "../lib/agent/map-message";
-import { runAutomation } from "../lib/agent/run";
-import { startRun } from "../lib/runs/start";
 import promptsFixture from "../../fixtures/prompts.json";
 
 type FixturePrompt = { id: string; label: string; text: string };
@@ -157,11 +154,5 @@ describe("the agent stubs", () => {
     expect(events).toEqual([]); // STUB: the engine package maps the message kinds
   });
 
-  it("startRun is not implemented yet and says so", async () => {
-    await expect(startRun({ prompt: fixturePrompts[0].text })).rejects.toThrow("not implemented: startRun");
-  });
 
-  it("runAutomation is not implemented yet and says so", async () => {
-    await expect(runAutomation("run_01JQ8N4K2W")).rejects.toThrow("not implemented: runAutomation");
-  });
 });

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { FileMeta, Plan, PlanStep, PlanStepStatus, Run, RunEvent, RunState, RunStatus } from "./run";
 import { AgentLimits } from "./agent";
-import { getFile, getRun, listRuns } from "../lib/runs/queries";
 import { deriveState } from "../lib/runs/state";
 import runsFixture from "../../fixtures/runs.json";
 
@@ -10,7 +9,11 @@ import runsFixture from "../../fixtures/runs.json";
 // around (camelCase). Run and FileMeta are therefore tested through the stubs that do that mapping, and
 // RunEvent is tested against the fixture events directly - those are stored as-is.
 type FixtureEvent = { seq: number; kind: string; at: string; payload: Record<string, unknown> };
-type FixtureRun = { id: string; status: string; events: FixtureEvent[] };
+type FixtureRun = {
+  id: string; prompt: string; status: string; model: string; connection_id: string | null; started_at: string;
+  finished_at: string | null; num_turns: number | null; duration_ms: number | null; total_cost_usd: number | null;
+  artifacts: { name: string; mime: string; bytes: number }[]; events: FixtureEvent[];
+};
 const fixtureRuns = runsFixture as unknown as FixtureRun[];
 const fixtureEvents = fixtureRuns.flatMap((r) => r.events);
 
@@ -36,6 +39,27 @@ function without(event: FixtureEvent, field: string) {
 function withField(event: FixtureEvent, field: string, value: unknown) {
   return { ...event, payload: { ...event.payload, [field]: value } };
 }
+
+// The reads are built from the fixture here: since P1 landed, src/lib/runs/queries.ts reads the database.
+function toRun(r: FixtureRun): Run {
+  const finished = r.events.find((e) => e.kind === "finished")?.payload as { result?: string } | undefined;
+  return {
+    id: r.id, prompt: r.prompt, status: r.status as Run["status"], model: r.model,
+    connectionIds: r.connection_id ? [r.connection_id] : [], report: finished?.result ?? null, error: null,
+    numTurns: r.num_turns ?? null, durationMs: r.duration_ms ?? null, costUsd: r.total_cost_usd ?? null,
+    createdAt: r.started_at, finishedAt: r.finished_at ?? null,
+  };
+}
+const listRuns = async () => fixtureRuns.map(toRun);
+const getRun = async (id: string) => {
+  const r = fixtureRuns.find((x) => x.id === id);
+  if (!r) return null;
+  return { run: toRun(r), events: r.events as unknown as RunEvent[], files: r.artifacts.map((a) => ({ name: a.name, mime: a.mime, bytes: a.bytes })), verdict: null };
+};
+const getFile = async (runId: string, name: string) => {
+  const a = fixtureRuns.find((x) => x.id === runId)?.artifacts.find((f) => f.name === name);
+  return a ? { meta: { name: a.name, mime: a.mime, bytes: a.bytes }, content: "title,source,url,published_at,summary\n" } : null;
+};
 
 async function loadRun(id: string) {
   const got = await getRun(id);
@@ -253,7 +277,7 @@ describe("RunState", () => {
   });
 });
 
-describe("the read stubs", () => {
+describe("the fixture reads", () => {
   it("listRuns answers an array of Run", async () => {
     expect(z.array(Run).parse(await listRuns())).toHaveLength(fixtureRuns.length);
   });
