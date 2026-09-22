@@ -53,7 +53,9 @@ off is a data leak.
 - Q3 What does the evaluator judge? - default: the CSV artifact. Code checks first (parses, required columns, 5+ rows, valid URLs, dates within 7 days, no duplicate URLs), then the decision model (`decide()`) on the closed questions (rows on topic, run complete); verdict pass/fail with reasons, shown on the run.
 - Q4 Agent model and backend? - default: `claude-sonnet-5` with the Anthropic key; OpenRouter as the Anthropic-compatible fallback.
 
-## Scope (aligned, T+13)
+## Scope (aligned, T+13; size A picked at the design gate, T+26)
+
+- Size A: packages engine, ui, eval, connections - the Must core. Free text only, no presets (T+24); the evaluator cascades from Jev to an LLM review (T+24).
 
 - Must: R1, R2, R3, R4, R5, I1, I2, I3, I4, I5, I9 - a generic agent (web search, read, write .txt/.md/.csv), one page with the run side panel, the plan tool as the source of "where it is", connections as a list of the user's http MCP servers (seeded, on/off, enforced at the run), files downloadable, and the evaluator as the run's last step before it is marked done.
 - Should: I6, I7, a live run on Vercel, token streaming of the assistant text, a per-step evaluator (Jev after every turn of the loop).
