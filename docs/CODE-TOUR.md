@@ -11,3 +11,9 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/db/schema.ts` - four tables beside the baseline `notes`. `runs.verdict` is jsonb, stored whole. `run_events(run_id, seq)` is the only index the reads need. `files.content` is text: a CSV needs no blob store.
 - `scripts/seed.ts` - loads the fixture runs, events, files and connections so every screen demos when the model is down. Its own client, because `@/db` is server-only.
 - `next.config.ts` - `serverExternalPackages` for the Agent SDK: it carries the Claude Code binary and must not be bundled.
+
+## P4 - connections
+
+- `src/lib/connections/store.ts` - Drizzle on the `connections` table. `toConnection()` is the one place a row loses its token: the UI shape gets `hasToken`, only `listEnabledConnectionsWithSecrets()` returns the token, and only the agent loop calls it.
+- `src/lib/connections/key.ts` - `connectionKey(name)`: the MCP server key from the user's name (lowercase, non-alphanumerics to `_`, empty falls back to `server`). The agent's tool names are `mcp__<key>__<tool>`, so the key in the trace and the name the user typed cannot drift.
+- `src/lib/connections/store.int.test.ts` - the promises against the real table; every row it creates is named `[int] ...` and deleted after.

@@ -3,7 +3,7 @@
 An agentic automation platform: brief an agent in free text, watch it plan and work step by step, download the
 files it wrote, connect it to your own data through MCP servers, and get an automatic verdict on the result.
 
-**Live:** _pending first deploy_
+**Live:** https://duvo-take-home.vercel.app
 
 ## What it does
 
