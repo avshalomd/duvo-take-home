@@ -47,6 +47,8 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 
 ## Decisions and trade-offs
 
+- **The agent's sandbox.** The SDK's `tools` option leaves the agent exactly Read, WebFetch, WebSearch, Write and the plan tools; a PreToolUse hook refuses any path outside the run's directory; a wall clock of 240 s, 25 turns and $1 end a runaway run and the run always closes with its reason.
+
 - **The plan is data the agent emits, not a summary we infer.** The plan tool makes the agent say where it is;
   the timeline still records every tool call, so a run that skips the tool is still observable.
 - **State is derived, never stored.** `deriveState(run, events)` is a pure function, tested on fixtures; the key
@@ -58,7 +60,7 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 
 ## Tests
 
-- Unit (`npm run check`, 232 tests): the contracts against fixtures, the SDK message mapper, the derived run state,
+- Unit (`npm run check`, 282 tests): the contracts against fixtures, the SDK message mapper, the derived run state,
   the evaluator's checks and its cascade with the model calls mocked, the UI formatting.
 - Integration (`npm run test:int`): the connections store against the real table, cleaning up after itself.
 - Evaluator accuracy (`EVAL=1 ...`): 10 of 10 labelled cases, [docs/EVAL.md](docs/EVAL.md).
@@ -68,6 +70,7 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 
 ## Extras
 
+- **The glance view.** The run is shown the way an office worker reads it: the instruction as the title, the outcome in a sentence ("Done - looks good"), the plan as an animated stepper with a progress bar, what it produced as file cards and prose. Everything technical (the timeline, the state grid, cost, turns, the judge's percentages, ids, raw errors) sits under a Details toggle.
 - The timeline groups events under the plan step that was running when they happened, shows each tool call as a card labelled by kind (search, fetch, write, connection) with its result folded to two lines, and renders the agent's own text quietly between them.
 
 ## Not done, next
