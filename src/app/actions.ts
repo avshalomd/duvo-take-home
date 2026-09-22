@@ -7,6 +7,7 @@ import { StartRunInput } from "@/contracts/agent";
 import { NewConnection } from "@/contracts/connection";
 import { addConnection, setConnectionEnabled } from "@/lib/connections/store";
 import { reevaluateRun } from "@/lib/eval/reevaluate";
+import { getRun } from "@/lib/runs/queries";
 import { startRun } from "@/lib/runs/start";
 
 // Every action returns its state instead of throwing: the engine and the store are still stubs, and a stub's
@@ -37,10 +38,18 @@ export async function startRunAction(_prev: FormState, formData: FormData): Prom
 
 // The verdict is stored on the run, so re-evaluating is a write: a Server Action, not a client fetch.
 export async function reevaluateAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const runId = String(formData.get("runId") ?? "");
-  if (!runId) return { error: "No run selected" };
+  // ids arrive from a hidden field, which is user input like any other: validated before it reaches the database
+  const runId = z.uuid().safeParse(String(formData.get("runId") ?? ""));
+  if (!runId.success) return { error: "No run selected" };
+
+  const data = await getRun(runId.data);
+  if (!data) return { error: "That run no longer exists" };
+  // judging a run that is still working would evaluate half a result and overwrite it a minute later
+  if (data.run.status !== "succeeded" && data.run.status !== "failed")
+    return { error: "This run is still going - check it again when it finishes" };
+
   try {
-    await reevaluateRun(runId);
+    await reevaluateRun(runId.data);
   } catch (e) {
     return { error: readable(e) };
   }
@@ -49,8 +58,11 @@ export async function reevaluateAction(_prev: FormState, formData: FormData): Pr
 }
 
 export async function setConnectionEnabledAction(id: string, enabled: boolean): Promise<FormState> {
+  const input = z.object({ id: z.uuid(), enabled: z.boolean() }).safeParse({ id, enabled });
+  if (!input.success) return { error: "That connection could not be found" }; // a Server Action is a public endpoint: its arguments are validated too
+
   try {
-    await setConnectionEnabled(id, enabled);
+    await setConnectionEnabled(input.data.id, input.data.enabled);
   } catch (e) {
     return { error: readable(e) };
   }
