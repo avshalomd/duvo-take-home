@@ -11,3 +11,10 @@ export function planProgress(
   const done = plan.steps.filter((s) => s.status === "done" || s.status === "skipped").length;
   return { done, total, percent: Math.round((done / total) * 100), label: `${done} of ${total} steps` };
 }
+
+// The colour of that bar. It answers "how far", so it may not also claim "and it went well".
+export type BarTone = "pass" | "warn" | "neutral";
+
+export function barTone(verdict: string | null | undefined, anyDone: boolean): BarTone {
+  return anyDone ? "pass" : "neutral";
+}

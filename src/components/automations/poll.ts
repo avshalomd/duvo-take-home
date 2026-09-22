@@ -17,6 +17,12 @@ export function shouldPoll(status: string): boolean {
   return status === "queued" || status === "running" || status === "evaluating";
 }
 
+// A run that has settled. The panel polls until then; the runs list beside it is a server render, so reaching
+// this is also the moment to ask the server for a fresh page (Q79: the row said "Working on it" until a reload).
+export function isTerminal(status: string): boolean {
+  return status === "succeeded" || status === "failed";
+}
+
 export function parseRunPayload(json: unknown): RunView | null {
   const parsed = Payload.safeParse(json);
   if (!parsed.success) return null; // a 404 or a changed payload keeps the last good view instead of blanking it
