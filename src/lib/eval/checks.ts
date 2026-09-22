@@ -83,9 +83,18 @@ function csvChecks(file: { name: string; content: string }, input: EvaluateInput
 function duplicateCheck(header: string[], data: string[][], ok: Push) {
   const urlAt = header.findIndex((h) => /^(url|link|href|source_url)$/i.test(h.trim()));
   const keys = data.map((row) => (urlAt >= 0 ? (row[urlAt] ?? "").trim().toLowerCase() : row.join("").toLowerCase()));
-  const distinct = new Set(keys.filter(Boolean)).size;
+  // A row with a blank URL has no identity to compare, so it leaves both sides of the count: counting it in the
+  // total while dropping it from the distinct set failed a file in which nothing was actually repeated.
+  const keyed = keys.filter(Boolean);
+  const distinct = new Set(keyed).size;
   const what = urlAt >= 0 ? "distinct urls" : "distinct rows";
-  ok("duplicates", "No row is a duplicate of another", distinct === keys.length, `${data.length} rows, ${distinct} ${what}`);
+  const blank = data.length - keyed.length;
+  ok(
+    "duplicates",
+    "No row is a duplicate of another",
+    distinct === keyed.length,
+    `${data.length} rows, ${distinct} ${what}${blank ? `, ${blank} with none` : ""}`,
+  );
 }
 
 // A model that cannot search answers from memory, and the giveaway is the dates. Only run when the instructions
