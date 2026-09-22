@@ -68,6 +68,24 @@ test("the plan leads the panel as a stepper with a progress line saying how many
   await expect(panel.getByTestId("plan-steps").getByRole("listitem").first()).toBeVisible();
 });
 
+test("what the run produced is offered as files to download and a readable report", async ({ page }) => {
+  const panel = await openFirstRun(page);
+  const produced = panel.getByTestId("produced");
+  await expect(produced).toBeVisible();
+  // a run with files offers each one with a Download button; a run without says so in words
+  const files = produced.getByTestId("files");
+  await expect(files).toContainText(/Download|No files/i);
+  // the report is prose, not raw markdown: no ** left on the screen
+  await expect(produced).not.toContainText("**");
+});
+
+test("the outcome is said in plain words with the checks as a short list", async ({ page }) => {
+  const panel = await openFirstRun(page);
+  const result = panel.getByTestId("result");
+  await expect(result).toContainText(/Done|Working on it|Getting ready|Checking|Something went wrong/);
+  await expect(result).not.toContainText(/%|followedPlan|answeredQuery/); // probabilities belong under Details
+});
+
 test("everything technical is folded behind Details until it is asked for", async ({ page }) => {
   const panel = await openFirstRun(page);
   await expect(panel.getByTestId("timeline")).toBeHidden();
