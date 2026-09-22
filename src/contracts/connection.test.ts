@@ -93,9 +93,14 @@ describe("NewConnection", () => {
     expect(parsed.token).toBeUndefined();
   });
 
-  it("rejects a name with parentheses, which the fixture's \"GitHub (read-only)\" has", () => {
+  it('rejects a name with parentheses, which the fixture\'s "GitHub (read-only)" has', () => {
     // The name becomes the mcp__<key>__ prefix, so the regex is letters, digits, space, - and _ only.
-    expect(NewConnection.safeParse({ name: "GitHub (read-only)", url: "https://api.githubcopilot.com/mcp/readonly" }).success).toBe(false);
+    expect(
+      NewConnection.safeParse({
+        name: "GitHub (read-only)",
+        url: "https://api.githubcopilot.com/mcp/readonly",
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects an empty name", () => {
@@ -107,7 +112,10 @@ describe("NewConnection", () => {
   });
 
   it("rejects a transport of stdio: only remote servers can be added", () => {
-    expect(NewConnection.safeParse({ name: "DeepWiki", url: "https://mcp.deepwiki.com/mcp", transport: "stdio" }).success).toBe(false);
+    expect(
+      NewConnection.safeParse({ name: "DeepWiki", url: "https://mcp.deepwiki.com/mcp", transport: "stdio" })
+        .success,
+    ).toBe(false);
   });
 });
 
@@ -129,7 +137,9 @@ describe("the connection stubs", () => {
   });
 
   it("setConnectionEnabled is not implemented yet and says so", async () => {
-    await expect(setConnectionEnabled("conn_github", true)).rejects.toThrow("not implemented: setConnectionEnabled");
+    await expect(setConnectionEnabled("conn_github", true)).rejects.toThrow(
+      "not implemented: setConnectionEnabled",
+    );
   });
 
   it("addConnection is not implemented yet and says so", async () => {

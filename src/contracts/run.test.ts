@@ -1,15 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import {
-  FileMeta,
-  Plan,
-  PlanStep,
-  PlanStepStatus,
-  Run,
-  RunEvent,
-  RunState,
-  RunStatus,
-} from "./run";
+import { FileMeta, Plan, PlanStep, PlanStepStatus, Run, RunEvent, RunState, RunStatus } from "./run";
 import { AgentLimits } from "./agent";
 import { getFile, getRun, listRuns } from "../lib/runs/queries";
 import { deriveState } from "../lib/runs/state";
@@ -99,7 +90,7 @@ describe("RunEvent", () => {
     expect(RunEvent.safeParse(without(anEvent("tool_call"), "name")).success).toBe(false);
   });
 
-  it("rejects a tool_result whose is_error is the string \"false\"", () => {
+  it('rejects a tool_result whose is_error is the string "false"', () => {
     expect(RunEvent.safeParse(withField(anEvent("tool_result"), "is_error", "false")).success).toBe(false);
   });
 
@@ -124,6 +115,9 @@ const planEvent = {
   at: "2026-09-22T09:14:04.000Z",
   kind: "plan",
   payload: {
+    intent: "Collect this week's AI news into a CSV",
+    expectedOutputs: ["output.csv with title,source,url,published_at,summary"],
+    sources: ["web search", "web fetch"],
     steps: [
       { index: 0, title: "Search the web for AI news (7 days)", status: "done" },
       { index: 1, title: "Open the top stories, collect fields", status: "running", note: "3 of 10 read" },
@@ -140,6 +134,35 @@ describe("Plan", () => {
     expect(Plan.parse(parsed.payload).steps).toHaveLength(4);
   });
 
+  it("carries the agent's reading of the instructions beside the steps", () => {
+    const plan = Plan.parse(planEvent.payload);
+    expect(plan.intent).toBe("Collect this week's AI news into a CSV");
+    expect(plan.expectedOutputs).toHaveLength(1);
+    expect(plan.sources).toContain("web search");
+  });
+
+  it("accepts a plan with steps only: intent, expectedOutputs and sources default to empty", () => {
+    // An agent that posts nothing but steps still leaves a readable plan; the UI shows the empty reading.
+    const plan = Plan.parse({ steps: [{ index: 0, title: "Write output.csv", status: "pending" }] });
+    expect(plan.intent).toBe("");
+    expect(plan.expectedOutputs).toEqual([]);
+    expect(plan.sources).toEqual([]);
+  });
+
+  it("rejects a plan whose sources is one string, not an array", () => {
+    expect(Plan.safeParse({ ...planEvent.payload, sources: "web search" }).success).toBe(false);
+  });
+
+  it("rejects a plan whose intent is a number", () => {
+    expect(Plan.safeParse({ ...planEvent.payload, intent: 1 }).success).toBe(false);
+  });
+
+  it("rejects a plan without steps: the default fields do not make a plan on their own", () => {
+    expect(Plan.safeParse({ intent: "Collect AI news", expectedOutputs: [], sources: [] }).success).toBe(
+      false,
+    );
+  });
+
   it("accepts every status a step can be in", () => {
     for (const status of ["pending", "running", "done", "skipped"]) {
       expect(PlanStepStatus.parse(status)).toBe(status);
@@ -147,7 +170,9 @@ describe("Plan", () => {
   });
 
   it("rejects a PlanStep with a status of in_progress", () => {
-    expect(PlanStep.safeParse({ index: 0, title: "Write output.csv", status: "in_progress" }).success).toBe(false);
+    expect(PlanStep.safeParse({ index: 0, title: "Write output.csv", status: "in_progress" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects a PlanStep with an empty title", () => {

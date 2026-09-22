@@ -14,8 +14,15 @@ const fixturePrompts = promptsFixture as unknown as FixturePrompt[];
 const SetPlan = z.object(SetPlanInput);
 const UpdateStep = z.object(UpdateStepInput);
 
+/** The same object without one key, so a rejection names that key and nothing else. */
+function omit<T extends object>(value: T, key: keyof T & string) {
+  const copy = { ...value } as Record<string, unknown>;
+  delete copy[key];
+  return copy;
+}
+
 describe("StartRunInput", () => {
-  it("accepts every preset prompt in fixtures/prompts.json", () => {
+  it("accepts every prompt in fixtures/prompts.json", () => {
     expect(fixturePrompts.length).toBeGreaterThan(0);
     for (const p of fixturePrompts) expect(StartRunInput.parse({ prompt: p.text }).prompt).toBe(p.text);
   });
@@ -49,35 +56,72 @@ describe("SetPlanInput", () => {
     "Write output.csv",
     "Report",
   ];
+  // The agent has to state what it understood before it acts: free text in, so a wrong reading shows early.
+  const setPlan = {
+    intent: "Collect this week's AI news into a CSV",
+    expectedOutputs: ["output.csv with title,source,url,published_at,summary"],
+    sources: ["web search", "web fetch"],
+    steps,
+  };
 
-  it("accepts the titles the agent posts before it does anything else", () => {
-    expect(SetPlan.parse({ steps }).steps).toHaveLength(4);
+  it("accepts the reading and the titles the agent posts before it does anything else", () => {
+    const parsed = SetPlan.parse(setPlan);
+    expect(parsed.intent).toBe(setPlan.intent);
+    expect(parsed.steps).toHaveLength(4);
   });
 
-  it("turns into the Plan the UI reads: one pending step per title", () => {
+  it("accepts an empty sources list: not every run uses a connection or the web", () => {
+    expect(SetPlan.parse({ ...setPlan, sources: [] }).sources).toEqual([]);
+  });
+
+  it("turns into the Plan the UI reads: the reading, then one pending step per title", () => {
+    const posted = SetPlan.parse(setPlan);
     const plan = Plan.parse({
-      steps: SetPlan.parse({ steps }).steps.map((title, index) => ({ index, title, status: "pending" })),
+      intent: posted.intent,
+      expectedOutputs: posted.expectedOutputs,
+      sources: posted.sources,
+      steps: posted.steps.map((title, index) => ({ index, title, status: "pending" })),
     });
+    expect(plan.intent).toBe(setPlan.intent);
     expect(plan.steps[3]).toEqual({ index: 3, title: "Report", status: "pending" });
   });
 
+  it("rejects a set_plan without intent: the plan tool has no default, the agent must say it", () => {
+    expect(SetPlan.safeParse(omit(setPlan, "intent")).success).toBe(false);
+  });
+
+  it("rejects an empty intent", () => {
+    expect(SetPlan.safeParse({ ...setPlan, intent: "" }).success).toBe(false);
+  });
+
+  it("rejects an empty expectedOutputs: the agent has to name what it will produce", () => {
+    expect(SetPlan.safeParse({ ...setPlan, expectedOutputs: [] }).success).toBe(false);
+  });
+
+  it("rejects a sources that is one string, not an array", () => {
+    expect(SetPlan.safeParse({ ...setPlan, sources: "web search" }).success).toBe(false);
+  });
+
   it("rejects an empty steps array: a plan of nothing is not a plan", () => {
-    expect(SetPlan.safeParse({ steps: [] }).success).toBe(false);
+    expect(SetPlan.safeParse({ ...setPlan, steps: [] }).success).toBe(false);
   });
 
   it("rejects an empty step title", () => {
-    expect(SetPlan.safeParse({ steps: ["Search the web", ""] }).success).toBe(false);
+    expect(SetPlan.safeParse({ ...setPlan, steps: ["Search the web", ""] }).success).toBe(false);
   });
 
   it("rejects more than 12 steps", () => {
-    expect(SetPlan.safeParse({ steps: Array.from({ length: 13 }, (_, i) => `Step ${i}`) }).success).toBe(false);
+    const thirteen = Array.from({ length: 13 }, (_, i) => `Step ${i}`);
+    expect(SetPlan.safeParse({ ...setPlan, steps: thirteen }).success).toBe(false);
   });
 });
 
 describe("UpdateStepInput", () => {
   it("accepts a step going to running, and to done with a note", () => {
     expect(UpdateStep.parse({ index: 1, status: "running" }).note).toBeUndefined();
-    expect(UpdateStep.parse({ index: 1, status: "done", note: "no results, tried RSS" }).note).toBe("no results, tried RSS");
+    expect(UpdateStep.parse({ index: 1, status: "done", note: "no results, tried RSS" }).note).toBe(
+      "no results, tried RSS",
+    );
   });
 
   it("rejects a status of in_progress: the four PlanStep statuses are the whole vocabulary", () => {
@@ -107,7 +151,9 @@ describe("AgentLimits", () => {
 
 describe("the agent stubs", () => {
   it("mapMessage answers RunEvent[] for an SDK message", () => {
-    const events = z.array(RunEvent).parse(mapMessage({ type: "assistant", message: { content: [] } }, 1, "2026-09-22T09:14:06.441Z"));
+    const events = z
+      .array(RunEvent)
+      .parse(mapMessage({ type: "assistant", message: { content: [] } }, 1, "2026-09-22T09:14:06.441Z"));
     expect(events).toEqual([]); // STUB: the engine package maps the message kinds
   });
 
