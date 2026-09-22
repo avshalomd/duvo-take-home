@@ -177,12 +177,38 @@ function connectionCheck(input: EvaluateInput, ok: Push) {
   if (!named || tools.length === 0) return; // no claim, or no tool names recorded: no evidence either way
   const prefix = `mcp__${named.toLowerCase()}`;
   const used = tools.filter((t) => t.toLowerCase().startsWith(prefix));
+
+  // Q61: "use the connected DeepWiki server if it helps, otherwise search the web" leaves the route to the run, so
+  // a web-only answer is not a broken promise. The check is recorded either way - it is evidence a reader wants -
+  // but it only fails when the instructions made the connection the required route.
+  if (!connectionRequired(input.prompt, named)) {
+    ok(
+      "connection_used",
+      `The ${named} connection was offered`,
+      true,
+      used.length ? `connection mentioned, not required; used anyway: ${used.join(", ")}` : `connection mentioned, not required; tools used: ${tools.join(", ")}`,
+    );
+    return;
+  }
   ok(
     "connection_used",
     `The ${named} connection was used`,
     used.length > 0,
     used.length ? used.join(", ") : `no ${prefix}__ tool call; tools used: ${tools.join(", ")}`,
   );
+}
+
+// A requirement reads "must", "only", or "using/through/with the connected X"; an offer softens it in the same
+// breath ("if it helps", "optionally", "or search the web"). Both are read in the sentence that names the
+// connection, because a softener two sentences away is qualifying something else.
+const REQUIRES = /\b(?:must|only)\b|\b(?:use|using|used|through|via|with)\s+(?:the\s+)?connected\b/i;
+const OPTIONAL = /\b(?:if it helps|if useful|if available|if possible|if you (?:can|like|want)|optionally|where possible|you may|feel free|otherwise)\b|\bor\s+(?:search|use|fetch|look|fall back|the web)\b/i;
+
+/** Whether the instructions make the connection the required route, rather than one option among others. */
+export function connectionRequired(prompt: string, named: string): boolean {
+  const sentence = prompt.split(/(?<=[.!?])\s+/).find((s) => new RegExp(`\\b${named}\\b`, "i").test(s)) ?? prompt;
+  if (OPTIONAL.test(sentence)) return false;
+  return REQUIRES.test(sentence);
 }
 
 /** The connection the instructions say to use, as its slug: "the connected DeepWiki server" -> "deepwiki". */
