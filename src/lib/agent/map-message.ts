@@ -96,3 +96,6 @@ export function createMapper(): MapMessage {
     return []; // stream_event and anything a later SDK version adds
   };
 }
+
+/** The contract's MapMessage for a single message on its own; the run loop uses createMapper() to keep the plan. */
+export const mapMessage: MapMessage = (message, seq, at) => createMapper()(message, seq, at);
