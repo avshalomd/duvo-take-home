@@ -32,10 +32,12 @@ export function RunsList({ runs, selectedId }: { runs: Run[]; selectedId?: strin
                 )}
               >
                 <div className="flex items-center gap-2">
-                  {/* the same words as the panel's outcome: the list and the run must never disagree */}
-                  <StatusDot tone={outcome(run.status, null).tone} />
-                  <span className="text-xs font-medium">{outcome(run.status, null).label}</span>
-                  <TimeAgo iso={run.createdAt} className="ml-auto text-[11px] text-muted-foreground" />
+                  {/* the same function the panel calls, on Run.outcome: the list and the run can never disagree */}
+                  <StatusDot tone={outcome(run.status, run.outcome ?? null).tone} />
+                  <span data-testid="row-outcome" className="truncate text-xs font-medium">
+                    {outcome(run.status, run.outcome ?? null).label}
+                  </span>
+                  <TimeAgo iso={run.createdAt} className="ml-auto shrink-0 text-[11px] text-muted-foreground" />
                 </div>
                 <p className="mt-1 truncate text-sm">{run.prompt}</p>
                 {run.finishedAt && (

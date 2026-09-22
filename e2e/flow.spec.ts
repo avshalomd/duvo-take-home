@@ -51,8 +51,14 @@ test("each run in the list carries its status and how long ago it ran", async ({
   await page.goto("/");
   const first = page.getByTestId("runs").getByRole("link").first();
   await expect(first).toContainText(/ago|just now/);
+  // the row says exactly what the panel says, verdict included: never a bare "Done" on a run that did not pass
+  await expect(first).toContainText(/Done - looks good|Done, with notes|Done, but the result did not pass|Done - not checked|Done|Working on it|Getting ready|Checking the result|Something went wrong/);
   await first.click();
   await expect(first).toHaveAttribute("aria-current", "true"); // the open run stays marked in the list
+
+  // the list and the panel must not disagree about how a run turned out
+  const rowWords = await first.getByTestId("row-outcome").textContent();
+  await expect(page.getByTestId("run-panel").getByTestId("outcome")).toHaveText(rowWords!);
 });
 
 test("a run is named by its instructions and says how it turned out in plain words", async ({ page }) => {
@@ -120,12 +126,14 @@ test.describe("on a phone", () => {
   test("nothing floats over the panel's own content", async ({ page }) => {
     await page.goto("/");
     // "What it produced" is in every panel whatever the run did, so this does not depend on which run is newest
-    const produced = page.getByTestId("produced");
-    await expect(produced).toBeVisible();
-    const box = await produced.boundingBox();
+    // the section's heading, not the section: a tall section can start above the viewport, where elementFromPoint is null
+    const heading = page.getByTestId("produced").getByRole("heading", { name: /what it produced/i });
+    await expect(heading).toBeVisible();
+    await heading.scrollIntoViewIfNeeded();
+    const box = await heading.boundingBox();
     const onTop = await page.evaluate(
       (p) => document.elementFromPoint(p.x, p.y)?.closest("[data-testid]")?.getAttribute("data-testid") ?? "",
-      { x: box!.x + 10, y: box!.y + 10 },
+      { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 },
     );
     expect(onTop).toBe("produced");
   });
