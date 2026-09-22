@@ -19,6 +19,8 @@ export function runChecks(input: EvaluateInput): Check[] {
     input.runStatus === "succeeded" ? "succeeded" : `run status ${input.runStatus} - ${oneLine(input.report ?? "no report")}`,
   );
 
+  connectionCheck(input, ok);
+
   if (asksForFile(input.prompt)) {
     ok("file_expected", "A file was written", input.files.length > 0, input.files.length ? names(input.files) : "no file was written");
   }
@@ -107,6 +109,31 @@ function freshnessCheck(header: string[], data: string[][], input: EvaluateInput
     stale.length * 2 <= dated.length,
     stale.length ? `${stale.length} of ${dated.length} rows are older than ${days} days (oldest ${oldest})` : `${dated.length} rows, oldest ${oldest}`,
   );
+}
+
+// "Use the connected X server" is a promise about HOW the work is done, and the tool names are the evidence: a
+// connection's tools are all called mcp__<slug>__*. Checked in code because the model's word is exactly what is
+// in doubt - a plausible file written from memory looks the same as one read through the connection.
+function connectionCheck(input: EvaluateInput, ok: Push) {
+  const named = connectionNamed(input.prompt);
+  const tools = input.toolsUsed ?? [];
+  if (!named || tools.length === 0) return; // no claim, or no tool names recorded: no evidence either way
+  const prefix = `mcp__${named.toLowerCase()}`;
+  const used = tools.filter((t) => t.toLowerCase().startsWith(prefix));
+  ok(
+    "connection_used",
+    `The ${named} connection was used`,
+    used.length > 0,
+    used.length ? used.join(", ") : `no ${prefix}__ tool call; tools used: ${tools.join(", ")}`,
+  );
+}
+
+/** The connection the instructions say to use, as its slug: "the connected DeepWiki server" -> "deepwiki". */
+export function connectionNamed(prompt: string): string | null {
+  const m =
+    prompt.match(/\bconnected\s+([A-Za-z][A-Za-z0-9_-]*)\s+(?:server|connection|mcp)/i) ??
+    prompt.match(/\b(?:via|through|using)\s+the\s+([A-Za-z][A-Za-z0-9_-]*)\s+(?:server|connection|mcp)/i);
+  return m ? m[1] : null;
 }
 
 /** A file is expected when the instructions ask for one in so many words; a question-only run owes no file. */

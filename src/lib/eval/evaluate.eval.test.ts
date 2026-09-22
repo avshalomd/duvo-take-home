@@ -33,7 +33,6 @@ function toInput(c: Case): EvaluateInput {
   const report = [
     c.input.run_error ? `Run ended: ${c.input.run_error}` : a ? `Wrote ${a.name}.` : "Nothing was written.",
     c.input.last_tool_error ? `Last tool error: ${c.input.last_tool_error}` : "",
-    c.input.tools_used?.length ? `Tools used: ${c.input.tools_used.join(", ")}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -44,6 +43,7 @@ function toInput(c: Case): EvaluateInput {
     plan: null, // the fixtures carry no plan: the judge sees the instructions, the report and the file
     files: a ? [{ name: a.name, content }] : [],
     today: c.input.today,
+    toolsUsed: c.input.tools_used ?? [], // the evidence for "the connection was claimed but never called"
   };
 }
 
@@ -58,7 +58,7 @@ describe.skipIf(process.env.EVAL !== "1")("evaluateRun over the labelled cases",
       let note = "";
       try {
         verdict = await evaluateRun(toInput(c));
-        note = [verdict.reasons[0] ?? "", verdict.judgment ? `aQ=${verdict.judgment.answeredQuery} fP=${verdict.judgment.followedPlan}` : ""]
+        note = [verdict.judgment ? `aQ=${verdict.judgment.answeredQuery} fP=${verdict.judgment.followedPlan}` : "", verdict.reasons[0] ?? ""]
           .filter(Boolean)
           .join(" - ");
       } catch (e) {
