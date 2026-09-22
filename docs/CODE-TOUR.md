@@ -55,3 +55,12 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/llm/decide.ts` - honours `AI_SIMULATE_DOWN` like `getModel()`, so QA can walk "judge unavailable".
 - `src/components/automations/run-panel.tsx`, `plan-stepper.tsx`, `details-section.tsx` (UX, C6) - the glance view for office workers: the instruction as the title, the outcome in a sentence, the plan as an animated stepper with a progress bar; everything technical (timeline, state grid, judgment, ids, model) under a Details toggle. Pure display rules live in `console.ts`-style helpers with their own tests.
 - `src/components/automations/` (UX, round 2) - `run-panel.tsx` no longer clips or floats its header (Q38); `overview.tsx`-style blocks say what the run produced (file cards, the report rendered from `markdown.ts`) and how it turned out in plain words; `status-words.ts` gives the runs list and the panel one vocabulary (Done, Done with notes, Something went wrong, Working...); the Details toggle holds the timeline, the state grid, the judgment sentence, the raw error and the ids. `Run.outcome` (the verdict's headline) exists so the list can agree with the panel without loading every verdict.
+
+## Round 4 - after the deep QA (docs/QA.md, Q46-Q79)
+
+- `src/lib/runs/limits.ts`, `rate-limit.ts`, `client-ip.ts` - the cap on runs in flight (3) and the per-address bucket (5 per 10 min) live inside `startRun`, so the form and the POST route cannot drift; the cap is checked before the bucket so a refused visitor keeps their tokens. Per server instance: real protection is authentication (roadmap).
+- `src/lib/runs/download-headers.ts` - the download name goes out as an ascii fallback plus RFC 5987 `filename*`, with `X-Content-Type-Options: nosniff`; the route no longer double-decodes the segment.
+- `src/lib/agent/workspace.ts`, `unknown-verdict.ts` - the run directory is removed in the finally; an evaluator crash stores an `unknown` verdict with its reason instead of null.
+- `src/lib/eval/checks.ts` - strict field counts (a ragged row fails `parses` by row number), a `urls` check on the url column, skip counts in the details, and `connectionRequired()` that reads the sentence naming a connection to tell a route from an offer.
+- `src/contracts/connection.ts` - `publicHttpUrl`: http(s) only, no loopback, link-local or private hosts, because the SDK child fetches the URL server-side.
+- `.claude/scripts/qa-env.mjs`, `npm run qa:dev` - the app against the separate QA database, so QA never writes to production again.
