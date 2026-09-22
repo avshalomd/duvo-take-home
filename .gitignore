@@ -46,5 +46,5 @@ next-env.d.ts
 test-results
 playwright-report
 
-# agent working directories, one per run
-runs/
+# agent working directories, one per run (anchored: bare `runs/` also ignored src/lib/runs)
+/runs/
