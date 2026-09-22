@@ -13,9 +13,17 @@ export const Connection = z.object({
 });
 export type Connection = z.infer<typeof Connection>;
 
+// Only a public http(s) host: the SDK child fetches this URL server-side, so loopback, link-local and private
+// ranges would turn a connection into a request into our own network (QA round 3, Q46).
+const PRIVATE_HOST = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|metadata\.google)/i;
+export const publicHttpUrl = z
+  .url("Give the server's full address, starting with https://")
+  .refine((u) => /^https?:\/\//i.test(u), "Only http:// or https:// addresses can be connected")
+  .refine((u) => { try { return !PRIVATE_HOST.test(new URL(u).hostname); } catch { return false; } }, "That address points at a private or local network, which a connection cannot reach");
+
 export const NewConnection = z.object({
-  name: z.string().trim().min(1, "Name it").max(40).regex(/^[A-Za-z0-9 _-]+$/, "Letters, digits, space, - and _"), // becomes the mcp__<key>__ prefix
-  url: z.url("A full http(s) URL"),
+  name: z.string().trim().min(1, "Give the server a name").max(40, "Keep the name under 40 characters").regex(/^[A-Za-z0-9 _-]+$/, "Use letters, digits, spaces, - and _ only"), // becomes the mcp__<key>__ prefix
+  url: publicHttpUrl,
   transport: Transport.default("http"),
   token: z.string().trim().optional(), // sent as Authorization: Bearer <token>
 });

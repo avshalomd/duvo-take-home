@@ -65,18 +65,26 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | Q44 | qa-ux | add-a-server errors are fragments; focus stays on body after a failed submit | full sentences, focus the first bad field | minor | ui | fixed (UX, merged 22efdf4) |
 | Q45 | qa-func | `/api/runs/<36 dashes>` returned 500: the id guard accepted any 36 hex-or-dash characters | a strict uuid shape, 404 otherwise | minor | engine | fixed |
 
+## The QA database (from round 4 on)
+
+Production is in the reviewer's hands, so QA never writes to it again. A separate Neon project `duvo-qa` (free
+plan, fra1) is connected to the Vercel project's development environment only, under the `QA_` prefix.
+`vercel env pull .env.qa --environment=development` fetches its URL (the file is ignored);
+`node .claude/scripts/qa-env.mjs <cmd>` runs any command with `DATABASE_URL` swapped for it: `npm run qa:dev`
+(the app on :3010 against the QA database), `npm run qa:seed`, `npm run qa:sql -- "<statement>"`.
+
 ## Round 3 (deep QA on the live URL): bug log
 
 | id | source | observed | expected | severity | owner | status |
 |---|---|---|---|---|---|---|
-| Q46 | qa-edge | `NewConnection.url` accepts any scheme and host (`javascript:`, `file:`, `http://localhost:3000`, `http://169.254.169.254/...`); the SDK child fetches it server-side | only http(s), no loopback/link-local/private hosts, readable error | major | main (contracts) | open |
+| Q46 | qa-edge | `NewConnection.url` accepts any scheme and host (`javascript:`, `file:`, `http://localhost:3000`, `http://169.254.169.254/...`); the SDK child fetches it server-side | only http(s), no loopback/link-local/private hosts, readable error | major | main (contracts) | fixed (publicHttpUrl in the contract) |
 | Q47 | qa-edge | no rate limit on run creation: 10 runs in 10 min from one client, each up to $1 | a per-IP/per-window cap on starting runs | major | engine | open |
 | Q48 | qa-edge | no authentication: any visitor reads every run, report and file and starts runs | known for a single-user demo; on the roadmap (1e) | minor | main | open (roadmap) |
 | Q49 | qa-edge | on the injection prompt the agent called no tool at all, so the run closed with no plan (the judge failed it) | the plan tool is called before the agent decides anything, even to refuse | minor | engine | open |
 | Q50 | qa-edge | the markdown link regex stops at the first `)`: `[x](javascript:alert(1))` leaves a stray `)` | the whole link consumed (React already neutralises the javascript: href) | minor | ui | open |
 | Q51 | qa-edge | a file named `a"b.csv` is served as `filename="ab.csv"` while the UI shows the original name | the same name, or RFC 5987 `filename*` | minor | engine | open |
 | Q52 | qa-edge | a new connection is created enabled while the toast says "switch it on to give it to the next run" | the toast and the state agree | minor | ui | open |
-| Q53 | qa-edge | raw Zod wording in the UI: "Too big: expected string to have <=40 characters" | the app's own voice | minor | main (contracts) | open |
+| Q53 | qa-edge | raw Zod wording in the UI: "Too big: expected string to have <=40 characters" | the app's own voice | minor | main (contracts) | fixed (messages in the contracts) |
 | Q54 | reviewer | (same as Q47) startRun has no global cap; both callers are anonymous | refuse a start while 3 runs are in flight, plus a per-IP token bucket or a shared secret in both callers | major | engine | open |
 | Q55 | reviewer | the form's Server Action runs the loop in the page's function, which exports no `maxDuration`; 240 s wall clock + judge + review can pass Vercel's 300 s, killing a run mid-evaluation ("evaluating" for ever) | `export const maxDuration = 300` on page.tsx; wall clock ~180 s so the whole tail fits | minor | main (page) | open |
 | Q56 | reviewer | the download route decodes an already-decoded name: `100%25.csv` answers 500, `a b.csv` never matches; non-Latin-1 names throw; no `X-Content-Type-Options` | drop the decode; `filename` ascii fallback + `filename*`; nosniff | minor | engine | open |
@@ -101,5 +109,5 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | Q75 | qa-ux | at 390 px the primary controls are under 40 px tall (Run 28, Download 26, switches 18) | 40 px minimum at mobile width | minor | ui | open |
 | Q76 | qa-ux | at 390 px with a run open the instructions box is ~1000 px below the fold | a "New run" affordance in the header on small screens | minor | ui | open |
 | Q77 | qa-func | the evaluator passed a CSV with a ragged row: an unquoted comma shifted the cells, `parses` accepted it (`relax_column_count`), `duplicates` counted "WION" as a URL, `freshness` silently dropped the row | a ragged row fails `parses` (or is named); freshness and duplicates report the rows they skipped | major | eval | open |
-| Q78 | qa-func | "Too big: expected string to have <=4000 characters" - raw Zod wording on the instruction field | one sentence in the app's voice | minor | main (contracts) | open |
+| Q78 | qa-func | "Too big: expected string to have <=4000 characters" - raw Zod wording on the instruction field | one sentence in the app's voice | minor | main (contracts) | fixed (messages in the contracts) |
 | Q79 | qa-func | the runs list row stays "Working on it" until a reload while the panel beside it already says "Done" | the row follows the run (poll refreshes the list, or router.refresh on terminal) | minor | ui | open |
