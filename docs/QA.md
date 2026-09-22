@@ -14,3 +14,10 @@ No open blocker.
 
 The midway deploy (T+44) passed the smoke test (health, home page). The last deploy carries the merged page; a live
 run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour.
+
+## Round 2 (after the hour): bug log
+
+| id | source | observed | expected | severity | owner | status |
+|---|---|---|---|---|---|---|
+| Q1 | him | a run on the live URL stayed "queued" with no events | it runs, or fails with its reason | blocker | main | fixed (f706368: run dir under the temp dir on Vercel, early failures close the run) |
+| Q2 | him | a run on the live URL failed: "Native CLI binary for linux-x64 not found" | the agent spawns on Vercel | blocker | main | re-check (670ebfc: the linux-x64 package traced into the functions) |
