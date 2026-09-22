@@ -55,6 +55,14 @@ test("a failed run shows why it stopped and offers Run again", async ({ page }) 
   await expect(panel.getByRole("button", { name: /run again/i })).toBeVisible();
 });
 
+// Only the validation path is exercised here: a valid submit would start a real agent run on the shared database.
+test("instructions that say nothing are refused before any run is started", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("textbox", { name: /instructions/i }).fill("do it");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.getByText(/say what the agent should do/i)).toBeVisible();
+});
+
 test("re-evaluating reports the evaluator's own failure instead of crashing the page", async ({ page }) => {
   await page.goto(`/?run=${FIXTURE_RUN}`);
   await page.getByRole("button", { name: /re-evaluate/i }).click();
