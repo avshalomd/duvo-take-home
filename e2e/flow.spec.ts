@@ -51,8 +51,14 @@ test("each run in the list carries its status and how long ago it ran", async ({
   await page.goto("/");
   const first = page.getByTestId("runs").getByRole("link").first();
   await expect(first).toContainText(/ago|just now/);
+  // the row says exactly what the panel says, verdict included: never a bare "Done" on a run that did not pass
+  await expect(first).toContainText(/Done - looks good|Done, with notes|Done, but the result did not pass|Done - not checked|Done|Working on it|Getting ready|Checking the result|Something went wrong/);
   await first.click();
   await expect(first).toHaveAttribute("aria-current", "true"); // the open run stays marked in the list
+
+  // the list and the panel must not disagree about how a run turned out
+  const rowWords = await first.getByTestId("row-outcome").textContent();
+  await expect(page.getByTestId("run-panel").getByTestId("outcome")).toHaveText(rowWords!);
 });
 
 test("a run is named by its instructions and says how it turned out in plain words", async ({ page }) => {

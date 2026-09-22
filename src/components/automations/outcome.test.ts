@@ -22,4 +22,9 @@ describe("outcome", () => {
   it("a run that broke reads as a problem whatever the judge said", () => {
     expect(outcome("failed", "pass")).toEqual({ label: "Something went wrong", tone: "bad" });
   });
+
+  // the run rows call outcome() with Run.outcome, which is optional on the contract and absent on old rows
+  it("treats a missing verdict field as 'not judged', never as a pass", () => {
+    expect(outcome("succeeded", undefined)).toEqual({ label: "Done", tone: "ok" });
+  });
 });
