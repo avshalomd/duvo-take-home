@@ -62,6 +62,7 @@ export async function addConnectionAction(_prev: FormState, formData: FormData):
   const values = {
     name: String(formData.get("name") ?? ""),
     url: String(formData.get("url") ?? ""),
+    transport: String(formData.get("transport") ?? "http"),
     token: String(formData.get("token") ?? ""),
   };
   const parsed = NewConnection.safeParse({ ...values, token: values.token || undefined });

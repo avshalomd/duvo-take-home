@@ -1,4 +1,4 @@
-import { AddConnectionForm } from "@/components/automations/add-connection-form";
+import { AppHeader } from "@/components/automations/app-header";
 import { ConnectionsList } from "@/components/automations/connections-list";
 import { InstructionsForm } from "@/components/automations/instructions-form";
 import { RunPanel } from "@/components/automations/run-panel";
@@ -17,34 +17,34 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const data = selectedId ? await getRun(selectedId) : null;
   // deriveState is pure, so the panel's state card is computed on every render rather than stored and stale
   const view: RunView | null = data ? { ...data, state: deriveState(data.run, data.events) } : null;
+  const live = runs.filter((r) => r.status === "running" || r.status === "queued" || r.status === "evaluating").length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
-      <div className="space-y-6">
-        <section className="rounded-xl border bg-background p-4">
-          <h1 className="mb-3 text-lg font-semibold">Automations</h1>
+    <>
+      <AppHeader liveCount={live} />
+      {/* one column under 900px, and there the panel comes first: after pressing Run, the run is what you want to see */}
+      <main className="mx-auto grid w-full max-w-[100rem] flex-1 grid-cols-1 gap-4 px-4 py-4 min-[900px]:grid-cols-[21rem_minmax(0,1fr)] min-[900px]:gap-5">
+        <div className="min-w-0 space-y-4">
           <InstructionsForm />
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">Connections</h2>
           <ConnectionsList connections={connections} />
-          <AddConnectionForm />
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">Runs</h2>
           <RunsList runs={runs} selectedId={selectedId} />
-        </section>
-      </div>
-
-      {view ? (
-        <RunPanel view={view} connections={connections} />
-      ) : (
-        <div className="flex items-center justify-center rounded-xl border bg-background p-10 text-sm text-muted-foreground">
-          {selectedId ? "That run was not found." : "No run selected - write instructions and press Run."}
         </div>
-      )}
+
+        <div className="order-first min-w-0 min-[900px]:order-none">
+          {view ? <RunPanel view={view} connections={connections} /> : <NoRun notFound={Boolean(selectedId)} />}
+        </div>
+      </main>
+    </>
+  );
+}
+
+function NoRun({ notFound }: { notFound: boolean }) {
+  return (
+    <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-1 rounded-xl border border-dashed bg-background p-10 text-center">
+      <p className="text-sm font-medium">{notFound ? "That run was not found." : "Pick a run or start one"}</p>
+      <p className="text-xs text-muted-foreground">
+        {notFound ? "It may have been deleted." : "Write the task on the left and press Run - the agent plans first."}
+      </p>
     </div>
   );
 }

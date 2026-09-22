@@ -120,7 +120,7 @@ token), `ListConnections`, `SetConnectionEnabled`, `AddConnection`, `ListEnabled
 
 ## Look
 
-Dense and quiet: zinc neutrals, one accent (emerald) for Run and pass, red only for failures; shadcn Card, Badge,
+(Revised in round 2, his call C6: the glance view is for everyday office workers - the plan's progress as an animated stepper, the files and the outcome in plain words; everything technical under a Details view.) Originally: dense and quiet: zinc neutrals, one accent (emerald) for Run and pass, red only for failures; shadcn Card, Badge,
 Button, Textarea, Input, Separator, Skeleton, Switch (added in WP0); monospace for tool inputs.
 
 ## Risks

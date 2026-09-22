@@ -90,6 +90,8 @@ const DEFAULT_TIMEOUT_MS = 10_000; // per route. Short on purpose: three routes 
  * second call is justified only when an earlier answer changes what you must fetch or ask next.
  */
 export async function decide<const Qs extends Record<string, Question>>(args: DecideArgs<Qs>): Promise<DecideResult<Qs>> {
+  // The same switch as getModel(): QA walks the "judge unavailable" path with AI_SIMULATE_DOWN=1.
+  if (process.env.AI_SIMULATE_DOWN === "1") throw new LlmError("decision model unavailable (AI_SIMULATE_DOWN=1)", "unavailable");
   const routes = args.route ? [args.route] : routesFor(args.model);
   if (routes.length === 0) throw notConfigured();
   // Failover: the same question, the same model, the next provider. The FIRST failure is the one reported, as in
