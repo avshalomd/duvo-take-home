@@ -15,7 +15,7 @@ export const listRuns: ListRuns = async () => runsFixture.map(toRun); // STUB
 export const getRun: GetRun = async (id) => { // STUB
   const r = runsFixture.find((x) => x.id === id);
   if (!r) return null;
-  return { run: toRun(r), events: r.events as RunEvent[], files: r.artifacts.map((a) => ({ name: a.name, mime: a.mime, bytes: a.bytes })) };
+  return { run: toRun(r), events: r.events as RunEvent[], files: r.artifacts.map((a) => ({ name: a.name, mime: a.mime, bytes: a.bytes })), verdict: null };
 };
 export const getFile: GetFile = async (runId, name) => { // STUB
   const r = runsFixture.find((x) => x.id === runId);
