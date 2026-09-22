@@ -22,12 +22,16 @@ function resultText(content: unknown): string {
  */
 export function createMapper(): MapMessage {
   let plan: Plan | null = null;
+  let turn = 0; // an assistant message is a turn, which is what the SDK's num_turns and maxTurns count
   const planCallIds = new Set<string>();
 
   return (message: unknown, seq: number, at: string): RunEvent[] => {
     const m = rec(message);
+    if (m.type === "assistant") turn += 1;
     const events: RunEvent[] = [];
-    const push = (e: Omit<RunEvent, "seq" | "at">) => events.push({ ...e, seq: seq + events.length, at } as RunEvent);
+    // Every event carries the turn it happened in, so the state card can show "turn 3 of 25" in the SDK's own terms.
+    const push = (e: Omit<RunEvent, "seq" | "at">) =>
+      events.push({ ...e, payload: { ...e.payload, turn }, seq: seq + events.length, at } as RunEvent);
 
     if (m.type === "system") {
       if (m.subtype !== "init") return []; // thinking_tokens, post_turn_summary and friends are noise
@@ -87,7 +91,9 @@ export function createMapper(): MapMessage {
           num_turns: num(m.num_turns),
           duration_ms: num(m.duration_ms),
           total_cost_usd: num(m.total_cost_usd),
-          result: str(m.result),
+          // An error result carries `errors: string[]` and no `result`: without this the provider's own words -
+          // "API Error 429: rate limit exceeded" - are lost and the run shows a bare subtype.
+          result: str(m.result) || (Array.isArray(m.errors) ? m.errors.map((e) => str(e, JSON.stringify(e))).join("; ") : ""),
         },
       });
       return events;

@@ -65,6 +65,28 @@ describe("runChecks", () => {
     expect(check(checks, "duplicates")?.detail).toMatch(/2 distinct/);
   });
 
+  // Q9: a row with no URL has no identity to duplicate. It used to be dropped from the distinct set but still
+  // counted in the total, so a single URL-less row failed a file in which nothing was repeated.
+  it("passes 'duplicates' when one row has no URL and no row is actually repeated", () => {
+    const oneBlank =
+      "title,source,url,published_at,summary\n" +
+      '"A ships X",Anthropic,https://a.example/1,2026-09-21,"One"\n' +
+      '"B raises money",Bloomberg,,2026-09-18,"Two"\n' +
+      '"C opens up",Reuters,https://c.example/3,2026-09-19,"Three"\n';
+    const checks = runChecks(input({ files: csv(oneBlank) }));
+    expect(failedIds(checks)).not.toContain("duplicates");
+  });
+
+  it("still fails 'duplicates' when two rows share a URL and a third has none", () => {
+    const blankAndPadded =
+      "title,source,url,published_at,summary\n" +
+      '"MCP joins the LF",InfoWorld,https://iw.example/mcp,2026-09-17,"One"\n' +
+      '"MCP goes to the LF",InfoWorld,https://iw.example/mcp,2026-09-17,"Two"\n' +
+      '"Mistral raises",Bloomberg,,2026-09-18,"Three"\n';
+    const checks = runChecks(input({ files: csv(blankAndPadded) }));
+    expect(failedIds(checks)).toContain("duplicates");
+  });
+
   it("fails 'columns' when the header misses the columns the instructions named", () => {
     const wrong = "headline,link,blurb\n" + '"A ships X",https://a.example/1,"Structured output"\n';
     const checks = runChecks(input({ files: csv(wrong) }));

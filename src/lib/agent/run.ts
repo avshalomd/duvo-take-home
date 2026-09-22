@@ -12,8 +12,10 @@ import { evaluateRun } from "@/lib/eval/evaluate";
 import { listEnabledConnectionsWithSecrets } from "@/lib/connections/store";
 import { connectionKey } from "@/lib/connections/key";
 import { statusUpdates } from "./connection-status";
+import { startDeadline } from "./deadline";
+import { pathGuard } from "./guard";
 import { createMapper } from "./map-message";
-import { planServer } from "./plan-tool";
+import { createPlanServer } from "./plan-tool";
 import { SYSTEM_PROMPT } from "./system.prompt";
 
 export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
@@ -92,6 +94,12 @@ export const runAutomation: RunAutomation = async (runId) => {
     }
   };
 
+  // The wall clock the SDK does not keep: turns and budget cannot stop a tool that simply hangs.
+  const deadline = startDeadline(AgentLimits.wallClockMs);
+  const guard = pathGuard(dir);
+
+  // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
+  // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
   try {
     const q = query({
       prompt: run.prompt,
@@ -100,54 +108,70 @@ export const runAutomation: RunAutomation = async (runId) => {
         settingSources: [], // never load this repo's or the user's settings into the child (hooks, CLAUDE.md)
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
+        abortController: deadline.controller,
+        tools: NATIVE_TOOLS, // the child's built-in tool set; MCP tools are added by mcpServers and are not in it
         allowedTools: [...NATIVE_TOOLS, "mcp__plan__*", ...Object.keys(servers).map((k) => `mcp__${k}__*`)],
         disallowedTools: ["Bash", "Edit", "Task", "Glob", "Grep", "NotebookEdit"], // allowedTools approves, only this restricts
+        // Permissions are bypassed, so this hook is the only thing stopping a fetched page from talking the agent
+        // into reading .env.local or ~/.ssh and writing it into an output we then serve.
+        hooks: {
+          PreToolUse: [{ matcher: "Read|Write|Edit|Glob|Grep|NotebookEdit", hooks: [async (input) => guard(input as { tool_name: string; tool_input: unknown })] }],
+        },
         maxTurns: AgentLimits.maxTurns,
         maxBudgetUsd: AgentLimits.maxBudgetUsd,
         model: AGENT_MODEL,
         systemPrompt: SYSTEM_PROMPT, // a plain string replaces Claude Code's large preset prompt
-        mcpServers: { plan: planServer, ...servers },
+        mcpServers: { plan: createPlanServer(), ...servers }, // one plan server per run: a shared one connects once
         env: { ...process.env }, // env REPLACES the child's environment: without the spread it has no API key
       },
     });
 
     for await (const message of q) await record(map(message, seq, new Date().toISOString()));
+    deadline.clear(); // the stream is done; nothing left to abort
+
+    const written = await collectFiles(dir);
+    if (written.length) await db.insert(filesTable).values(written.map((f) => ({ runId, ...f })));
+
+    const end = recorded.find((e) => e.kind === "finished")?.payload;
+    // No result message means the child died mid-stream. That is a failure, not a success with no report.
+    if (!end) throw new Error("the agent ended without a result");
+    const plan = (recorded.filter((e) => e.kind === "plan").at(-1)?.payload ?? null) as Plan | null;
+    await db
+      .update(runs)
+      .set({
+        status: "evaluating", // visible while the judge runs: the run is done but the verdict is not
+        report: end.result || null,
+        error: end.is_error ? end.result || end.subtype : null, // the provider's words when the SDK sent any
+        numTurns: end.num_turns,
+        durationMs: end.duration_ms,
+        costUsd: end.total_cost_usd,
+      })
+      .where(eq(runs.id, runId));
+
+    const verdict = await evaluateRun({
+      prompt: run.prompt,
+      runStatus: end.is_error ? "failed" : "succeeded",
+      report: end.result || null,
+      plan,
+      files: written.map((f) => ({ name: f.name, content: f.content })),
+      today: new Date().toISOString().slice(0, 10),
+      // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
+      toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
+    }).catch(() => null); // an evaluator failure must not lose the run the agent already did
+
+    await db
+      .update(runs)
+      .set({ status: end.is_error ? "failed" : "succeeded", verdict, finishedAt: new Date() })
+      .where(eq(runs.id, runId));
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
+    // An abort reads as a generic "aborted" error, so say which limit ended the run.
+    const error = deadline.expired()
+      ? `timed out after ${Math.round(AgentLimits.wallClockMs / 1000)} s`
+      : err instanceof Error
+        ? err.message
+        : String(err);
     await db.update(runs).set({ status: "failed", error, finishedAt: new Date() }).where(eq(runs.id, runId));
-    return;
+  } finally {
+    deadline.clear();
   }
-
-  const written = await collectFiles(dir);
-  if (written.length) await db.insert(filesTable).values(written.map((f) => ({ runId, ...f })));
-
-  const end = recorded.find((e) => e.kind === "finished")?.payload;
-  const plan = (recorded.filter((e) => e.kind === "plan").at(-1)?.payload ?? null) as Plan | null;
-  await db
-    .update(runs)
-    .set({
-      status: "evaluating", // visible while the judge runs: the run is done but the verdict is not
-      report: end?.result ?? null,
-      error: end?.is_error ? end.result || end.subtype : null,
-      numTurns: end?.num_turns ?? null,
-      durationMs: end?.duration_ms ?? null,
-      costUsd: end?.total_cost_usd ?? null,
-    })
-    .where(eq(runs.id, runId));
-
-  const verdict = await evaluateRun({
-    prompt: run.prompt,
-    runStatus: end?.is_error ? "failed" : "succeeded",
-    report: end?.result ?? null,
-    plan,
-    files: written.map((f) => ({ name: f.name, content: f.content })),
-    today: new Date().toISOString().slice(0, 10),
-    // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
-    toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
-  }).catch(() => null); // an evaluator failure must not lose the run the agent already did
-
-  await db
-    .update(runs)
-    .set({ status: end?.is_error ? "failed" : "succeeded", verdict, finishedAt: new Date() })
-    .where(eq(runs.id, runId));
 };

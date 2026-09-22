@@ -137,6 +137,48 @@ describe("mapMessage", () => {
     });
   });
 
+  // Q33: the state card called every tool call a "turn", so it read 8 of 25 while the SDK's result said 3. The
+  // turn is the assistant message, so the mapper counts those and stamps the number on every event it makes.
+  it("stamps each event with the assistant turn it belongs to, counting assistant messages and not tool calls", () => {
+    const map = createMapper();
+    expect((map(init, 1, "t")[0].payload as { turn: number }).turn).toBe(0); // the init message is before any turn
+    const first = map(assistant([{ type: "tool_use", id: "t1", name: "WebSearch", input: {} }, { type: "tool_use", id: "t2", name: "WebSearch", input: {} }]), 2, "t");
+    expect(first.map((e) => (e.payload as { turn: number }).turn)).toEqual([1, 1]); // two tools, one turn
+    expect((map(userResult({ tool_use_id: "t1", content: "ok" }), 4, "t")[0].payload as { turn: number }).turn).toBe(1);
+    const second = map(assistant([{ type: "text", text: "Writing it up." }]), 5, "t");
+    expect((second[0].payload as { turn: number }).turn).toBe(2);
+  });
+
+  // Q7: the SDK's error result carries `errors: string[]` and no `result`, so the provider's own words - the only
+  // thing that tells a user why the run died - were dropped on the floor and the run showed a bare subtype.
+  it("keeps the provider's words from an error result, which arrive in errors[] and not in result", () => {
+    const events = createMapper()(
+      {
+        type: "result",
+        subtype: "error_during_execution",
+        is_error: true,
+        num_turns: 3,
+        errors: ["API Error 429: rate limit exceeded", "retry in 60s"],
+      },
+      9,
+      "t",
+    );
+    expect(events[0].payload).toMatchObject({
+      subtype: "error_during_execution",
+      is_error: true,
+      result: "API Error 429: rate limit exceeded; retry in 60s",
+    });
+  });
+
+  it("prefers the result text when the SDK sends both a result and errors", () => {
+    const events = createMapper()(
+      { type: "result", subtype: "success", is_error: false, result: "Wrote output.csv", errors: [] },
+      1,
+      "t",
+    );
+    expect((events[0].payload as { result: string }).result).toBe("Wrote output.csv");
+  });
+
   it("records nothing for a system message that is not init, or for an unknown message", () => {
     const map = createMapper();
     expect(map({ type: "system", subtype: "post_turn_summary", summary: "x" }, 1, "t")).toEqual([]);

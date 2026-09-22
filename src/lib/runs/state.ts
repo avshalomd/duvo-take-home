@@ -28,8 +28,20 @@ function summarize(input: unknown): string {
   return json === "{}" ? "" : json.slice(0, 140);
 }
 
+// The SDK's own tool lookup, run before the agent does anything: it is the harness searching, not the agent working.
+const HOST_TOOLS = ["ToolSearch"];
+
+/** The highest turn stamped on any event, or null for a run recorded before the mapper stamped them. */
+function maxTurn(events: RunEvent[]): number | null {
+  const turns = events.map((e) => (e.payload as { turn?: unknown }).turn).filter((t): t is number => typeof t === "number");
+  return turns.length ? Math.max(...turns) : null;
+}
+
 export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
-  const calls: ToolCall[] = events.filter((e) => e.kind === "tool_call").map((e) => e.payload as ToolCall);
+  const calls: ToolCall[] = events
+    .filter((e) => e.kind === "tool_call")
+    .map((e) => e.payload as ToolCall)
+    .filter((c) => !HOST_TOOLS.includes(c.name));
   const started = events.find((e) => e.kind === "started")?.payload as Started | undefined;
   const finished = events.find((e) => e.kind === "finished")?.payload as Finished | undefined;
   const plans = events.filter((e) => e.kind === "plan");
@@ -51,7 +63,9 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
 
   return {
     status: run.status,
-    turn: calls.length, // one turn per tool call: plan-tool bookkeeping is not counted (see map-message.ts)
+    // The turn the mapper stamped on the events, which is the SDK's own count; runs recorded before it was
+    // stamped have no turn on their payloads, so they fall back to counting tool calls.
+    turn: maxTurn(events) ?? calls.length,
     maxTurns: AgentLimits.maxTurns,
     plan,
     currentStep,
