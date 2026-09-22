@@ -2,6 +2,29 @@
 
 What comes after the hour, in the order it would be built. Nothing here is implemented.
 
+## In short (the list sent with the deliverable)
+
+1. Make the UX less cluttered.
+2. Keep the instructions box, the runs and the run summary on one page; move settings (connections, editable
+   skills, other configuration) into a separate settings menu.
+3. Editable skills: let the user define, externally, a complete automation, an answer format, sub-steps, or any
+   other behaviour the agent should have.
+4. Save a run as an automation: a reusable template (plan, output format, sources) the user reviews and edits,
+   then invokes with a command plus input instead of full instructions, e.g. `\audit Acme Ltd`. Still agentic:
+   the plan and the output format are predefined, the work is done by the agent with the input.
+5. Better visibility into the evaluation: what each check found, whether Jev decided on its own or delegated to
+   the LLM review, and what the review concluded and why.
+6. Authentication and guardrails: sign-in with per-user runs, connections and skills; prompt-injection defences
+   for an agent that reads the open web and connected services; output guardrails; a budget per user.
+
+The sections below carry the detail.
+
+## 0. A less cluttered UX
+
+The glance view is in; next is fewer boxes on the main page: the connections and the add-a-server form leave the
+left column for the settings menu (item 2), the runs list gets grouping by day, and the panel's Details view
+becomes a drawer so the main column stays short.
+
 ## 1. Skills: user-defined behaviour for the agent (his request, T+42)
 
 Let the user edit and add **skills** externally, without touching the code. A skill is a named document the agent

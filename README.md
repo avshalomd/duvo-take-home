@@ -5,6 +5,11 @@ files it wrote, connect it to your own data through MCP servers, and get an auto
 
 **Live:** https://duvo-take-home.vercel.app
 
+**Versions.** `v1.0.0` is exactly what existed at the end of the one-hour timed build (the git history shows how it
+got there). `v1.1.0` is after about 30 more minutes of polish and bug fixing: the glance view for non-technical
+users, live runs working on Vercel, and a hardened run loop (tool allowlist, path guard, wall clock, runs always
+closed with a reason). Everything is deployed and works end to end on the live URL.
+
 ## What it does
 
 1. **Free-text instructions.** No presets: the agent reads the instructions itself and states, through a plan
@@ -60,7 +65,7 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 
 ## Tests
 
-- Unit (`npm run check`, 282 tests): the contracts against fixtures, the SDK message mapper, the derived run state,
+- Unit (`npm run check`, 291 tests): the contracts against fixtures, the SDK message mapper, the derived run state,
   the evaluator's checks and its cascade with the model calls mocked, the UI formatting.
 - Integration (`npm run test:int`): the connections store against the real table, cleaning up after itself.
 - Evaluator accuracy (`EVAL=1 ...`): 10 of 10 labelled cases, [docs/EVAL.md](docs/EVAL.md).
@@ -75,12 +80,11 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 
 ## Not done, next
 
-- Live runs work on the deployed URL (the agent spawns inside a Vercel function; the run's working directory is
-  the function's temp dir and the SDK's Linux binary is traced into the bundle). A run is capped at 240 s of
-  wall clock, under the function's 300 s.
 - `reevaluateRun`'s database path has no integration test (the mapping and the cascade do).
-- Skills the user can define externally, per-turn evaluation, more output kinds, OAuth connections:
-  [docs/ROADMAP.md](docs/ROADMAP.md).
+- The roadmap, in the order it would be built, is in [docs/ROADMAP.md](docs/ROADMAP.md): a less cluttered UX, a
+  settings menu for connections and configuration, editable skills, saving a run as a reusable automation
+  (`\audit Acme Ltd`), visibility into how each evaluation was decided, and authentication with prompt-injection
+  guardrails.
 
 ## Evaluation results
 
