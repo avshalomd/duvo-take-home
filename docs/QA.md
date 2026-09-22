@@ -47,3 +47,12 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | Q26 | qa-ux | the product is called "App" in the header and the tab | a real name | minor | main | fixed (APP_NAME = "Automations") |
 | Q27 | qa-ux | the amber "running" badge is at 4.6:1 contrast at 10 px | amber-800 at that size | minor | ui | fixing |
 | Q28 | qa-ux | a failed run at turn 0 shows "turn 0 of 25" and an enabled Re-evaluate | the counter hidden at turn 0, Re-evaluate disabled with nothing to judge | minor | ui | fixing |
+| Q29 | qa-func | the agent's init tool list includes host tools (CronCreate, SendMessage, Workflow, ToolSearch...) beyond the four native ones | only WebSearch, WebFetch, Read, Write, mcp__plan__*, mcp__<connection>__* | major | engine | fixing (with Q5) |
+| Q30 | qa-func | three runs from before the Vercel fix stay "queued" for ever in the list | terminal status with a reason | major | main | fixed (rows closed as failed with the reason) |
+| Q31 | qa-func | AI_SIMULATE_DOWN does not reach decide(), so "judge unavailable" is unreachable in QA | the switch fails the judge too | minor | main | fixing |
+| Q32 | qa-func | the SDK's own ToolSearch call precedes the plan and is counted in Tools used | ToolSearch hidden from tools used and the timeline | minor | engine | fixing |
+| Q33 | qa-func | the state's turn counter (tool calls) disagrees with the SDK's num_turns | the turn shown is the one the cap applies to | minor | engine | fixing |
+| Q34 | qa-func | the review's reasoning is rendered twice in the verdict | once | minor | ui | fixing |
+| Q35 | qa-func | Run again and Re-evaluate active while the run is running | disabled until terminal | minor | ui | fixing |
+| Q36 | qa-func | an empty or 5-character instruction is refused with no visible message | a rendered field error | minor | ui | fixing |
+| Q37 | qa-func | a terminal run without a plan says "has not said how it read the instructions yet" | "the agent never stated a plan" on a finished run | minor | ui | fixing |
