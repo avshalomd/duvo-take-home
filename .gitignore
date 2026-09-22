@@ -48,3 +48,9 @@ playwright-report
 
 # agent working directories, one per run (anchored: bare `runs/` also ignored src/lib/runs)
 /runs/
+
+# dropped in by the Neon marketplace install, not part of the product
+.agents/
+.claude/skills/neon/
+.claude/skills/neon-postgres/
+skills-lock.json
