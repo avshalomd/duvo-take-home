@@ -75,6 +75,7 @@ None beyond the requirements; the hour went to the five steps and the evaluator 
 - Live runs on the deployed URL need `ANTHROPIC_API_KEY` on Vercel and depend on the Agent SDK spawning its
   subprocess inside a Vercel function; verified locally, not yet verified in production. Seeded runs demo every
   screen on the live URL either way.
+- A richer timeline (events grouped under their plan step, tool calls as cards) was started and not finished in time; the timeline is a flat list of events.
 - The seeded "running" fixture run never finishes (it is a fixture), so its panel keeps polling.
 - `reevaluateRun`'s database path has no integration test (the mapping and the cascade do).
 - Skills the user can define externally, per-turn evaluation, more output kinds, OAuth connections:
