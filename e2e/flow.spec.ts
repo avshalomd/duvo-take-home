@@ -11,10 +11,10 @@ test("the home page offers the instructions box, the connections with switches a
   const box = page.getByRole("textbox", { name: /instructions/i });
   await expect(box).toBeVisible();
   await expect(box).toHaveAttribute("placeholder", /latest AI news/i);
-  await expect(page.getByRole("button", { name: "Run" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible(); // exact: "Run again" lives in the panel
 
   const connections = page.getByTestId("connections");
-  await expect(connections.getByText("DeepWiki")).toBeVisible();
+  await expect(connections.getByText("DeepWiki", { exact: true })).toBeVisible();
   await expect(connections.getByRole("switch").first()).toBeVisible();
 
   const runs = page.getByTestId("runs");

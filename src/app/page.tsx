@@ -1,30 +1,50 @@
+import { ConnectionsList } from "@/components/automations/connections-list";
+import { fixtureVerdict } from "@/components/automations/fixture-verdict";
+import { InstructionsForm } from "@/components/automations/instructions-form";
+import { RunPanel } from "@/components/automations/run-panel";
+import { RunsList } from "@/components/automations/runs-list";
+import type { RunView } from "@/components/automations/types";
 import { listConnections } from "@/lib/connections/store";
 import { getRun, listRuns } from "@/lib/runs/queries";
 import { deriveState } from "@/lib/runs/state";
 
-// WP0 placeholder: fixture data through the stubs, so the seams render before the UI package lands.
-export default async function Home() {
+// One page: the left column starts a run, the right shows the run named by ?run=<id>.
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const { run: requested } = await searchParams;
   const [runs, connections] = await Promise.all([listRuns(), listConnections()]);
-  const first = runs[0] ? await getRun(runs[0].id) : null;
-  const state = first ? deriveState(first.run, first.events) : null;
+
+  const selectedId = typeof requested === "string" ? requested : runs[0]?.id;
+  const data = selectedId ? await getRun(selectedId) : null;
+  const view: RunView | null = data
+    ? { ...data, state: deriveState(data.run, data.events), verdict: fixtureVerdict(data.run.id) }
+    : null;
+
   return (
-    <main className="mx-auto max-w-5xl p-6 space-y-6">
-      <h1 className="text-xl font-semibold">Automations</h1>
-      <section>
-        <h2 className="font-medium">Connections</h2>
-        <ul className="text-sm">{connections.map((c) => <li key={c.id}>{c.name} - {c.enabled ? "on" : "off"} - {c.url}</li>)}</ul>
-      </section>
-      <section>
-        <h2 className="font-medium">Runs</h2>
-        <ul className="text-sm">{runs.map((r) => <li key={r.id}>{r.status} - {r.prompt.slice(0, 80)}</li>)}</ul>
-      </section>
-      {first && state && (
-        <section className="text-sm">
-          <h2 className="font-medium">Run {first.run.id}</h2>
-          <pre className="overflow-auto rounded bg-muted p-2 text-xs">{JSON.stringify(state, null, 2)}</pre>
-          <p>{first.events.length} events, {first.files.length} files</p>
+    <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
+      <div className="space-y-6">
+        <section className="rounded-xl border bg-background p-4">
+          <h1 className="mb-3 text-lg font-semibold">Automations</h1>
+          <InstructionsForm />
         </section>
+
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">Connections</h2>
+          <ConnectionsList connections={connections} />
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">Runs</h2>
+          <RunsList runs={runs} selectedId={selectedId} />
+        </section>
+      </div>
+
+      {view ? (
+        <RunPanel view={view} connections={connections} />
+      ) : (
+        <div className="flex items-center justify-center rounded-xl border bg-background p-10 text-sm text-muted-foreground">
+          {selectedId ? "That run was not found." : "No run selected - write instructions and press Run."}
+        </div>
       )}
-    </main>
+    </div>
   );
 }
