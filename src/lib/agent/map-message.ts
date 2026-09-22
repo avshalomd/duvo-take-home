@@ -87,7 +87,9 @@ export function createMapper(): MapMessage {
           num_turns: num(m.num_turns),
           duration_ms: num(m.duration_ms),
           total_cost_usd: num(m.total_cost_usd),
-          result: str(m.result),
+          // An error result carries `errors: string[]` and no `result`: without this the provider's own words -
+          // "API Error 429: rate limit exceeded" - are lost and the run shows a bare subtype.
+          result: str(m.result) || (Array.isArray(m.errors) ? m.errors.map((e) => str(e, JSON.stringify(e))).join("; ") : ""),
         },
       });
       return events;
