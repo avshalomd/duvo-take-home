@@ -164,3 +164,127 @@ describe("runChecks", () => {
     expect(check(checks, "completed")?.detail).toMatch(/web_search is not enabled/);
   });
 });
+
+// Q77: the evaluator passed a CSV whose last row had an unquoted comma in the title. The row had 6 fields against a
+// 5-column header, so every cell after the comma was shifted: "WION" (the source) sat in the url column and was
+// counted as a distinct URL, and the shifted date was silently dropped from the freshness check.
+describe("runChecks on a CSV with a ragged row", () => {
+  const raggedCsv =
+    "title,source,url,published_at,summary\n" +
+    '"A ships X",Anthropic,https://a.example/1,2026-09-21,"One"\n' +
+    '"B raises money",Bloomberg,https://b.example/2,2026-09-18,"Two"\n' +
+    '"C opens up",Reuters,https://c.example/3,2026-09-19,"Three"\n' +
+    '"D ships Y",TechCrunch,https://d.example/4,2026-09-20,"Four"\n' +
+    "Trump says India, US close to trade deal,WION,https://w.example/5,2026-09-20,Five\n";
+
+  it("fails 'parses' and names the row and both field counts", () => {
+    const checks = runChecks(input({ files: csv(raggedCsv) }));
+    expect(failedIds(checks)).toContain("parses");
+    expect(check(checks, "parses")?.detail).toMatch(/row 6 has 6 fields, the header has 5/);
+  });
+
+  it("keeps the shifted cells of a ragged row out of the URL set and says it skipped the row", () => {
+    const checks = runChecks(input({ files: csv(raggedCsv) }));
+    const detail = check(checks, "duplicates")?.detail ?? "";
+    expect(detail).toMatch(/4 rows, 4 distinct urls/); // the ragged row is not a fifth URL
+    expect(detail.toLowerCase()).not.toContain("wion");
+    expect(detail).toMatch(/1 skipped/);
+  });
+
+  it("says in 'freshness' how many rows it could not read", () => {
+    const checks = runChecks(input({ files: csv(raggedCsv) }));
+    expect(check(checks, "freshness")?.detail).toMatch(/1 skipped/);
+  });
+
+  it("names every ragged row when there is more than one", () => {
+    const two = raggedCsv + "Meta, Google and the rest,Reuters,https://r.example/6,2026-09-21,Six\n";
+    const checks = runChecks(input({ files: csv(two) }));
+    expect(check(checks, "parses")?.detail).toMatch(/row 6 has 6 fields, the header has 5.*1 more row/);
+  });
+});
+
+// Q77, second half: the url column is the identity the duplicate check keys on, so a cell that is not a URL is
+// named rather than compared. Fixture-shaped cases: the ragged CSV must fail, the non-URL one must be named.
+describe("runChecks on a url column that does not hold URLs", () => {
+  it("fails 'urls' and names the cells that are not links", () => {
+    const notUrls =
+      "title,source,url,published_at,summary\n" +
+      '"A ships X",Anthropic,WION,2026-09-21,"One"\n' +
+      '"B raises money",Bloomberg,Reuters,2026-09-18,"Two"\n';
+    const checks = runChecks(input({ files: csv(notUrls) }));
+    expect(failedIds(checks)).toContain("urls");
+    expect(check(checks, "urls")?.detail).toMatch(/WION/);
+  });
+
+  it("leaves a blank url cell alone: a row with no link is not a broken link", () => {
+    const oneBlank =
+      "title,source,url,published_at,summary\n" +
+      '"A ships X",Anthropic,https://a.example/1,2026-09-21,"One"\n' +
+      '"B raises money",Bloomberg,,2026-09-18,"Two"\n';
+    const checks = runChecks(input({ files: csv(oneBlank) }));
+    expect(failedIds(checks)).not.toContain("urls");
+  });
+});
+
+// Q77, third half: "the rows are from the last 7 days" is a promise about every row. A row whose date cannot be
+// read is not evidence of freshness, so it counts against the check instead of disappearing from the denominator.
+describe("runChecks freshness with dates it cannot read", () => {
+  const recent = "Latest AI news to a CSV. Last 7 days only.";
+
+  it("fails when most rows carry no readable date", () => {
+    const undated =
+      "title,source,url,published_at,summary\n" +
+      '"A ships X",Anthropic,https://a.example/1,2026-09-21,"One"\n' +
+      '"B raises money",Bloomberg,https://b.example/2,,"Two"\n' +
+      '"C opens up",Reuters,https://c.example/3,recently,"Three"\n';
+    const checks = runChecks(input({ prompt: recent, files: csv(undated) }));
+    expect(failedIds(checks)).toContain("freshness");
+    expect(check(checks, "freshness")?.detail).toMatch(/2 of 3 rows/);
+    expect(check(checks, "freshness")?.detail).toMatch(/no readable date/);
+  });
+
+  it("passes but still names the undated row when the rest are fresh", () => {
+    const mostlyDated =
+      "title,source,url,published_at,summary\n" +
+      '"A ships X",Anthropic,https://a.example/1,2026-09-21,"One"\n' +
+      '"B raises money",Bloomberg,https://b.example/2,2026-09-20,"Two"\n' +
+      '"C opens up",Reuters,https://c.example/3,2026-09-19,"Three"\n' +
+      '"D ships Y",TechCrunch,https://d.example/4,soon,"Four"\n';
+    const checks = runChecks(input({ prompt: recent, files: csv(mostlyDated) }));
+    expect(failedIds(checks)).not.toContain("freshness");
+    expect(check(checks, "freshness")?.detail).toMatch(/no readable date/);
+  });
+});
+
+// Q61: "use the connected DeepWiki server if it helps, otherwise search the web" is an offer, not a requirement.
+// The hard check belongs to the wording that makes the connection the only allowed route.
+describe("runChecks on a connection the instructions only offer", () => {
+  const offered =
+    "Use the connected DeepWiki server if it helps, otherwise search the web, and write output.csv with area, what_it_does.";
+  const file = csv('area,what_it_does\nOverview,"Servers"\n');
+
+  it("passes a web-only run and records that the connection was mentioned, not required", () => {
+    const checks = runChecks(input({ prompt: offered, files: file, toolsUsed: ["WebSearch", "Write"] }));
+    expect(failedIds(checks)).toEqual([]);
+    expect(check(checks, "connection_used")?.ok).toBe(true);
+    expect(check(checks, "connection_used")?.detail).toMatch(/mentioned, not required/i);
+  });
+
+  it("still reports the connection's tools when an optional connection was used anyway", () => {
+    const checks = runChecks(input({ prompt: offered, files: file, toolsUsed: ["mcp__deepwiki__read_wiki_structure", "Write"] }));
+    expect(failedIds(checks)).toEqual([]);
+    expect(check(checks, "connection_used")?.detail).toMatch(/mcp__deepwiki__read_wiki_structure/);
+  });
+
+  it("fails a web-only run when the instructions say the connection must be used", () => {
+    const must = "Write output.csv with area, what_it_does. You must use the connected DeepWiki server.";
+    const checks = runChecks(input({ prompt: must, files: file, toolsUsed: ["WebFetch", "Write"] }));
+    expect(failedIds(checks)).toContain("connection_used");
+  });
+
+  it("fails a web-only run when the instructions say to work only through the connection", () => {
+    const only = "Write output.csv with area, what_it_does, using only the connected DeepWiki server.";
+    const checks = runChecks(input({ prompt: only, files: file, toolsUsed: ["WebFetch", "Write"] }));
+    expect(failedIds(checks)).toContain("connection_used");
+  });
+});
