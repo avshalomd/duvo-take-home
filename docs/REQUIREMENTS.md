@@ -85,3 +85,8 @@ off is a data leak.
 - T+42 roadmap: user-defined skills (docs/ROADMAP.md).
 - T+43 the last deploy moved to T+55; feedback comes on the go.
 - T+47 a better timeline visualization (asked, routed to the UI package, may not land); offline evaluation across automations and failure cases on the roadmap as important.
+
+## Changes after the hour (round 2, his request: "make it great")
+
+- Q1-Q2 live runs on Vercel fixed (temp dir, early failures close the run, the Linux binary traced in).
+- C6 (his words): "a much more pleasant design, for everyday office workers, not technical people; a beautiful animation of the process (the steps and the plan); an extended view for the logs and metadata not relevant at a glance." The glance view: plan progress animated, what it produced, the outcome in a sentence. Details view: timeline, state, cost, ids, probabilities, raw errors.
