@@ -55,33 +55,27 @@ test("each run in the list carries its status and how long ago it ran", async ({
   await expect(first).toHaveAttribute("aria-current", "true"); // the open run stays marked in the list
 });
 
-test("opening a run shows intent, plan, state, timeline, files and verdict in that order", async ({ page }) => {
+test("a run is named by its instructions and says how it turned out in plain words", async ({ page }) => {
   const panel = await openFirstRun(page);
-
-  const sections = panel.getByRole("heading", { level: 3 });
-  await expect(sections).toHaveText([/intent/i, /plan/i, /state/i, /timeline/i, /files/i, /verdict/i]);
-
-  // the state card carries the numbers the run is judged on
-  await expect(panel.getByTestId("state-card")).toContainText(/turn \d+ of \d+/);
-  await expect(panel.getByTestId("state-card")).toContainText(/\$\d|-/);
-
-  // the timeline is the agent's own trace, grouped under the plan step each event belonged to
-  await expect(panel.getByTestId("timeline")).toBeVisible();
-
+  await expect(panel.getByTestId("outcome")).toHaveText(/Done|Working on it|Getting ready|Checking|Something went wrong/);
+  await expect(panel.getByRole("heading", { level: 2 })).not.toHaveText(/^[0-9a-f]{8}-/); // the title is the task, not the id
   await expect(panel.getByTestId("files")).toBeVisible();
-  await expect(panel.getByTestId("verdict")).toBeVisible();
-  await expect(panel.getByRole("button", { name: /run again/i })).toBeVisible();
 });
 
-test("the plan is a stepper with a progress line saying how many steps are settled", async ({ page }) => {
+test("the plan leads the panel as a stepper with a progress line saying how many steps are settled", async ({ page }) => {
   const panel = await openFirstRun(page);
   await expect(panel.getByTestId("plan-progress")).toContainText(/\d+ of \d+ steps/);
+  await expect(panel.getByTestId("plan-steps").getByRole("listitem").first()).toBeVisible();
 });
 
-test("the verdict is one pill you can read across the room, with its checks listed", async ({ page }) => {
+test("everything technical is folded behind Details until it is asked for", async ({ page }) => {
   const panel = await openFirstRun(page);
-  const verdict = panel.getByTestId("verdict");
-  await expect(verdict.getByTestId("verdict-pill")).toContainText(/pass|fail|unknown|not evaluated/i);
+  await expect(panel.getByTestId("timeline")).toBeHidden();
+
+  await panel.getByRole("button", { name: /details/i }).click();
+  await expect(panel.getByTestId("timeline")).toBeVisible();
+  await expect(panel.getByTestId("state-card")).toContainText(/turn \d+ of \d+/);
+  await expect(panel.getByTestId("verdict")).toBeVisible();
 });
 
 // Only the validation path is exercised here: a valid submit would start a real agent run on the shared database.
