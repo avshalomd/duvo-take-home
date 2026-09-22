@@ -45,3 +45,6 @@ next-env.d.ts
 .claude/worktrees/
 test-results
 playwright-report
+
+# agent working directories, one per run
+runs/
