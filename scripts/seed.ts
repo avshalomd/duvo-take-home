@@ -32,7 +32,7 @@ async function main() {
       }).returning({ id: schema.runs.id });
       for (const e of r.events) await db.insert(schema.runEvents).values({ runId: row.id, seq: e.seq, kind: e.kind, payload: e.payload, at: new Date(e.at) });
       for (const a of r.artifacts) {
-        const content = a.source_file ? readFileSync(a.source_file, "utf8") : "";
+        const content = "source_file" in a ? readFileSync(a.source_file, "utf8") : (a as { content?: string }).content ?? "";
         await db.insert(schema.files).values({ runId: row.id, name: a.name, mime: a.mime, bytes: Buffer.byteLength(content), content });
       }
     }
