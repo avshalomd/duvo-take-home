@@ -12,10 +12,21 @@ export const Judgment = z.object({
 });
 export type Judgment = z.infer<typeof Judgment>;
 
+// Tier two (his call, T+24): when Jev says the plan was not followed, or is not confident, an LLM review
+// (extract()) reads the whole run and decides whether the task is finished and the response is usable.
+export const Review = z.object({
+  taskFinished: z.boolean(),
+  responseSuitable: z.boolean(), // the report and files can go to the user as they are
+  changeNeeded: z.string().nullable(), // what would have to change, in one or two lines, when not suitable
+  reasoning: z.string(),
+});
+export type Review = z.infer<typeof Review>;
+
 export const Verdict = z.object({
   verdict: z.enum(["pass", "pass_with_notes", "fail", "unknown"]), // unknown = the judge was unavailable; checks alone decide nothing
   checks: z.array(Check), // the code checks, every one listed even when ok
   judgment: Judgment.nullable(),
+  review: Review.nullable(), // null when Jev was confident the plan was followed: no escalation
   reasons: z.array(z.string()), // one line per failed check or low-confidence answer, shown on the run
   evaluatedAt: z.string(),
 });

@@ -2,15 +2,19 @@
 
 ## What the user can do
 
-1. Types instructions (or clicks the preset "AI news to CSV"), sees which connections are on, clicks **Run**.
+1. Types free-text instructions (no presets: the example prompt is only the placeholder), sees which connections
+   are on, clicks **Run**.
    The system inserts the run, redirects to `/?run=<id>` and starts the agent in `after()`.
-2. The side panel opens on the run: the agent posts its **plan** first (plan tool), then the panel fills in step by
-   step: the plan with done / current / pending, the key state card, the timeline of text, tool calls and results.
+2. The side panel opens on the run: the agent first states how it read the instructions through the plan tool -
+   **intent, expected outputs, sources** (which connections and abilities) - and its steps; then the panel fills in
+   step by step: the plan with done / current / pending, the key state card, the timeline of text, tool calls and results.
    The panel polls `/api/runs/[id]` every 2 s while the run is running.
 3. The agent finishes with a **report** (what it did, what it could not do) and the files it wrote (.txt, .md,
    .csv). Files show with a Download button.
 4. The **evaluator** runs before the run is marked done: code checks on the files, then Jev answers "answered the
-   query?" and "followed the plan?". The verdict lands on the run: pass, pass with notes, fail, with reasons.
+   query?" and "followed the plan?". When Jev finds the plan was not followed, or is not confident, it escalates to
+   an LLM review that decides whether the task is finished and whether the response is suitable or what must
+   change. The verdict lands on the run: pass, pass with notes, fail, with reasons and the review when there was one.
 5. Past runs are listed on the left; clicking one opens it in the panel. Connections can be switched on and off,
    and a new http MCP server added by name, URL and token.
 
@@ -25,7 +29,7 @@ unavailable (verdict "unknown: judge unavailable", **Re-evaluate**); a file that
 |                                           | PLAN  [x] Search the web for AI news (7 days)  |
 | [Fetch the latest AI news from the web    |       [>] Open the top stories, collect fields |
 |  and save them into a CSV. ...          ] |       [ ] Write output.csv                     |
-|   preset: AI news to CSV        [ Run ]   |       [ ] Report                               |
+|                                 [ Run ]   |       [ ] Report                               |
 |                                           | STATE last tool: WebFetch theverge.com/...     |
 | Connections                               |       tools: WebSearch x3, WebFetch x2         |
 |  (o) DeepWiki   mcp.deepwiki.com   on     |       connections: DeepWiki connected, unused  |
@@ -51,7 +55,8 @@ actions.ts (server actions, Zod) ──> runs/start.ts (insert, after()) ──>
 agent/run.ts: query() [Agent SDK subprocess] + agent/plan-tool.ts (sdk MCP: set_plan, update_step)
               + connections as mcpServers ──messages──> agent/map-message.ts ──> run_events rows
               then: copy .txt/.md/.csv from runs/<id> ──> files rows; eval/evaluate.ts ──> runs.verdict; close
-eval/evaluate.ts: eval/checks.ts (code) then llm/decide.ts (Jev: answeredQuery, followedPlan)
+eval/evaluate.ts: eval/checks.ts (code) -> llm/decide.ts (Jev: answeredQuery, followedPlan)
+                  -> eval/review.ts (extract(), only when Jev says not followed or is unsure)
 db: runs, run_events, files, connections
 ```
 
@@ -100,11 +105,16 @@ token), `ListConnections`, `SetConnectionEnabled`, `AddConnection`, `ListEnabled
   into the working directory, end with a report of what was done and what could not be. Caps: 25 turns, $1,
   240 s wall clock; the `finished` event's subtype names which one ended a runaway run. Every message is stored
   as an event with the prompt that produced it; the UI shows a failed run in red with Run again.
+- **The plan tool** input is the interpretation: `intent`, `expectedOutputs`, `sources` (which connections and
+  abilities), `steps`. The agent gets no presets and no task-specific prompt: it reads the instructions itself.
 - **The judge**: `decide()` (Jev), state = {instructions, plan with statuses, report, files with the first 40
   lines}, questions `answeredQuery` and `followedPlan` as `noul()`. Code checks first in `eval/checks.ts`: a file
   exists when the instructions ask for one, the extension is allowed, a CSV parses with a header and 1+ rows,
   no duplicate rows, .md/.txt non-empty. Verdict: any failed check -> fail; both answers confident true -> pass;
-  either confident false -> fail; otherwise pass_with_notes; judge unavailable -> unknown with the checks
+  answeredQuery confident false -> fail; **followedPlan false or unconfident -> tier two**: `extract()` with `Review`
+  (`src/lib/eval/review.prompt.ts`, the instructions, plan, report and files in; taskFinished, responseSuitable,
+  changeNeeded out): finished and suitable -> pass_with_notes, finished but not suitable -> fail with
+  changeNeeded, not finished -> fail; judge unavailable -> unknown with the checks
   listed and a Re-evaluate button. Eval `src/lib/eval/evaluate.eval.test.ts` over `fixtures/llm-cases.json`
   (skipped unless `EVAL=1`), writing `docs/EVAL.md`; pass bar 8 of 10 verdicts as expected.
 

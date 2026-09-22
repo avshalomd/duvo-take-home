@@ -8,7 +8,12 @@ export type StartRun = (input: StartRunInput) => Promise<{ id: string }>; // ins
 export type RunAutomation = (runId: string) => Promise<void>; // the whole loop: query(), events, files, evaluate, close the run
 
 // The plan tool's inputs, as raw Zod shapes because the SDK's tool() takes a shape, not a z.object.
-export const SetPlanInput = { steps: z.array(z.string().min(1)).min(1).max(12) };
+export const SetPlanInput = {
+  intent: z.string().min(1),
+  expectedOutputs: z.array(z.string()).min(1),
+  sources: z.array(z.string()), // names of the connections and native abilities it intends to use; [] if none
+  steps: z.array(z.string().min(1)).min(1).max(12),
+};
 export const UpdateStepInput = { index: z.number().int().min(0), status: PlanStepStatus, note: z.string().optional() };
 
 // One SDK message becomes zero or more events; seq is the next free number for the run.

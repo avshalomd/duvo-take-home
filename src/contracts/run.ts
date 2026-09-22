@@ -12,7 +12,14 @@ export const PlanStep = z.object({
   status: PlanStepStatus,
   note: z.string().optional(), // what happened on this step, in the agent's words ("no results, tried RSS")
 });
-export const Plan = z.object({ steps: z.array(PlanStep) });
+// The agent's reading of the instructions comes first (his call, T+24): free text in, no presets, so the agent
+// states what it understood before it acts, and the user can see a wrong reading before the work is done.
+export const Plan = z.object({
+  intent: z.string().default(""), // what the user wants, in one line
+  expectedOutputs: z.array(z.string()).default([]), // e.g. ["output.csv with title,url,date", "a short report"]
+  sources: z.array(z.string()).default([]), // which abilities and connections it will use: "web search", "GitHub"
+  steps: z.array(PlanStep),
+});
 export type PlanStep = z.infer<typeof PlanStep>;
 export type Plan = z.infer<typeof Plan>;
 
