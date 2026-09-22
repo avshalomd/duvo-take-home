@@ -1,5 +1,6 @@
 import "server-only";
 import { mkdir, readdir, readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { eq } from "drizzle-orm";
@@ -19,8 +20,9 @@ export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const NATIVE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]; // everything else is removed below
 const MIME: Record<string, string> = { ".csv": "text/csv", ".md": "text/markdown", ".txt": "text/plain" };
 
-/** One working directory per run, gitignored; bypassPermissions lets the agent write anywhere under it. */
-export const runDir = (runId: string) => path.join(process.cwd(), "runs", runId);
+/** One working directory per run, gitignored; bypassPermissions lets the agent write anywhere under it.
+ *  On Vercel the code directory is read-only, so the run lives under the function's temp dir instead. */
+export const runDir = (runId: string) => path.join(process.env.VERCEL ? os.tmpdir() : process.cwd(), "runs", runId);
 
 /** The user's enabled connections as MCP servers, keyed so their tools arrive as mcp__<key>__<tool>. */
 async function connectionServers() {
@@ -57,11 +59,20 @@ export const runAutomation: RunAutomation = async (runId) => {
   const [run] = await db.select().from(runs).where(eq(runs.id, runId));
   if (!run) throw new Error(`run ${runId} not found`);
 
+  // Everything before the first message can fail too (a read-only disk, a bad connection row): a run must never
+  // stay "queued" with no reason, so these steps close the run as failed like the loop below does.
   const dir = runDir(runId);
-  await mkdir(dir, { recursive: true });
-  const { enabled, servers } = await connectionServers();
-  const ids = enabled.map((c) => c.id);
-  await db.update(runs).set({ status: "running", connectionIds: ids }).where(eq(runs.id, runId));
+  let enabled: Awaited<ReturnType<typeof connectionServers>>["enabled"];
+  let servers: Awaited<ReturnType<typeof connectionServers>>["servers"];
+  try {
+    await mkdir(dir, { recursive: true });
+    ({ enabled, servers } = await connectionServers());
+    await db.update(runs).set({ status: "running", connectionIds: enabled.map((c) => c.id) }).where(eq(runs.id, runId));
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    await db.update(runs).set({ status: "failed", error, finishedAt: new Date() }).where(eq(runs.id, runId));
+    return;
+  }
 
   const map = createMapper();
   let seq = 1;
