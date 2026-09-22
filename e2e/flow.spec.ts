@@ -54,3 +54,18 @@ test("a failed run shows why it stopped and offers Run again", async ({ page }) 
   await expect(panel.getByTestId("files")).toContainText(/no files/i);
   await expect(panel.getByRole("button", { name: /run again/i })).toBeVisible();
 });
+
+test("re-evaluating reports the evaluator's own failure instead of crashing the page", async ({ page }) => {
+  await page.goto(`/?run=${FIXTURE_RUN}`);
+  await page.getByRole("button", { name: /re-evaluate/i }).click();
+  await expect(page.getByTestId("run-panel")).toContainText(/not implemented/i);
+});
+
+test("a new MCP server is refused with a readable error when the URL is not a URL", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /add an MCP server/i }).click();
+  await page.getByLabel("Name").fill("Linear");
+  await page.getByLabel("URL").fill("not-a-url");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByTestId("connections-form")).toContainText(/full http/i);
+});
