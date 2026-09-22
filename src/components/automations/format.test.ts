@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCost, formatDuration, toolLine } from "./format";
+import { formatCost, formatDuration, toolKind, toolLine } from "./format";
 
 const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
 
@@ -29,6 +29,23 @@ describe("toolLine - one line per tool call, readable without opening the payloa
     expect(toolLine("WebFetch", { url: "https://example.com/a", prompt: "dates" }, connections)).toBe(
       "WebFetch https://example.com/a",
     );
+  });
+});
+
+describe("toolKind - the timeline is scanned by what the agent was doing", () => {
+  it("sorts the native tools into search, fetch and write", () => {
+    expect(toolKind("WebSearch")).toBe("search");
+    expect(toolKind("WebFetch")).toBe("fetch");
+    expect(toolKind("Read")).toBe("fetch");
+    expect(toolKind("Write")).toBe("write");
+  });
+
+  it("marks anything that went through a connection as a connection call", () => {
+    expect(toolKind("mcp__deepwiki__read_wiki_structure")).toBe("connection");
+  });
+
+  it("falls back to tool for anything else", () => {
+    expect(toolKind("Bash")).toBe("tool");
   });
 });
 

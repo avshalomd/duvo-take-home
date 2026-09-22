@@ -39,6 +39,17 @@ export function toolLine(name: string, input: unknown, connections: { name: stri
   return arg ? `${label} ${arg}` : label;
 }
 
+export type ToolKind = "search" | "fetch" | "write" | "connection" | "tool";
+
+// Four kinds cover every tool the agent is given; the card shows the kind so a run can be scanned, not read.
+export function toolKind(name: string): ToolKind {
+  if (name.startsWith("mcp__")) return "connection";
+  if (name === "WebSearch" || name === "Grep" || name === "Glob") return "search";
+  if (name === "WebFetch" || name === "Read") return "fetch";
+  if (name === "Write" || name === "Edit") return "write";
+  return "tool";
+}
+
 export function formatDuration(ms: number | null): string {
   if (ms === null || ms === undefined) return "-";
   if (ms < 1000) return `${(ms / 1000).toFixed(1)} s`;

@@ -1,55 +1,93 @@
 import type { RunEvent } from "@/contracts/run";
-import { formatClock, toolLine } from "./format";
+import { cn } from "@/lib/utils";
+import { formatClock } from "./format";
+import { groupEvents, type EventGroup } from "./group-events";
 import { Empty, Section } from "./section";
+import { ToolCard } from "./tool-card";
 
-// The agent's trace, in order: what it said, what it called, what came back. The evidence behind the verdict.
-export function TimelineSection({
-  events,
-  connections,
-}: {
-  events: RunEvent[];
-  connections: { name: string }[];
-}) {
+const mark: Record<string, string> = { done: "[x]", running: "[>]", pending: "[ ]", skipped: "[-]", planning: "[.]" };
+
+// The agent's trace, grouped under the plan step it belonged to: the evidence behind the verdict, in the shape
+// the agent itself worked in.
+export function TimelineSection({ events, connections }: { events: RunEvent[]; connections: { name: string }[] }) {
+  const groups = groupEvents(events);
   return (
     <Section title="Timeline">
-      {events.length === 0 ? (
+      {groups.length === 0 ? (
         <Empty>Nothing yet - the agent is starting.</Empty>
       ) : (
-        <ul data-testid="timeline" className="space-y-1.5 text-xs">
-          {events.map((e) => (
-            <li key={e.seq} className="flex gap-2">
-              <span className="shrink-0 font-mono text-muted-foreground">{formatClock(e.at)}</span>
-              <span className="min-w-0 break-words">{line(e, connections)}</span>
-            </li>
+        <div data-testid="timeline" className="space-y-3">
+          {groups.map((group) => (
+            <Group key={group.key} group={group} connections={connections} />
           ))}
-        </ul>
+        </div>
       )}
     </Section>
   );
 }
 
-function line(e: RunEvent, connections: { name: string }[]) {
-  switch (e.kind) {
-    case "started":
-      return <span className="text-muted-foreground">started on {e.payload.model}</span>;
-    case "text":
-      return <span>{e.payload.text}</span>;
-    case "tool_call":
-      return <span className="font-mono">{toolLine(e.payload.name, e.payload.input, connections)}</span>;
-    case "tool_result":
-      return (
-        <span className={e.payload.is_error ? "font-mono text-red-600" : "font-mono text-muted-foreground"}>
-          {"-> "}
-          {e.payload.preview}
+function Group({ group, connections }: { group: EventGroup; connections: { name: string }[] }) {
+  return (
+    <div>
+      <p className="flex items-baseline gap-2 text-xs font-medium">
+        <span className={cn("font-mono", group.status === "running" ? "text-amber-700" : "text-muted-foreground")}>
+          {mark[group.status]}
         </span>
-      );
-    case "plan":
-      return <span className="text-muted-foreground">plan: {e.payload.steps.length} steps</span>;
-    case "finished":
-      return (
-        <span className={e.payload.is_error ? "text-red-600" : "text-emerald-700"}>
-          finished ({e.payload.subtype}) - {e.payload.result}
-        </span>
-      );
-  }
+        <span className={group.status === "done" ? "text-muted-foreground" : ""}>{group.title}</span>
+      </p>
+      <div className="mt-1 space-y-1.5 border-l pl-3">{renderEvents(group.events, connections)}</div>
+    </div>
+  );
+}
+
+// A tool call and its result are one card, so the result is looked up by id and skipped when it comes round.
+function renderEvents(events: RunEvent[], connections: { name: string }[]) {
+  const results = new Map(events.filter((e) => e.kind === "tool_result").map((e) => [e.payload.tool_use_id, e]));
+  const callIds = new Set(events.filter((e) => e.kind === "tool_call").map((e) => e.payload.tool_use_id));
+
+  return events.map((event) => {
+    switch (event.kind) {
+      case "tool_call":
+        return (
+          <ToolCard
+            key={event.seq}
+            call={event}
+            result={results.get(event.payload.tool_use_id)}
+            connections={connections}
+          />
+        );
+      case "tool_result":
+        // shown inside its call's card; only an orphan (its call fell in an earlier step) gets its own line
+        return callIds.has(event.payload.tool_use_id) ? null : (
+          <p key={event.seq} className="font-mono text-[11px] text-muted-foreground">
+            {"-> "}
+            {event.payload.preview}
+          </p>
+        );
+      case "text":
+        // the agent thinking out loud is context, not an action: a quiet paragraph, never a card
+        return (
+          <p key={event.seq} className="text-xs text-muted-foreground italic">
+            {event.payload.text}
+          </p>
+        );
+      case "started":
+        return (
+          <p key={event.seq} className="text-[11px] text-muted-foreground">
+            {formatClock(event.at)} started on {event.payload.model}
+          </p>
+        );
+      case "finished":
+        return (
+          <p
+            key={event.seq}
+            className={cn("text-xs", event.payload.is_error ? "text-red-600" : "text-emerald-700")}
+          >
+            finished ({event.payload.subtype}) - {event.payload.result}
+          </p>
+        );
+      default:
+        return null;
+    }
+  });
 }
