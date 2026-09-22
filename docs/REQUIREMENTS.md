@@ -34,6 +34,7 @@ off is a data leak.
 - I5 Safety and cost caps on every run (max turns, max budget, no shell, no edits, a working directory per run) - the agent runs with permissions bypassed.
 - I6 The verdict is stored with its reasons and the artifact it judged, so pass or fail can be defended on the call.
 - I7 A one-click preset for the AI-news task and a runs list of past runs, seeded from fixtures, so every screen demos even when the model is down.
+- I8 One page (his correction, T+5): the instructions box and the agent's response are the main interaction; the step timeline and the key state card are a side panel on that same page, opened for the current run, not a separate route.
 
 ## Open questions
 
@@ -47,3 +48,7 @@ off is a data leak.
 - Must: R1, R2, R3, R4, R5, I1, I2, I3, I4, I5. If the build slips, R5's model judge goes first (code checks stay), then R4 keeps one connection with the toggle and drops the second.
 - Should: I6, I7, Q1's live run on Vercel, token streaming of the assistant text.
 - Won't: sign-in and multi-user, scheduled or recurring automations, editing the agent's tools from the UI, resuming a run, more than one connection type, cost dashboards.
+
+## Design choices
+
+- One page. Left: instructions box, the AI-news preset, the connection switch, the agent's final response, past runs. Right, a side panel for the selected run: key state card on top, the step timeline below it, artifacts and the verdict at the bottom. No separate run route (his call at T+5).
