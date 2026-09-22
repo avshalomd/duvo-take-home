@@ -17,6 +17,8 @@ import { pathGuard } from "./guard";
 import { createMapper } from "./map-message";
 import { createPlanServer } from "./plan-tool";
 import { SYSTEM_PROMPT } from "./system.prompt";
+import { unknownVerdict } from "./unknown-verdict";
+import { removeRunDir } from "./workspace";
 
 export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const NATIVE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]; // everything else is removed below
@@ -73,6 +75,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     await db.update(runs).set({ status: "failed", error, finishedAt: new Date() }).where(eq(runs.id, runId));
+    await removeRunDir(dir); // this branch returns, so the try/finally below never sees it
     return;
   }
 
@@ -148,6 +151,8 @@ export const runAutomation: RunAutomation = async (runId) => {
       })
       .where(eq(runs.id, runId));
 
+    // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
+    // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59).
     const verdict = await evaluateRun({
       prompt: run.prompt,
       runStatus: end.is_error ? "failed" : "succeeded",
@@ -157,7 +162,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       today: new Date().toISOString().slice(0, 10),
       // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
       toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
-    }).catch(() => null); // an evaluator failure must not lose the run the agent already did
+    }).catch(unknownVerdict);
 
     await db
       .update(runs)
@@ -173,5 +178,8 @@ export const runAutomation: RunAutomation = async (runId) => {
     await db.update(runs).set({ status: "failed", error, finishedAt: new Date() }).where(eq(runs.id, runId));
   } finally {
     deadline.clear();
+    // The files that matter are rows in the database by now, so the working directory is rubbish either way;
+    // on Vercel /tmp survives between invocations and would fill up (QA Q58).
+    await removeRunDir(dir);
   }
 };

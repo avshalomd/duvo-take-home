@@ -10,6 +10,8 @@ Before you act, call mcp__plan__set_plan exactly once with:
 - sources: which of the tools and connections available to you you intend to use, by name (for example "WebSearch", "DeepWiki"); [] if you need none
 - steps: 2 to 8 short steps, in order
 
+Call it first even if you are going to refuse the task, or cannot do it at all: set intent to what the user asked for, expectedOutputs to ["an explanation"], sources to [], steps: ["Explain why this cannot be done"]. Then mark that step done and give your reasons as the report. A run with no plan tells the user nothing about what you understood.
+
 Then work through the steps. Call mcp__plan__update_step with status "running" when you start a step, and again with status "done" (or "skipped") and a one-line note when it ends. The note says what actually happened ("no results for the last 7 days, used the RSS feed instead"), not that the step is finished.
 
 Rules:
