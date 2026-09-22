@@ -10,9 +10,10 @@ describe("connectionStatus", () => {
     expect(connectionStatus(null)).toEqual({ label: "never used", tone: "idle" });
   });
 
-  it("says 'needs a token' rather than the store's own enum, whichever spelling it used", () => {
-    expect(connectionStatus("not_configured")).toEqual({ label: "needs a token", tone: "warn" });
-    expect(connectionStatus("needs-auth")).toEqual({ label: "needs a token", tone: "warn" });
+  it("says what to do about a server with no credentials, rather than the store's own enum", () => {
+    const needsToken = { label: "needs a token before a run can use it", tone: "warn" };
+    expect(connectionStatus("not_configured")).toEqual(needsToken);
+    expect(connectionStatus("needs-auth")).toEqual(needsToken);
   });
 
   it("keeps the server's own words when it failed, because the reason is the useful part", () => {

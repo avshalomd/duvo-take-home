@@ -147,5 +147,7 @@ test("a new MCP server is added in a dialog and refused with a readable error wh
   await dialog.getByLabel("Name").fill("Linear");
   await dialog.getByLabel("URL").fill("not-a-url");
   await dialog.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.getByTestId("connections-form")).toContainText(/full http/i);
+  // a full sentence with an example, and the cursor put back in the field that was refused
+  await expect(page.getByTestId("connections-form")).toContainText(/full URL, for example https/i);
+  await expect(dialog.getByLabel("URL")).toBeFocused();
 });

@@ -1,3 +1,4 @@
+import { CircleCheck, CircleDashed, CircleMinus, LoaderCircle } from "lucide-react";
 import type { RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
 import { formatCost, formatDuration } from "./format";
@@ -6,7 +7,13 @@ import { groupEvents, type EventGroup } from "./group-events";
 import { Empty, Section } from "./section";
 import { ToolCard } from "./tool-card";
 
-const mark: Record<string, string> = { done: "[x]", running: "[>]", pending: "[ ]", skipped: "[-]", planning: "[.]" };
+// the same icons as the plan stepper above, so a step means the same thing in both places
+function GroupIcon({ status }: { status: EventGroup["status"] }) {
+  if (status === "done") return <CircleCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />;
+  if (status === "running") return <LoaderCircle className="size-3.5 animate-spin text-amber-600 dark:text-amber-400" />;
+  if (status === "skipped") return <CircleMinus className="size-3.5 text-muted-foreground" />;
+  return <CircleDashed className="size-3.5 text-muted-foreground/60" />;
+}
 
 // The agent's trace, grouped under the plan step it belonged to: the evidence behind the verdict, in the shape
 // the agent itself worked in.
@@ -30,10 +37,8 @@ export function TimelineSection({ events, connections }: { events: RunEvent[]; c
 function Group({ group, connections }: { group: EventGroup; connections: { name: string }[] }) {
   return (
     <div>
-      <p className="flex items-baseline gap-2 text-xs font-medium">
-        <span className={cn("font-mono", group.status === "running" ? "text-amber-700" : "text-muted-foreground")}>
-          {mark[group.status]}
-        </span>
+      <p className="flex items-center gap-2 text-xs font-medium">
+        <GroupIcon status={group.status} />
         <span className={group.status === "done" ? "text-muted-foreground" : ""}>{group.title}</span>
       </p>
       <div className="mt-1 space-y-1.5 border-l pl-3">{renderEvents(group.events, connections)}</div>

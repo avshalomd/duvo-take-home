@@ -5,7 +5,16 @@ import { StatusBadge } from "./status-badge";
 
 // The evaluator's answer in full: the code checks (each one listed, passed or not), what the models judged and,
 // when it was escalated, the review's own reasoning. The overview above carries the short version.
-export function VerdictSection({ verdict, connections }: { verdict: Verdict | null; connections: { name: string }[] }) {
+export function VerdictSection({
+  verdict,
+  connections,
+  runStatus,
+}: {
+  verdict: Verdict | null;
+  connections: { name: string }[];
+  runStatus: string;
+}) {
+  const finished = runStatus === "succeeded" || runStatus === "failed";
   // the escalation's reasoning is also copied into reasons by the evaluator: show it once, under Review
   const reasons = verdict?.reasons.filter((r) => r !== verdict.review?.reasoning) ?? [];
 
@@ -13,7 +22,9 @@ export function VerdictSection({ verdict, connections }: { verdict: Verdict | nu
     <Section title="Verdict" aside={verdict ? <StatusBadge status={verdict.verdict} /> : undefined}>
       <div data-testid="verdict" className="space-y-3">
         {!verdict ? (
-          <Empty>Not evaluated - the evaluator runs when the agent finishes.</Empty>
+          <Empty>
+            {finished ? "This run was not judged." : "Not evaluated yet - the evaluator runs when the agent finishes."}
+          </Empty>
         ) : (
           <>
             <ul className="space-y-1 text-sm">

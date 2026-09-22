@@ -47,11 +47,7 @@ export function StateSection({ state, connections }: { state: RunState; connecti
         <Row label="Cost">
           <span className="tabular-nums">{formatCost(state.costUsd)}</span>
         </Row>
-        {state.error && (
-          <Row label="Error">
-            <span className="text-red-600 dark:text-red-400">{state.error}</span>
-          </Row>
-        )}
+        {/* the run's error text is printed once, at the bottom of Details: repeating it here read as two failures */}
       </dl>
     </Section>
   );
