@@ -5,7 +5,7 @@
 | # | severity | finding | owner | status |
 |---|---|---|---|---|
 | 1 | - | Live run from the form: succeeded in 1 min 29 s, $0.39; plan of 4 steps with the agent's notes, state card, timeline, output.csv downloadable (attachment header), verdict pass with 7 checks and Jev 0.90 / 0.93 | - | verified |
-| 2 | minor | The seeded "running" fixture run never finishes, so its panel polls every 2 s for ever | ui | open, listed in the README |
+| 2 | minor | The seeded "running" fixture run never finished, so its panel polled for ever | data | fixed at T+58: the seeded row was deleted from the database |
 | 3 | minor | `reevaluateRun`'s two database queries have no integration test | eval | open, listed in the README |
 
 No open blocker.
