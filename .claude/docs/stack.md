@@ -12,6 +12,7 @@ piece is here because he can explain why it is there. Nothing gets added without
 | Zod 4 | one validation at every boundary: form input, route params, API bodies, LLM output |
 | Vercel AI SDK 7 through `getModel()` in `src/lib/ai.ts` | one call shape for any provider; structured output checked against a Zod schema |
 | `.claude/docs/models.md` | which model, what it costs, and the failures that look like a bad model and are not |
+| `.claude/docs/agent-sdk.md` | **the agent runtime for this task, his decision: the Claude Agent SDK** (Claude Code as a library, a subprocess per run). The verified `query()` call, the message stream and how each of the task's five steps maps onto it; the kit's `agent.ts` loop is not used for the runs |
 | `src/lib/llm/extract.ts`, `agent.ts`, `decide.ts` | the three model templates: one structured call, a tool-calling agent loop (AI SDK's `ToolLoopAgent`), and a typed decision (Jev - a model that judges rather than writes); no agent framework, so every line is ours to explain |
 | Vitest, Playwright | logic tests without a network; a read-only smoke test against production |
 | Vercel CLI, region fra1 | the live URL in one command; the database is in the same region |
