@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Verdict } from "./eval"; // type-only: no runtime cycle with eval.ts, which imports Plan from here
 
 // A run is one automation: one set of instructions in, a trace of events, a report and files out.
 export const RunStatus = z.enum(["queued", "running", "evaluating", "succeeded", "failed"]);
@@ -95,5 +96,5 @@ export type RunState = z.infer<typeof RunState>;
 
 export type DeriveState = (run: Run, events: RunEvent[]) => RunState;
 export type ListRuns = () => Promise<Run[]>;
-export type GetRun = (id: string) => Promise<{ run: Run; events: RunEvent[]; files: FileMeta[] } | null>;
+export type GetRun = (id: string) => Promise<{ run: Run; events: RunEvent[]; files: FileMeta[]; verdict: Verdict | null } | null>;
 export type GetFile = (runId: string, name: string) => Promise<{ meta: FileMeta; content: string } | null>;

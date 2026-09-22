@@ -123,6 +123,8 @@ export const runAutomation: RunAutomation = async (runId) => {
     plan,
     files: written.map((f) => ({ name: f.name, content: f.content })),
     today: new Date().toISOString().slice(0, 10),
+    // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
+    toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
   }).catch(() => null); // an evaluator failure must not lose the run the agent already did
 
   await db

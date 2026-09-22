@@ -1,4 +1,4 @@
-import { getRun, getVerdict } from "@/lib/runs/queries";
+import { getRun } from "@/lib/runs/queries";
 import { deriveState } from "@/lib/runs/state";
 
 export const runtime = "nodejs";
@@ -9,6 +9,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params; // params is a Promise in Next 15+
   const found = await getRun(id);
   if (!found) return Response.json({ error: "not found" }, { status: 404 });
-  const verdict = await getVerdict(id);
-  return Response.json({ ...found, verdict, state: deriveState(found.run, found.events) });
+  return Response.json({ ...found, state: deriveState(found.run, found.events) });
 }

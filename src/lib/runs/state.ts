@@ -13,17 +13,20 @@ function connectionOf(toolName: string): string | null {
   return parts.length >= 3 && parts[0] === "mcp" ? parts[1] : null;
 }
 
+const basename = (p: string) => p.split("/").pop() ?? p;
+
 /** One readable line for the state card: the field of the input that says what the call was about. */
 function summarize(input: unknown): string {
   const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   for (const key of ["query", "file_path", "url", "repoName", "prompt", "path", "question"]) {
-    if (typeof i[key] === "string" && i[key]) return String(i[key]).slice(0, 140);
+    if (typeof i[key] !== "string" || !i[key]) continue;
+    const value = String(i[key]);
+    // the agent writes with an absolute path; the card shows the file's name, which is what the user recognises
+    return (key === "file_path" || key === "path" ? basename(value) : value).slice(0, 140);
   }
   const json = JSON.stringify(input ?? {});
   return json === "{}" ? "" : json.slice(0, 140);
 }
-
-const basename = (p: string) => p.split("/").pop() ?? p;
 
 export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
   const calls: ToolCall[] = events.filter((e) => e.kind === "tool_call").map((e) => e.payload as ToolCall);

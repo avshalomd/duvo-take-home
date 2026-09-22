@@ -2,6 +2,7 @@ import { asc, desc, eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
 import { RunEvent, type GetFile, type GetRun, type ListRuns, type Run, type RunStatus } from "@/contracts/run";
+import { Verdict } from "@/contracts/eval";
 
 type RunRow = typeof runs.$inferSelect;
 
@@ -39,17 +40,18 @@ export const getRun: GetRun = async (id) => {
     .map((e) => RunEvent.safeParse({ seq: e.seq, at: e.at.toISOString(), kind: e.kind, payload: e.payload }))
     .filter((r) => r.success)
     .map((r) => r.data);
-  return { run: toRun(row), events, files: fileRows.map((f) => ({ name: f.name, mime: f.mime, bytes: f.bytes })) };
+  // The verdict is stored whole on the run so a pass or fail can be defended later; parsed here, not trusted raw.
+  const verdict = Verdict.safeParse(row.verdict);
+  return {
+    run: toRun(row),
+    events,
+    files: fileRows.map((f) => ({ name: f.name, mime: f.mime, bytes: f.bytes })),
+    verdict: verdict.success ? verdict.data : null,
+  };
 };
 
 export const getFile: GetFile = async (runId, name) => {
   if (!/^[0-9a-f-]{36}$/i.test(runId)) return null;
   const [row] = await db.select().from(files).where(and(eq(files.runId, runId), eq(files.name, name)));
   return row ? { meta: { name: row.name, mime: row.mime, bytes: row.bytes }, content: row.content } : null;
-};
-
-/** The verdict is stored whole on the run so a pass or fail can be defended later; the UI reads it from here. */
-export const getVerdict = async (runId: string): Promise<unknown> => {
-  const [row] = await db.select({ verdict: runs.verdict }).from(runs).where(eq(runs.id, runId));
-  return row?.verdict ?? null;
 };
