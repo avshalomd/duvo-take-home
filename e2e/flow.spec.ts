@@ -68,6 +68,24 @@ test("the plan leads the panel as a stepper with a progress line saying how many
   await expect(panel.getByTestId("plan-steps").getByRole("listitem").first()).toBeVisible();
 });
 
+test("what the run produced is offered as files to download and a readable report", async ({ page }) => {
+  const panel = await openFirstRun(page);
+  const produced = panel.getByTestId("produced");
+  await expect(produced).toBeVisible();
+  // a run with files offers each one with a Download button; a run without says so in words
+  const files = produced.getByTestId("files");
+  await expect(files).toContainText(/Download|No files/i);
+  // the report is prose, not raw markdown: no ** left on the screen
+  await expect(produced).not.toContainText("**");
+});
+
+test("the outcome is said in plain words with the checks as a short list", async ({ page }) => {
+  const panel = await openFirstRun(page);
+  const result = panel.getByTestId("result");
+  await expect(result).toContainText(/Done|Working on it|Getting ready|Checking|Something went wrong/);
+  await expect(result).not.toContainText(/%|followedPlan|answeredQuery/); // probabilities belong under Details
+});
+
 test("everything technical is folded behind Details until it is asked for", async ({ page }) => {
   const panel = await openFirstRun(page);
   await expect(panel.getByTestId("timeline")).toBeHidden();
@@ -76,6 +94,41 @@ test("everything technical is folded behind Details until it is asked for", asyn
   await expect(panel.getByTestId("timeline")).toBeVisible();
   await expect(panel.getByTestId("state-card")).toContainText(/turn \d+ of \d+/);
   await expect(panel.getByTestId("verdict")).toBeVisible();
+});
+
+// test.describe with its own viewport: setViewportSize inside the test raced the page's first paint in a full run
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the page fits the screen and leads with the run", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("run-panel")).toBeVisible(); // the page streams a skeleton first: measure the real thing
+
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth); // nothing sticks out sideways: no horizontal scrolling
+
+    // one column, and the open run is above the form: after pressing Run, the run is what you want to see
+    const panel = await page.getByTestId("run-panel").boundingBox();
+    const form = await page.getByRole("textbox", { name: /instructions/i }).boundingBox();
+    expect(panel!.y).toBeLessThan(form!.y);
+  });
+
+  // Q38: the panel header must not cover what is under it - the point over the failure text is the failure text
+  test("nothing floats over the panel's own content", async ({ page }) => {
+    await page.goto("/");
+    // "What it produced" is in every panel whatever the run did, so this does not depend on which run is newest
+    const produced = page.getByTestId("produced");
+    await expect(produced).toBeVisible();
+    const box = await produced.boundingBox();
+    const onTop = await page.evaluate(
+      (p) => document.elementFromPoint(p.x, p.y)?.closest("[data-testid]")?.getAttribute("data-testid") ?? "",
+      { x: box!.x + 10, y: box!.y + 10 },
+    );
+    expect(onTop).toBe("produced");
+  });
 });
 
 // Only the validation path is exercised here: a valid submit would start a real agent run on the shared database.

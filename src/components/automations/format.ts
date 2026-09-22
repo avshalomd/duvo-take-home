@@ -4,8 +4,18 @@ function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, ""); // same rule the connection key uses: "DeepWiki" -> "deepwiki"
 }
 
+// The state card names connections by the key the SDK used ("deepwiki"); the user named it "DeepWiki".
+export function connectionName(key: string, connections: { name: string }[]): string {
+  return connections.find((c) => slug(c.name) === slug(key))?.name ?? key;
+}
+
+// The evaluator and the state card quote tool ids inside sentences: rewrite them wherever they appear.
+export function humanizeTools(text: string, connections: { name: string }[]): string {
+  return text.replace(/mcp__[A-Za-z0-9_]+/g, (id) => toolLabel(id, connections));
+}
+
 // "mcp__deepwiki__read_wiki_structure" is unreadable in a timeline: show the connection's own name and the tool.
-function toolLabel(name: string, connections: { name: string }[]): string {
+export function toolLabel(name: string, connections: { name: string }[]): string {
   if (!name.startsWith("mcp__")) return name;
   const [, server, ...rest] = name.split("__");
   const tool = rest.join("__");

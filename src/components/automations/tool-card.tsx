@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { formatClock, toolKind, toolLine } from "./format";
+import { toolKind, toolLine } from "./format";
+import { LocalTime } from "./local-time";
 
 const kindStyle: Record<string, string> = {
   search: "border-sky-600/30 bg-sky-600/10 text-sky-700",
@@ -36,7 +37,7 @@ export function ToolCard({
         <span className="min-w-0 flex-1 font-mono text-xs break-words">
           {toolLine(call.payload.name, call.payload.input, connections)}
         </span>
-        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatClock(call.at)}</span>
+        <LocalTime iso={call.at} className="shrink-0 font-mono text-[10px] text-muted-foreground" />
       </div>
 
       {result && (

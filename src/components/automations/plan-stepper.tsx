@@ -1,4 +1,4 @@
-import { CircleCheck, CircleDashed, LoaderCircle, SkipForward } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleMinus, LoaderCircle } from "lucide-react";
 import type { Plan, PlanStep } from "@/contracts/run";
 import { cn } from "@/lib/utils";
 import { planProgress } from "./plan-progress";
@@ -17,6 +17,8 @@ export function PlanStepper({ plan, terminal }: { plan: Plan | null; terminal: b
   }
 
   const running = plan.steps.find((s) => s.status === "running");
+  // a run whose every step was skipped is settled but not successful: a full emerald bar would say the opposite
+  const anyDone = plan.steps.some((s) => s.status === "done");
 
   return (
     <div>
@@ -24,7 +26,10 @@ export function PlanStepper({ plan, terminal }: { plan: Plan | null; terminal: b
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           {/* the width transition is the progress animation: one CSS line, no library */}
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out"
+            className={cn(
+              "h-full rounded-full transition-all duration-700 ease-out",
+              anyDone ? "bg-emerald-500" : "bg-muted-foreground/40",
+            )}
             style={{ width: `${progress.percent}%` }}
           />
         </div>
@@ -75,6 +80,6 @@ function StepIcon({ status }: { status: PlanStep["status"] }) {
     return <CircleCheck className="mt-0.5 size-4 shrink-0 animate-in text-emerald-600 zoom-in-50 duration-300 dark:text-emerald-400" />;
   if (status === "running")
     return <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin text-amber-600 dark:text-amber-400" />;
-  if (status === "skipped") return <SkipForward className="mt-0.5 size-4 shrink-0 text-muted-foreground" />;
+  if (status === "skipped") return <CircleMinus className="mt-0.5 size-4 shrink-0 text-muted-foreground" />;
   return <CircleDashed className="mt-0.5 size-4 shrink-0 text-muted-foreground/60" />;
 }

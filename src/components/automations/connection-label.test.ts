@@ -10,8 +10,9 @@ describe("connectionStatus", () => {
     expect(connectionStatus(null)).toEqual({ label: "never used", tone: "idle" });
   });
 
-  it("says 'needs a token' rather than the store's 'not_configured'", () => {
+  it("says 'needs a token' rather than the store's own enum, whichever spelling it used", () => {
     expect(connectionStatus("not_configured")).toEqual({ label: "needs a token", tone: "warn" });
+    expect(connectionStatus("needs-auth")).toEqual({ label: "needs a token", tone: "warn" });
   });
 
   it("keeps the server's own words when it failed, because the reason is the useful part", () => {

@@ -9,6 +9,8 @@ import { Elapsed } from "./elapsed";
 import { FilesSection } from "./files-section";
 import { outcome } from "./outcome";
 import { PlanStepper } from "./plan-stepper";
+import { Report } from "./report";
+import { ResultSection } from "./result-section";
 import { RunDetails } from "./run-details";
 import { StatusDot } from "./status-dot";
 import { TimeAgo } from "./time-ago";
@@ -29,8 +31,9 @@ export function RunPanel({ view: initial, connections }: { view: RunView; connec
   const error = again.error ?? judged.error;
 
   return (
-    <div data-testid="run-panel" className="overflow-hidden rounded-xl border bg-background">
-      <header className="sticky top-14 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur">
+    <div data-testid="run-panel" className="rounded-xl border bg-background">
+      {/* not sticky: a sticky header inside the card covered the section under it at some scroll positions */}
+      <header className="rounded-t-xl border-b bg-background px-4 py-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             {/* the instruction is the run's name: an id means nothing to the person who typed the task */}
@@ -101,10 +104,19 @@ export function RunPanel({ view: initial, connections }: { view: RunView; connec
         <PlanStepper plan={state.plan} terminal={terminal} />
       </section>
 
-      <section className="border-t px-4 py-4">
+      <section data-testid="produced" className="border-t px-4 py-4">
         <h3 className="mb-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase">What it produced</h3>
         <FilesSection runId={run.id} files={files} />
-        {run.report && <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap">{run.report}</p>}
+        {run.report && (
+          <div className="mt-3">
+            <Report text={run.report} />
+          </div>
+        )}
+      </section>
+
+      <section className="border-t px-4 py-4">
+        <h3 className="mb-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase">How it turned out</h3>
+        <ResultSection runStatus={run.status} verdict={verdict} />
       </section>
 
       <button

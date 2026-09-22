@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCost, formatDuration, toolKind, toolLine } from "./format";
+import { connectionName, formatCost, formatDuration, humanizeTools, toolKind, toolLine } from "./format";
 
 const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
 
@@ -70,5 +70,31 @@ describe("formatCost - three decimals, because runs cost cents", () => {
 
   it("renders a missing cost as a dash", () => {
     expect(formatCost(null)).toBe("-");
+  });
+});
+
+describe("connectionName - the server's key becomes the name the user gave it", () => {
+  const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
+
+  it("turns the mcp key back into the display name", () => {
+    expect(connectionName("deepwiki", connections)).toBe("DeepWiki");
+  });
+
+  it("keeps an unknown key rather than inventing a name", () => {
+    expect(connectionName("linear", connections)).toBe("linear");
+  });
+});
+
+describe("humanizeTools - no mcp__x__y ever reaches the screen", () => {
+  const connections = [{ name: "DeepWiki" }];
+
+  it("rewrites tool ids inside a sentence the evaluator wrote", () => {
+    expect(humanizeTools("used mcp__deepwiki__ask_wiki_question twice", connections)).toBe(
+      "used DeepWiki: ask_wiki_question twice",
+    );
+  });
+
+  it("leaves a sentence with no tool ids untouched", () => {
+    expect(humanizeTools("the CSV has 10 rows", connections)).toBe("the CSV has 10 rows");
   });
 });
