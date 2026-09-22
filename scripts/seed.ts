@@ -24,11 +24,14 @@ async function main() {
   if ((await db.select().from(schema.runs).limit(1)).length === 0) {
     for (const r of runsFixture) {
       const finished = r.events.find((e) => e.kind === "finished")?.payload as { result?: string } | undefined;
+      // A fixture recorded mid-flight has no finished event; seeded as-is it would say "working on it" for ever.
+      const stuck = !finished && r.status === "running";
       const [row] = await db.insert(schema.runs).values({
-        prompt: r.prompt, status: r.status, model: r.model, connectionIds: [],
+        prompt: r.prompt, status: stuck ? "failed" : r.status, model: r.model, connectionIds: [],
+        error: stuck ? "Seeded example: this run was recorded while it was still working and has no ending." : null,
         report: finished?.result ?? null, verdict: r.evaluation ?? null,
         numTurns: r.num_turns ?? null, durationMs: r.duration_ms ?? null, costUsd: r.total_cost_usd ?? null,
-        createdAt: new Date(r.started_at), finishedAt: r.finished_at ? new Date(r.finished_at) : null,
+        createdAt: new Date(r.started_at), finishedAt: r.finished_at ? new Date(r.finished_at) : stuck ? new Date(r.started_at) : null,
       }).returning({ id: schema.runs.id });
       for (const e of r.events) await db.insert(schema.runEvents).values({ runId: row.id, seq: e.seq, kind: e.kind, payload: e.payload, at: new Date(e.at) });
       for (const a of r.artifacts) {
