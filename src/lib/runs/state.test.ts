@@ -28,10 +28,10 @@ const RUNNING = "run_01JQ8QB9XM"; // no finished event
 const FAILED = "run_01JQ8R2F0C"; // error_max_turns, every tool call failed
 
 describe("deriveState", () => {
-  it("counts one turn per tool call and caps it with the agent's maxTurns", () => {
+  it("shows the SDK's own turn count on a finished run and caps it with the agent's maxTurns", () => {
     const { run, events } = fixture(NEWS);
     const state = deriveState(run, events);
-    expect(state.turn).toBe(4); // two WebSearch, one WebFetch, one Write
+    expect(state.turn).toBe(5); // the finished event's num_turns, the count the cap applied to
     expect(state.maxTurns).toBe(AgentLimits.maxTurns);
     expect(state.status).toBe("succeeded");
   });
@@ -88,7 +88,7 @@ describe("deriveState", () => {
     const { run, events } = fixture(FAILED);
     const state = deriveState(run, events);
     expect(state.error).toBe("Reached the turn limit without producing a file. Web search returned 400 on every attempt.");
-    expect(state.turn).toBe(3);
+    expect(state.turn).toBe(12); // the finished event's num_turns
   });
 
   it("takes the plan from the last plan event and the current step from the one that is running", () => {
@@ -115,15 +115,15 @@ describe("deriveState", () => {
 
   // Q32/Q33, both from the same reading of a real run: the card said "turn 8 of 25" where the agent had taken
   // three, and it showed ToolSearch - the SDK's own tool lookup - as the agent's last tool.
-  it("reads the turn from the assistant turn the mapper stamped, not from the number of tool calls", () => {
+  it("reads the turn from the assistant turn the mapper stamped while the run is still going", () => {
     const { run, events } = fixture(NEWS);
-    const stamped = events.map((e, i) => ({ ...e, payload: { ...e.payload, turn: i < 3 ? 1 : 2 } }) as RunEvent);
+    const stamped = events.filter((e) => e.kind !== "finished").map((e, i) => ({ ...e, payload: { ...e.payload, turn: i < 3 ? 1 : 2 } }) as RunEvent);
     expect(deriveState(run, stamped).turn).toBe(2);
   });
 
-  it("still counts tool calls for a run recorded before the turn was stamped", () => {
+  it("still counts tool calls for a running run recorded before the turn was stamped", () => {
     const { run, events } = fixture(NEWS);
-    expect(deriveState(run, events).turn).toBe(4); // the four tool calls of the fixture
+    expect(deriveState(run, events.filter((e) => e.kind !== "finished")).turn).toBe(4); // the four tool calls of the fixture
   });
 
   it("ignores the SDK's own ToolSearch call: it is the harness looking for tools, not the agent working", () => {

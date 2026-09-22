@@ -1,3 +1,5 @@
+// A real uuid shape, not just 36 hex-or-dash characters: 36 dashes reached Postgres and threw (QA, round 2).
+const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 import { asc, desc, eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
@@ -29,7 +31,7 @@ export const listRuns: ListRuns = async () => {
 };
 
 export const getRun: GetRun = async (id) => {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null; // a non-uuid id would make Postgres throw, not return nothing
+  if (!isUuid(id)) return null; // a non-uuid id would make Postgres throw, not return nothing
   const [row] = await db.select().from(runs).where(eq(runs.id, id));
   if (!row) return null;
   const eventRows = await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq));
@@ -51,7 +53,7 @@ export const getRun: GetRun = async (id) => {
 };
 
 export const getFile: GetFile = async (runId, name) => {
-  if (!/^[0-9a-f-]{36}$/i.test(runId)) return null;
+  if (!isUuid(runId)) return null;
   const [row] = await db.select().from(files).where(and(eq(files.runId, runId), eq(files.name, name)));
   return row ? { meta: { name: row.name, mime: row.mime, bytes: row.bytes }, content: row.content } : null;
 };

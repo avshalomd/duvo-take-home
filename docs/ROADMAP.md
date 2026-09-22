@@ -35,6 +35,15 @@ configuration move to a settings menu. Less clutter on the page the operator use
 Show how a verdict was reached: each check's finding, whether Jev decided alone or delegated to the LLM review,
 and what the review concluded and why.
 
+## 1e. Authentication, prompt-injection safeguards and guardrails (his request)
+
+Sign-in and per-user data (runs, connections, skills) before anyone but the operator can reach the app.
+Prompt-injection defences for an agent that reads the open web and connected services: fetched content and tool
+results treated as data (fenced and labelled in the prompt), a decision-model check on tool inputs that try to
+exfiltrate (a URL with secrets, a write outside the run, a connection call the plan did not name), an allowlist of
+domains per run, and the existing path guard and tool allowlist kept. Guardrails on outputs: a check that a file
+contains no credentials or personal data before it is served, and a budget per user per day.
+
 ## 2. Offline evaluation across automations and failure cases (his request, T+47) - important
 
 Today there is one offline eval: the evaluator itself over 10 labelled cases (`docs/EVAL.md`, 10/10). It judges

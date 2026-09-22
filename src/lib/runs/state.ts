@@ -65,7 +65,8 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
     status: run.status,
     // The turn the mapper stamped on the events, which is the SDK's own count; runs recorded before it was
     // stamped have no turn on their payloads, so they fall back to counting tool calls.
-    turn: maxTurn(events) ?? calls.length,
+    // On a finished run the SDK's own num_turns is the count the cap applied to; while it runs, the mapper's stamp.
+    turn: finished?.num_turns ?? maxTurn(events) ?? calls.length,
     maxTurns: AgentLimits.maxTurns,
     plan,
     currentStep,
