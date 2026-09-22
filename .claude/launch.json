@@ -1,4 +1,23 @@
 {
   "version": "0.0.1",
-  "configurations": [{ "name": "app", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 }]
+  "configurations": [
+    {
+      "name": "app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "qa",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "qa:dev"
+      ],
+      "port": 3010
+    }
+  ]
 }
