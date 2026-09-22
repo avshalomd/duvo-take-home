@@ -22,7 +22,14 @@ function toRun(row: RunRow): Run {
     costUsd: row.costUsd,
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+    outcome: outcomeOf(row.verdict),
   };
+}
+
+/** The stored verdict's headline, or null when the run was never judged or the stored shape is unknown. */
+function outcomeOf(verdict: unknown): Run["outcome"] {
+  const v = (verdict as { verdict?: unknown } | null)?.verdict;
+  return v === "pass" || v === "pass_with_notes" || v === "fail" || v === "unknown" ? v : null;
 }
 
 export const listRuns: ListRuns = async () => {

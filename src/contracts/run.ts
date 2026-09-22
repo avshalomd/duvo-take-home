@@ -73,6 +73,8 @@ export const Run = z.object({
   costUsd: z.number().nullable(),
   createdAt: z.string(),
   finishedAt: z.string().nullable(),
+  // The verdict's headline, so a run row can say "Done, with notes" like the panel; the full Verdict is on GetRun.
+  outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown"]).nullable().optional(),
 });
 export type Run = z.infer<typeof Run>;
 
