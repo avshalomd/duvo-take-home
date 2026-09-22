@@ -2,7 +2,7 @@
 
 Verified on this Mac on 2026-09-22 with `@anthropic-ai/claude-agent-sdk@0.3.278`: a real `query()` run that wrote a
 file into its working directory, connected an http MCP server, ran `WebSearch`, and returned a `json_schema`
-structured output. Everything below is from that run and the package's own `sdk.d.ts`, not from memory.
+structured output; and a second run inside a Next 16 route handler (`next dev`, Turbopack, `serverExternalPackages: ["@anthropic-ai/claude-agent-sdk"]`) that spawned the agent and wrote its file. Everything below is from those runs and the package's own `sdk.d.ts`, not from memory.
 
 ## What it is
 
