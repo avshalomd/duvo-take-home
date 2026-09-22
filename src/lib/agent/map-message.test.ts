@@ -141,12 +141,12 @@ describe("mapMessage", () => {
   // turn is the assistant message, so the mapper counts those and stamps the number on every event it makes.
   it("stamps each event with the assistant turn it belongs to, counting assistant messages and not tool calls", () => {
     const map = createMapper();
-    expect((map(init, 1, "t")[0].payload as { turn: number }).turn).toBe(0); // the init message is before any turn
+    const turnOf = (e: { payload: unknown }) => (e.payload as Record<string, unknown>).turn;
+    expect(turnOf(map(init, 1, "t")[0])).toBe(0); // the init message arrives before any turn
     const first = map(assistant([{ type: "tool_use", id: "t1", name: "WebSearch", input: {} }, { type: "tool_use", id: "t2", name: "WebSearch", input: {} }]), 2, "t");
-    expect(first.map((e) => (e.payload as { turn: number }).turn)).toEqual([1, 1]); // two tools, one turn
-    expect((map(userResult({ tool_use_id: "t1", content: "ok" }), 4, "t")[0].payload as { turn: number }).turn).toBe(1);
-    const second = map(assistant([{ type: "text", text: "Writing it up." }]), 5, "t");
-    expect((second[0].payload as { turn: number }).turn).toBe(2);
+    expect(first.map(turnOf)).toEqual([1, 1]); // two tools, one turn
+    expect(turnOf(map(userResult({ tool_use_id: "t1", content: "ok" }), 4, "t")[0])).toBe(1);
+    expect(turnOf(map(assistant([{ type: "text", text: "Writing it up." }]), 5, "t")[0])).toBe(2);
   });
 
   // Q7: the SDK's error result carries `errors: string[]` and no `result`, so the provider's own words - the only
