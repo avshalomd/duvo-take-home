@@ -39,7 +39,7 @@ export const EvaluateInput = z.object({
   plan: Plan.nullable(),
   files: z.array(z.object({ name: z.string(), content: z.string() })),
   today: z.string(), // ISO date, so "last 7 days" checks are testable
-  toolsUsed: z.array(z.string()).default([]), // tool names the run called: "a connection claimed but never used" is one line of code, not a judge call
+  toolsUsed: z.array(z.string()).optional(), // tool names the run called: "a connection claimed but never used" is one line of code, not a judge call
 });
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
 export type EvaluateRun = (input: EvaluateInput) => Promise<Verdict>;
