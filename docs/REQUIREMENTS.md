@@ -36,6 +36,16 @@ off is a data leak.
 - I7 A one-click preset for the AI-news task and a runs list of past runs, seeded from fixtures, so every screen demos even when the model is down.
 - I8 One page (his correction, T+5): the instructions box and the agent's response are the main interaction; the step timeline and the key state card are a side panel on that same page, opened for the current run, not a separate route.
 
+- I9 (his idea, T+8) A plan tool: the agent must call out every step it will take, then mark each step done and the step it is on as it goes - the key state comes from the agent's own plan (done, current, pending), not only from inferred tool calls. An in-process MCP tool (`set_plan`, `update_step`), enforced by the system prompt; the state card renders it.
+
+
+## His framing (T+10, replaces the step-by-step reading above where they differ)
+
+- A **generic automation agent**: native abilities are searching the web, reading pages and writing text files. It gets one query and always reports where it is in the automation (the plan tool, I9).
+- A run ends either with a report of what it did and what it could not do, or with an explanation plus **downloadable files, text only for now: .txt, .md, .csv** (visuals later).
+- **Connections are the user's own MCP servers** (Jira, GitHub, any non-trivial data source), enabled or disabled per connection; the agent uses only the enabled ones and the run shows which it used. The hour ships the mechanism with one or two seeded servers; adding any http MCP by URL is the generic form.
+- The evaluator is therefore generic: it judges the run's outputs (final report and files) against the instructions, with per-file-type code checks (a CSV parses, files non-empty) before the model judgment.
+
 ## Open questions
 
 - Q1 Live URL: the SDK spawns a ~270 MB Claude Code binary; Vercel's function package cap is now 5 GB on Fluid Compute, unverified for this SDK. - default: deploy the app and the stored runs to Vercel, try one live run there; if the agent cannot spawn there, live runs are local-only and the README says so.
@@ -43,12 +53,25 @@ off is a data leak.
 - Q3 What does the evaluator judge? - default: the CSV artifact. Code checks first (parses, required columns, 5+ rows, valid URLs, dates within 7 days, no duplicate URLs), then the decision model (`decide()`) on the closed questions (rows on topic, run complete); verdict pass/fail with reasons, shown on the run.
 - Q4 Agent model and backend? - default: `claude-sonnet-5` with the Anthropic key; OpenRouter as the Anthropic-compatible fallback.
 
-## Scope (first guess)
+## Scope (aligned, T+13)
 
-- Must: R1, R2, R3, R4, R5, I1, I2, I3, I4, I5. If the build slips, R5's model judge goes first (code checks stay), then R4 keeps one connection with the toggle and drops the second.
-- Should: I6, I7, Q1's live run on Vercel, token streaming of the assistant text.
-- Won't: sign-in and multi-user, scheduled or recurring automations, editing the agent's tools from the UI, resuming a run, more than one connection type, cost dashboards.
+- Must: R1, R2, R3, R4, R5, I1, I2, I3, I4, I5, I9 - a generic agent (web search, read, write .txt/.md/.csv), one page with the run side panel, the plan tool as the source of "where it is", connections as a list of the user's http MCP servers (seeded, on/off, enforced at the run), files downloadable, and the evaluator as the run's last step before it is marked done.
+- Should: I6, I7, a live run on Vercel, token streaming of the assistant text, a per-step evaluator (Jev after every turn of the loop).
+- Won't: sign-in and multi-user, scheduled or recurring automations, non-text outputs (visuals), resuming a run, stdio MCP servers, cost dashboards.
+- If the build slips: the model judgment goes first (the code checks and the plan-followed check stay), then the "add a connection" form (seeded connections keep their switches).
+
+## Assumptions
+
+- "Turn" in his evaluator answer means one automation run: the evaluator runs once, when the agent finishes, before the run is marked done. A per-step evaluator is a Should.
+- The agent decides the output format from the instructions ("save as CSV"); the user does not pick one. Files are restricted to .txt, .md and .csv by the agent's Write tool rules and by what we serve.
+- Agent model: `claude-sonnet-5` on the Anthropic key; OpenRouter as the Anthropic-compatible fallback. Native abilities: WebSearch, WebFetch, Read, Write; no Bash, no Edit; cwd per run; max turns and max budget per run.
+- No sign-in: one operator. Connection tokens are stored in the database as entered (a demo; the README says so) and never rendered back.
+- The run page polls the events every 2 s; no token streaming in the Must tier.
+- Connections: the seeded ones are DeepWiki (no auth) and GitHub read-only when `GITHUB_TOKEN` is set. Only http/sse MCP servers; stdio servers need a command on the host and are out.
 
 ## Design choices
 
-- One page. Left: instructions box, the AI-news preset, the connection switch, the agent's final response, past runs. Right, a side panel for the selected run: key state card on top, the step timeline below it, artifacts and the verdict at the bottom. No separate run route (his call at T+5).
+- **One page** (his call, T+5). Left: instructions box, the AI-news preset, the connections with their switches, past runs. Right, a side panel for the selected run: the plan (done / current / pending) and key state card on top, the step timeline below, the end report, files and the verdict at the bottom.
+- **Connections** (T+12): a list of the user's http MCP servers, name + URL + optional token, on/off; seeded; the agent gets every enabled one; the run records which it had (init message) and which it used (tool calls).
+- **Evaluator** (T+12, his words): "at the end of every turn, before we mark it as done, a real-time evaluator: Jev checks that the agent answered the user query and followed the plan." Code checks on the files first (parse per type, non-empty, exist when asked), then `decide()` with the instructions, the plan and the report: answered the query? followed the plan? Verdict with reasons on the run.
+- **Live URL** (T+12): deploy everything; the first deploy tries a live run on Vercel; if the SDK cannot spawn there, live runs are local-only and the README says so.
