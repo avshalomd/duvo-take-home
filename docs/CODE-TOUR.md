@@ -45,3 +45,12 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/components/automations/format.ts` - tool calls as one-liners; `mcp__deepwiki__read_wiki_structure` reads "DeepWiki: read_wiki_structure" by matching the connection key.
 - `src/components/automations/connections-list.tsx` - the switches and the folded add-a-server form; a token is typed once and never rendered back.
 - `e2e/flow.spec.ts` - the page and the panel on seeded runs, run on :3000 before a deploy.
+
+## Round 2 - fixes and the glance view
+
+- `src/lib/agent/run.ts` - the wall clock is enforced with an AbortController at `AgentLimits.wallClockMs`; a PreToolUse hook refuses any Read/Write path outside the run's directory (both spellings of the temp dir on macOS); the whole tail (files, evaluation, closing) sits inside the try, so a run always ends in a terminal status with its reason; on Vercel the run directory is under the OS temp dir.
+- `src/lib/agent/plan-tool.ts` - `createPlanServer()` per run: an MCP server instance can connect to one transport only, so a shared one broke the second concurrent run.
+- `src/lib/agent/map-message.ts` - error results keep the provider's own words (`errors[]`); every event is stamped with the assistant turn so the state's turn matches the SDK's cap; the host's ToolSearch call is not the agent's work and is dropped.
+- `src/lib/eval/checks.ts` - a row without a URL is not a duplicate.
+- `src/lib/llm/decide.ts` - honours `AI_SIMULATE_DOWN` like `getModel()`, so QA can walk "judge unavailable".
+- `src/components/automations/run-panel.tsx`, `plan-stepper.tsx`, `details-section.tsx` (UX, C6) - the glance view for office workers: the instruction as the title, the outcome in a sentence, the plan as an animated stepper with a progress bar; everything technical (timeline, state grid, judgment, ids, model) under a Details toggle. Pure display rules live in `console.ts`-style helpers with their own tests.
