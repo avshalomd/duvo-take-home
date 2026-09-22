@@ -77,7 +77,7 @@ describe("evaluate", () => {
 
   it("escalates to the review when the judge is not confident either way", async () => {
     const d = deps(judgment(0.96, 0.6));
-    const verdict = await evaluate(input, d);
+    await evaluate(input, d);
     expect(d.review).toHaveBeenCalledOnce();
   });
 
