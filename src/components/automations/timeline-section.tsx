@@ -1,6 +1,7 @@
 import type { RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { formatClock } from "./format";
+import { formatCost, formatDuration } from "./format";
+import { LocalTime } from "./local-time";
 import { groupEvents, type EventGroup } from "./group-events";
 import { Empty, Section } from "./section";
 import { ToolCard } from "./tool-card";
@@ -73,17 +74,23 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
         );
       case "started":
         return (
-          <p key={event.seq} className="text-[11px] text-muted-foreground">
-            {formatClock(event.at)} started on {event.payload.model}
+          <p key={event.seq} className="flex gap-2 text-[11px] text-muted-foreground">
+            <LocalTime iso={event.at} />
+            started on {event.payload.model}
           </p>
         );
       case "finished":
+        // the report itself is the panel's "What it produced" section: here the event is one line of bookkeeping
         return (
           <p
             key={event.seq}
-            className={cn("text-xs", event.payload.is_error ? "text-red-600" : "text-emerald-700")}
+            className={cn(
+              "text-xs tabular-nums",
+              event.payload.is_error ? "text-red-600 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400",
+            )}
           >
-            finished ({event.payload.subtype}) - {event.payload.result}
+            finished ({event.payload.subtype}) - {formatDuration(event.payload.duration_ms)},{" "}
+            {formatCost(event.payload.total_cost_usd)}
           </p>
         );
       default:
