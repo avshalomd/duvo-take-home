@@ -42,7 +42,8 @@ export function AddConnectionDialog({ open, onOpenChange }: { open: boolean; onO
     submitted.current = false;
     if (state.error) toast.error(state.error);
     else if (!state.fieldErrors) {
-      toast.success("Server added - switch it on to give it to the next run");
+      // the store creates a connection enabled, so the toast says what is true: it is already on (Q52)
+      toast.success("Server added and switched on for the next run");
       onOpenChange(false);
     }
   }, [state, pending, onOpenChange]);

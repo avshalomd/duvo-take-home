@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   title: "Automations",
   description: "Give an agent a task in plain English and watch it plan, work and be judged.",
 };
+
+// Renders <meta name="color-scheme" content="light dark">: it tells the browser both themes exist, so form
+// controls and scrollbars follow the theme the CSS tokens pick, and the first paint is not a white flash.
+export const viewport: Viewport = { colorScheme: "light dark" };
 
 // The shell is only the frame: the header needs to know whether a run is live, so the page renders it.
 export default function RootLayout({ children }: LayoutProps<"/">) {

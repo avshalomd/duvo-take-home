@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { chooseView, parseRunPayload, shouldPoll } from "./poll";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { chooseView, isTerminal, parseRunPayload, shouldPoll } from "./poll";
 import type { RunView } from "./types";
 
 const INTERVAL_MS = 2000;
@@ -13,6 +14,16 @@ export function useRunPoll(initial: RunView): RunView {
   // chooseView decides which picture is the later one: another run, or a newer server render (Re-evaluate), drops the poll
   const view = chooseView(initial, polled);
   const { id, status } = view.run;
+
+  // The runs list beside the panel is a server render, so it would say "Working on it" until the next reload.
+  // One refresh at the moment the run settles brings the row - and the header's live count - up to date (Q79).
+  const seenLive = useRef<string | null>(isTerminal(initial.run.status) ? null : initial.run.id);
+  const router = useRouter();
+  useEffect(() => {
+    if (seenLive.current !== id || !isTerminal(status)) return;
+    seenLive.current = null; // once per run: a run that was already finished when the page rendered needs nothing
+    router.refresh();
+  }, [id, status, router]);
 
   useEffect(() => {
     if (!shouldPoll(status)) return;

@@ -9,6 +9,7 @@ import { addConnection, setConnectionEnabled } from "@/lib/connections/store";
 import { reevaluateRun } from "@/lib/eval/reevaluate";
 import { getRun } from "@/lib/runs/queries";
 import { startRun } from "@/lib/runs/start";
+import { readable } from "./readable";
 
 // Every action returns its state instead of throwing: the engine and the store are still stubs, and a stub's
 // "not implemented" must reach the user as an error state, not as a crashed page.
@@ -17,10 +18,6 @@ export type FormState = {
   fieldErrors?: Record<string, string[] | undefined>;
   values?: Record<string, string>;
 };
-
-function readable(e: unknown): string {
-  return e instanceof Error ? e.message : "Something went wrong";
-}
 
 export async function startRunAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const values = { prompt: String(formData.get("prompt") ?? "") };

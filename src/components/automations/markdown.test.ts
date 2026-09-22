@@ -16,6 +16,26 @@ describe("parseInline", () => {
   it("leaves a lone asterisk alone, so prose is never mangled", () => {
     expect(parseInline("2 * 3 = 6")).toEqual([{ text: "2 * 3 = 6" }]);
   });
+
+  // Q50: a URL with brackets in it is normal on Wikipedia; stopping at the first ")" left a stray bracket on screen
+  it("consumes the whole (...) of a link, nested brackets included", () => {
+    expect(parseInline("see [docs](https://a.test/x_(y)) now")).toEqual([
+      { text: "see " },
+      { text: "docs", href: "https://a.test/x_(y)" },
+      { text: " now" },
+    ]);
+  });
+
+  // Q57: the href comes from the model's text, so only the two schemes a report ever needs are turned into a link
+  it("keeps a link the browser should not follow as plain text, with nothing left over", () => {
+    expect(parseInline("[x](javascript:alert(1))")).toEqual([{ text: "x" }]);
+    expect(parseInline("a [file](file:///etc/passwd) b")).toEqual([{ text: "a " }, { text: "file" }, { text: " b" }]);
+    expect(parseInline("[img](data:text/html,<script>)")).toEqual([{ text: "img" }]);
+  });
+
+  it("links http as well as https, and nothing else", () => {
+    expect(parseInline("[a](http://a.test)")).toEqual([{ text: "a", href: "http://a.test" }]);
+  });
 });
 
 describe("parseMarkdown", () => {

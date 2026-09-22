@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseView, parseRunPayload, shouldPoll } from "./poll";
+import { chooseView, isTerminal, parseRunPayload, shouldPoll } from "./poll";
 
 const payload = {
   run: {
@@ -47,6 +47,20 @@ describe("shouldPoll - the panel only polls a run that can still change", () => 
   it("stops polling once the run has ended", () => {
     expect(shouldPoll("succeeded")).toBe(false);
     expect(shouldPoll("failed")).toBe(false);
+  });
+});
+
+// Q79: the row in the runs list is a server render, so the panel has to say when a run has settled.
+describe("isTerminal - the moment the rest of the page has to be told about", () => {
+  it("is true only for a run that has ended, whichever way it ended", () => {
+    expect(isTerminal("succeeded")).toBe(true);
+    expect(isTerminal("failed")).toBe(true);
+  });
+
+  it("is false while the run can still change, evaluating included", () => {
+    expect(isTerminal("queued")).toBe(false);
+    expect(isTerminal("running")).toBe(false);
+    expect(isTerminal("evaluating")).toBe(false);
   });
 });
 

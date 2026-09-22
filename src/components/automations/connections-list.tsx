@@ -46,6 +46,7 @@ function ConnectionRow({ connection }: { connection: Connection }) {
   const status = connectionStatus(connection.lastStatus);
 
   function toggle(next: boolean) {
+    if (pending) return; // a second press while the first is in flight is ignored, rather than disabling the switch (Q69)
     setEnabled(next); // optimistic: the switch must feel instant
     startTransition(async () => {
       const result = await setConnectionEnabledAction(connection.id, next);
@@ -73,10 +74,13 @@ function ConnectionRow({ connection }: { connection: Connection }) {
       </div>
       <Switch
         checked={enabled}
-        disabled={pending}
+        // never disabled while saving: a disabled control loses focus, and the next press goes nowhere (Q69).
+        // aria-busy says the change is being saved, which is what disabled was wrongly being used to say.
+        aria-busy={pending}
         onCheckedChange={toggle}
         aria-label={`Enable ${connection.name}`}
-        className="shrink-0 data-checked:bg-emerald-600"
+        // the switch stays 18 px tall; the pseudo-element gives it a 44 px hit area on a phone (Q75)
+        className="relative shrink-0 data-checked:bg-emerald-700 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']"
       />
     </li>
   );

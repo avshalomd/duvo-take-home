@@ -1,13 +1,25 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 // Runs against a dev server on whatever runs the database holds:
 // BASE_URL=http://localhost:3001 npx playwright test e2e/flow.spec.ts
 // It never starts a run, so it creates nothing and cleans nothing up.
-async function openFirstRun(page: Page) {
-  await page.goto("/");
-  await page.getByTestId("runs").getByRole("link").first().click();
+// aria-current is set by the server render, so waiting for it is waiting for the panel to be the row's own run.
+async function openRun(page: Page, row: Locator) {
+  await row.click();
+  await expect(row).toHaveAttribute("aria-current", "true");
   await expect(page.getByTestId("run-panel")).toBeVisible();
   return page.getByTestId("run-panel");
+}
+
+async function openFirstRun(page: Page) {
+  await page.goto("/");
+  return openRun(page, page.getByTestId("runs").getByRole("link").first());
+}
+
+// A run still working has no plan and no verdict yet, so anything about the finished picture opens a finished run.
+async function openFinishedRun(page: Page) {
+  await page.goto("/");
+  return openRun(page, page.getByTestId("runs").getByRole("link").filter({ hasText: /Done/ }).first());
 }
 
 test("the home page offers the instructions box, the connections with switches and the past runs", async ({ page }) => {
@@ -69,9 +81,15 @@ test("a run is named by its instructions and says how it turned out in plain wor
 });
 
 test("the plan leads the panel as a stepper with a progress line saying how many steps are settled", async ({ page }) => {
-  const panel = await openFirstRun(page);
-  await expect(panel.getByTestId("plan-progress")).toContainText(/\d+ of \d+ steps/);
-  await expect(panel.getByTestId("plan-steps").getByRole("listitem").first()).toBeVisible();
+  const panel = await openFinishedRun(page);
+  const progress = panel.getByTestId("plan-progress");
+  if (await progress.count()) {
+    await expect(progress).toContainText(/\d+ of \d+ steps/);
+    await expect(panel.getByTestId("plan-steps").getByRole("listitem").first()).toBeVisible();
+  } else {
+    // a run the agent never planned says so where the stepper would be, rather than leaving an empty box
+    await expect(panel).toContainText(/never stated a plan/i);
+  }
 });
 
 test("what the run produced is offered as files to download and a readable report", async ({ page }) => {
@@ -156,6 +174,139 @@ test("a new MCP server is added in a dialog and refused with a readable error wh
   await dialog.getByLabel("URL").fill("not-a-url");
   await dialog.getByRole("button", { name: "Add", exact: true }).click();
   // a full sentence with an example, and the cursor put back in the field that was refused
-  await expect(page.getByTestId("connections-form")).toContainText(/full URL, for example https/i);
+  await expect(page.getByTestId("connections-form")).toContainText(/full address, starting with https/i);
   await expect(dialog.getByLabel("URL")).toBeFocused();
+});
+
+// ---- round 3 QA findings: the keyboard, the screen reader and the phone (Q62, Q68-Q76) ----
+
+// Q62: a modal that does not hold the keyboard loses the person who cannot see where focus went.
+test("the add-a-server dialog holds the keyboard inside it and hands it back on Escape", async ({ page }) => {
+  await page.goto("/");
+  const opener = page.getByRole("button", { name: /add a server/i });
+  await opener.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+
+  // more tabs than the dialog has controls: focus must cycle inside it, never reach the page behind
+  for (let i = 0; i < 10; i++) {
+    await page.keyboard.press("Tab");
+    await expect.poll(() => dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+  }
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(opener).toBeFocused(); // the cursor comes back to where it was
+});
+
+// Q68: the outcome changes while the run polls; a live region is the only way that reaches a screen reader.
+test("the run's outcome line is a live region", async ({ page }) => {
+  const panel = await openFirstRun(page);
+  const status = panel.getByRole("status").first();
+  await expect(status).toContainText(/Done|Working on it|Getting ready|Checking|Something went wrong/);
+  await expect(status.getByTestId("outcome")).toBeVisible();
+});
+
+// Q70: 22 tabs through the runs list before reaching the run is not a keyboard path anyone would take.
+test("the first tab on the page skips to the open run", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("run-panel")).toBeVisible();
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: /skip to the run/i });
+  await expect(skip).toBeFocused();
+  await skip.press("Enter");
+  await expect(page.getByTestId("run-panel")).toBeFocused();
+});
+
+// Q71: one focus ring, so a keyboard user sees the same mark wherever they are.
+test("run rows and the Details toggle carry the same focus-ring token", async ({ page }) => {
+  const panel = await openFirstRun(page);
+  const row = page.getByTestId("runs").getByRole("link").first();
+  const details = panel.getByRole("button", { name: /details/i });
+  for (const el of [row, details]) {
+    await expect(el).toHaveClass(/focus-visible:ring-\[3px\]/);
+  }
+});
+
+// Q72: two links both called "Download" are two identical rows in a screen reader's link list.
+test("each download link names its file and its size", async ({ page }) => {
+  await page.goto("/");
+  const rows = page.getByTestId("runs").getByRole("link");
+  await expect(rows.first()).toBeVisible(); // the page streams a skeleton first: count() before that is 0
+  const count = await rows.count();
+  for (let i = 0; i < count; i++) {
+    await openRun(page, rows.nth(i));
+    const link = page.getByTestId("files").getByRole("link").first();
+    if ((await link.count()) === 0) continue;
+    await expect(link).toHaveAccessibleName(/^Download .+ \(\d+(\.\d+)? KB\)$/);
+    return;
+  }
+  throw new Error("no run with a file in this database - seed one");
+});
+
+// Q73: headings and landmarks are how a screen reader user moves; a label is not a heading.
+test("the page is navigable by landmark and heading", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 2, name: /instructions/i })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /past runs/i })).toBeVisible();
+  const panel = page.getByTestId("run-panel");
+  await expect(panel).toHaveAttribute("aria-labelledby", "run-title");
+  await expect(page.locator("#run-title")).toBeVisible();
+});
+
+// Q74: a truncated instruction with no tooltip, and a bare "19 s - $0.028", say nothing.
+test("a run row shows its full instructions on hover and says what its numbers mean", async ({ page }) => {
+  await page.goto("/");
+  const rows = page.getByTestId("runs").getByRole("link");
+  await expect(rows.first()).toHaveAttribute("title", /\S/);
+  const finished = rows.filter({ hasText: /Done/ }).first();
+  await expect(finished).toContainText(/\d+ s, \$\d+(\.\d+)? spent/);
+});
+
+test.describe("on a phone, the controls are reachable", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  // Q75: 28 px is a miss under a thumb; 40 px is the smallest target that is not a game.
+  test("the primary controls are at least 40 px tall", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("run-panel")).toBeVisible();
+    const run = await page.getByRole("button", { name: "Run", exact: true }).boundingBox();
+    expect(run!.height).toBeGreaterThanOrEqual(40);
+
+    // the switch stays small, but its hit area does not: a press 14 px above its middle still lands on it
+    const toggle = page.getByTestId("connections").getByRole("switch").first();
+    await toggle.scrollIntoViewIfNeeded(); // elementFromPoint reads the viewport, so the switch has to be in it
+    const box = (await toggle.boundingBox())!;
+    const role = await page.evaluate(
+      (p) => document.elementFromPoint(p.x, p.y)?.closest("[role=switch]")?.getAttribute("role") ?? "",
+      { x: box.x + box.width / 2, y: box.y + box.height / 2 - 14 },
+    );
+    expect(role).toBe("switch");
+  });
+
+  // Q76: with a run open, the instructions box is a thousand pixels down the page.
+  test("the header offers a way back to a new run", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("run-panel")).toBeVisible();
+    await page.getByTestId("app-header").getByRole("link", { name: /new run/i }).click();
+    await expect(page.getByRole("textbox", { name: /instructions/i })).toBeInViewport();
+  });
+});
+
+// Q69: a switch that disables itself under the finger drops focus and swallows the second press.
+test("a connection switch keeps focus while its change is saved", async ({ page }) => {
+  await page.goto("/");
+  const toggle = page.getByTestId("connections").getByRole("switch").first();
+  const before = await toggle.getAttribute("aria-checked");
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(toggle).toBeEnabled(); // never disabled mid-flight
+  await expect(toggle).toBeFocused();
+  await expect(toggle).not.toHaveAttribute("aria-checked", before!);
+  await expect(toggle).toHaveAttribute("aria-busy", "true"); // the save is announced instead of disabling the control
+
+  await expect(toggle).toHaveAttribute("aria-busy", "false");
+  await page.keyboard.press("Space"); // put the connection back as it was
+  await expect(toggle).toHaveAttribute("aria-checked", before!);
 });
