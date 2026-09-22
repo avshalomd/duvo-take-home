@@ -1,11 +1,17 @@
-import type { EvaluateRun } from "@/contracts/eval";
+import type { EvaluateInput, EvaluateRun, Judgment, Review, Verdict } from "@/contracts/eval";
 
-// STUB - the eval package: code checks on the files, then decide() on answeredQuery and followedPlan.
-export const evaluateRun: EvaluateRun = async (input) => ({
-  verdict: input.files.length > 0 ? "pass" : "fail",
-  checks: [{ id: "files", label: "A file was written", ok: input.files.length > 0, detail: `${input.files.length} file(s)` }],
-  judgment: null,
-  review: null,
-  reasons: input.files.length > 0 ? [] : ["No file was written"],
-  evaluatedAt: new Date().toISOString(),
-});
+export type EvaluateDeps = {
+  judge: (input: EvaluateInput) => Promise<Judgment>;
+  review: (input: EvaluateInput) => Promise<Review>;
+};
+
+// placeholder: the tests land first and must fail on their assertions, not on a missing module.
+export async function evaluate(_input: EvaluateInput, _deps: EvaluateDeps): Promise<Verdict> {
+  return { verdict: "unknown", checks: [], judgment: null, review: null, reasons: [], evaluatedAt: "" };
+}
+
+export const evaluateRun: EvaluateRun = async (input) =>
+  evaluate(input, {
+    judge: async () => ({ answeredQuery: 0, followedPlan: 0 }),
+    review: async () => ({ taskFinished: false, responseSuitable: false, changeNeeded: null, reasoning: "" }),
+  });
