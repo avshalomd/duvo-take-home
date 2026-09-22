@@ -1,15 +1,16 @@
 # QA
 
-Findings from the QA agents (qa-func, qa-ux) and from him, logged and routed by the main thread.
+## R3 - the merged app on :3000 (T+45 to T+48, orchestrator's walk)
 
-## Bug log
-
-| id | source | step | observed | expected | severity | owner | status |
-|---|---|---|---|---|---|---|---|
-
-## Script (optional, only if he asks to click through himself)
-
-| # | do | expect | R3 | R4 |
+| # | severity | finding | owner | status |
 |---|---|---|---|---|
+| 1 | - | Live run from the form: succeeded in 1 min 29 s, $0.39; plan of 4 steps with the agent's notes, state card, timeline, output.csv downloadable (attachment header), verdict pass with 7 checks and Jev 0.90 / 0.93 | - | verified |
+| 2 | minor | The seeded "running" fixture run never finishes, so its panel polls every 2 s for ever | ui | open, listed in the README |
+| 3 | minor | `reevaluateRun`'s two database queries have no integration test | eval | open, listed in the README |
 
-## Sample inputs
+No open blocker.
+
+## R4 - the live URL
+
+The midway deploy (T+44) passed the smoke test (health, home page). The last deploy carries the merged page; a live
+run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour.
