@@ -39,10 +39,10 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | Q18 | qa-ux | the raw enum `not_configured` on the GitHub row while its switch is on | "needs a token" and a warning that it does nothing until then | minor | ui | fixed (UX, merged 22efdf4) |
 | Q19 | qa-ux | plan steps as `[x] [.] [ ]` in mono; `[x]` reads as failed | check / dot / empty circle icons | minor | ui | fixed (UX, merged 22efdf4) |
 | Q20 | qa-ux | timeline clock times in UTC with no label | local time or a UTC label | minor | ui | fixed (UX, merged 22efdf4) |
-| Q21 | qa-ux | runs list rows have no date or relative time | "12 min ago" beside the duration | minor | ui | fixing |
+| Q21 | qa-ux | runs list rows have no date or relative time | "12 min ago" beside the duration | minor | ui | fixed (UX: "18 min ago" on every row) |
 | Q22 | qa-ux | cost and duration merged in one row, no tabular figures | two rows, tabular-nums | minor | ui | fixed (UX, merged 22efdf4) |
 | Q23 | qa-ux | the judgment percentages are unexplained | "checked by a second model: 90% confident it answered the query" | minor | ui | fixed (UX, merged 22efdf4) |
-| Q24 | qa-ux | add-a-server errors are fragments, not tied to inputs, focus lost | full sentences, aria-describedby, focus on the first error | minor | ui | fixing |
+| Q24 | qa-ux | add-a-server errors are fragments, not tied to inputs, focus lost | full sentences, aria-describedby, focus on the first error | minor | ui | fixed (UX: sentence errors, focus on the refused field) |
 | Q25 | qa-ux | "No run selected" ignores the runs list beside it; "not found" offers no way back | "Pick a run on the left, or write instructions and press Run." | minor | ui | fixed (UX, merged 22efdf4) |
 | Q26 | qa-ux | the product is called "App" in the header and the tab | a real name | minor | main | fixed |
 | Q27 | qa-ux | the amber "running" badge is at 4.6:1 contrast at 10 px | amber-800 at that size | minor | ui | fixed |
