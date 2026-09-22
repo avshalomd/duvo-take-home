@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { startRunAction } from "@/app/actions";
+import { reevaluateAction, startRunAction } from "@/app/actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FilesSection } from "./files-section";
@@ -11,13 +11,17 @@ import { StateSection } from "./state-section";
 import { StatusBadge } from "./status-badge";
 import { TimelineSection } from "./timeline-section";
 import type { RunView } from "./types";
+import { useRunPoll } from "./use-run-poll";
 import { VerdictSection } from "./verdict-section";
 
 // The panel reads top to bottom the way the run happened: how it read the task, what it planned, where it is,
 // what it did, what it produced, and only then the judgment.
-export function RunPanel({ view, connections }: { view: RunView; connections: { name: string }[] }) {
-  const [again, runAgain, pending] = useActionState(startRunAction, {});
+export function RunPanel({ view: initial, connections }: { view: RunView; connections: { name: string }[] }) {
+  const view = useRunPoll(initial); // live while the run is running, the server's render otherwise
+  const [again, runAgain, starting] = useActionState(startRunAction, {});
+  const [judged, reevaluate, judging] = useActionState(reevaluateAction, {});
   const { run, state, events, files, verdict } = view;
+  const error = again.error ?? judged.error;
 
   return (
     <div data-testid="run-panel" className="rounded-xl border bg-background">
@@ -28,20 +32,22 @@ export function RunPanel({ view, connections }: { view: RunView; connections: { 
         <div className="ml-auto flex items-center gap-2">
           <form action={runAgain}>
             <input type="hidden" name="prompt" value={run.prompt} />
-            <Button type="submit" size="sm" variant="outline" disabled={pending}>
-              {pending ? "Starting..." : "Run again"}
+            <Button type="submit" size="sm" variant="outline" disabled={starting}>
+              {starting ? "Starting..." : "Run again"}
             </Button>
           </form>
-          {/* Re-evaluate needs an engine entry point that no contract exposes yet (contract request filed). */}
-          <Button size="sm" variant="outline" disabled title="Wired when the evaluator exposes a re-run">
-            Re-evaluate
-          </Button>
+          <form action={reevaluate}>
+            <input type="hidden" name="runId" value={run.id} />
+            <Button type="submit" size="sm" variant="outline" disabled={judging}>
+              {judging ? "Evaluating..." : "Re-evaluate"}
+            </Button>
+          </form>
         </div>
       </header>
 
-      {again.error && (
+      {error && (
         <Alert variant="destructive" className="m-4 w-auto">
-          <AlertDescription>{again.error}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 

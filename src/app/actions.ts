@@ -6,6 +6,7 @@ import { z } from "zod";
 import { StartRunInput } from "@/contracts/agent";
 import { NewConnection } from "@/contracts/connection";
 import { addConnection, setConnectionEnabled } from "@/lib/connections/store";
+import { reevaluateRun } from "@/lib/eval/reevaluate";
 import { startRun } from "@/lib/runs/start";
 
 // Every action returns its state instead of throwing: the engine and the store are still stubs, and a stub's
@@ -32,6 +33,19 @@ export async function startRunAction(_prev: FormState, formData: FormData): Prom
     return { error: readable(e), values }; // keeps what was typed, so the instructions are not lost
   }
   redirect(`/?run=${id}`); // redirect throws its own signal: it must stay outside the try
+}
+
+// The verdict is stored on the run, so re-evaluating is a write: a Server Action, not a client fetch.
+export async function reevaluateAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const runId = String(formData.get("runId") ?? "");
+  if (!runId) return { error: "No run selected" };
+  try {
+    await reevaluateRun(runId);
+  } catch (e) {
+    return { error: readable(e) };
+  }
+  revalidatePath("/");
+  return {};
 }
 
 export async function setConnectionEnabledAction(id: string, enabled: boolean): Promise<FormState> {

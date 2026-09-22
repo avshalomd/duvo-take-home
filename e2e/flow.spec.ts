@@ -42,8 +42,8 @@ test("opening a run shows intent, plan, state, timeline, files and verdict in th
   const download = panel.getByTestId("files").getByRole("link", { name: /output\.csv/ });
   await expect(download).toHaveAttribute("href", `/api/runs/${FIXTURE_RUN}/files/output.csv`);
 
-  await expect(panel.getByTestId("verdict")).toContainText("pass");
-  await expect(panel.getByTestId("verdict")).toContainText("CSV parses");
+  // no verdict is stored against a run until the evaluator has run: the block says so instead of sitting empty
+  await expect(panel.getByTestId("verdict")).toContainText(/not evaluated/i);
 });
 
 test("a failed run shows why it stopped and offers Run again", async ({ page }) => {

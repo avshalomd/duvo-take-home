@@ -1,5 +1,5 @@
+import { AddConnectionForm } from "@/components/automations/add-connection-form";
 import { ConnectionsList } from "@/components/automations/connections-list";
-import { fixtureVerdict } from "@/components/automations/fixture-verdict";
 import { InstructionsForm } from "@/components/automations/instructions-form";
 import { RunPanel } from "@/components/automations/run-panel";
 import { RunsList } from "@/components/automations/runs-list";
@@ -15,9 +15,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   const selectedId = typeof requested === "string" ? requested : runs[0]?.id;
   const data = selectedId ? await getRun(selectedId) : null;
-  const view: RunView | null = data
-    ? { ...data, state: deriveState(data.run, data.events), verdict: fixtureVerdict(data.run.id) }
-    : null;
+  // deriveState is pure, so the panel's state card is computed on every render rather than stored and stale
+  const view: RunView | null = data ? { ...data, state: deriveState(data.run, data.events) } : null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
@@ -30,6 +29,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground">Connections</h2>
           <ConnectionsList connections={connections} />
+          <AddConnectionForm />
         </section>
 
         <section className="space-y-2">
