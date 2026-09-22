@@ -113,6 +113,30 @@ describe("deriveState", () => {
     expect(state.currentStep).toEqual({ index: 1, title: "Read each release", status: "running" });
   });
 
+  // Q32/Q33, both from the same reading of a real run: the card said "turn 8 of 25" where the agent had taken
+  // three, and it showed ToolSearch - the SDK's own tool lookup - as the agent's last tool.
+  it("reads the turn from the assistant turn the mapper stamped, not from the number of tool calls", () => {
+    const { run, events } = fixture(NEWS);
+    const stamped = events.map((e, i) => ({ ...e, payload: { ...e.payload, turn: i < 3 ? 1 : 2 } }) as RunEvent);
+    expect(deriveState(run, stamped).turn).toBe(2);
+  });
+
+  it("still counts tool calls for a run recorded before the turn was stamped", () => {
+    const { run, events } = fixture(NEWS);
+    expect(deriveState(run, events).turn).toBe(4); // the four tool calls of the fixture
+  });
+
+  it("ignores the SDK's own ToolSearch call: it is the harness looking for tools, not the agent working", () => {
+    const { run, events } = fixture(NEWS);
+    const withSearch: RunEvent[] = [
+      { seq: 100, at: "2026-09-22T09:50:00.000Z", kind: "tool_call", payload: { tool_use_id: "ts1", name: "ToolSearch", input: { query: "web" } } },
+      ...events,
+    ];
+    const state = deriveState(run, withSearch);
+    expect(state.toolsUsed).not.toContain("ToolSearch");
+    expect(state.lastTool?.name).toBe("Write");
+  });
+
   it("has no plan and no current step when the agent never called the plan tool", () => {
     const { run, events } = fixture(NEWS);
     const state = deriveState(run, events);
