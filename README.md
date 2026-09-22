@@ -72,9 +72,9 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 
 ## Not done, next
 
-- Live runs on the deployed URL need `ANTHROPIC_API_KEY` on Vercel and depend on the Agent SDK spawning its
-  subprocess inside a Vercel function; verified locally, not yet verified in production. Seeded runs demo every
-  screen on the live URL either way.
+- Live runs work on the deployed URL (the agent spawns inside a Vercel function; the run's working directory is
+  the function's temp dir and the SDK's Linux binary is traced into the bundle). A run is capped at 240 s of
+  wall clock, under the function's 300 s.
 - `reevaluateRun`'s database path has no integration test (the mapping and the cascade do).
 - Skills the user can define externally, per-turn evaluation, more output kinds, OAuth connections:
   [docs/ROADMAP.md](docs/ROADMAP.md).

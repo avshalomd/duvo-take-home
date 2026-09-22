@@ -20,4 +20,4 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | id | source | observed | expected | severity | owner | status |
 |---|---|---|---|---|---|---|
 | Q1 | him | a run on the live URL stayed "queued" with no events | it runs, or fails with its reason | blocker | main | fixed (f706368: run dir under the temp dir on Vercel, early failures close the run) |
-| Q2 | him | a run on the live URL failed: "Native CLI binary for linux-x64 not found" | the agent spawns on Vercel | blocker | main | re-check (670ebfc: the linux-x64 package traced into the functions) |
+| Q2 | him | a run on the live URL failed: "Native CLI binary for linux-x64 not found" | the agent spawns on Vercel | blocker | main | fixed (670ebfc: the linux-x64 package traced into the functions; a run on the URL succeeded in 18 s with a file and a verdict) |
