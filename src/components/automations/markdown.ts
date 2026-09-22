@@ -31,35 +31,33 @@ const NUMBER = /^\s*\d+[.)]\s+(.*)$/;
 export function parseMarkdown(text: string): Block[] {
   const blocks: Block[] = [];
   let paragraph: string[] = [];
-  let list: { ordered: boolean; items: Inline[][] } | null = null;
 
-  // both buffers flush on any change of block type, so a bullet ends the paragraph above it
-  const flush = () => {
+  // a paragraph runs until a blank line or any other block starts: that is the only buffer this parser needs
+  const flushParagraph = () => {
     if (paragraph.length) blocks.push({ kind: "paragraph", spans: parseInline(paragraph.join(" ")) });
     paragraph = [];
-    if (list) blocks.push({ kind: "list", ...list });
-    list = null;
+  };
+  // consecutive bullets group by appending to the last block when it is already a list of the same kind
+  const openList = (ordered: boolean) => {
+    flushParagraph();
+    const last = blocks.at(-1);
+    if (last?.kind === "list" && last.ordered === ordered) return last;
+    const list = { kind: "list" as const, ordered, items: [] as Inline[][] };
+    blocks.push(list);
+    return list;
   };
 
   for (const line of text.split("\n")) {
     const heading = HEADING.exec(line);
-    const bullet = BULLET.exec(line);
-    const numbered = NUMBER.exec(line);
+    const item = BULLET.exec(line) ?? NUMBER.exec(line);
 
-    if (!line.trim()) flush();
+    if (!line.trim()) flushParagraph();
     else if (heading) {
-      flush();
+      flushParagraph();
       blocks.push({ kind: "heading", level: heading[1].length, spans: parseInline(heading[2]) });
-    } else if (bullet || numbered) {
-      const ordered = Boolean(numbered);
-      if (paragraph.length || list?.ordered !== ordered) flush();
-      list ??= { ordered, items: [] };
-      list.items.push(parseInline((bullet ?? numbered)![1]));
-    } else {
-      if (list) flush();
-      paragraph.push(line.trim());
-    }
+    } else if (item) openList(NUMBER.test(line)).items.push(parseInline(item[1]));
+    else paragraph.push(line.trim());
   }
-  flush();
+  flushParagraph();
   return blocks;
 }
