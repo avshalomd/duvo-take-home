@@ -19,20 +19,31 @@ the skills it used in `set_plan.sources`, so the run shows which skills shaped i
 skills too, so "followed the plan" can include "followed the skill". Later: import a skill from a file or a URL,
 and a skill that declares the connections it needs.
 
-## 2. Per-turn evaluation
+## 2. Offline evaluation across automations and failure cases (his request, T+47) - important
+
+Today there is one offline eval: the evaluator itself over 10 labelled cases (`docs/EVAL.md`, 10/10). It judges
+the judge, not the agent. Needed: a suite of **recorded runs** (real `run_events` captured as fixtures) across
+several automations (news to CSV, a connection-backed digest, a question with no file, a multi-file report) and
+the failure cases (max turns, budget stop, provider error, a plan the agent abandoned, a file with the wrong
+columns, a connection claimed but unused, stale or duplicated rows). Each run labelled with the expected verdict
+and the expected plan shape. Run in CI with the model calls replayed from the recording, and live on demand, so a
+prompt or model change shows its effect on both the agent's behaviour and the evaluator's verdicts before it
+ships. Extend `fixtures/llm-cases.json` into that suite rather than starting a second format.
+
+## 3. Per-turn evaluation
 
 Jev after every agent turn (not only at the end), shown in the timeline, so a run drifting off its plan is
 flagged while it can still be stopped.
 
-## 3. More output kinds
+## 4. More output kinds
 
 Images and charts as artifacts; a file store instead of `files.content` once outputs are not small text.
 
-## 4. Live runs on Vercel, or a worker
+## 5. Live runs on Vercel, or a worker
 
 The Agent SDK spawns a Claude Code subprocess; if the function limits do not allow it in production, a small
 always-on worker takes the run loop and the web app only records and shows.
 
-## 5. Connections with OAuth
+## 6. Connections with OAuth
 
 Jira, GitHub, Notion through their OAuth flows instead of a pasted token; stdio MCP servers on the worker.

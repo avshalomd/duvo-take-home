@@ -77,3 +77,11 @@ off is a data leak.
 - **Connections** (T+12): a list of the user's http MCP servers, name + URL + optional token, on/off; seeded; the agent gets every enabled one; the run records which it had (init message) and which it used (tool calls).
 - **Evaluator** (T+12, his words): "at the end of every turn, before we mark it as done, a real-time evaluator: Jev checks that the agent answered the user query and followed the plan." Code checks on the files first (parse per type, non-empty, exist when asked), then `decide()` with the instructions, the plan and the report: answered the query? followed the plan? Verdict with reasons on the run.
 - **Live URL** (T+12): deploy everything; the first deploy tries a live run on Vercel; if the SDK cannot spawn there, live runs are local-only and the README says so.
+
+## Changes during the hour
+
+- T+24 free text only, no presets; the plan tool carries intent, expected outputs and sources.
+- T+24 the evaluator cascades from Jev to an LLM review when the plan was not followed or Jev is unsure.
+- T+42 roadmap: user-defined skills (docs/ROADMAP.md).
+- T+43 the last deploy moved to T+55; feedback comes on the go.
+- T+47 a better timeline visualization (asked, routed to the UI package, may not land); offline evaluation across automations and failure cases on the roadmap as important.
