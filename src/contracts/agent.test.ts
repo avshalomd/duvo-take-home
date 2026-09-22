@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { AgentLimits, SetPlanInput, StartRunInput, UpdateStepInput } from "./agent";
 import { Plan, RunEvent } from "./run";
 import { mapMessage } from "../lib/agent/map-message";
