@@ -100,3 +100,6 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | Q74 | qa-ux | run rows truncate the instruction with no `title`; "19 s - $0.028" has no label | `title={run.prompt}`; "19 s, $0.03 spent" or cost under Details | minor | ui | open |
 | Q75 | qa-ux | at 390 px the primary controls are under 40 px tall (Run 28, Download 26, switches 18) | 40 px minimum at mobile width | minor | ui | open |
 | Q76 | qa-ux | at 390 px with a run open the instructions box is ~1000 px below the fold | a "New run" affordance in the header on small screens | minor | ui | open |
+| Q77 | qa-func | the evaluator passed a CSV with a ragged row: an unquoted comma shifted the cells, `parses` accepted it (`relax_column_count`), `duplicates` counted "WION" as a URL, `freshness` silently dropped the row | a ragged row fails `parses` (or is named); freshness and duplicates report the rows they skipped | major | eval | open |
+| Q78 | qa-func | "Too big: expected string to have <=4000 characters" - raw Zod wording on the instruction field | one sentence in the app's voice | minor | main (contracts) | open |
+| Q79 | qa-func | the runs list row stays "Working on it" until a reload while the panel beside it already says "Done" | the row follows the run (poll refreshes the list, or router.refresh on terminal) | minor | ui | open |
