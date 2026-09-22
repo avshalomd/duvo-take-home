@@ -4,12 +4,13 @@ import path from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { files as filesTable, runEvents, runs } from "@/db/schema";
+import { connections, files as filesTable, runEvents, runs } from "@/db/schema";
 import { AgentLimits, type RunAutomation } from "@/contracts/agent";
 import type { Plan, RunEvent } from "@/contracts/run";
 import { evaluateRun } from "@/lib/eval/evaluate";
 import { listEnabledConnectionsWithSecrets } from "@/lib/connections/store";
 import { connectionKey } from "@/lib/connections/key";
+import { statusUpdates } from "./connection-status";
 import { createMapper } from "./map-message";
 import { planServer } from "./plan-tool";
 import { SYSTEM_PROMPT } from "./system.prompt";
@@ -32,7 +33,7 @@ async function connectionServers() {
       headers: c.token ? { Authorization: `Bearer ${c.token}` } : undefined, // the token never leaves the server
     };
   }
-  return { ids: enabled.map((c) => c.id), servers };
+  return { enabled, servers };
 }
 
 /** Text files the agent left behind, the only outputs we serve (his call, T+10). */
@@ -58,7 +59,8 @@ export const runAutomation: RunAutomation = async (runId) => {
 
   const dir = runDir(runId);
   await mkdir(dir, { recursive: true });
-  const { ids, servers } = await connectionServers();
+  const { enabled, servers } = await connectionServers();
+  const ids = enabled.map((c) => c.id);
   await db.update(runs).set({ status: "running", connectionIds: ids }).where(eq(runs.id, runId));
 
   const map = createMapper();
@@ -68,6 +70,12 @@ export const runAutomation: RunAutomation = async (runId) => {
   const record = async (events: RunEvent[]) => {
     for (const e of events) {
       await db.insert(runEvents).values({ runId, seq: e.seq, kind: e.kind, payload: e.payload, at: new Date(e.at) });
+      // the init message is where a connection's real status shows up; write it back so the list stops guessing
+      if (e.kind === "started") {
+        for (const u of statusUpdates(e.payload.mcp_servers, enabled)) {
+          await db.update(connections).set({ lastStatus: u.lastStatus }).where(eq(connections.id, u.id));
+        }
+      }
       recorded.push(e);
       seq = e.seq + 1;
     }
