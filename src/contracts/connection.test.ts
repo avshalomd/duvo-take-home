@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { Connection, NewConnection, Transport } from "./connection";
-import {
-  addConnection,
-  listConnections,
-  listEnabledConnectionsWithSecrets,
-  setConnectionEnabled,
-} from "../lib/connections/store";
 import connectionsFixture from "../../fixtures/connections.json";
 
 type FixtureConnection = {
@@ -45,30 +39,32 @@ describe("Transport", () => {
 });
 
 describe("Connection", () => {
-  it("accepts every connection the store builds from the fixture", async () => {
-    const connections = await listConnections();
-    expect(connections.length).toBeGreaterThan(0);
-    for (const c of connections) expect(Connection.parse(c).id).toBe(c.id);
+  // Built from the fixture, not the store: the store is Drizzle on the connections table since P4 landed.
+  const fixture = connectionsFixture.filter((c) => c.transport === "http" || c.transport === "sse");
+  const toConnection = (c: (typeof fixture)[number]) => ({
+    id: c.id, name: c.name, url: c.url as string, transport: c.transport as "http" | "sse",
+    hasToken: false, enabled: c.enabled, lastStatus: c.last_status ?? null,
+  });
+  const first = toConnection(fixture[0]);
+
+  it("accepts every http/sse connection in the fixture", () => {
+    expect(fixture.length).toBeGreaterThan(0);
+    for (const c of fixture) expect(Connection.parse(toConnection(c)).id).toBe(c.id);
   });
 
-  it("never carries the token itself, only hasToken", async () => {
-    const [first] = await listConnections();
-    expect(typeof first.hasToken).toBe("boolean");
+  it("never carries the token itself, only hasToken", () => {
     expect("token" in Connection.parse(first)).toBe(false);
   });
 
-  it("rejects a connection whose url has no scheme", async () => {
-    const [first] = await listConnections();
+  it("rejects a connection whose url has no scheme", () => {
     expect(Connection.safeParse({ ...first, url: "mcp.deepwiki.com/mcp" }).success).toBe(false);
   });
 
-  it("rejects a connection whose hasToken is a string", async () => {
-    const [first] = await listConnections();
+  it("rejects a connection whose hasToken is a string", () => {
     expect(Connection.safeParse({ ...first, hasToken: "yes" }).success).toBe(false);
   });
 
-  it("rejects a connection whose lastStatus is missing rather than null", async () => {
-    const [first] = await listConnections();
+  it("rejects a connection whose lastStatus is missing rather than null", () => {
     expect(Connection.safeParse(omit(first, "lastStatus")).success).toBe(false);
   });
 });
@@ -116,35 +112,5 @@ describe("NewConnection", () => {
       NewConnection.safeParse({ name: "DeepWiki", url: "https://mcp.deepwiki.com/mcp", transport: "stdio" })
         .success,
     ).toBe(false);
-  });
-});
-
-describe("the connection stubs", () => {
-  it("listConnections answers an array of Connection, and drops the sdk-transport row", async () => {
-    const connections = z.array(Connection).parse(await listConnections());
-    const remote = fixtureConnections.filter((c) => c.transport === "http" || c.transport === "sse");
-    expect(connections).toHaveLength(remote.length);
-  });
-
-  it("listEnabledConnectionsWithSecrets answers Connections that also carry a token field", async () => {
-    const secrets = await listEnabledConnectionsWithSecrets();
-    expect(secrets.length).toBeGreaterThan(0);
-    for (const secret of secrets) {
-      Connection.parse(secret);
-      expect(secret.enabled).toBe(true);
-      expect("token" in secret).toBe(true);
-    }
-  });
-
-  it("setConnectionEnabled is not implemented yet and says so", async () => {
-    await expect(setConnectionEnabled("conn_github", true)).rejects.toThrow(
-      "not implemented: setConnectionEnabled",
-    );
-  });
-
-  it("addConnection is not implemented yet and says so", async () => {
-    await expect(
-      addConnection({ name: "DeepWiki", url: "https://mcp.deepwiki.com/mcp", transport: "http" }),
-    ).rejects.toThrow("not implemented: addConnection");
   });
 });
