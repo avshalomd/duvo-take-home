@@ -106,6 +106,34 @@ describe("runChecks", () => {
     expect(check(checks, "extension")?.detail).toMatch(/\.png/);
   });
 
+  it("fails 'connection_used' when the instructions name a connected server the run never called", () => {
+    const checks = runChecks(
+      input({
+        prompt: "Using the connected DeepWiki server, read the repo and write output.csv with area, what_it_does, why_it_matters.",
+        files: csv("area,what_it_does,why_it_matters\nOverview,\"Servers\",\"Entry point\"\n"),
+        toolsUsed: ["WebFetch", "Write"],
+      }),
+    );
+    expect(failedIds(checks)).toContain("connection_used");
+    expect(check(checks, "connection_used")?.detail).toMatch(/mcp__deepwiki__/);
+  });
+
+  it("passes 'connection_used' when the connection's own tools were called", () => {
+    const checks = runChecks(
+      input({
+        prompt: "Using the connected DeepWiki server, read the repo and write output.csv with area, what_it_does, why_it_matters.",
+        files: csv("area,what_it_does,why_it_matters\nOverview,\"Servers\",\"Entry point\"\n"),
+        toolsUsed: ["mcp__deepwiki__read_wiki_structure", "Write"],
+      }),
+    );
+    expect(failedIds(checks)).toEqual([]);
+  });
+
+  it("says nothing about connections when no tool names were recorded", () => {
+    const checks = runChecks(input({ prompt: "Using the connected DeepWiki server, write output.csv with area, what_it_does.", files: csv("area,what_it_does\nOverview,\"Servers\"\n") }));
+    expect(check(checks, "connection_used")).toBeUndefined(); // no evidence either way is not a failure
+  });
+
   it("fails 'completed' when the run itself did not finish, quoting the error", () => {
     const checks = runChecks(
       input({ runStatus: "failed", files: [], report: "error_max_turns\nAPI Error 400: web_search is not enabled for this organization" }),
