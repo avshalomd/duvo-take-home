@@ -22,3 +22,17 @@ export function parseRunPayload(json: unknown): RunView | null {
   if (!parsed.success) return null; // a 404 or a changed payload keeps the last good view instead of blanking it
   return parsed.data;
 }
+
+// How far along a view is: more events, or a newer verdict, means it is the later picture of the run.
+function freshness(view: RunView): [number, string] {
+  return [view.events.length, view.verdict?.evaluatedAt ?? ""];
+}
+
+// The panel holds two pictures of a run: the server's render and the last poll. The poll is usually ahead, but a
+// server render that is newer must win - otherwise Re-evaluate writes a verdict the stale poll keeps hidden.
+export function chooseView(server: RunView, polled: RunView | null): RunView {
+  if (!polled || polled.run.id !== server.run.id) return server;
+  const [polledEvents, polledAt] = freshness(polled);
+  const [serverEvents, serverAt] = freshness(server);
+  return polledEvents >= serverEvents && polledAt >= serverAt ? polled : server;
+}

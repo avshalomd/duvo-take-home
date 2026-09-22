@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { parseRunPayload, shouldPoll } from "./poll";
+import { chooseView, parseRunPayload, shouldPoll } from "./poll";
 import type { RunView } from "./types";
 
 const INTERVAL_MS = 2000;
@@ -10,8 +10,8 @@ const INTERVAL_MS = 2000;
 // seconds is enough for a run that lasts a minute, and it is one thing to explain instead of three.
 export function useRunPoll(initial: RunView): RunView {
   const [polled, setPolled] = useState<RunView | null>(null);
-  // the id check is the reset: when the server renders another run, the previous run's polled view is ignored
-  const view = polled && polled.run.id === initial.run.id ? polled : initial;
+  // chooseView decides which picture is the later one: another run, or a newer server render (Re-evaluate), drops the poll
+  const view = chooseView(initial, polled);
   const { id, status } = view.run;
 
   useEffect(() => {
