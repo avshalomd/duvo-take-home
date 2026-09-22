@@ -96,6 +96,41 @@ test("everything technical is folded behind Details until it is asked for", asyn
   await expect(panel.getByTestId("verdict")).toBeVisible();
 });
 
+// test.describe with its own viewport: setViewportSize inside the test raced the page's first paint in a full run
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the page fits the screen and leads with the run", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("run-panel")).toBeVisible(); // the page streams a skeleton first: measure the real thing
+
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth); // nothing sticks out sideways: no horizontal scrolling
+
+    // one column, and the open run is above the form: after pressing Run, the run is what you want to see
+    const panel = await page.getByTestId("run-panel").boundingBox();
+    const form = await page.getByRole("textbox", { name: /instructions/i }).boundingBox();
+    expect(panel!.y).toBeLessThan(form!.y);
+  });
+
+  // Q38: the panel header must not cover what is under it - the point over the failure text is the failure text
+  test("nothing floats over the panel's own content", async ({ page }) => {
+    await page.goto("/");
+    // "What it produced" is in every panel whatever the run did, so this does not depend on which run is newest
+    const produced = page.getByTestId("produced");
+    await expect(produced).toBeVisible();
+    const box = await produced.boundingBox();
+    const onTop = await page.evaluate(
+      (p) => document.elementFromPoint(p.x, p.y)?.closest("[data-testid]")?.getAttribute("data-testid") ?? "",
+      { x: box!.x + 10, y: box!.y + 10 },
+    );
+    expect(onTop).toBe("produced");
+  });
+});
+
 // Only the validation path is exercised here: a valid submit would start a real agent run on the shared database.
 test("instructions that say nothing are refused before any run is started", async ({ page }) => {
   await page.goto("/");
