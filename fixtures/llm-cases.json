@@ -5,9 +5,16 @@
       "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary. At least 8 rows from the last 7 days.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "source_file": "fixtures/ai-news.csv" }
+      "artifact": {
+        "name": "output.csv",
+        "source_file": "fixtures/ai-news.csv"
+      }
     },
-    "expected": { "verdict": "pass", "failed_checks": [], "score_at_least": 0.85 },
+    "expected": {
+      "verdict": "pass",
+      "failed_checks": [],
+      "score_at_least": 0.85
+    },
     "why": "The easy case: 10 dated, on-topic rows with real outlets and live links. If this does not pass, the evaluator is broken, not the run."
   },
   {
@@ -16,9 +23,18 @@
       "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "csv": "title,source,url,published_at,summary\n" }
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n"
+      }
     },
-    "expected": { "verdict": "fail", "failed_checks": ["rows"], "reason_contains": "no rows" },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "rows"
+      ],
+      "reason_contains": "no rows"
+    },
     "why": "A header-only file. The deterministic row check catches it before any model call - the judge must never be asked to bless an empty file."
   },
   {
@@ -27,9 +43,19 @@
       "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "csv": "headline,link,blurb\n\"Anthropic ships Claude Agent SDK 0.3\",https://www.anthropic.com/news/agent-sdk-0-3,\"Structured output lands\"\n\"Mistral raises $900M\",https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,\"European sovereign inference\"\n" }
+      "artifact": {
+        "name": "output.csv",
+        "csv": "headline,link,blurb\n\"Anthropic ships Claude Agent SDK 0.3\",https://www.anthropic.com/news/agent-sdk-0-3,\"Structured output lands\"\n\"Mistral raises $900M\",https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,\"European sovereign inference\"\n"
+      }
     },
-    "expected": { "verdict": "fail", "failed_checks": ["columns", "rows"], "reason_contains": "source, published_at" },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "columns",
+        "rows"
+      ],
+      "reason_contains": "source, published_at"
+    },
     "why": "Right content, wrong schema. Tests that the verdict names the missing columns instead of saying 'bad CSV'; also short of the row floor."
   },
   {
@@ -38,9 +64,18 @@
       "prompt": "Fetch the LATEST AI news from the web and save them into a CSV with title, source, url, published_at, summary. Last 7 days only.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "csv": "title,source,url,published_at,summary\n\"GPT-4o goes multimodal\",OpenAI,https://openai.com/index/hello-gpt-4o,2024-05-13,\"Voice and vision in one model\"\n\"Llama 3 released\",Meta,https://ai.meta.com/blog/meta-llama-3/,2024-04-18,\"8B and 70B open weights\"\n\"Claude 3.5 Sonnet\",Anthropic,https://www.anthropic.com/news/claude-3-5-sonnet,2024-06-20,\"Faster than Opus 3\"\n\"Gemini 1.5 Pro GA\",Google,https://blog.google/technology/ai/gemini-15-pro-ga,2024-05-14,\"One million token context\"\n\"Mistral Large\",Mistral,https://mistral.ai/news/mistral-large/,2024-02-26,\"Flagship reasoning model\"\n\"Devin announced\",Cognition,https://cognition.ai/blog/introducing-devin,2024-03-12,\"An AI software engineer\"\n\"Sora preview\",OpenAI,https://openai.com/sora,2024-02-15,\"Text to video\"\n\"Grok-1 open sourced\",xAI,https://x.ai/blog/grok-os,2024-03-17,\"314B mixture of experts\"\n" }
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n\"GPT-4o goes multimodal\",OpenAI,https://openai.com/index/hello-gpt-4o,2024-05-13,\"Voice and vision in one model\"\n\"Llama 3 released\",Meta,https://ai.meta.com/blog/meta-llama-3/,2024-04-18,\"8B and 70B open weights\"\n\"Claude 3.5 Sonnet\",Anthropic,https://www.anthropic.com/news/claude-3-5-sonnet,2024-06-20,\"Faster than Opus 3\"\n\"Gemini 1.5 Pro GA\",Google,https://blog.google/technology/ai/gemini-15-pro-ga,2024-05-14,\"One million token context\"\n\"Mistral Large\",Mistral,https://mistral.ai/news/mistral-large/,2024-02-26,\"Flagship reasoning model\"\n\"Devin announced\",Cognition,https://cognition.ai/blog/introducing-devin,2024-03-12,\"An AI software engineer\"\n\"Sora preview\",OpenAI,https://openai.com/sora,2024-02-15,\"Text to video\"\n\"Grok-1 open sourced\",xAI,https://x.ai/blog/grok-os,2024-03-17,\"314B mixture of experts\"\n"
+      }
     },
-    "expected": { "verdict": "fail", "failed_checks": ["freshness"], "reason_contains": "2024" },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "freshness"
+      ],
+      "reason_contains": "2024"
+    },
     "why": "A well-formed CSV that answers a different question: the model recited training-data news instead of searching. Eight rows, every column present, so only the date check saves it."
   },
   {
@@ -49,9 +84,18 @@
       "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary. At least 8 rows, no duplicate URLs.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "csv": "title,source,url,published_at,summary\n\"MCP becomes a Linux Foundation project\",InfoWorld,https://www.infoworld.com/article/mcp-linux-foundation-2026,2026-09-17,\"Anthropic hands the spec to a foundation\"\n\"MCP joins the Linux Foundation\",InfoWorld,https://www.infoworld.com/article/mcp-linux-foundation-2026,2026-09-17,\"Microsoft, Google and AWS join the board\"\n\"MCP goes to the Linux Foundation\",InfoWorld,https://www.infoworld.com/article/mcp-linux-foundation-2026,2026-09-17,\"A neutral home for the protocol\"\n\"Mistral raises $900M\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,\"Led by European pension funds\"\n\"Mistral's Series D closes\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,\"Data centres in France and Sweden\"\n\"Meta open-sources Llama 4.1\",TechCrunch,https://techcrunch.com/2026/09/17/meta-llama-4-1-weights/,2026-09-17,\"Revised licence\"\n\"Llama 4.1 weights are out\",TechCrunch,https://techcrunch.com/2026/09/17/meta-llama-4-1-weights/,2026-09-17,\"The MAU cap is gone\"\n\"Nvidia Rubin slips\",The Information,https://www.theinformation.com/articles/nvidia-rubin-delay-hbm4,2026-09-16,\"HBM4 supply\"\n" }
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n\"MCP becomes a Linux Foundation project\",InfoWorld,https://www.infoworld.com/article/mcp-linux-foundation-2026,2026-09-17,\"Anthropic hands the spec to a foundation\"\n\"MCP joins the Linux Foundation\",InfoWorld,https://www.infoworld.com/article/mcp-linux-foundation-2026,2026-09-17,\"Microsoft, Google and AWS join the board\"\n\"MCP goes to the Linux Foundation\",InfoWorld,https://www.infoworld.com/article/mcp-linux-foundation-2026,2026-09-17,\"A neutral home for the protocol\"\n\"Mistral raises $900M\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,\"Led by European pension funds\"\n\"Mistral's Series D closes\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,\"Data centres in France and Sweden\"\n\"Meta open-sources Llama 4.1\",TechCrunch,https://techcrunch.com/2026/09/17/meta-llama-4-1-weights/,2026-09-17,\"Revised licence\"\n\"Llama 4.1 weights are out\",TechCrunch,https://techcrunch.com/2026/09/17/meta-llama-4-1-weights/,2026-09-17,\"The MAU cap is gone\"\n\"Nvidia Rubin slips\",The Information,https://www.theinformation.com/articles/nvidia-rubin-delay-hbm4,2026-09-16,\"HBM4 supply\"\n"
+      }
     },
-    "expected": { "verdict": "fail", "failed_checks": ["duplicates"], "reason_contains": "4 distinct" },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "duplicates"
+      ],
+      "reason_contains": "4 distinct"
+    },
     "why": "Eight fresh rows that pass every naive check and are really four stories padded out. The duplicate-URL check is the only thing between this and a green tick."
   },
   {
@@ -60,9 +104,18 @@
       "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "csv": "title,source,url,published_at,summary\n\"Premier League: Arsenal beat Spurs 3-1\",BBC Sport,https://www.bbc.co.uk/sport/football/articles/arsenal-spurs-2026,2026-09-21,\"Two goals in six second-half minutes\"\n\"Norges Bank holds rates at 3.75%\",E24,https://e24.no/norsk-okonomi/rentebeslutning-september-2026,2026-09-18,\"The committee split three ways\"\n\"Hurricane Delia makes landfall in Florida\",AP,https://apnews.com/article/hurricane-delia-landfall,2026-09-20,\"Category 3 at landfall\"\n\"Oslo opens the Fornebubanen\",NRK,https://www.nrk.no/osloogviken/fornebubanen-apner-2026,2026-09-19,\"Twelve years after the first plan\"\n\"Apple's iPhone 18 sales beat expectations\",CNBC,https://www.cnbc.com/2026/09/16/iphone-18-launch-weekend.html,2026-09-16,\"Launch weekend up 9% year on year\"\n\"Tour of Spain ends in Madrid\",Cyclingnews,https://www.cyclingnews.com/races/vuelta-2026/stage-21,2026-09-15,\"A sprint finish on the Gran Via\"\n\"Nobel medicine prize announced Monday\",Reuters,https://www.reuters.com/science/nobel-medicine-2026,2026-09-21,\"The first of the week's prizes\"\n\"Boeing 797 completes first test flight\",Flightglobal,https://www.flightglobal.com/boeing-797-first-flight,2026-09-17,\"Three hours over Puget Sound\"\n\"Eurovision 2027 host city named\",EBU,https://eurovision.tv/story/host-city-2027,2026-09-19,\"Malmo gets it again\"\n" }
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n\"Premier League: Arsenal beat Spurs 3-1\",BBC Sport,https://www.bbc.co.uk/sport/football/articles/arsenal-spurs-2026,2026-09-21,\"Two goals in six second-half minutes\"\n\"Norges Bank holds rates at 3.75%\",E24,https://e24.no/norsk-okonomi/rentebeslutning-september-2026,2026-09-18,\"The committee split three ways\"\n\"Hurricane Delia makes landfall in Florida\",AP,https://apnews.com/article/hurricane-delia-landfall,2026-09-20,\"Category 3 at landfall\"\n\"Oslo opens the Fornebubanen\",NRK,https://www.nrk.no/osloogviken/fornebubanen-apner-2026,2026-09-19,\"Twelve years after the first plan\"\n\"Apple's iPhone 18 sales beat expectations\",CNBC,https://www.cnbc.com/2026/09/16/iphone-18-launch-weekend.html,2026-09-16,\"Launch weekend up 9% year on year\"\n\"Tour of Spain ends in Madrid\",Cyclingnews,https://www.cyclingnews.com/races/vuelta-2026/stage-21,2026-09-15,\"A sprint finish on the Gran Via\"\n\"Nobel medicine prize announced Monday\",Reuters,https://www.reuters.com/science/nobel-medicine-2026,2026-09-21,\"The first of the week's prizes\"\n\"Boeing 797 completes first test flight\",Flightglobal,https://www.flightglobal.com/boeing-797-first-flight,2026-09-17,\"Three hours over Puget Sound\"\n\"Eurovision 2027 host city named\",EBU,https://eurovision.tv/story/host-city-2027,2026-09-19,\"Malmo gets it again\"\n"
+      }
     },
-    "expected": { "verdict": "fail", "failed_checks": ["on_topic"], "reason_contains": "not about AI" },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "on_topic"
+      ],
+      "reason_contains": "not about AI"
+    },
     "why": "Nine fresh, well-formed, non-duplicate rows of real news that is not AI news. Every deterministic check passes, so this is the case that only the judge can catch - the reason the judge exists."
   },
   {
@@ -71,9 +124,17 @@
       "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary. At least 8 rows.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "csv": "title,source,url,published_at,summary\n\"Anthropic ships Claude Agent SDK 0.3\",Anthropic,https://www.anthropic.com/news/agent-sdk-0-3,2026-09-21,\"Structured output lands in the SDK\"\n\"Gemini 3.5 tops ARC-AGI-3\",The Verge,https://www.theverge.com/2026/9/18/gemini-35-arc-agi-3,2026-09-18,\"61% on the new benchmark\"\n\"Nvidia Rubin GPUs slip to Q1 2027\",The Information,https://www.theinformation.com/articles/nvidia-rubin-delay-hbm4,2026-09-16,\"HBM4 supply constraints\"\n\"TSMC raises capex on packaging demand\",Nikkei,https://asia.nikkei.com/tsmc-capex-2026-09,2026-09-17,\"Advanced packaging is the bottleneck\"\n\"Apple's iPhone 18 sales beat expectations\",CNBC,https://www.cnbc.com/2026/09/16/iphone-18-launch-weekend.html,2026-09-16,\"Launch weekend up 9%\"\n\"EU AI Act enforcement letters go out\",Financial Times,https://www.ft.com/content/eu-ai-act-first-enforcement-2026-09-19,2026-09-19,\"Model cards due in 30 days\"\n\"Datacentre power draw tops 4% of US grid\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-15/datacentre-power,2026-09-15,\"Utilities ask for new tariffs\"\n\"Mistral raises $900M\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,\"Sovereign inference in Europe\"\n\"Salesforce reorganises around agents\",Reuters,https://www.reuters.com/technology/salesforce-agent-reorg-2026,2026-09-19,\"Support headcount moves to agent operations\"\n" }
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n\"Anthropic ships Claude Agent SDK 0.3\",Anthropic,https://www.anthropic.com/news/agent-sdk-0-3,2026-09-21,\"Structured output lands in the SDK\"\n\"Gemini 3.5 tops ARC-AGI-3\",The Verge,https://www.theverge.com/2026/9/18/gemini-35-arc-agi-3,2026-09-18,\"61% on the new benchmark\"\n\"Nvidia Rubin GPUs slip to Q1 2027\",The Information,https://www.theinformation.com/articles/nvidia-rubin-delay-hbm4,2026-09-16,\"HBM4 supply constraints\"\n\"TSMC raises capex on packaging demand\",Nikkei,https://asia.nikkei.com/tsmc-capex-2026-09,2026-09-17,\"Advanced packaging is the bottleneck\"\n\"Apple's iPhone 18 sales beat expectations\",CNBC,https://www.cnbc.com/2026/09/16/iphone-18-launch-weekend.html,2026-09-16,\"Launch weekend up 9%\"\n\"EU AI Act enforcement letters go out\",Financial Times,https://www.ft.com/content/eu-ai-act-first-enforcement-2026-09-19,2026-09-19,\"Model cards due in 30 days\"\n\"Datacentre power draw tops 4% of US grid\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-15/datacentre-power,2026-09-15,\"Utilities ask for new tariffs\"\n\"Mistral raises $900M\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,\"Sovereign inference in Europe\"\n\"Salesforce reorganises around agents\",Reuters,https://www.reuters.com/technology/salesforce-agent-reorg-2026,2026-09-19,\"Support headcount moves to agent operations\"\n"
+      }
     },
-    "expected": { "verdict": "pass_with_notes", "failed_checks": [], "note_contains": "iPhone", "score_at_most": 0.85 },
+    "expected": {
+      "verdict": "pass_with_notes",
+      "failed_checks": [],
+      "note_contains": "iPhone",
+      "score_at_most": 0.85
+    },
     "why": "The ambiguous case: seven clearly-AI rows, one adjacent (TSMC packaging, datacentre power) and one that is plain consumer tech. A judge that answers only pass/fail gets this wrong either way - it needs a per-row on-topic count and a note."
   },
   {
@@ -86,7 +147,15 @@
       "run_error": "error_max_turns",
       "last_tool_error": "API Error 400: web_search is not enabled for this organization"
     },
-    "expected": { "verdict": "fail", "failed_checks": ["artifact", "completed"], "reason_contains": "web_search is not enabled", "no_model_call": true },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "artifact",
+        "completed"
+      ],
+      "reason_contains": "web_search is not enabled",
+      "no_model_call": true
+    },
     "why": "Nothing to judge. The evaluator must short-circuit, quote the provider's own error rather than 'the model failed', and never spend a model call on a missing file."
   },
   {
@@ -95,9 +164,18 @@
       "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "artifact": { "name": "output.csv", "csv": "title,source,url,published_at,summary\n\"Anthropic ships Claude Agent SDK 0.3, with structured output,Anthropic,https://www.anthropic.com/news/agent-sdk-0-3,2026-09-21,\"Unterminated quote swallows the rest of the file\nMistral raises $900M,Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,Led by pension funds\n" }
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n\"Anthropic ships Claude Agent SDK 0.3, with structured output,Anthropic,https://www.anthropic.com/news/agent-sdk-0-3,2026-09-21,\"Unterminated quote swallows the rest of the file\nMistral raises $900M,Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,Led by pension funds\n"
+      }
     },
-    "expected": { "verdict": "fail", "failed_checks": ["parses"], "reason_contains": "quote" },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "parses"
+      ],
+      "reason_contains": "quote"
+    },
     "why": "The broken case: an unterminated quote. The parser must fail with a readable message and the UI must show it, not throw a 500."
   },
   {
@@ -106,11 +184,66 @@
       "prompt": "Using the connected DeepWiki server, read modelcontextprotocol/servers and write output.csv with area, what_it_does, why_it_matters.",
       "run_status": "succeeded",
       "today": "2026-09-22",
-      "connection": { "id": "conn_deepwiki", "enabled": true },
-      "tools_used": ["WebFetch", "Write"],
-      "artifact": { "name": "output.csv", "csv": "area,what_it_does,why_it_matters\nOverview,\"Collects reference MCP servers\",\"Entry point for integrators\"\nTransport,\"stdio and HTTP\",\"Most common setup failure\"\nAuthentication,\"OAuth and bearer tokens\",\"Remote servers need credentials\"\n" }
+      "connection": {
+        "id": "conn_deepwiki",
+        "enabled": true
+      },
+      "tools_used": [
+        "WebFetch",
+        "Write"
+      ],
+      "artifact": {
+        "name": "output.csv",
+        "csv": "area,what_it_does,why_it_matters\nOverview,\"Collects reference MCP servers\",\"Entry point for integrators\"\nTransport,\"stdio and HTTP\",\"Most common setup failure\"\nAuthentication,\"OAuth and bearer tokens\",\"Remote servers need credentials\"\n"
+      }
     },
-    "expected": { "verdict": "fail", "failed_checks": ["connection_used"], "reason_contains": "no mcp__deepwiki__" },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "connection_used"
+      ],
+      "reason_contains": "no mcp__deepwiki__"
+    },
     "why": "A plausible CSV produced without touching the enabled connection. Step 4 asks us to make the connection visible, so 'was it actually used' is a check, derived from the events, not from the model's word."
+  },
+  {
+    "id": "eval_ragged_row",
+    "input": {
+      "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary. At least 4 rows.",
+      "run_status": "succeeded",
+      "today": "2026-09-22",
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n\"A ships X\",Anthropic,https://a.example/1,2026-09-21,\"One\"\n\"B raises money\",Bloomberg,https://b.example/2,2026-09-18,\"Two\"\n\"C opens up\",Reuters,https://c.example/3,2026-09-19,\"Three\"\n\"D ships Y\",TechCrunch,https://d.example/4,2026-09-20,\"Four\"\nTrump says India, US close to trade deal,WION,https://w.example/5,2026-09-20,Five\n"
+      }
+    },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "parses"
+      ],
+      "reason_contains": "row 6 has 6 fields"
+    },
+    "why": "An unquoted comma shifts every cell after it, so the url column holds a source name and the date column a url. Found on the live URL in QA round 3 (Q77)."
+  },
+  {
+    "id": "eval_url_column_not_urls",
+    "input": {
+      "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary.",
+      "run_status": "succeeded",
+      "today": "2026-09-22",
+      "artifact": {
+        "name": "output.csv",
+        "csv": "title,source,url,published_at,summary\n\"A ships X\",Anthropic,WION,2026-09-21,\"One\"\n\"B raises money\",Bloomberg,Reuters,2026-09-18,\"Two\"\n"
+      }
+    },
+    "expected": {
+      "verdict": "fail",
+      "failed_checks": [
+        "urls"
+      ],
+      "reason_contains": "not a url"
+    },
+    "why": "The url column is the identity the duplicate check keys on; a source name there is not a source you can open."
   }
 ]
