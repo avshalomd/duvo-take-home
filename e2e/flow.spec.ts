@@ -126,12 +126,14 @@ test.describe("on a phone", () => {
   test("nothing floats over the panel's own content", async ({ page }) => {
     await page.goto("/");
     // "What it produced" is in every panel whatever the run did, so this does not depend on which run is newest
-    const produced = page.getByTestId("produced");
-    await expect(produced).toBeVisible();
-    const box = await produced.boundingBox();
+    // the section's heading, not the section: a tall section can start above the viewport, where elementFromPoint is null
+    const heading = page.getByTestId("produced").getByRole("heading", { name: /what it produced/i });
+    await expect(heading).toBeVisible();
+    await heading.scrollIntoViewIfNeeded();
+    const box = await heading.boundingBox();
     const onTop = await page.evaluate(
       (p) => document.elementFromPoint(p.x, p.y)?.closest("[data-testid]")?.getAttribute("data-testid") ?? "",
-      { x: box!.x + 10, y: box!.y + 10 },
+      { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 },
     );
     expect(onTop).toBe("produced");
   });
