@@ -54,10 +54,10 @@ a run with the tool list (via OpenRouter Sonnet 4.6; Anthropic direct is the sam
 
 | `type` | what it carries | record as |
 |---|---|---|
-| `system` / `subtype: "init"` | `model`, `tools[]` (includes `mcp__<server>__<tool>`), `mcp_servers[{name, status: "connected" \| ...}]`, `apiKeySource`, `permissionMode`, `cwd` | the run's `started` event; the MCP status is the connection badge |
+| `system` / `subtype: "init"` | `model`, `tools[]` (includes `mcp__<server>__<tool>`), `mcp_servers[{name, status}]` (status `"connected"` or the failure), `apiKeySource`, `permissionMode`, `cwd` | the run's `started` event; the MCP status is the connection badge |
 | `assistant` | `message.content[]`: `thinking`, `text {text}`, `tool_use {id, name, input}` | one `tool_call` event per `tool_use`, one `text` event per `text`; skip `thinking` |
 | `user` | `message.content[]`: `tool_result {tool_use_id, content}`; also `tool_use_result` | one `tool_result` event, matched to the call by `tool_use_id` |
-| `result` | `subtype: "success" \| "error_max_turns" \| "error_during_execution" \| "error_max_budget_usd" \| "error_max_structured_output_retries"`, `num_turns`, `duration_ms`, `total_cost_usd`, `is_error`, `result` (final text), `structured_output` (when `outputFormat` was set) | the run's `finished` event; status, cost, text |
+| `result` | `subtype`: `success`, or `error_max_turns`, `error_during_execution`, `error_max_budget_usd`, `error_max_structured_output_retries`, `num_turns`, `duration_ms`, `total_cost_usd`, `is_error`, `result` (final text), `structured_output` (when `outputFormat` was set) | the run's `finished` event; status, cost, text |
 | `system` / other subtypes (`thinking_tokens`, `task_summary`, `post_turn_summary`, `status`, ...) | noise | ignore: `m.type === "system" && m.subtype !== "init"` |
 
 `includePartialMessages: true` adds `stream_event` messages for token streaming. Not needed: the run page polls
