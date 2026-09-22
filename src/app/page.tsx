@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppHeader } from "@/components/automations/app-header";
 import { ConnectionsList } from "@/components/automations/connections-list";
 import { InstructionsForm } from "@/components/automations/instructions-form";
@@ -41,10 +42,15 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 function NoRun({ notFound }: { notFound: boolean }) {
   return (
     <div className="flex h-full min-h-[24rem] flex-col items-center justify-center gap-1 rounded-xl border border-dashed bg-background p-10 text-center">
-      <p className="text-sm font-medium">{notFound ? "That run was not found." : "Pick a run or start one"}</p>
-      <p className="text-xs text-muted-foreground">
-        {notFound ? "It may have been deleted." : "Write the task on the left and press Run - the agent plans first."}
-      </p>
+      <p className="text-sm font-medium">{notFound ? "That run was not found." : "Pick a run on the left, or write instructions and press Run."}</p>
+      {notFound ? (
+        // a dead link in the address bar is a dead end otherwise: "/" opens the newest run
+        <Link href="/" className="text-xs text-emerald-700 underline underline-offset-2 dark:text-emerald-400">
+          Open the most recent run
+        </Link>
+      ) : (
+        <p className="text-xs text-muted-foreground">The agent says how it read the task before it starts work.</p>
+      )}
     </div>
   );
 }

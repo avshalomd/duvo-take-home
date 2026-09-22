@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Run } from "@/contracts/run";
 import { cn } from "@/lib/utils";
 import { formatCost, formatDuration } from "./format";
-import { StatusBadge } from "./status-badge";
-import { statusTone, StatusDot } from "./status-dot";
+import { outcome } from "./outcome";
+import { StatusDot } from "./status-dot";
 import { TimeAgo } from "./time-ago";
 
 // The run to show is a search param, not component state, so a refresh or a shared link keeps the same run open.
@@ -32,8 +32,9 @@ export function RunsList({ runs, selectedId }: { runs: Run[]; selectedId?: strin
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <StatusDot tone={statusTone[run.status] ?? "idle"} />
-                  <StatusBadge status={run.status} className="text-[10px]" />
+                  {/* the same words as the panel's outcome: the list and the run must never disagree */}
+                  <StatusDot tone={outcome(run.status, null).tone} />
+                  <span className="text-xs font-medium">{outcome(run.status, null).label}</span>
                   <TimeAgo iso={run.createdAt} className="ml-auto text-[11px] text-muted-foreground" />
                 </div>
                 <p className="mt-1 truncate text-sm">{run.prompt}</p>

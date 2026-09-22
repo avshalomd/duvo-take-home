@@ -17,9 +17,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 // Adding a server is the rare path: it lives in a dialog so the column stays a list of what is connected.
+// The Zod messages in the contract are short labels; a form asks for a correction in a sentence, with an example.
+const SENTENCE: Record<string, string> = {
+  "Name it": "Give the server a name - the agent sees it, for example Linear.",
+  "A full http(s) URL": "Enter the server's full URL, for example https://mcp.example.com/mcp.",
+  "Letters, digits, space, - and _": "Use letters, digits, spaces, hyphens and underscores in the name.",
+};
+const sentence = (message?: string) => (message ? (SENTENCE[message] ?? message) : undefined);
+
 export function AddConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [state, action, pending] = useActionState(addConnectionAction, {});
   const submitted = useRef(false);
+  const form = useRef<HTMLFormElement>(null);
+
+  // the first field that was refused takes the cursor: correcting an error should not need a hunt for it
+  useEffect(() => {
+    if (!state.fieldErrors) return;
+    form.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus();
+  }, [state]);
 
   // the action answers with {} when it worked: that is the only signal, so the dialog closes on an empty answer
   useEffect(() => {
@@ -41,14 +56,15 @@ export function AddConnectionDialog({ open, onOpenChange }: { open: boolean; onO
         </DialogHeader>
         <form
           data-testid="connections-form"
+          ref={form}
           action={action}
           onSubmit={() => {
             submitted.current = true;
           }}
           className="space-y-3"
         >
-          <Field name="name" label="Name" placeholder="Linear" defaultValue={state.values?.name} error={state.fieldErrors?.name?.[0]} />
-          <Field name="url" label="URL" placeholder="https://mcp.example.com/mcp" defaultValue={state.values?.url} error={state.fieldErrors?.url?.[0]} />
+          <Field name="name" label="Name" placeholder="Linear" defaultValue={state.values?.name} error={sentence(state.fieldErrors?.name?.[0])} />
+          <Field name="url" label="URL" placeholder="https://mcp.example.com/mcp" defaultValue={state.values?.url} error={sentence(state.fieldErrors?.url?.[0])} />
           <div className="space-y-1">
             <Label htmlFor="transport" className="text-xs">
               Transport
@@ -105,9 +121,9 @@ function Field({
       <Label htmlFor={name} className="text-xs">
         {label}
       </Label>
-      <Input id={name} name={name} aria-invalid={Boolean(error)} {...input} />
+      <Input id={name} name={name} aria-invalid={Boolean(error)} aria-describedby={error ? `${name}-error` : undefined} {...input} />
       {error && (
-        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p id={`${name}-error`} role="alert" className="text-xs text-red-600 dark:text-red-400">
           {error}
         </p>
       )}

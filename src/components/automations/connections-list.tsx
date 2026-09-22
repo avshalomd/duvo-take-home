@@ -68,7 +68,7 @@ function ConnectionRow({ connection }: { connection: Connection }) {
         </p>
         {/* an enabled server with no token is handed to the agent and fails on the first call: say so before the run */}
         {enabled && !connection.hasToken && status.tone === "warn" && (
-          <p className="text-[11px] text-amber-700 dark:text-amber-400">Add a token or the agent cannot use it.</p>
+          <p className="text-[11px] text-amber-700 dark:text-amber-400">It is on, but without a token it will do nothing.</p>
         )}
       </div>
       <Switch

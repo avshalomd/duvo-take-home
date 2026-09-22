@@ -2,7 +2,7 @@ import type { Plan } from "@/contracts/run";
 import { Empty, Section } from "./section";
 
 // First in the panel, on purpose: how the agent read the instructions, before any work is judged.
-export function IntentSection({ prompt, plan }: { prompt: string; plan: Plan | null }) {
+export function IntentSection({ prompt, plan, finished }: { prompt: string; plan: Plan | null; finished: boolean }) {
   return (
     <Section title="Intent">
       <p className="mb-3 rounded-md bg-muted/60 p-2 font-mono text-xs leading-relaxed text-muted-foreground">
@@ -15,7 +15,11 @@ export function IntentSection({ prompt, plan }: { prompt: string; plan: Plan | n
           <Field label="Sources" items={plan.sources} />
         </div>
       ) : (
-        <Empty>The agent has not said how it read the instructions yet.</Empty>
+        <Empty>
+          {finished
+            ? "The agent never stated how it read the instructions."
+            : "The agent has not said how it read the instructions yet."}
+        </Empty>
       )}
     </Section>
   );
