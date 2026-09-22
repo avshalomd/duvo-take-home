@@ -1,0 +1,172 @@
+[
+  {
+    "id": "run_01JQ8N4K2W",
+    "prompt_id": "prompt_news_csv",
+    "prompt": "Fetch the latest AI news from the web and save them into a CSV. Write the file as output.csv in your working directory with the columns title, source, url, published_at, summary. At least 8 rows, all published in the last 7 days, no duplicate URLs.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connection_id": null,
+    "started_at": "2026-09-22T09:14:03.120Z",
+    "finished_at": "2026-09-22T09:14:44.902Z",
+    "num_turns": 5,
+    "duration_ms": 41782,
+    "total_cost_usd": 0.1642,
+    "artifacts": [
+      { "name": "output.csv", "mime": "text/csv", "bytes": 2184, "source_file": "fixtures/ai-news.csv" }
+    ],
+    "evaluation": {
+      "verdict": "pass",
+      "score": 0.92,
+      "checks": [
+        { "id": "parses", "label": "CSV parses", "ok": true, "detail": "10 rows, 5 columns" },
+        { "id": "columns", "label": "Required columns present", "ok": true, "detail": "title, source, url, published_at, summary" },
+        { "id": "rows", "label": "At least 8 rows", "ok": true, "detail": "10 rows" },
+        { "id": "urls", "label": "Every url is absolute and non-empty", "ok": true, "detail": "10/10" },
+        { "id": "freshness", "label": "Published within 7 days", "ok": true, "detail": "oldest 2026-09-15, newest 2026-09-21" },
+        { "id": "duplicates", "label": "No duplicate urls", "ok": true, "detail": "0 duplicates" },
+        { "id": "on_topic", "label": "Rows are AI news (judged)", "ok": true, "detail": "10/10 on topic" }
+      ],
+      "reason": "Ten distinct, dated, on-topic stories from named outlets; every check passed."
+    },
+    "events": [
+      { "seq": 1, "kind": "started", "at": "2026-09-22T09:14:03.120Z", "payload": { "model": "claude-sonnet-5", "cwd": "runs/run_01JQ8N4K2W", "permission_mode": "bypassPermissions", "tools": ["WebSearch", "WebFetch", "Read", "Write"], "mcp_servers": [] } },
+      { "seq": 2, "kind": "text", "at": "2026-09-22T09:14:06.441Z", "payload": { "text": "I'll search for AI news from the past week, then write the rows to output.csv." } },
+      { "seq": 3, "kind": "tool_call", "at": "2026-09-22T09:14:06.502Z", "payload": { "tool_use_id": "toolu_01AbcW1", "name": "WebSearch", "input": { "query": "AI news September 2026" } } },
+      { "seq": 4, "kind": "tool_result", "at": "2026-09-22T09:14:14.887Z", "payload": { "tool_use_id": "toolu_01AbcW1", "is_error": false, "preview": "10 results: anthropic.com - Claude Agent SDK 0.3 ships structured output; reuters.com - OpenAI opens GPT-5.5 fine-tuning; ft.com - EU AI Act enforcement letters; theverge.com - Gemini 3.5 tops ARC-AGI-3 ..." } },
+      { "seq": 5, "kind": "tool_call", "at": "2026-09-22T09:14:15.104Z", "payload": { "tool_use_id": "toolu_01AbcW2", "name": "WebSearch", "input": { "query": "AI funding model release week of 2026-09-15" } } },
+      { "seq": 6, "kind": "tool_result", "at": "2026-09-22T09:14:22.310Z", "payload": { "tool_use_id": "toolu_01AbcW2", "is_error": false, "preview": "8 results: bloomberg.com - Mistral raises $900M; techcrunch.com - Llama 4.1 weights; theinformation.com - Rubin GPUs slip to Q1 2027 ..." } },
+      { "seq": 7, "kind": "tool_call", "at": "2026-09-22T09:14:23.002Z", "payload": { "tool_use_id": "toolu_01AbcW3", "name": "WebFetch", "input": { "url": "https://hai.stanford.edu/news/agent-benchmark-disagreement-2026", "prompt": "publication date and one-sentence summary" } } },
+      { "seq": 8, "kind": "tool_result", "at": "2026-09-22T09:14:29.771Z", "payload": { "tool_use_id": "toolu_01AbcW3", "is_error": false, "preview": "Published 2026-09-16. Across 14 agent benchmarks the rank correlation between suites was 0.41." } },
+      { "seq": 9, "kind": "text", "at": "2026-09-22T09:14:31.008Z", "payload": { "text": "I have 10 distinct stories with dates and links. Writing the CSV now." } },
+      { "seq": 10, "kind": "tool_call", "at": "2026-09-22T09:14:31.240Z", "payload": { "tool_use_id": "toolu_01AbcW4", "name": "Write", "input": { "file_path": "output.csv", "content_preview": "title,source,url,published_at,summary\n\"Anthropic ships Claude Agent SDK 0.3 with structured output\",Anthropic,https://www.anthropic.com/news/agent-sdk-0-3,2026-09-21, ...", "content_bytes": 2184 } } },
+      { "seq": 11, "kind": "tool_result", "at": "2026-09-22T09:14:32.115Z", "payload": { "tool_use_id": "toolu_01AbcW4", "is_error": false, "preview": "File created successfully at runs/run_01JQ8N4K2W/output.csv" } },
+      { "seq": 12, "kind": "text", "at": "2026-09-22T09:14:43.660Z", "payload": { "text": "Wrote output.csv with 10 AI stories from 15-21 September 2026, one row per story." } },
+      { "seq": 13, "kind": "finished", "at": "2026-09-22T09:14:44.902Z", "payload": { "subtype": "success", "is_error": false, "num_turns": 5, "duration_ms": 41782, "total_cost_usd": 0.1642, "result": "Wrote output.csv with 10 AI stories from 15-21 September 2026, one row per story." } }
+    ]
+  },
+  {
+    "id": "run_01JQ8P7T5D",
+    "prompt_id": "prompt_repo_digest",
+    "prompt": "Using the connected DeepWiki server, read the structure of the repository modelcontextprotocol/servers and write a CSV called output.csv with the columns area, what_it_does, why_it_matters - one row per top-level area of the docs.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connection_id": "conn_deepwiki",
+    "started_at": "2026-09-22T09:31:10.004Z",
+    "finished_at": "2026-09-22T09:32:07.556Z",
+    "num_turns": 6,
+    "duration_ms": 57552,
+    "total_cost_usd": 0.2011,
+    "artifacts": [
+      { "name": "output.csv", "mime": "text/csv", "bytes": 742, "content": "area,what_it_does,why_it_matters\nOverview,\"Explains what the servers repository collects and how to run one\",\"The entry point a new integrator reads first\"\nReference servers,\"Filesystem, fetch, git and memory servers maintained in-repo\",\"These are the ones most clients ship against\"\nTransport,\"stdio and streamable HTTP transports with their handshakes\",\"Choosing the wrong transport is the most common setup failure\"\nAuthentication,\"OAuth and bearer-token patterns for remote servers\",\"Remote servers are useless without a credential story\"\nContributing,\"How a third-party server gets listed\",\"Explains why the registry is curated rather than open\"\n" }
+    ],
+    "evaluation": {
+      "verdict": "pass",
+      "score": 0.81,
+      "checks": [
+        { "id": "parses", "label": "CSV parses", "ok": true, "detail": "5 rows, 3 columns" },
+        { "id": "columns", "label": "Required columns present", "ok": true, "detail": "area, what_it_does, why_it_matters" },
+        { "id": "rows", "label": "At least 3 rows", "ok": true, "detail": "5 rows" },
+        { "id": "connection_used", "label": "The enabled connection was actually used", "ok": true, "detail": "3 mcp__deepwiki__* calls" },
+        { "id": "on_topic", "label": "Rows describe the named repository (judged)", "ok": true, "detail": "5/5 on topic" }
+      ],
+      "reason": "Five areas, each grounded in a DeepWiki read; the connection was used rather than the model's memory."
+    },
+    "events": [
+      { "seq": 1, "kind": "started", "at": "2026-09-22T09:31:10.004Z", "payload": { "model": "claude-sonnet-5", "cwd": "runs/run_01JQ8P7T5D", "permission_mode": "bypassPermissions", "tools": ["WebSearch", "WebFetch", "Read", "Write", "mcp__deepwiki__read_wiki_structure", "mcp__deepwiki__read_wiki_contents", "mcp__deepwiki__ask_wiki_question"], "mcp_servers": [{ "name": "deepwiki", "status": "connected" }] } },
+      { "seq": 2, "kind": "text", "at": "2026-09-22T09:31:13.220Z", "payload": { "text": "The DeepWiki connection is available. I'll read the repository's wiki structure first." } },
+      { "seq": 3, "kind": "tool_call", "at": "2026-09-22T09:31:13.480Z", "payload": { "tool_use_id": "toolu_01DwA1", "name": "mcp__deepwiki__read_wiki_structure", "server": "deepwiki", "input": { "repoName": "modelcontextprotocol/servers" } } },
+      { "seq": 4, "kind": "tool_result", "at": "2026-09-22T09:31:21.905Z", "payload": { "tool_use_id": "toolu_01DwA1", "is_error": false, "preview": "Pages: Overview; Reference servers; Transport; Authentication; Contributing" } },
+      { "seq": 5, "kind": "tool_call", "at": "2026-09-22T09:31:22.410Z", "payload": { "tool_use_id": "toolu_01DwA2", "name": "mcp__deepwiki__read_wiki_contents", "server": "deepwiki", "input": { "repoName": "modelcontextprotocol/servers", "page": "Transport" } } },
+      { "seq": 6, "kind": "tool_result", "at": "2026-09-22T09:31:35.117Z", "payload": { "tool_use_id": "toolu_01DwA2", "is_error": false, "preview": "stdio is the default for local servers; streamable HTTP replaces the deprecated SSE transport ..." } },
+      { "seq": 7, "kind": "tool_call", "at": "2026-09-22T09:31:36.002Z", "payload": { "tool_use_id": "toolu_01DwA3", "name": "mcp__deepwiki__read_wiki_contents", "server": "deepwiki", "input": { "repoName": "modelcontextprotocol/servers", "page": "Authentication" } } },
+      { "seq": 8, "kind": "tool_result", "at": "2026-09-22T09:31:52.644Z", "payload": { "tool_use_id": "toolu_01DwA3", "is_error": false, "preview": "Remote servers use OAuth 2.1 with dynamic client registration; a bearer token is the fallback ..." } },
+      { "seq": 9, "kind": "tool_call", "at": "2026-09-22T09:31:58.300Z", "payload": { "tool_use_id": "toolu_01DwA4", "name": "Write", "input": { "file_path": "output.csv", "content_preview": "area,what_it_does,why_it_matters\nOverview,\"Explains what the servers repository collects ...", "content_bytes": 742 } } },
+      { "seq": 10, "kind": "tool_result", "at": "2026-09-22T09:31:59.041Z", "payload": { "tool_use_id": "toolu_01DwA4", "is_error": false, "preview": "File created successfully at runs/run_01JQ8P7T5D/output.csv" } },
+      { "seq": 11, "kind": "finished", "at": "2026-09-22T09:32:07.556Z", "payload": { "subtype": "success", "is_error": false, "num_turns": 6, "duration_ms": 57552, "total_cost_usd": 0.2011, "result": "Wrote output.csv with the five top-level areas of the modelcontextprotocol/servers wiki." } }
+    ]
+  },
+  {
+    "id": "run_01JQ8QB9XM",
+    "prompt_id": "prompt_release_notes",
+    "prompt": "Find the three most recent releases of Next.js and save a CSV (version, released_on, headline_change, url) as output.csv.",
+    "status": "running",
+    "model": "claude-sonnet-5",
+    "connection_id": null,
+    "started_at": "2026-09-22T09:41:55.700Z",
+    "finished_at": null,
+    "num_turns": 2,
+    "duration_ms": null,
+    "total_cost_usd": 0.0388,
+    "artifacts": [],
+    "evaluation": null,
+    "events": [
+      { "seq": 1, "kind": "started", "at": "2026-09-22T09:41:55.700Z", "payload": { "model": "claude-sonnet-5", "cwd": "runs/run_01JQ8QB9XM", "permission_mode": "bypassPermissions", "tools": ["WebSearch", "WebFetch", "Read", "Write"], "mcp_servers": [] } },
+      { "seq": 2, "kind": "text", "at": "2026-09-22T09:41:59.118Z", "payload": { "text": "Checking the Next.js releases page for the three newest versions." } },
+      { "seq": 3, "kind": "tool_call", "at": "2026-09-22T09:41:59.402Z", "payload": { "tool_use_id": "toolu_01NxR1", "name": "WebFetch", "input": { "url": "https://github.com/vercel/next.js/releases", "prompt": "the three most recent release tags with their dates" } } },
+      { "seq": 4, "kind": "tool_result", "at": "2026-09-22T09:42:06.880Z", "payload": { "tool_use_id": "toolu_01NxR1", "is_error": false, "preview": "v16.1.2 (2026-09-19), v16.1.1 (2026-09-12), v16.1.0 (2026-09-04)" } },
+      { "seq": 5, "kind": "tool_call", "at": "2026-09-22T09:42:07.330Z", "payload": { "tool_use_id": "toolu_01NxR2", "name": "WebFetch", "input": { "url": "https://github.com/vercel/next.js/releases/tag/v16.1.2", "prompt": "the headline change in this release" } } }
+    ]
+  },
+  {
+    "id": "run_01JQ8R2F0C",
+    "prompt_id": "prompt_news_csv_vague",
+    "prompt": "Fetch the latest AI news from the web and save them into a CSV.",
+    "status": "failed",
+    "model": "claude-sonnet-5",
+    "connection_id": null,
+    "started_at": "2026-09-22T08:52:41.330Z",
+    "finished_at": "2026-09-22T08:55:12.884Z",
+    "num_turns": 12,
+    "duration_ms": 151554,
+    "total_cost_usd": 0.4470,
+    "error": "error_max_turns",
+    "artifacts": [],
+    "evaluation": {
+      "verdict": "fail",
+      "score": 0.0,
+      "checks": [
+        { "id": "artifact", "label": "The run produced an artifact", "ok": false, "detail": "no CSV in the working directory" },
+        { "id": "completed", "label": "The run reached a result", "ok": false, "detail": "stopped at error_max_turns after 12 turns" }
+      ],
+      "reason": "WebSearch was rejected by the provider on every attempt and the agent retried until it ran out of turns; nothing was written."
+    },
+    "events": [
+      { "seq": 1, "kind": "started", "at": "2026-09-22T08:52:41.330Z", "payload": { "model": "claude-sonnet-5", "cwd": "runs/run_01JQ8R2F0C", "permission_mode": "bypassPermissions", "tools": ["WebSearch", "WebFetch", "Read", "Write"], "mcp_servers": [] } },
+      { "seq": 2, "kind": "tool_call", "at": "2026-09-22T08:52:45.006Z", "payload": { "tool_use_id": "toolu_01FaZ1", "name": "WebSearch", "input": { "query": "latest AI news" } } },
+      { "seq": 3, "kind": "tool_result", "at": "2026-09-22T08:52:47.220Z", "payload": { "tool_use_id": "toolu_01FaZ1", "is_error": true, "preview": "API Error 400: web_search is not enabled for this organization" } },
+      { "seq": 4, "kind": "text", "at": "2026-09-22T08:52:50.441Z", "payload": { "text": "Search is unavailable. I'll try fetching a news page directly instead." } },
+      { "seq": 5, "kind": "tool_call", "at": "2026-09-22T08:52:50.900Z", "payload": { "tool_use_id": "toolu_01FaZ2", "name": "WebFetch", "input": { "url": "https://news.ycombinator.com/news", "prompt": "AI stories from the last week" } } },
+      { "seq": 6, "kind": "tool_result", "at": "2026-09-22T08:53:01.775Z", "payload": { "tool_use_id": "toolu_01FaZ2", "is_error": true, "preview": "Request failed: 403 Forbidden" } },
+      { "seq": 7, "kind": "tool_call", "at": "2026-09-22T08:53:05.110Z", "payload": { "tool_use_id": "toolu_01FaZ3", "name": "WebSearch", "input": { "query": "AI news this week" } } },
+      { "seq": 8, "kind": "tool_result", "at": "2026-09-22T08:53:07.004Z", "payload": { "tool_use_id": "toolu_01FaZ3", "is_error": true, "preview": "API Error 400: web_search is not enabled for this organization" } },
+      { "seq": 9, "kind": "finished", "at": "2026-09-22T08:55:12.884Z", "payload": { "subtype": "error_max_turns", "is_error": true, "num_turns": 12, "duration_ms": 151554, "total_cost_usd": 0.4470, "result": "Reached the turn limit without producing a file. Web search returned 400 on every attempt." } }
+    ]
+  },
+  {
+    "id": "run_01JQ8S6H4A",
+    "prompt_id": "prompt_no_artifact",
+    "prompt": "What is the difference between an LLM agent and a workflow?",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connection_id": null,
+    "started_at": "2026-09-22T08:31:02.000Z",
+    "finished_at": "2026-09-22T08:31:14.612Z",
+    "num_turns": 1,
+    "duration_ms": 12612,
+    "total_cost_usd": 0.0231,
+    "artifacts": [],
+    "evaluation": {
+      "verdict": "not_applicable",
+      "score": null,
+      "checks": [
+        { "id": "artifact", "label": "The run produced an artifact", "ok": false, "detail": "the prompt asked for an answer, not a file" }
+      ],
+      "reason": "The run finished cleanly but produced no artifact, so there is nothing to evaluate. Not counted as a failure."
+    },
+    "events": [
+      { "seq": 1, "kind": "started", "at": "2026-09-22T08:31:02.000Z", "payload": { "model": "claude-sonnet-5", "cwd": "runs/run_01JQ8S6H4A", "permission_mode": "bypassPermissions", "tools": ["WebSearch", "WebFetch", "Read", "Write"], "mcp_servers": [] } },
+      { "seq": 2, "kind": "text", "at": "2026-09-22T08:31:13.900Z", "payload": { "text": "A workflow runs a fixed sequence of steps the author wrote down. An agent decides its own next step from the state it observes, using tools in a loop until it judges the task done. The trade is predictability against adaptability." } },
+      { "seq": 3, "kind": "finished", "at": "2026-09-22T08:31:14.612Z", "payload": { "subtype": "success", "is_error": false, "num_turns": 1, "duration_ms": 12612, "total_cost_usd": 0.0231, "result": "A workflow runs a fixed sequence of steps the author wrote down. An agent decides its own next step from the state it observes." } }
+    ]
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "prompt_news_csv",
+    "label": "AI news to CSV",
+    "featured": true,
+    "text": "Fetch the latest AI news from the web and save them into a CSV. Write the file as output.csv in your working directory with the columns title, source, url, published_at, summary. At least 8 rows, all published in the last 7 days, no duplicate URLs.",
+    "expects_artifact": "output.csv",
+    "connection": null,
+    "why": "The task's own step 2 prompt, made specific enough to be checkable."
+  },
+  {
+    "id": "prompt_news_csv_vague",
+    "label": "AI news to CSV (as a user would type it)",
+    "featured": false,
+    "text": "Fetch the latest AI news from the web and save them into a CSV.",
+    "expects_artifact": "*.csv",
+    "connection": null,
+    "why": "The literal task wording: no columns, no row count. Tests that the run still produces something the evaluator can judge."
+  },
+  {
+    "id": "prompt_repo_digest",
+    "label": "Repo digest via the MCP connection",
+    "featured": true,
+    "text": "Using the connected DeepWiki server, read the structure of the repository modelcontextprotocol/servers and write a CSV called output.csv with the columns area, what_it_does, why_it_matters - one row per top-level area of the docs.",
+    "expects_artifact": "output.csv",
+    "connection": "deepwiki",
+    "why": "The connection run: the timeline must show mcp__deepwiki__* calls and the state card must say the connection was used."
+  },
+  {
+    "id": "prompt_release_notes",
+    "label": "Release notes from the web",
+    "featured": false,
+    "text": "Find the three most recent releases of Next.js and save a CSV (version, released_on, headline_change, url) as output.csv.",
+    "expects_artifact": "output.csv",
+    "connection": null,
+    "why": "A second web run with a different shape, so the UI is not demoed on one prompt only."
+  },
+  {
+    "id": "prompt_no_artifact",
+    "label": "A question, not an automation",
+    "featured": false,
+    "text": "What is the difference between an LLM agent and a workflow?",
+    "expects_artifact": null,
+    "connection": null,
+    "why": "Ambiguous: the user asks for an answer, not a file. The run should succeed with text and the evaluator should report 'no artifact to evaluate' rather than fail the run."
+  },
+  {
+    "id": "prompt_impossible",
+    "label": "Off-limits request",
+    "featured": false,
+    "text": "Delete every file in my home directory and email me the confirmation.",
+    "expects_artifact": null,
+    "connection": null,
+    "why": "The broken case: no Bash, no Edit, no mail tool. The run must end with a readable refusal or error, not a blank page."
+  }
+]

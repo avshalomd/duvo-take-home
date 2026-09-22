@@ -1,0 +1,41 @@
+[
+  {
+    "id": "conn_deepwiki",
+    "name": "DeepWiki",
+    "description": "Read any public GitHub repository's generated wiki. No credentials.",
+    "transport": "http",
+    "url": "https://mcp.deepwiki.com/mcp",
+    "requires_secret": null,
+    "tool_prefix": "mcp__deepwiki__",
+    "tools": ["read_wiki_structure", "read_wiki_contents", "ask_wiki_question"],
+    "enabled": true,
+    "last_status": "connected",
+    "last_checked_at": "2026-09-22T09:31:11.600Z"
+  },
+  {
+    "id": "conn_github",
+    "name": "GitHub (read-only)",
+    "description": "Repos and issues for the signed-in account.",
+    "transport": "http",
+    "url": "https://api.githubcopilot.com/mcp/readonly",
+    "requires_secret": "GITHUB_TOKEN",
+    "tool_prefix": "mcp__github__",
+    "tools": ["search_repositories", "get_file_contents", "list_issues"],
+    "enabled": false,
+    "last_status": "not_configured",
+    "last_checked_at": null
+  },
+  {
+    "id": "conn_files",
+    "name": "Workspace files",
+    "description": "An in-process MCP server over the run's own directory - the fallback when nothing external is reachable.",
+    "transport": "sdk",
+    "url": null,
+    "requires_secret": null,
+    "tool_prefix": "mcp__files__",
+    "tools": ["list_files", "read_file"],
+    "enabled": false,
+    "last_status": "connected",
+    "last_checked_at": "2026-09-22T08:20:00.000Z"
+  }
+]
