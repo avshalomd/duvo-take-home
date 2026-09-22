@@ -56,6 +56,20 @@ for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
 - **Text files only, stored in Postgres.** A CSV needs no blob store; visuals are a later step.
 - **Connection tokens are stored as entered** and never rendered back. A demo trade-off, noted here.
 
+## Tests
+
+- Unit (`npm run check`, 232 tests): the contracts against fixtures, the SDK message mapper, the derived run state,
+  the evaluator's checks and its cascade with the model calls mocked, the UI formatting.
+- Integration (`npm run test:int`): the connections store against the real table, cleaning up after itself.
+- Evaluator accuracy (`EVAL=1 ...`): 10 of 10 labelled cases, [docs/EVAL.md](docs/EVAL.md).
+- End to end (`npx playwright test e2e/flow.spec.ts` against a running app): the page, a finished run with its file
+  and verdict, a failed run, validation of the form and of a new connection, re-evaluation.
+- Production smoke (`e2e/smoke.spec.ts`, read-only): health with the database and the model, the home page.
+
+## Extras
+
+None beyond the requirements; the hour went to the five steps and the evaluator cascade.
+
 ## Not done, next
 
 - Live runs on the deployed URL need `ANTHROPIC_API_KEY` on Vercel and depend on the Agent SDK spawning its
