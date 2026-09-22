@@ -85,3 +85,18 @@ run there needs `ANTHROPIC_API_KEY` on Vercel, which was not set during the hour
 | Q59 | reviewer | a succeeded run whose evaluator crashed (verdict null) reads green "Done" like a pass | "Done - not checked" tone; store `{ verdict: "unknown", reasons }` instead of null | minor | ui + engine | open |
 | Q60 | reviewer | action errors forward any `Error.message` to the UI (database credentials, hosts) | log it; a fixed sentence to the user | minor | ui (actions) | open |
 | Q61 | reviewer | `connection_used` treats "use the connected X if it helps" as a hard requirement | assert only on must/only/use-the-connected wording; else informational | minor | eval | open |
+| Q62 | qa-ux | the add-a-server dialog does not trap focus and has no `aria-modal`; Tab leaves it while open | focus cycles inside; aria-modal; Escape and focus return already work | major | ui | open |
+| Q63 | qa-ux | no dark mode at all: `.dark` never applied, no prefers-color-scheme handling; every `dark:` class is dead | a dark theme, or the classes removed plus `<meta name="color-scheme" content="light">` | minor | ui | open |
+| Q64 | qa-ux | contrast: Run 3.65:1 (white on emerald-600), "1 run live" 3.20:1, selected row meta 4.35:1 | 4.5:1 (emerald-700, amber-700) | minor | ui | open |
+| Q65 | qa-ux | prefers-reduced-motion is ignored by the stepper animations and the progress transition | no motion under reduce; final state painted | minor | ui | open |
+| Q66 | qa-ux | switching runs blanks the right column (no skeleton, no old content) for 300 ms+, and the page jumps | keep the old panel or a panel-shaped Suspense skeleton; loading.tsx grid does not match the real layout | minor | ui | open |
+| Q67 | qa-ux | a run whose result did not pass shows a full green progress bar above the red outcome | neutral or amber bar when the verdict is not a pass | minor | ui | open |
+| Q68 | qa-ux | no aria-live region: the outcome change while polling is never announced | the outcome line in a `role="status"` region | minor | ui | open |
+| Q69 | qa-ux | a switch is `disabled` while its action runs, so focus is dropped and a second Space does nothing | keep it enabled and ignore repeats, or restore focus | minor | ui | open |
+| Q70 | qa-ux | tab order goes through every run row before the panel's controls (22 tabs, grows with runs); no skip link | a "Skip to the run" link or the panel first in DOM order at >= 900 px | minor | ui | open |
+| Q71 | qa-ux | focus rings differ: the design ring on the form, the browser default on run rows and Details | one ring token on all focusables | minor | ui | open |
+| Q72 | qa-ux | both download links are named "Download"; two files are indistinguishable to a screen reader | "Download nvidia_financials.csv (2.2 KB)" | minor | ui | open |
+| Q73 | qa-ux | "INSTRUCTIONS" is a label, not a heading; the runs list has no landmark; the panel is not a named section | an h2 on the card, a named landmark for the list | minor | ui | open |
+| Q74 | qa-ux | run rows truncate the instruction with no `title`; "19 s - $0.028" has no label | `title={run.prompt}`; "19 s, $0.03 spent" or cost under Details | minor | ui | open |
+| Q75 | qa-ux | at 390 px the primary controls are under 40 px tall (Run 28, Download 26, switches 18) | 40 px minimum at mobile width | minor | ui | open |
+| Q76 | qa-ux | at 390 px with a run open the instructions box is ~1000 px below the fold | a "New run" affordance in the header on small screens | minor | ui | open |
