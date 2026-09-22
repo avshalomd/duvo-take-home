@@ -1,45 +1,89 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { LoaderCircle } from "lucide-react";
+import { useActionState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { addConnectionAction } from "@/app/actions";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-// Adding a server is the rare path, so it stays folded away behind one line until it is wanted.
-export function AddConnectionForm() {
-  const [open, setOpen] = useState(false);
+// Adding a server is the rare path: it lives in a dialog so the column stays a list of what is connected.
+export function AddConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [state, action, pending] = useActionState(addConnectionAction, {});
+  const submitted = useRef(false);
 
-  if (!open) {
-    return (
-      <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => setOpen(true)}>
-        + add an MCP server
-      </Button>
-    );
-  }
+  // the action answers with {} when it worked: that is the only signal, so the dialog closes on an empty answer
+  useEffect(() => {
+    if (!submitted.current || pending) return;
+    submitted.current = false;
+    if (state.error) toast.error(state.error);
+    else if (!state.fieldErrors) {
+      toast.success("Server added - switch it on to give it to the next run");
+      onOpenChange(false);
+    }
+  }, [state, pending, onOpenChange]);
 
   return (
-    <form data-testid="connections-form" action={action} className="space-y-2 rounded-lg border bg-background p-3">
-      <Field name="name" label="Name" placeholder="Linear" defaultValue={state.values?.name} error={state.fieldErrors?.name?.[0]} />
-      <Field name="url" label="URL" placeholder="https://mcp.example.com/mcp" defaultValue={state.values?.url} error={state.fieldErrors?.url?.[0]} />
-      {/* the token is sent as a Bearer header and stays on the server: the list only ever shows hasToken */}
-      <Field name="token" label="Token (optional)" type="password" error={state.fieldErrors?.token?.[0]} />
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
-      <div className="flex justify-end gap-2">
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Adding..." : "Add"}
-        </Button>
-      </div>
-    </form>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add a server</DialogTitle>
+          <DialogDescription>An MCP server over http. The token is stored on the server and never shown again.</DialogDescription>
+        </DialogHeader>
+        <form
+          data-testid="connections-form"
+          action={action}
+          onSubmit={() => {
+            submitted.current = true;
+          }}
+          className="space-y-3"
+        >
+          <Field name="name" label="Name" placeholder="Linear" defaultValue={state.values?.name} error={state.fieldErrors?.name?.[0]} />
+          <Field name="url" label="URL" placeholder="https://mcp.example.com/mcp" defaultValue={state.values?.url} error={state.fieldErrors?.url?.[0]} />
+          <div className="space-y-1">
+            <Label htmlFor="transport" className="text-xs">
+              Transport
+            </Label>
+            {/* two values only, from the contract's Transport enum: a native select is the whole control */}
+            <select
+              id="transport"
+              name="transport"
+              defaultValue={state.values?.transport ?? "http"}
+              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+            >
+              <option value="http">http</option>
+              <option value="sse">sse</option>
+            </select>
+          </div>
+          <Field
+            name="token"
+            label="Token (optional)"
+            type="password"
+            placeholder="pasted once, kept on the server"
+            error={state.fieldErrors?.token?.[0]}
+          />
+          {state.error && <p className="text-xs text-red-600 dark:text-red-400">{state.error}</p>}
+          <DialogFooter>
+            <Button type="button" size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={pending}>
+              {pending && <LoaderCircle className="size-3.5 animate-spin" />}
+              {pending ? "Adding..." : "Add"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -62,7 +106,11 @@ function Field({
         {label}
       </Label>
       <Input id={name} name={name} aria-invalid={Boolean(error)} {...input} />
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
