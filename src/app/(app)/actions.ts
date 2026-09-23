@@ -26,7 +26,7 @@ export type FormState = {
 const RunId = z.uuid(); // ids arrive from hidden fields, which are user input like any other
 
 /**
- * The composer's one box: "\audit Acme Ltd" (or "/audit ...") runs the saved automation, anything else is
+ * The composer's one box: "/audit Acme Ltd" runs the saved automation (a front slash only), anything else is
  * instructions for a new run. The workspace always comes from the session, never from the form.
  */
 export async function startRunAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -40,7 +40,7 @@ export async function startRunAction(_prev: FormState, formData: FormData): Prom
   const word = parsed?.command ?? commandWord(values.prompt);
   let id: string;
   if (word) {
-    const unknown = { error: `There is no saved automation called \\${word}. Type \\ to see the ones you have.`, values };
+    const unknown = { error: `There is no saved automation called /${word}. Type / to see the ones you have.`, values };
     if (!parsed) return unknown;
     try {
       // looked up here, not left to runCommand, so the refusal names the command in words the person typed
