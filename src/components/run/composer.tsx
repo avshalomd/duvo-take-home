@@ -156,8 +156,9 @@ export function Composer({
         data-testid="composer-capsule"
         // the ring is an outline, not a ring utility: a ring is a box-shadow, and the style below sets box-shadow (Q143)
         className={cn(
-          // 2 px at 45%: the app's 3 px focus ring reads as a heavy border around something this large
-          "glass rounded-[26px] outline-ring/45 focus-within:outline-2",
+          // 2 px at 45%: the app's 3 px focus ring reads as a heavy border around something this large. relative z-20:
+          // the command list is placed against the capsule, above what follows it on the page
+          "glass relative z-20 rounded-[26px] outline-ring/45 focus-within:outline-2",
           hero ? "px-5 pt-4 pb-3" : "px-4 pt-3 pb-2.5",
         )}
         // glass sets its own box-shadow (the light top edge), which would cancel a shadow utility: the edge, a hairline
@@ -219,17 +220,6 @@ export function Composer({
               </p>
             </ViewTransition>
           )}
-          {open && (
-            <CommandList
-              options={options}
-              query={query ?? ""}
-              active={highlighted}
-              ready={automations.length}
-              notReady={notReady}
-              placement={hero ? "below" : "above"}
-              onPick={pick}
-            />
-          )}
         </div>
 
         {state.fieldErrors?.prompt && (
@@ -253,6 +243,19 @@ export function Composer({
             </Button>
           </div>
         </div>
+
+        {/* anchored to the whole capsule, not the text: it opens past the Run button and the chips, never over them */}
+        {open && (
+          <CommandList
+            options={options}
+            query={query ?? ""}
+            active={highlighted}
+            ready={automations.length}
+            notReady={notReady}
+            placement={hero ? "below" : "above"}
+            onPick={pick}
+          />
+        )}
       </div>
 
       {/* the first visit offers the saved automations as tokens: a click writes the command into the box */}

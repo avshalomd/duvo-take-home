@@ -50,7 +50,28 @@ export function emptyListLine({ ready, notReady, query }: { ready: number; notRe
   return "No saved automations yet - make one from a finished run";
 }
 
-/** An automation's output line with its input named: "about {input}" reads "about the topic" (Q118). */
+// What a file is, for someone who does not read extensions; anything unknown is simply "a file".
+const KIND: Record<string, string> = {
+  csv: "a CSV table",
+  xlsx: "a spreadsheet",
+  xls: "a spreadsheet",
+  svg: "a chart",
+  png: "a chart",
+  md: "a document",
+  txt: "a document",
+  json: "a data file",
+};
+const FILE_FIRST = /^[\w.-]+\.([A-Za-z0-9]{1,5})\b\s*(.*)$/;
+
+/**
+ * An automation's output line, in plain words, for the command list and the tokens: its input named ("about
+ * {input}" reads "about the topic", Q118), the file said by its kind ("output.csv" reads "a CSV table"), and the
+ * template's fine print left to the automation's page - column names, and whatever follows the first comma.
+ */
 export function describeOutput(text: string, inputLabel: string): string {
-  return text.replaceAll("{input}", `the ${inputLabel.toLowerCase()}`);
+  const line = text.replaceAll("{input}", `the ${inputLabel.toLowerCase()}`).trim();
+  const m = FILE_FIRST.exec(line);
+  if (!m) return line; // no file named first: already words ("a short answer in the report")
+  const rest = /^with (the )?columns\b/i.test(m[2]) ? "" : m[2].split(",")[0].trim();
+  return [KIND[m[1].toLowerCase()] ?? "a file", rest].filter(Boolean).join(" ");
 }
