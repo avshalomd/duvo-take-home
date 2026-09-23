@@ -245,7 +245,6 @@ export const runAutomation: RunAutomation = async (runId) => {
 
   /** One attempt: the agent works (or fixes its work) until its result message, every message recorded as it comes. */
   const runAttempt = async (attemptPrompt: string, attemptResume: { resume: string; forkSession?: boolean } | null) => {
-    deadline = startDeadline(attemptMs());
     attemptStartedAt = Date.now();
     attemptFrom = recorded.length; // the previous attempt settled, so every one of its events is in
     turnsBefore = maxTurn(recorded);
@@ -314,10 +313,28 @@ export const runAutomation: RunAutomation = async (runId) => {
   // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
   // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
   try {
-    let attemptPrompt = prompt;
-    let attemptResume: { resume: string; forkSession?: boolean } | null = resume;
+    // What the next attempt is sent; for a fix, also what its heal event says, written only once the fix starts.
+    let next: { prompt: string; resume: { resume: string; forkSession?: boolean } | null; heal: { reasons: string[]; feedback: string } | null } = {
+      prompt,
+      resume,
+      heal: null,
+    };
     for (;;) {
-      await runAttempt(attemptPrompt, attemptResume);
+      // The attempt's controller first, then the stop check. A Stop the watch saw before this line aborted the last
+      // attempt's controller, already spent, and is caught here; one it sees after aborts this one. A Stop pressed but
+      // not polled yet is read here too: no attempt starts, and none is paid for, on a run the user stopped.
+      deadline.clear();
+      deadline = startDeadline(attemptMs());
+      if (cancel.cancelled() || (await cancelRequested(runId))) {
+        await closeStopped();
+        return;
+      }
+      if (next.heal) {
+        heals += 1;
+        await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, ...next.heal }, at: now() }]);
+        await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
+      }
+      await runAttempt(next.prompt, next.resume);
       const written = await storeFiles();
 
       // An abort can end the stream quietly instead of throwing: Stop is then seen here.
@@ -390,16 +407,15 @@ export const runAutomation: RunAutomation = async (runId) => {
         return;
       }
       earlierAttempts.push(print);
-      heals += 1;
-      await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback }, at: now() }]);
-      await chain;
-      await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
       // The same session, not a fork: the run stays one conversation. Where it is gone, the heal prompt carries the
       // instructions too, and the new session's total starts from nothing.
       const same = sessionId ? await resumeOptions(sessionId) : null;
-      attemptResume = same ? { resume: same.resume } : null;
       attemptBase = same ? end.total_cost_usd : 0;
-      attemptPrompt = same ? healPrompt(feedback) : `${prompt}\n\n${healPrompt(feedback)}`;
+      next = {
+        prompt: same ? healPrompt(feedback) : `${prompt}\n\n${healPrompt(feedback)}`,
+        resume: same ? { resume: same.resume } : null,
+        heal: { reasons: verdict.reasons, feedback },
+      };
     }
   } catch (err) {
     await settle().catch(() => undefined);
