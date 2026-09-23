@@ -157,6 +157,19 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
     expect(second.link).toBe(first.link);
   });
 
+  // Security QA: resend only renewed the pending invitation, so "invite again as admin" kept it a member invitation.
+  it("inviting a pending address again with another role closes the old link and gives a new one with the new role", async () => {
+    const owner = await signUp("Rhea Reinviter", email("reinvite"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+    const guestEmail = email("reinvite-guest");
+    const asMember = await createInvite(owner.headers, ownerCtx, { email: guestEmail, role: "member" });
+    const asAdmin = await createInvite(owner.headers, ownerCtx, { email: guestEmail, role: "admin" });
+
+    expect(asAdmin.link).not.toBe(asMember.link);
+    expect((await getInvitation(asMember.link.split("/invite/")[1]))?.open).toBe(false);
+    expect((await listInvitations(ownerCtx)).map((i) => [i.email, i.role, i.link])).toEqual([[guestEmail, "admin", asAdmin.link]]);
+  });
+
   it("a plain member cannot invite, and is told so in plain words", async () => {
     const owner = await signUp("Inty Boss", email("boss"));
     const ownerCtx = (await sessionFromHeaders(owner.headers))!;
