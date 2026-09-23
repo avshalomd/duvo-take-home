@@ -20,12 +20,15 @@ describe("threadSteps - the plan as the thread draws it", () => {
     ]);
   });
 
-  it("flags a finished step the checker doubted, in plain words, and not one it believed", () => {
-    const steps = threadSteps(plan(["done", "done"]), "succeeded", [
-      { stepIndex: 0, onTrack: 0.3, note: "It found two facts, not three." },
-      { stepIndex: 1, onTrack: 0.9, note: "As planned." },
+  it("flags a finished step the checker doubted, once, in plain words, and not one it believed", () => {
+    // The checker's note only repeats the step's own note, which the thread already shows (production, 2026-09-23:
+    // "This step may not have done what it says. May not have done what it says: Selected 5...").
+    const steps = threadSteps(plan(["done", "done"], ["Selected 5 rounds"]), "succeeded", [
+      { stepIndex: 0, onTrack: 0.3, note: "May not have done what it says: Selected 5 rounds" },
+      { stepIndex: 1, onTrack: 0.9, note: "Looks done" },
     ]);
-    expect(steps[0].flag).toBe("This step may not have done what it says. It found two facts, not three.");
+    expect(steps[0].flag).toBe("This step may not have done what it says.");
+    expect(steps[0].note).toBe("Selected 5 rounds");
     expect(steps[1].flag).toBeUndefined();
   });
 
