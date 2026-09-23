@@ -1,4 +1,5 @@
 import { parse } from "csv-parse/sync";
+import { AgentLimits } from "@/contracts/agent";
 import type { Check, EvaluateInput } from "@/contracts/eval";
 import { templateChecks } from "./template-checks";
 
@@ -6,9 +7,9 @@ import { templateChecks } from "./template-checks";
 // reading the instructions and the files. Any failure here ends the evaluation before a model is paid to look at
 // an empty file. Each check carries the detail a user needs to fix the run, not just a red tick.
 
-// The agent's Write tool is limited to .txt, .md and .csv (DESIGN, Model design); v2's output tools add charts (.svg)
-// and spreadsheets (.xlsx), which our own code renders, so they are allowed here too.
-const ALLOWED_EXTENSIONS = [".txt", ".md", ".csv", ".svg", ".xlsx"];
+// What the Write tool may produce (.txt, .md, .csv) and what v2's output tools render (.svg, .xlsx): the same two
+// lists the run loop collects files by, so the evaluator can never reject a file the app itself made.
+const ALLOWED_EXTENSIONS: readonly string[] = [...AgentLimits.fileExtensions, ...AgentLimits.toolFileExtensions];
 const DEFAULT_FRESH_DAYS = 30; // "latest" with no window named: a month is the widest reading of "latest news"
 
 export function runChecks(input: EvaluateInput): Check[] {

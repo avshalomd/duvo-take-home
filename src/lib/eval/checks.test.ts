@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AgentLimits } from "@/contracts/agent";
 import type { EvaluateInput } from "@/contracts/eval";
 import { runChecks } from "./checks";
 
@@ -129,6 +130,22 @@ describe("runChecks", () => {
     ];
     const checks = runChecks(input({ prompt: "Chart the prices and export a spreadsheet.", files }));
     expect(check(checks, "extension")?.ok).toBe(true);
+  });
+
+  it("accepts every file type the run loop collects, so the evaluator and the collector cannot drift apart", () => {
+    const types = [...AgentLimits.fileExtensions, ...AgentLimits.toolFileExtensions];
+    const files = types.map((ext) => ({ name: `out${ext}`, content: ext === ".csv" ? "a,b\n1,2\n" : "x" }));
+    expect(check(runChecks(input({ prompt: "Do it.", files })), "extension")?.ok).toBe(true);
+  });
+
+  it("does not read a chart or a spreadsheet as text: no content, parse or row check on them", () => {
+    const files = [
+      { name: "chart.svg", content: "" },
+      { name: "data.xlsx", content: "(application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, 6120 bytes)" },
+    ];
+    const checks = runChecks(input({ prompt: "Chart the prices.", files }));
+    expect(checks.map((c) => c.id).filter((id) => ["content", "parses", "rows"].includes(id))).toEqual([]);
+    expect(failedIds(checks)).toEqual([]);
   });
 
   it("rejects a file type the agent was not allowed to write", () => {
