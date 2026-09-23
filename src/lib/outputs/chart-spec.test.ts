@@ -32,6 +32,8 @@ describe("buildChartSpec", () => {
     expect(s.mark.type).toBe("bar");
     expect(s.encoding.y).toMatchObject({ field: "country", type: "nominal", sort: null });
     expect(s.encoding.x).toMatchObject({ field: "population", type: "quantitative" });
+    // numbers side by side along the bottom: ten ticks put "80" against "90" (production, 2026-09-23)
+    expect(s.encoding.x?.axis).toMatchObject({ tickCount: 5 });
   });
 
   it("groups the bars side by side when a series splits them", () => {
