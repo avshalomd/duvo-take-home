@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   DEMO_EMAIL,
   DEMO_PASSWORD,
@@ -18,6 +18,9 @@ test.use({ storageState: SIGNED_OUT });
 
 const created: string[] = [];
 test.afterAll(async () => deleteUsers(created));
+
+// The example is drawn at two sizes and CSS shows the one for the screen's width: test the one on screen.
+const visibleThread = (page: Page) => page.getByTestId("thread").filter({ visible: true });
 
 test("signing up creates a personal workspace and lands on Home", async ({ page }) => {
   const email = e2eEmail("signup");
@@ -42,7 +45,7 @@ test("signing up with an email that already has an account links to sign-in with
 
 test("sign-in sets the example thread beside the form, and it draws itself through to done", async ({ page }) => {
   await page.goto("/sign-in");
-  const thread = page.getByTestId("thread");
+  const thread = visibleThread(page);
   const email = page.getByLabel("Email");
   await expect(thread).toBeVisible();
   const [t, f] = [await thread.boundingBox(), await email.boundingBox()];
@@ -55,7 +58,7 @@ test.describe("on a phone", () => {
 
   test("the example thread shrinks to a strip above the form, and nothing sticks out sideways", async ({ page }) => {
     await page.goto("/sign-in");
-    const [t, f] = [await page.getByTestId("thread").boundingBox(), await page.getByLabel("Email").boundingBox()];
+    const [t, f] = [await visibleThread(page).boundingBox(), await page.getByLabel("Email").boundingBox()];
     expect(t!.y + t!.height).toBeLessThanOrEqual(f!.y);
     expect(t!.height).toBeLessThanOrEqual(120); // a strip, not the desktop illustration
     const { scrollWidth, clientWidth } = await page.evaluate(() => ({
@@ -71,9 +74,13 @@ test.describe("on a phone", () => {
     await signInThroughUi(page, DEMO_EMAIL, DEMO_PASSWORD);
     await page.waitForURL((url) => url.pathname === "/");
     const trigger = page.getByTestId("app-header").getByRole("button", { name: /Demo/ });
-    await expect(trigger).toContainText("Demo workspace");
+    const box = await trigger.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390); // the trigger fits: no clipped name or chevron
     await trigger.click();
-    await expect(page.getByRole("menu")).toContainText(DEMO_EMAIL); // who is signed in, inside the menu
+    // the top of the menu says which workspace this is, readable (not truncated away), and who is signed in
+    await expect(page.getByTestId("menu-workspace")).toHaveText("Demo workspace");
+    await expect(page.getByTestId("menu-workspace")).toBeInViewport();
+    await expect(page.getByRole("menu")).toContainText(DEMO_EMAIL);
   });
 });
 
