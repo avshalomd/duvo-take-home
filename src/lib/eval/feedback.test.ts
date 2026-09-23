@@ -71,6 +71,17 @@ describe("feedbackForAgent", () => {
     );
   });
 
+  // Q148: "without adding any quotes" and a value with a comma cannot both hold. The heal quoted it, the reviewer held
+  // it to "no quotes", the next heal removed them: the attempts undid each other. A readable file wins, and the
+  // report says why. The feedback cannot see the instructions, so it says it as a rule the agent applies.
+  it("tells the agent to keep the CSV valid even against a 'no quotes' instruction, and to say so in the report", () => {
+    const conflict = "If the instructions say not to use quotes, keep the file valid (quote the value) and say in the report that the instruction could not be followed for that value, and why.";
+    const ragged: Check = { id: "parses", label: "The CSV parses", ok: false, detail: "output.csv: row 7 has 8 fields, the header has 7" };
+    expect(feedbackForAgent(verdictOf([ragged]))).toContain(conflict);
+    const unterminated: Check = { id: "parses", label: "The CSV parses", ok: false, detail: 'output.csv: Invalid Closing Quote: got "U" at line 2' };
+    expect(feedbackForAgent(verdictOf([unterminated]))).toContain(conflict);
+  });
+
   it("says a value is missing when a row has fewer values than the header", () => {
     const check: Check = { id: "parses", label: "The CSV parses", ok: false, detail: "output.csv: row 3 has 4 fields, the header has 5" };
     expect(feedbackForAgent(verdictOf([check]))).toMatch(/row 3 has 4 values but the header has 5: a value is missing/);

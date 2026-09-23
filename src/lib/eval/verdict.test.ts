@@ -77,6 +77,14 @@ describe("evaluate", () => {
     expect(verdict.review).not.toBeNull();
   });
 
+  it("hands the reviewer the checks the run passed, so it can see which rules are fixed (Q148)", async () => {
+    const d = deps(judgment(0.96, 0.5));
+    await evaluate(input, d);
+    const [, checks] = d.review.mock.calls[0] as unknown as [EvaluateInput, { id: string; ok: boolean }[]];
+    expect(checks.map((c) => c.id)).toContain("parses");
+    expect(checks.every((c) => c.ok)).toBe(true);
+  });
+
   it("escalates to the review when the judge is not confident either way", async () => {
     const d = deps(judgment(0.96, 0.6));
     await evaluate(input, d);
