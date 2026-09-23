@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { AUTOMATION, createHomeRuns, deleteHomeRuns, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
+import { AUTOMATION, createHomeRuns, deleteHomeRuns, FAILED_ERROR, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
 
 // The Home page: the rail, the first-visit question, the run sheet with its thread, the floating composer and the
 // Details panel. Runs against a dev server on the local database, signed in as the demo user:
@@ -437,6 +437,21 @@ test.describe("a finished run", () => {
     await expect(panel.getByTestId("outcome")).toHaveText("Something went wrong");
     await expect(panel.getByRole("button", { name: "Run again", exact: true })).toBeVisible(); // Q101
     await expect(panel.getByRole("button", { name: /why\?/i })).toHaveCount(0); // Q102
+  });
+
+  // the banner sent the reader to Details, where there was only a red monospace raw error; and Details still showed
+  // a pending Planning and a call "waiting for the result..." on a run that had ended
+  test("a failed run says why in plain words, and Details shows nothing still waiting", async ({ page }) => {
+    const panel = await openRun(page, runs.failed);
+    await expect(panel.getByTestId("failure")).toContainText("It ran out of time before it finished.");
+    await expect(panel.getByTestId("failure")).not.toContainText(FAILED_ERROR);
+    await panel.getByRole("button", { name: /details/i }).click();
+    const details = page.getByRole("dialog", { name: /details/i });
+    await expect(details).toContainText(FAILED_ERROR); // the raw error is kept, for a bug report
+    const timeline = details.getByTestId("timeline");
+    await expect(timeline).toContainText("no result: the run ended before this call answered");
+    await expect(timeline).not.toContainText(/waiting/i);
+    await expect(timeline.getByLabel("Stopped here")).toHaveCount(1);
   });
 });
 

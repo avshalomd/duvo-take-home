@@ -37,6 +37,8 @@ export const TITLES = {
   unfixed: `${PREFIX} unfixed: list at least eight space stories in a CSV`,
   stuck: `${PREFIX} stuck: list at least eight sea stories in a CSV`,
 };
+// The failed run's error as the engine records a run that hit its time limit (src/lib/agent/run.ts)
+export const FAILED_ERROR = "timed out after 290 s";
 // Auto-heal: what the check found on the first result, what the agent was then told, and the engine's words when it
 // stops trying (src/lib/agent/heal.ts, noProgress)
 export const HEAL = {
@@ -163,8 +165,9 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const audit = await insert({ prompt: TITLES.audit, status: "succeeded", minutesAgo: 6, purpose: "automation", automation, input: AUTOMATION.input, verdict: V1_PASS, report: "Acme Ltd is owned by ..." });
   await events(audit, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
 
-  const failed = await insert({ prompt: TITLES.failed, status: "failed", minutesAgo: 5, error: "error_during_execution: the page returned 404" });
-  await events(failed, [started, { kind: "plan", payload: PLAN(1) }, finished("error_during_execution", true)]);
+  // it ran out of time in the middle of a call: the call never answered, and the run has no finished event
+  const failed = await insert({ prompt: TITLES.failed, status: "failed", minutesAgo: 5, error: FAILED_ERROR });
+  await events(failed, [started, { kind: "plan", payload: PLAN(1) }, call("t0", "WebFetch", { url: "https://example.com/not-there" })]);
 
   const followUp = await insert({ prompt: TITLES.followUp, status: "succeeded", minutesAgo: 4, purpose: "followup", parent, verdict: V2_NOTES, human: "approved", report: REPORT });
   await events(followUp, [
