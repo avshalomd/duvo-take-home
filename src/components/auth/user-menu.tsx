@@ -65,10 +65,15 @@ export function UserMenu({ userName, workspaceName }: { userName: string; worksp
             <Menu.Portal keepMounted>
               <Menu.Positioner align="end" sideOffset={8} className="z-50 outline-none">
                 <Menu.Popup
-                  className="glass w-72 max-w-[calc(100vw-1.5rem)] rounded-[18px] p-1.5 text-graphite shadow-float outline-none"
+                  className="glass w-72 max-w-[calc(100vw-1.5rem)] rounded-[18px] p-1.5 text-graphite outline-none"
                   render={
                     <motion.div
-                      style={{ transformOrigin: "var(--transform-origin)" }} // Base UI puts the trigger's side here
+                      style={{
+                        transformOrigin: "var(--transform-origin)", // Base UI puts the trigger's side here
+                        // glass sets its own box-shadow (the light top edge), which cancelled shadow-float: on the white
+                        // sheet the popover had no edge at all. The edge, a hairline and the float are set together
+                        boxShadow: "inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--hairline), var(--shadow-float)",
+                      }}
                       initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
