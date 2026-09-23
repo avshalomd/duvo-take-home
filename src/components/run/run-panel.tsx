@@ -28,7 +28,7 @@ import { TimeAgo } from "./time-ago";
 import type { RunView } from "./types";
 import { useRunPoll } from "./use-run-poll";
 import { whyLines } from "./why";
-import { WhyButton, WhyList } from "./why-section";
+import { NotChecked, WhyButton, WhyList } from "./why-section";
 
 const gutter = SHEET_GUTTER;
 
@@ -114,6 +114,8 @@ export function RunPanel({
             </p>
             {why.length > 0 && <WhyButton open={whyOpen} onToggle={() => setWhyOpen(!whyOpen)} />}
           </div>
+          {/* Q208: nobody could check the result (the checker was down): said here, with the way to check it again */}
+          {run.status === "succeeded" && headline === "unknown" && <NotChecked runId={run.id} />}
           {whyOpen && why.length > 0 && <WhyList lines={why} />}
         </header>
 
