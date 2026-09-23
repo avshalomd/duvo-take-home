@@ -7,7 +7,7 @@ import { FollowUpInput, StartRunInput } from "@/contracts/agent";
 import { commandWord } from "@/components/run/command-query";
 import { requireSession } from "@/lib/auth/session";
 import { parseCommand } from "@/lib/automations/command";
-import { getActiveByCommand, runCommand } from "@/lib/automations/store";
+import { runCommand } from "@/lib/automations/store";
 import { reevaluateRun } from "@/lib/eval/reevaluate";
 import { cancelRun } from "@/lib/runs/cancel";
 import { startFollowUp } from "@/lib/runs/follow-up";
@@ -21,6 +21,7 @@ export type FormState = {
   error?: string;
   fieldErrors?: Record<string, string[] | undefined>;
   values?: Record<string, string>;
+  startedId?: string; // the run a start created: the caller opens it (the composer hands the brief over to it)
 };
 
 const RunId = z.uuid(); // ids arrive from hidden fields, which are user input like any other
@@ -28,6 +29,9 @@ const RunId = z.uuid(); // ids arrive from hidden fields, which are user input l
 /**
  * The composer's one box: "/audit Acme Ltd" runs the saved automation (a front slash only), anything else is
  * instructions for a new run. The workspace always comes from the session, never from the form.
+ *
+ * It answers with the new run's id instead of redirecting: the composer navigates itself, inside the same React
+ * transition that carries the brief from the box into the run's title (the one orchestrated moment).
  */
 export async function startRunAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const values = { prompt: String(formData.get("prompt") ?? "") };
@@ -38,27 +42,20 @@ export async function startRunAction(_prev: FormState, formData: FormData): Prom
   // paid free-text run. parseCommand reads it; commandWord still names the command when it does not parse.
   const parsed = parseCommand(values.prompt.trim());
   const word = parsed?.command ?? commandWord(values.prompt);
-  let id: string;
-  if (word) {
-    const unknown = { error: `There is no saved automation called /${word}. Type / to see the ones you have.`, values };
-    if (!parsed) return unknown;
-    try {
-      // looked up here, not left to runCommand, so the refusal names the command in words the person typed
-      if (!(await getActiveByCommand(session.workspaceId, parsed.command))) return unknown;
-      ({ id } = await runCommand(ctx, parsed));
-    } catch (e) {
-      return { error: readable(e), values };
+  try {
+    if (word) {
+      if (!parsed) return { error: `There is no saved automation called /${word}. Type / to see the ones you have.`, values };
+      // runCommand refuses in its own words - not found, not approved yet, turned off, no input (Q116)
+      const { id } = await runCommand(ctx, parsed);
+      return { startedId: id };
     }
-  } else {
     const input = StartRunInput.safeParse(values);
     if (!input.success) return { fieldErrors: z.flattenError(input.error).fieldErrors, values };
-    try {
-      ({ id } = await startRun(ctx, { prompt: input.data.prompt }));
-    } catch (e) {
-      return { error: readable(e), values }; // keeps what was typed, so the instructions are not lost
-    }
+    const { id } = await startRun(ctx, { prompt: input.data.prompt });
+    return { startedId: id };
+  } catch (e) {
+    return { error: readable(e), values }; // keeps what was typed, so the instructions are not lost
   }
-  redirect(`/?run=${id}`); // redirect throws its own signal: it must stay outside the try
 }
 
 /** Stop: asks the runner to abort the run; it sees the request within two seconds and closes it as cancelled. */
