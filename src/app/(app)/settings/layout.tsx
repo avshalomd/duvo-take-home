@@ -7,7 +7,7 @@ export default function SettingsLayout({ children }: LayoutProps<"/settings">) {
   return (
     <SettingsMotion>
       <main className="mx-auto w-full max-w-[680px] flex-1 px-4 pt-8 pb-20 sm:pt-12">
-        <h1 className="display text-[34px]">Settings</h1>
+        <h1 className="page-title">Settings</h1>
         <div className="mt-5">
           <SettingsTabs />
         </div>

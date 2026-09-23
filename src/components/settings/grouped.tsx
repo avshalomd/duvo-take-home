@@ -47,6 +47,13 @@ export function rowLine(leading: "glyph" | "text" = "text"): string {
   );
 }
 
+/**
+ * A row whose field has no border of its own shows focus on the row: an inset ring (and, in a sheet, a paper fill).
+ * The first and last rows take the group's 16 px corners, so the ring follows the rounded group instead of being
+ * clipped into square corners by it (Q146).
+ */
+export const FOCUS_ROW = "focus-within:shadow-[inset_0_0_0_2px_var(--ring)] first:rounded-t-[16px] last:rounded-b-[16px]";
+
 /** The 30 px rounded tile at the start of a row: a status or an action, drawn in one colour on its own wash. */
 export function RowGlyph({ className, children, label }: { className?: string; children: ReactNode; label?: string }) {
   return (
