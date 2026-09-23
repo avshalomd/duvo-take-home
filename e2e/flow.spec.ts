@@ -100,6 +100,26 @@ test.describe("the frame", () => {
     await expect(rail(page)).toContainText(/no runs match/i);
   });
 
+  // the field showed the browser's own blue clear "x"; it has a quiet clear button of its own, there only with text
+  test("the rail's search clears with its own button, not the browser's", async ({ page }) => {
+    await page.goto("/");
+    const search = rail(page).getByRole("searchbox", { name: /search runs/i });
+    const clear = rail(page).getByRole("button", { name: "Clear search" });
+    await expect(clear).toHaveCount(0);
+    await search.fill("zzzz no run says this");
+    await clear.click();
+    await expect(search).toHaveValue("");
+    await expect(search).toBeFocused();
+    await expect(clear).toHaveCount(0);
+    expect(await search.evaluate((el) => getComputedStyle(el, "::-webkit-search-cancel-button").getPropertyValue("appearance"))).toBe("none");
+  });
+
+  // "News digest CSV: el... /news-digest": the tag repeated the automation's name and cut the input short
+  test("a rail row of a saved automation's run carries no tag that repeats its name", async ({ page }) => {
+    await page.goto("/");
+    await expect(rail(page).locator(`a[href="/?run=${runs.audit}"]`)).not.toContainText(`/${AUTOMATION.command}`);
+  });
+
   test("a rail row says its outcome in words, and says the same thing as the run", async ({ page }) => {
     await page.goto("/");
     const row = rail(page).locator(`a[href="/?run=${runs.stopped}"]`);

@@ -93,9 +93,15 @@ describe("runTitle - a short name for a run", () => {
       );
   });
 
-  it("is the input alone when the automation is gone, and the name alone when there was no input", () => {
-    expect(runTitle({ prompt: "Audit ...", purpose: "automation", input: "Acme Ltd", automationId: "deleted" }, NAMES)).toBe("Acme Ltd");
+  it("is the name alone when there was no input", () => {
     expect(runTitle({ prompt: "Weekly AI digest", purpose: "schedule", input: "", automationId: "auto-1" }, NAMES)).toBe("Company audit");
+  });
+
+  // Q204: a deleted automation's run was titled by the bare input ("cherries 7, grapes 3"), which names nothing
+  it("reads as a plain run, by the first line of its instructions, when the automation is gone", () => {
+    expect(runTitle({ prompt: "Count the fruit: cherries 7, grapes 3\nas a chart", purpose: "automation", input: "cherries 7, grapes 3", automationId: "deleted" }, NAMES)).toBe(
+      "Count the fruit: cherries 7, grapes 3",
+    );
   });
 
   it("falls back to the instructions when an automation run has neither", () => {
@@ -106,16 +112,19 @@ describe("runTitle - a short name for a run", () => {
 describe("runTag - the quiet label that says why a run exists", () => {
   const commands = { "auto-1": "audit" };
 
-  it("names the command of a saved automation", () => {
-    expect(runTag({ purpose: "automation", automationId: "auto-1" }, commands)).toBe("/audit"); // a front slash only
+  // "News digest CSV: el... /news-digest": the tag repeated the name and squeezed out the input, the useful part
+  it("leaves a run of a saved automation untagged: its title already names the automation", () => {
+    expect(runTag({ purpose: "automation", automationId: "auto-1" }, commands)).toBeNull();
   });
 
   it("says a scheduled run was started by the schedule", () => {
-    expect(runTag({ purpose: "schedule", automationId: "auto-1" }, commands)).toBe("/audit, scheduled");
+    expect(runTag({ purpose: "schedule", automationId: "auto-1" }, commands)).toBe("scheduled");
+    expect(runTag({ purpose: "schedule", automationId: "deleted" }, commands)).toBe("scheduled");
   });
 
-  it("still tags an automation run whose automation is gone", () => {
-    expect(runTag({ purpose: "automation", automationId: "deleted" }, commands)).toBe("automation");
+  // Q204: with its automation gone, the run reads as a plain run, titled by its instructions
+  it("leaves a run whose automation is gone untagged, like a plain run", () => {
+    expect(runTag({ purpose: "automation", automationId: "deleted" }, commands)).toBeNull();
   });
 
   it("marks follow-ups and examples, and leaves a plain run untagged", () => {
