@@ -8,7 +8,7 @@ import { DEMO_EMAIL, DEMO_PASSWORD, E2E_PASSWORD, SIGNED_OUT, deleteUsers, e2eEm
 test.skip(process.env.SIGNUP_MODE !== "invite", "run with SIGNUP_MODE=invite, against a server started the same way");
 test.use({ storageState: SIGNED_OUT });
 
-const INVITE_ONLY = "Handover is invite-only. Ask someone in a workspace to send you an invitation.";
+const INVITE_ONLY = "Handover is invite-only. Open your invitation link, or ask someone in a workspace to invite you.";
 const created: string[] = [];
 test.afterAll(async () => deleteUsers(created));
 
@@ -80,7 +80,7 @@ test("an invitation's sign-up form refuses another email in plain words", async 
   await page.getByLabel("Email").fill(other);
   await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(formError(page)).toHaveText("There is no invitation for this email. Use the address your invitation was sent to.");
+  await expect(formError(page)).toHaveText("This does not match an invitation. Use the address your invitation was sent to, and open its link in this browser.");
 });
 
 test("signing in to an existing account is unchanged", async ({ page }) => {
