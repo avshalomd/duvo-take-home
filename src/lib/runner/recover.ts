@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNotNull, isNull, lt, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, not, notInArray, type SQL } from "drizzle-orm";
 import { db, transaction } from "@/db";
 import { files, jobs, runEvents, runs } from "@/db/schema";
 import { STOPPED_BY_YOU } from "@/lib/runs/cancel-rule";
@@ -71,6 +71,21 @@ export async function recoverStaleJobs(now: Date): Promise<Recovered> {
   return out;
 }
 
+/** The rule for a run nobody will ever close: in flight, older than 10 minutes, and no job queued or running for it. */
+export function abandonedRun(now: Date): SQL {
+  const cutoff = new Date(now.getTime() - ABANDONED_AFTER_MS);
+  const live = db.select({ runId: jobs.runId }).from(jobs).where(inArray(jobs.status, ["queued", "running"]));
+  return and(inArray(runs.status, [...IN_FLIGHT]), lt(runs.createdAt, cutoff), notInArray(runs.id, live))!; // three conditions: never undefined
+}
+
+/**
+ * A run that holds one of the deployment's in-flight slots (lib/runs/limits.ts): in flight and not abandoned. A
+ * stranded run is only swept when its own workspace starts again, so it must not hold everyone else's slot until then.
+ */
+export function holdsASlot(now: Date): SQL {
+  return and(inArray(runs.status, [...IN_FLIGHT]), not(abandonedRun(now)))!;
+}
+
 /**
  * Runs nobody will ever close: unfinished, older than 10 minutes, and with no job queued or running for them. That
  * is an inline run whose server restarted mid-run (after() died with it); a queued run waiting behind others has a
@@ -79,14 +94,8 @@ export async function recoverStaleJobs(now: Date): Promise<Recovered> {
  * cron route (QA Q84). Returns the ids it closed.
  */
 export async function closeAbandonedRuns(now: Date, workspaceId?: string): Promise<string[]> {
-  const cutoff = new Date(now.getTime() - ABANDONED_AFTER_MS);
-  const live = db.select({ runId: jobs.runId }).from(jobs).where(inArray(jobs.status, ["queued", "running"]));
-  const abandoned = and(
-    inArray(runs.status, [...IN_FLIGHT]),
-    lt(runs.createdAt, cutoff),
-    notInArray(runs.id, live),
-    workspaceId === undefined ? undefined : eq(runs.workspaceId, workspaceId), // and() skips an undefined condition
-  );
+  // and() skips an undefined condition: without a workspace, every workspace's
+  const abandoned = and(abandonedRun(now), workspaceId === undefined ? undefined : eq(runs.workspaceId, workspaceId));
 
   const stopped = await db
     .update(runs)

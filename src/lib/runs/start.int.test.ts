@@ -1,6 +1,6 @@
 // startRun against the real tables. `npm run test:int`. RUNNER=queue, so a start becomes a jobs row and never an
 // agent run. Runs are "[int] ..." in workspaces "int-engine-start*", deleted after with their jobs and settings.
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { count, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, runs, workspaceSettings } from "@/db/schema";
@@ -36,13 +36,18 @@ async function inFlightEverywhere() {
   const [row] = await db.select({ n: count() }).from(runs).where(holdsASlot(new Date()));
   return row.n;
 }
-/** Makes up runs in flight until the deployment holds `total` of them. */
-async function fillDeploymentTo(total: number) {
+/** Makes up runs in flight until the deployment holds `total` of them; false when others already hold more. */
+async function fillDeploymentTo(total: number): Promise<boolean> {
   const missing = total - (await inFlightEverywhere());
-  if (missing <= 0) return;
-  await db.insert(runs).values(Array.from({ length: missing }, () => ({ prompt: "[int] another workspace's run", status: "running", model: "test", workspaceId: FILL_WS })));
+  if (missing > 0) {
+    await db.insert(runs).values(Array.from({ length: missing }, () => ({ prompt: "[int] another workspace's run", status: "running", model: "test", workspaceId: FILL_WS })));
+  }
+  return missing >= 0;
 }
-const clearFill = () => db.delete(runs).where(eq(runs.workspaceId, FILL_WS));
+async function clearThisFilesRuns() {
+  await db.delete(jobs).where(inArray(jobs.runId, db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, ALL))));
+  await db.delete(runs).where(inArray(runs.workspaceId, ALL));
+}
 const statusOf = async (id: string) => (await db.select({ status: runs.status, error: runs.error }).from(runs).where(eq(runs.id, id)))[0];
 
 beforeEach(() => {
@@ -50,8 +55,7 @@ beforeEach(() => {
 });
 afterAll(async () => {
   vi.unstubAllEnvs();
-  await db.delete(jobs).where(inArray(jobs.runId, db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, ALL))));
-  await db.delete(runs).where(inArray(runs.workspaceId, ALL));
+  await clearThisFilesRuns();
   await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, ALL));
 });
 
@@ -91,38 +95,33 @@ describe.skipIf(!process.env.DATABASE_URL)("startRun", () => {
   });
 
   // Security QA: each workspace has limits of its own, and anyone can make workspaces, all on the operator's key.
-  it("refuses any start once six runs are in flight across the deployment, even in a workspace with room of its own", async () => {
-    try {
+  // The database is shared: other worktrees' runs hold slots too, so each test first clears this file's runs and then
+  // makes up the rest; a test that needs a free slot when others already hold them all is skipped, not failed.
+  describe("the deployment's cap", () => {
+    beforeEach(clearThisFilesRuns);
+    afterEach(clearThisFilesRuns);
+
+    it("refuses any start once six runs are in flight across the deployment, even in a workspace with room of its own", async () => {
       await fillDeploymentTo(MAX_IN_FLIGHT);
       await expect(startRun({ workspaceId: CAP_WS[0], userId: "int-user" }, { prompt: "[int] one start too many" }, nextIp())).rejects.toThrow(IN_FLIGHT_MESSAGE);
       expect(await db.select().from(runs).where(eq(runs.workspaceId, CAP_WS[0]))).toHaveLength(0);
-    } finally {
-      await clearFill();
-    }
-  });
+    });
 
-  it("lets only one of three parallel starts in different workspaces take the deployment's last slot", async () => {
-    try {
-      await fillDeploymentTo(MAX_IN_FLIGHT - 1);
+    it("lets only one of three parallel starts in different workspaces take the deployment's last slot", async (t) => {
+      if (!(await fillDeploymentTo(MAX_IN_FLIGHT - 1))) t.skip();
       const results = await Promise.allSettled(
         CAP_WS.map((workspaceId) => startRun({ workspaceId, userId: "int-user" }, { prompt: "[int] racing for the last slot" }, nextIp())),
       );
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
       const refused = results.flatMap((r) => (r.status === "rejected" ? [r.reason as Error] : []));
       expect(refused.map((e) => e.message)).toEqual([IN_FLIGHT_MESSAGE, IN_FLIGHT_MESSAGE]);
-    } finally {
-      await clearFill();
-    }
-  });
+    });
 
-  it("does not count a run stranded in another workspace against the deployment's cap", async () => {
-    try {
-      await fillDeploymentTo(MAX_IN_FLIGHT - 1);
+    it("does not count a run stranded in another workspace against the deployment's cap", async (t) => {
+      if (!(await fillDeploymentTo(MAX_IN_FLIGHT - 1))) t.skip();
       await strandedRun(OTHER_WS); // nobody will close it until that workspace starts again: it must not hold a slot
       const { id } = await startRun({ workspaceId: CAP_WS[1], userId: "int-user" }, { prompt: "[int] a start beside a stranded run" }, nextIp());
       expect(id).toBeTruthy();
-    } finally {
-      await clearFill();
-    }
+    });
   });
 });
