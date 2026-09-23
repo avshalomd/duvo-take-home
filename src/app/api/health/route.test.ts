@@ -17,6 +17,13 @@ describe("GET /api/health", () => {
     expect(body.ai.usable).toBeUndefined();
   });
 
+  it("says how runs execute, so a deploy can check it: Vercel needs RUNNER=route", async () => {
+    vi.stubEnv("RUNNER", "route");
+    const body = await (await GET(new Request("http://x/api/health"))).json();
+    expect(body.runner).toBe("route");
+    vi.unstubAllEnvs();
+  });
+
   it("reports a usable model on deep=1", async () => {
     model.current = scriptedModel(["ok"]);
     const body = await (await GET(new Request("http://x/api/health?deep=1"))).json();
