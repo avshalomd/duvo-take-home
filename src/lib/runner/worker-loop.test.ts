@@ -45,7 +45,7 @@ describe("the worker loop", () => {
     const w = createWorker(deps, { concurrency: 2, pollMs: 1000, tickMs: 30_000 });
     expect(await w.pollOnce()).toBe(2);
     expect(deps.claim).toHaveBeenCalledTimes(2);
-    expect(deps.run.mock.calls.map((c) => c[0])).toEqual(["run-0", "run-1"]);
+    expect(vi.mocked(deps.run).mock.calls.map((c) => c[0])).toEqual(["run-0", "run-1"]);
     expect(w.inFlight()).toBe(2);
     expect(await w.pollOnce()).toBe(0); // both slots busy: it does not even ask the queue
     expect(deps.claim).toHaveBeenCalledTimes(2);
@@ -87,7 +87,7 @@ describe("the worker loop", () => {
     runs.get("run-0")!.resolve();
     await flush();
     await flush();
-    expect(deps.run.mock.calls.map((c) => c[0])).toEqual(["run-0", "run-1"]);
+    expect(vi.mocked(deps.run).mock.calls.map((c) => c[0])).toEqual(["run-0", "run-1"]);
   });
 
   it("logs a claim that throws (the database is down) and carries on", async () => {

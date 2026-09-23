@@ -22,6 +22,90 @@ export type Worker = {
   inFlight: () => number;
 };
 
+const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/**
+ * The worker: up to `concurrency` runs at once, each one claimed from the jobs table. It never throws: every failure
+ * is logged and the loop carries on, because one bad job or one database blink must not stop the others.
+ */
 export function createWorker(deps: WorkerDeps, opts: WorkerOptions): Worker {
-  throw new Error(`not implemented: createWorker(${Object.keys(deps).length}, ${opts.concurrency})`);
+  const now = deps.now ?? (() => new Date());
+  const log = deps.log ?? ((line: string) => console.log(line));
+  const active = new Set<Promise<void>>();
+  let stopping = false;
+  let polling: Promise<number> | null = null; // one claim loop at a time, or two could fill the same free slot
+  let ticking = false;
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
+  let tickTimer: ReturnType<typeof setInterval> | undefined;
+
+  function launch(job: ClaimedJob) {
+    const p = (async () => {
+      let status: "done" | "failed" = "done";
+      try {
+        await deps.run(job.runId); // runAutomation closes its own run; a throw here means it could not even start
+      } catch (e) {
+        status = "failed";
+        log(`run ${job.runId} (job ${job.jobId}) threw: ${reason(e)}`);
+      }
+      await deps.finish(job.jobId, status).catch((e) => log(`could not mark job ${job.jobId} ${status}: ${reason(e)}`));
+    })();
+    active.add(p);
+    void p.finally(() => {
+      active.delete(p);
+      if (!stopping) void pollOnce(); // a freed slot is filled now, not at the next poll
+    });
+  }
+
+  async function fill(): Promise<number> {
+    let started = 0;
+    while (!stopping && active.size < opts.concurrency) {
+      let job: ClaimedJob | null;
+      try {
+        job = await deps.claim();
+      } catch (e) {
+        log(`claim failed: ${reason(e)}`);
+        break;
+      }
+      if (!job) break; // the queue is empty
+      launch(job);
+      started++;
+    }
+    return started;
+  }
+
+  function pollOnce(): Promise<number> {
+    if (!polling) polling = fill().finally(() => (polling = null));
+    return polling;
+  }
+
+  async function tickOnce() {
+    if (ticking) return; // a slow tick is not overlapped by the next one
+    ticking = true;
+    const at = now();
+    try {
+      await deps.recover(at).catch((e) => log(`stale-lock recovery failed: ${reason(e)}`));
+      await deps.tick(at).catch((e) => log(`schedule tick failed: ${reason(e)}`));
+    } finally {
+      ticking = false;
+    }
+  }
+
+  return {
+    pollOnce,
+    tickOnce,
+    start() {
+      void tickOnce();
+      void pollOnce();
+      pollTimer = setInterval(() => void pollOnce(), opts.pollMs);
+      tickTimer = setInterval(() => void tickOnce(), opts.tickMs);
+    },
+    async stop() {
+      stopping = true;
+      clearInterval(pollTimer);
+      clearInterval(tickTimer);
+      await polling;
+      await Promise.allSettled([...active]); // runs in flight end on their own wall clock, then their jobs are marked
+    },
+    inFlight: () => active.size,
+  };
 }
