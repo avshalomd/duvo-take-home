@@ -180,3 +180,28 @@ Per file: what it does and why it is built that way. Grows at every merge.
   (`schedule_tz`), so 08:00 stays 08:00 across daylight saving; a zone-less row (saved before) reads as UTC.
 - `src/components/run/no-backslash-commands.test.ts` - commands are `/audit` only (his call); the test scans the
   Home's source for any text that would show a backslash command.
+
+### After the deep QA of v2 (docs/QA.md, Q159-Q208)
+- `src/lib/agent/heal.ts` `runBudgetMs` - inline or in the runner route a run lives in one 300 s function call, so
+  the agent gets 300 - 50 (the evaluation, boxed) - 10 (step checks still out) - 10 (files and closing writes) = 230 s:
+  a run the function outlived stayed "evaluating" for ever (Q159).
+- `src/lib/agent/deadline.ts` `within()` - races the evaluation and the step checks against a timer; the model call
+  is not stopped (it cannot be), only no longer waited for, and the run is "not checked", never a pass.
+- `src/lib/runner/recover.ts` `sweepIfOverdue` - a run in flight past 6 minutes (inline, route) has no function left;
+  the events stream, the polling route and Stop close it while someone watches, instead of at the next start.
+- `src/lib/agent/stopped-cost.ts` `runTotals` - one sum of what a run's attempts cost, used by Stop and by every
+  failure path, so the day's budget counts a run cut off by the wall clock too (Q161).
+- `src/lib/runs/run-again.ts` - Run again sends only the run's id; the brief is read from the caller's workspace with
+  `instructionsOf`, so a follow-up runs its whole thread, never just "Make the bars horizontal" (Q162).
+- `src/lib/net/address.ts` - internal addresses by what they are (node:net's `isIP` and a `BlockList`, the IPv4
+  inside mapped, NAT64 and 6to4 addresses) and a name by every address it resolves to; used on save, on each OAuth
+  fetch and redirect, in the WebFetch guard and at run start (`src/lib/agent/connection-reach.ts`) (Q168).
+- `src/lib/auth/invitation-privacy.ts` - Better Auth's organization plugin hands invitation ids to any member; the id
+  is the proof of holding the link, so these hooks keep it for owners and admins (Q167).
+- `src/lib/auth/invitation-cookie.ts`, `src/proxy.ts` - in invite mode an account needs the invitation's link, not
+  just its email: the invitation page's visit leaves the id in an httpOnly cookie on `/api/auth`, which reaches the
+  email sign-up and Google's callback alike, and `assertMayCreateAccount` checks it belongs to that email.
+- `src/lib/runs/limits.ts` - a deployment-wide cap of six runs in flight under a second advisory lock, beside each
+  workspace's own limits: every account can make workspaces, and they all spend one key (Q175).
+- `next.config.ts` headers - no framing (`X-Frame-Options`, `frame-ancestors 'none'`), `nosniff`, a referrer policy
+  and no `X-Powered-By` on every route (Q173).
