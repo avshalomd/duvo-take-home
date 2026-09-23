@@ -34,7 +34,7 @@ export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
       <section role="alert" className={cn(SHEET, "space-y-5 p-6 sm:p-10")}>
         <TriangleAlert aria-hidden className="size-6 text-crimson" />
         <div className="space-y-2">
-          <h1 className="display text-[28px] text-graphite">The draft could not be made</h1>
+          <h1 className="page-title text-graphite">The draft could not be made</h1>
           <p className="text-slate">{error}</p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
@@ -66,7 +66,7 @@ export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
         />
       </span>
       <div className="space-y-2">
-        <h1 className="display text-[28px] text-graphite sm:text-[36px]">Writing a first draft</h1>
+        <h1 className="page-title text-graphite">Writing a first draft</h1>
         <p className="text-slate">It reads what the run was asked, its plan and its files. This takes about half a minute.</p>
       </div>
       <blockquote className="max-w-[66ch] border-l-2 border-hairline pl-4 text-[15px] leading-6 text-graphite/80">{prompt}</blockquote>

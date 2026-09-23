@@ -23,7 +23,7 @@ export default async function NewAutomationPage({ searchParams }: PageProps<"/au
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-8 sm:px-6 sm:py-12">
         <BackLink />
         <header className="space-y-2">
-          <h1 className="display text-[32px] text-graphite sm:text-[40px]">Which run should it learn from?</h1>
+          <h1 className="page-title text-graphite">Which run should it learn from?</h1>
           <p className="max-w-prose text-slate">Pick a run that did what you wanted. A first draft is written from it, and you check it before it is saved.</p>
         </header>
         <RunPicker runs={await runsToStartFrom(workspaceId)} />
@@ -49,7 +49,7 @@ export default async function NewAutomationPage({ searchParams }: PageProps<"/au
 function Problem({ title, text }: { title: string; text: string }) {
   return (
     <section className={cn(SHEET, "space-y-3 p-6 sm:p-10")}>
-      <h1 className="display text-[28px] text-graphite">{title}</h1>
+      <h1 className="page-title text-graphite">{title}</h1>
       <p className="text-slate">{text}</p>
       <Link href="/automations/new" className={LINK}>
         Pick a run

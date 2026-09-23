@@ -16,7 +16,7 @@ export default async function AutomationsPage() {
     <main className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-4 py-8 sm:px-6 sm:py-12">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="display text-[36px] text-graphite sm:text-[44px]">Automations</h1>
+          <h1 className="page-title text-graphite">Automations</h1>
           <p className="max-w-prose text-slate">Runs you liked, saved to do again on a new input.</p>
         </div>
         <Link href="/automations/new" className={cn(buttonVariants(), "h-10 px-5 text-[15px]")}>
@@ -39,7 +39,8 @@ export default async function AutomationsPage() {
           </p>
         </section>
       ) : (
-        <ul data-testid="gallery" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        // grid-cols-1, not an implicit column: minmax(0, 1fr) lets the tiles truncate instead of widening the page
+        <ul data-testid="gallery" className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           {automations.map((a) => (
             <li key={a.id}>
               <GalleryTile automation={a} />
