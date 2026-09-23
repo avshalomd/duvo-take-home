@@ -1,9 +1,10 @@
-import { CircleCheck, CircleDashed, CircleMinus, LoaderCircle } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleMinus, CircleStop, LoaderCircle } from "lucide-react";
 import type { RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { attemptCost, formatCost, formatDuration } from "./format";
+import { attemptCost, formatCost, formatDuration, relativeToRun, runFolders } from "./format";
 import { LocalTime } from "./local-time";
 import { groupEvents, type EventGroup } from "./group-events";
+import { isTerminal } from "./poll";
 import { Empty, Section } from "./section";
 import { ToolCard } from "./tool-card";
 
@@ -12,13 +13,19 @@ function GroupIcon({ status }: { status: EventGroup["status"] }) {
   if (status === "done") return <CircleCheck className="size-3.5 text-fern" />;
   if (status === "running") return <LoaderCircle className="size-3.5 animate-spin text-saffron" />;
   if (status === "skipped") return <CircleMinus className="size-3.5 text-slate" />;
+  if (status === "stopped") return <CircleStop aria-label="Stopped here" className="size-3.5 text-slate" />;
   return <CircleDashed className="size-3.5 text-slate/60" />;
 }
+
+// What the timeline's lines need besides the events: connection names, the run's folder for its paths, and
+// whether the run is over (a call with no result on a finished run is not "waiting" any more).
+type Context = { connections: { name: string }[]; folders: string[]; over: boolean };
 
 // The agent's trace, grouped under the plan step it belonged to: the evidence behind the verdict, in the shape
 // the agent itself worked in.
 export function TimelineSection({ events, connections, runStatus }: { events: RunEvent[]; connections: { name: string }[]; runStatus: string }) {
   const groups = groupEvents(events, runStatus);
+  const context: Context = { connections, folders: runFolders(events), over: isTerminal(runStatus) };
   return (
     <Section title="Timeline">
       {groups.length === 0 ? (
@@ -26,7 +33,7 @@ export function TimelineSection({ events, connections, runStatus }: { events: Ru
       ) : (
         <div data-testid="timeline" className="space-y-3">
           {groups.map((group) => (
-            <Group key={group.key} group={group} connections={connections} />
+            <Group key={group.key} group={group} context={context} />
           ))}
         </div>
       )}
@@ -34,20 +41,20 @@ export function TimelineSection({ events, connections, runStatus }: { events: Ru
   );
 }
 
-function Group({ group, connections }: { group: EventGroup; connections: { name: string }[] }) {
+function Group({ group, context }: { group: EventGroup; context: Context }) {
   return (
     <div>
       <p className="flex items-center gap-2 text-[13px] font-medium">
         <GroupIcon status={group.status} />
         <span className={group.status === "done" ? "text-slate" : ""}>{group.title}</span>
       </p>
-      <div className="mt-1 space-y-1.5 border-l border-hairline pl-3">{renderEvents(group.events, connections)}</div>
+      <div className="mt-1 space-y-1.5 border-l border-hairline pl-3">{renderEvents(group.events, context)}</div>
     </div>
   );
 }
 
 // A tool call and its result are one card, so the result is looked up by id and skipped when it comes round.
-function renderEvents(events: RunEvent[], connections: { name: string }[]) {
+function renderEvents(events: RunEvent[], { connections, folders, over }: Context) {
   const results = new Map(events.filter((e) => e.kind === "tool_result").map((e) => [e.payload.tool_use_id, e]));
   const callIds = new Set(events.filter((e) => e.kind === "tool_call").map((e) => e.payload.tool_use_id));
 
@@ -60,6 +67,8 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
             call={event}
             result={results.get(event.payload.tool_use_id)}
             connections={connections}
+            folders={folders}
+            over={over}
           />
         );
       case "tool_result":
@@ -67,7 +76,7 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
         return callIds.has(event.payload.tool_use_id) ? null : (
           <p key={event.seq} className="font-mono text-[11px] text-slate">
             {"-> "}
-            {event.payload.preview}
+            {relativeToRun(event.payload.preview, folders)}
           </p>
         );
       case "text":

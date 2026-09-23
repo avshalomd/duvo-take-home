@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { toolKind, toolLine } from "./format";
+import { relativeToRun, toolKind, toolLine } from "./format";
 import { LocalTime } from "./local-time";
 
 // The kind of each call as a small label, from the palette's tokens so it reads in both themes (Q104: the old
@@ -11,6 +11,7 @@ import { LocalTime } from "./local-time";
 const kindStyle: Record<string, string> = {
   search: "bg-mist text-slate",
   fetch: "bg-mist text-slate",
+  read: "bg-mist text-slate",
   write: "bg-fern-wash text-fern",
   connection: "bg-saffron-wash text-[color-mix(in_oklab,var(--saffron),var(--graphite)_40%)]",
   tool: "bg-mist text-slate",
@@ -22,13 +23,18 @@ export function ToolCard({
   call,
   result,
   connections,
+  folders = [],
+  over = false,
 }: {
   call: Extract<RunEvent, { kind: "tool_call" }>;
   result?: Extract<RunEvent, { kind: "tool_result" }>;
   connections: { name: string }[];
+  folders?: string[]; // the run's working folder: paths in the result are shown relative to it (Q187)
+  over?: boolean; // the run has ended: a call with no result is no longer waiting for one
 }) {
   const [open, setOpen] = useState(false);
   const kind = toolKind(call.payload.name);
+  const preview = result ? relativeToRun(result.payload.preview, folders) : "";
 
   return (
     <div className="rounded-[12px] bg-mist/60 px-2.5 py-2">
@@ -51,9 +57,9 @@ export function ToolCard({
               !open && "line-clamp-2",
             )}
           >
-            {result.payload.preview}
+            {preview}
           </p>
-          {result.payload.preview.length > 120 && (
+          {preview.length > 120 && (
             <button
               type="button"
               onClick={() => setOpen(!open)}
@@ -64,7 +70,9 @@ export function ToolCard({
           )}
         </div>
       )}
-      {!result && <p className="mt-1 pl-2 text-[11px] text-slate">waiting for the result...</p>}
+      {!result && (
+        <p className="mt-1 pl-2 text-[11px] text-slate">{over ? "no result: the run ended before this call answered" : "waiting for the result..."}</p>
+      )}
     </div>
   );
 }

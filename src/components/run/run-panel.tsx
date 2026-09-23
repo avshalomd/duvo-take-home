@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ActionsRow } from "./actions-row";
 import { DetailsPanel } from "./details-panel";
 import { Elapsed } from "./elapsed";
+import { failureCause } from "./failure";
 import { FilesSection } from "./files-section";
 import { GuardNotices } from "./guard-notices";
 import { fixesRun, healsOf } from "./heal";
@@ -124,8 +125,10 @@ export function RunPanel({
           )}
           {run.status === "failed" && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[16px] bg-crimson-wash px-4 py-3">
-              <p className="min-w-0 flex-1 text-[14px] leading-5">
-                The run stopped before it finished. You can run the same brief again; what went wrong is in Details.
+              {/* the cause in one plain sentence when it is one we know; the raw error stays in Details */}
+              <p data-testid="failure" className="min-w-0 flex-1 text-[14px] leading-5">
+                {failureCause(run.error) ?? "The run stopped before it finished."} You can run the same brief again; the technical detail is in
+                Details.
               </p>
               <RunAgainButton prompt={run.prompt} prominent />
             </div>
