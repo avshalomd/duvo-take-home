@@ -64,6 +64,7 @@ export const RunEvent = z.discriminatedUnion("kind", [
     max: z.number().int().min(1),
     reasons: z.array(z.string()), // the verdict's reasons in plain words, as shown under "Why?"
     feedback: z.string(), // the exact instructions the agent was given
+    stopped: z.string().optional(), // set when healing stopped instead of trying again ("the fix undid an earlier one")
   }) }),
   // v2: the per-step check - Jev's reading of whether a finished step did what its title says
   z.object({ ...Base, kind: z.literal("check"), payload: z.looseObject({

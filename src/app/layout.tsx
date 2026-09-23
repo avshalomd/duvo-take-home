@@ -10,8 +10,8 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 // The product name lives here rather than in lib/app.ts, which the stack kit ships as "App".
 export const metadata: Metadata = {
-  title: "Automations",
-  description: "Give an agent a task in plain English and watch it plan, work and be judged.",
+  title: "Handover",
+  description: "Hand a task to an agent in plain words, watch it work, and keep what went well as a command.",
 };
 
 // Renders <meta name="color-scheme" content="light dark">: it tells the browser both themes exist, so form

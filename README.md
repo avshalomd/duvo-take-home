@@ -1,4 +1,4 @@
-# Automations
+# Handover
 
 An agentic automation platform for everyday office work: say what needs doing in plain words, watch an agent plan
 it and work through it, take the files it made, and turn a run that went well into a tested, reusable command.
