@@ -1,19 +1,36 @@
 import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 
-// The automation builder, from a seeded finished run to a draft that cannot be approved yet. Signed in as the demo
-// user by the "setup" project (e2e/auth.setup.ts). Run against a local dev server with the database's URL in the
-// environment (for the clean-up):
-//   npx dotenv -e .env.local -- env BASE_URL=http://localhost:3002 npx playwright test e2e/automations.spec.ts
-// It makes one real, cheap LLM call (the draft) and starts no agent run. The draft is renamed "[e2e] ..." and
-// deleted through the page; afterAll deletes it by id as well, in case the test stopped half-way.
+// The automation builder, from a finished run to a draft that cannot be approved yet. Signed in as the demo user by
+// the "setup" project (e2e/auth.setup.ts). It makes one real, cheap LLM call (the draft) and starts no agent run.
+// The source run is its own, "[e2e] ...", deleted in afterAll with the draft: the picker lists only the 12 newest
+// finished runs, and in the full suite the flow tests' seeded runs pushed a shared one off it.
+//   npx playwright test e2e/automations.spec.ts
 
-const SOURCE_RUN = /What is the difference between an LLM agent and a workflow/; // seeded, finished, no files: the cheapest draft
+const SOURCE_PROMPT = "[e2e] automations: What is the difference between an LLM agent and a workflow?"; // no files: the cheapest draft
+const SOURCE_RUN = /\[e2e\] automations: What is the difference between an LLM agent and a workflow/;
+let sourceId: string | null = null;
 let createdId: string | null = null;
 
+function sql() {
+  // the dev server under test reads .env.local; so does this, so both look at the same database
+  if (!process.env.DATABASE_URL) process.loadEnvFile(".env.local");
+  return neon(process.env.DATABASE_URL!);
+}
+
+test.beforeAll(async () => {
+  // dated an hour ahead, so it is the newest finished run whatever the other specs insert while this one runs
+  const [row] = await sql()`insert into runs (workspace_id, prompt, status, model, purpose, report, created_at, finished_at)
+    values ('demo-workspace', ${SOURCE_PROMPT}, 'succeeded', 'e2e', 'adhoc',
+      'An agent decides its next step as it goes; a workflow follows steps fixed in advance.',
+      now() + interval '1 hour', now() + interval '1 hour')
+    returning id`;
+  sourceId = row.id as string;
+});
+
 test.afterAll(async () => {
-  if (!createdId || !process.env.DATABASE_URL) return;
-  await neon(process.env.DATABASE_URL)`delete from automations where id = ${createdId}`;
+  if (createdId) await sql()`delete from automations where id = ${createdId}`;
+  if (sourceId) await sql()`delete from runs where id = ${sourceId}`;
 });
 
 test("a finished run becomes a draft automation that can be edited and cannot be approved before an example", async ({ page }) => {
