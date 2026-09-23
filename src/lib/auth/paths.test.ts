@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsSignIn, safeNext, signInPath } from "./paths";
+import { needsSignIn, safeNext, signInPath, withNext } from "./paths";
 
 describe("needsSignIn", () => {
   it("gates every page of the app", () => {
@@ -40,6 +40,17 @@ describe("signInPath", () => {
 
   it("sends a visit to the bare home page to /sign-in without a next", () => {
     expect(signInPath("/")).toBe("/sign-in");
+  });
+});
+
+describe("withNext", () => {
+  it("carries the page to return to from sign-in to sign-up and back", () => {
+    expect(withNext("/sign-up", "/invite/abc")).toBe("/sign-up?next=%2Finvite%2Fabc");
+    expect(withNext("/sign-in", "/automations")).toBe("/sign-in?next=%2Fautomations");
+  });
+
+  it("leaves the link bare when the page to return to is home", () => {
+    expect(withNext("/sign-up", "/")).toBe("/sign-up");
   });
 });
 
