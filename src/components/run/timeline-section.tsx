@@ -77,6 +77,29 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
             {event.payload.text}
           </p>
         );
+      case "guard":
+        // the raw decision, for the reader of Details: the glance view only carries the plain-words notice
+        return (
+          <p
+            key={event.seq}
+            className={cn(
+              "text-[11px]",
+              event.payload.decision === "allowed" ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400",
+            )}
+          >
+            guard {event.payload.guard}: {event.payload.decision} {event.payload.tool}
+            {event.payload.target && ` (${event.payload.target})`} - {event.payload.reason}
+          </p>
+        );
+      case "check":
+        return (
+          <p
+            key={event.seq}
+            className={cn("text-[11px] tabular-nums", event.payload.onTrack < 0.5 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}
+          >
+            step check {event.payload.stepIndex + 1}: {Math.round(event.payload.onTrack * 100)}% on track - {event.payload.note}
+          </p>
+        );
       case "started":
         return (
           <p key={event.seq} className="flex gap-2 text-[11px] text-muted-foreground">

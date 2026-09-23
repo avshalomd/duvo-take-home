@@ -14,7 +14,7 @@ export function VerdictSection({
   connections: { name: string }[];
   runStatus: string;
 }) {
-  const finished = runStatus === "succeeded" || runStatus === "failed";
+  const finished = runStatus === "succeeded" || runStatus === "failed" || runStatus === "cancelled";
   // the escalation's reasoning is also copied into reasons by the evaluator: show it once, under Review
   const reasons = verdict?.reasons.filter((r) => r !== verdict.review?.reasoning) ?? [];
 
@@ -45,6 +45,14 @@ export function VerdictSection({
               <p className="text-sm text-muted-foreground">
                 Checked by a second model: {pct(verdict.judgment.answeredQuery)} confident it answered the query,{" "}
                 {pct(verdict.judgment.followedPlan)} that it followed the plan.
+              </p>
+            )}
+
+            {/* v2 verdicts say which tiers ran and which one decided; a v1 verdict has neither */}
+            {verdict.path && (
+              <p className="text-xs text-muted-foreground">
+                Tiers run: {verdict.path.join(" -> ")}
+                {verdict.decidedBy && `; decided by: ${verdict.decidedBy}`}
               </p>
             )}
 
