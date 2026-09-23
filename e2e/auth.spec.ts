@@ -97,6 +97,15 @@ test("signing in returns to the page that was asked for", async ({ page }) => {
   await expect(page).toHaveURL((url) => url.pathname === "/automations");
 });
 
+// Q130: the cookie is there (so the proxy lets the request through) but no session matches it.
+test("a stale session cookie on a deep link still returns there after signing in", async ({ page, context, baseURL }) => {
+  await context.addCookies([{ name: "better-auth.session_token", value: "e2e-stale.token", url: baseURL! }]);
+  await page.goto("/automations?tab=mine");
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-in" && url.searchParams.get("next") === "/automations?tab=mine");
+  await signInThroughUi(page, DEMO_EMAIL, DEMO_PASSWORD);
+  await expect(page).toHaveURL((url) => url.pathname === "/automations" && url.searchParams.get("tab") === "mine");
+});
+
 test("a signed-out API call answers 401, not a redirect to a page", async ({ request }) => {
   const res = await request.get("/api/runs", { maxRedirects: 0 });
   expect(res.status()).toBe(401);

@@ -19,6 +19,11 @@ export function needsSignIn(pathname: string): boolean {
   return true;
 }
 
+export const NEXT_PATH_HEADER = "x-requested-path";
+export function requestedPath(_headers: Headers): string {
+  return "/"; // STUB
+}
+
 /** A sign-in or sign-up link that returns to `next` afterwards. */
 export function withNext(page: "/sign-in" | "/sign-up", next: string): string {
   if (next === "/") return page; // home is where signing in goes anyway
