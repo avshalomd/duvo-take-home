@@ -20,13 +20,27 @@ export type Connection = z.infer<typeof Connection>;
 // Only a public http(s) host: the SDK child fetches this URL server-side, so loopback, link-local and private
 // ranges would turn a connection into a request into our own network (QA round 3, Q46).
 const PRIVATE_HOST = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|metadata\.google)/i;
+// IPv6 unique-local (fc/fd), link-local (fe80-febf), IPv4-mapped, and *.localhost (the guards package, v2).
+const PRIVATE_HOST_V6 = /\.localhost\.?$|^\[(?:f[cd]|fe[89ab]|::ffff:)/i;
+/** One rule for "a private or local host", shared by the connection form and the agent's url guard. A name that
+ *  resolves to a private address is not caught: that needs the DNS lookup the fetch itself makes. */
+export const isPrivateHost = (hostname: string) => PRIVATE_HOST.test(hostname) || PRIVATE_HOST_V6.test(hostname);
 export const publicHttpUrl = z
   .url("Give the server's full address, starting with https://")
   .refine((u) => /^https?:\/\//i.test(u), "Only http:// or https:// addresses can be connected")
-  .refine((u) => { try { return !PRIVATE_HOST.test(new URL(u).hostname); } catch { return false; } }, "That address points at a private or local network, which a connection cannot reach");
+  .refine((u) => { try { return !isPrivateHost(new URL(u).hostname); } catch { return false; } }, "That address points at a private or local network, which a connection cannot reach");
+
+const RESERVED_KEYS = ["plan", "outputs"];
 
 export const NewConnection = z.object({
-  name: z.string().trim().min(1, "Give the server a name").max(40, "Keep the name under 40 characters").regex(/^[A-Za-z0-9 _-]+$/, "Use letters, digits, spaces, - and _ only"), // becomes the mcp__<key>__ prefix
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give the server a name")
+    .max(40, "Keep the name under 40 characters")
+    .regex(/^[A-Za-z0-9 _-]+$/, "Use letters, digits, spaces, - and _ only") // becomes the mcp__<key>__ prefix
+    // "plan" and "outputs" are our own tool servers' keys: a connection with that key would replace them
+    .refine((n) => !RESERVED_KEYS.includes(n.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")), "That name is taken by a built-in tool; choose another"),
   url: publicHttpUrl,
   transport: Transport.default("http"),
   token: z.string().trim().optional(), // sent as Authorization: Bearer <token>

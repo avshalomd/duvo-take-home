@@ -1,3 +1,4 @@
+import { isPrivateHost } from "@/contracts/connection";
 import type { GuardContext } from "@/contracts/guard";
 import type { Plan } from "@/contracts/run";
 import { LlmError } from "@/lib/llm/errors";
@@ -11,22 +12,13 @@ import { allowed, type Verdict } from "./verdict";
  * through and recorded as "unchecked".
  */
 
-// The same rule as publicHttpUrl in src/contracts/connection.ts, copied because the contract does not export it:
-// keep the two in step. A connection and a fetch must not reach our own network, for the same reason.
-const PRIVATE_HOST = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|metadata\.google)/i;
-// What that rule misses: *.localhost names, IPv6 unique-local (fc00::/7) and link-local (fe80::/10), and an IPv4
-// address wrapped in IPv6 ([::ffff:127.0.0.1], which the URL parser rewrites as [::ffff:7f00:1]). A public name
-// that resolves to a private address is not caught: that needs the DNS lookup the fetch itself makes.
-const PRIVATE_HOST_EXTRA = /\.localhost\.?$|^\[(?:f[cd]|fe[89ab]|::ffff:)/i;
-
 export const QUERY_LIMIT = 80; // ?id=, ?q=, ?page= are short; rows of a CSV or a report are not
 export const BLOCK_AT = 0.8;
 export const FLAG_AT = 0.5;
 const PLAN_LINES = 5; // the first steps say what the task is; the whole plan would only dilute the question
 
-export function isPrivateHost(hostname: string): boolean {
-  return PRIVATE_HOST.test(hostname) || PRIVATE_HOST_EXTRA.test(hostname);
-}
+// One rule with the connection form (src/contracts/connection.ts): a connection and a fetch must not reach our own network.
+export { isPrivateHost };
 
 export function isDeniedHost(hostname: string, denied: string[]): boolean {
   const host = hostname.toLowerCase().replace(/\.$/, ""); // "example.com." is the same host as "example.com"
