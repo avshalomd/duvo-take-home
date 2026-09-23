@@ -95,7 +95,8 @@ test("a member can edit a draft and run an example, and is told who approves and
   await expect(page.getByRole("button", { name: "Run example" })).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Approve and save" })).toHaveCount(0);
-  await expect(page.getByTestId("approve-reason")).toHaveText("An owner or an admin approves it once an example looks right.");
+  // the next step the owner is given too: running, judging and changing it are the member's as well (UX R2)
+  await expect(page.getByTestId("approve-reason")).toHaveText("Check the example's result and mark it as looks right.");
   await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
   await expect(page.getByText("An owner or an admin can delete it.")).toBeVisible();
 
@@ -134,7 +135,7 @@ test("a member judges an example; they read 'You said', and the owner reads the 
   const example = mine.getByTestId("example").filter({ hasText: "Acme Ltd" });
   await example.getByRole("button", { name: "Looks right" }).click();
   await expect(example).toContainText("You said it looks right");
-  await expect(mine.getByTestId("approve-reason")).toHaveText("An example looks right, so an owner or an admin can approve it now.");
+  await expect(mine.getByTestId("approve-reason")).toHaveText("An owner or an admin approves it.");
 
   await page.goto(`/automations/${draftId}`);
   await expect(page.getByTestId("example").filter({ hasText: "Acme Ltd" })).toContainText("e2e Mia Member said it looks right");
