@@ -1,11 +1,13 @@
+import type { SessionCtx } from "@/contracts/auth";
 import { invitationLine } from "@/lib/auth/invitation-line";
 import { listInvitations } from "@/lib/auth/members";
 import { InvitationActions } from "./invitation-actions";
 
 // The workspace's pending invitations with Copy link and Revoke (QA Q109). The auth package builds it on its own
-// members library; the Settings > Members page renders it under the member list. Nothing at all when there are none.
-export async function PendingInvitations({ workspaceId, canManage }: { workspaceId: string; canManage: boolean }) {
-  const invitations = await listInvitations(workspaceId);
+// members library; the Settings > Members page renders it under the member list, for owners and admins only (each
+// row carries its invitation's id, which is its link, even as a React key). Nothing at all when there are none.
+export async function PendingInvitations({ ctx }: { ctx: Pick<SessionCtx, "workspaceId" | "role"> }) {
+  const invitations = await listInvitations(ctx);
   if (invitations.length === 0) return null;
   const now = new Date(); // one clock for the whole list, so two rows made together say the same time left
 
@@ -21,7 +23,7 @@ export async function PendingInvitations({ workspaceId, canManage }: { workspace
               <p className="truncate text-[15px] font-medium">{i.email}</p>
               <p className="text-[13px] tracking-[0.01em] text-slate">{invitationLine(i.role, new Date(i.expiresAt), now)}</p>
             </div>
-            {canManage && <InvitationActions id={i.id} email={i.email} link={i.link} />}
+            <InvitationActions id={i.id} email={i.email} link={i.link} />
           </li>
         ))}
       </ul>

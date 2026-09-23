@@ -82,13 +82,15 @@ export type PendingInvitation = { id: string; email: string; role: string; expir
 
 /**
  * The workspace's invitations nobody has used yet, newest first, each with its link, so it can be copied again
- * after a reload (Q109). Accepted, revoked and expired ones are left out: their links no longer work.
+ * after a reload (Q109). Accepted, revoked and expired ones are left out: their links no longer work. Owners and
+ * admins only: an invitation's id is its link, and a member who read it could accept it as the invited address.
  */
-export async function listInvitations(workspaceId: string): Promise<PendingInvitation[]> {
+export async function listInvitations(ctx: Pick<SessionCtx, "workspaceId" | "role">): Promise<PendingInvitation[]> {
+  if (!canChangeSettings(ctx.role)) throw new Error("Only an owner or an admin can see the pending invitations.");
   const rows = await db
     .select({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt })
     .from(invitation)
-    .where(and(eq(invitation.organizationId, workspaceId), eq(invitation.status, "pending"), gt(invitation.expiresAt, new Date())))
+    .where(and(eq(invitation.organizationId, ctx.workspaceId), eq(invitation.status, "pending"), gt(invitation.expiresAt, new Date())))
     .orderBy(desc(invitation.createdAt));
   return rows.map((r) => ({ ...r, role: toRole(r.role ?? ""), expiresAt: r.expiresAt.toISOString(), link: inviteLink(r.id) }));
 }

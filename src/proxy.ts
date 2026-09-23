@@ -1,6 +1,7 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
-import { NEXT_PATH_HEADER, needsSignIn, signInPath } from "@/lib/auth/paths";
+import { invitationCookie, looksLikeInvitationId } from "@/lib/auth/invitation-cookie";
+import { NEXT_PATH_HEADER, invitationIdFrom, needsSignIn, signInPath } from "@/lib/auth/paths";
 
 /**
  * The sign-in gate in front of every page. It only looks for the session cookie (no database call), so a visitor
@@ -9,6 +10,14 @@ import { NEXT_PATH_HEADER, needsSignIn, signInPath } from "@/lib/auth/paths";
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  // An invitation's page: its id goes into a cookie the sign-up checks in invite mode (lib/auth/signup.ts). Set here
+  // because a Server Component cannot set cookies, and whatever id is written, only a real one for that email counts.
+  const invitationId = invitationIdFrom(pathname);
+  if (invitationId && looksLikeInvitationId(invitationId)) {
+    const res = NextResponse.next();
+    res.cookies.set(invitationCookie(invitationId, request.nextUrl.protocol === "https:"));
+    return res;
+  }
   if (!needsSignIn(pathname)) return NextResponse.next();
   if (!getSessionCookie(request)) return NextResponse.redirect(new URL(signInPath(pathname + search), request.url));
 
