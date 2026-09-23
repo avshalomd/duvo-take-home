@@ -7,6 +7,9 @@ import { asNumber } from "./numbers";
 export type ChartArgs = Omit<z.infer<z.ZodObject<typeof ChartInput>>, "file">;
 type Row = ChartArgs["data"][number];
 
+export const CHART_WIDTH = 640;
+export const CHART_HEIGHT = 360;
+
 // One accent for a single series; the companions only appear when a series splits the data into groups.
 export const ACCENT = "#2563eb";
 const PALETTE = [ACCENT, "#f59e0b", "#10b981", "#8b5cf6", "#f43f5e", "#64748b", "#0891b2", "#ea580c"];
