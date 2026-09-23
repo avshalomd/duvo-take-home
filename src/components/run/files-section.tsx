@@ -53,9 +53,11 @@ function FileTile({ runId, file, events, facts }: { runId: string; file: FileMet
   return (
     <li className={cn("flex flex-col gap-3 rounded-[16px] bg-mist/70 p-4", chart && "sm:col-span-2")}>
       {chart && (
-        // inline=1 asks the route to serve it for display rather than as a download
+        // inline=1 asks the route to serve it for display rather than as a download. The box is paper, not white: the
+        // chart's own @media (prefers-color-scheme) is answered by this element's colour scheme (the browser passes
+        // it into the image), and paper follows the same scheme, so the chart's text and its ground always agree.
         // eslint-disable-next-line @next/next/no-img-element -- a generated file behind our own route, not a static asset for next/image
-        <img src={`${url}?inline=1`} alt={`Chart: ${file.name}`} className="max-h-80 w-full rounded-[12px] bg-white object-contain" />
+        <img src={`${url}?inline=1`} alt={`Chart: ${file.name}`} className="max-h-80 w-full rounded-[12px] bg-paper object-contain" />
       )}
       <div className="flex items-start gap-3">
         {!chart && <Icon aria-hidden className="mt-0.5 size-5 shrink-0 text-slate" />}
