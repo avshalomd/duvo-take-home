@@ -1,11 +1,8 @@
 import "server-only";
-import type { AuthHeaders, CompleteOAuth, StartOAuth } from "@/contracts/connection";
 
-export const startOAuth: StartOAuth = async () => {
-  throw new Error("not implemented: startOAuth"); // STUB: the oauth package
-};
-export const completeOAuth: CompleteOAuth = async () => {
-  throw new Error("not implemented: completeOAuth"); // STUB
-};
-/** A bearer token as v1 did; the oauth package adds OAuth access tokens, refreshed when expired. */
-export const authHeaders: AuthHeaders = async (c) => (c.token ? { Authorization: `Bearer ${c.token}` } : undefined); // STUB
+// MCP authorization for connections: sign-in (start, callback) and the headers each run sends. One job per file.
+export { startOAuth } from "./start";
+export { completeOAuth } from "./complete";
+export { authHeaders } from "./headers";
+export { SignInError } from "./errors";
+export { isSignedIn } from "./shape";
