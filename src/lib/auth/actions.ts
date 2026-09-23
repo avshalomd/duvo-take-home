@@ -24,10 +24,10 @@ function openWorkspaceHome(): never {
 // The user menu's and the invitation page's writes. Each reads the session itself (never an id from the client
 // for who is asking); Better Auth checks membership before it switches or accepts anything.
 
-/** The workspaces for the user menu, loaded when it opens so the top bar needs no extra props. */
-export async function loadWorkspaces(): Promise<{ activeId: string; workspaces: WorkspaceSummary[] }> {
+/** The workspaces (and who is signed in) for the user menu, loaded when it opens so the top bar needs no extra props. */
+export async function loadWorkspaces(): Promise<{ activeId: string; email: string; workspaces: WorkspaceSummary[] }> {
   const ctx = await requireSession();
-  return { activeId: ctx.workspaceId, workspaces: await listWorkspaces(ctx.userId) };
+  return { activeId: ctx.workspaceId, email: ctx.email, workspaces: await listWorkspaces(ctx.userId) };
 }
 
 /** Makes another of the user's workspaces the active one, then opens Home: a run open on screen belongs to the old one. */

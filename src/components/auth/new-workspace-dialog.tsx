@@ -3,9 +3,8 @@
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createWorkspace, type NewWorkspaceState } from "@/lib/auth/actions";
+import { AuthField } from "./auth-field";
 import { FormError } from "./form-error";
 
 // Opened from the user menu. On success the action makes the new workspace active and opens Home.
@@ -13,19 +12,16 @@ export function NewWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOp
   const [state, action, pending] = useActionState<NewWorkspaceState, FormData>(createWorkspace, {});
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New workspace</DialogTitle>
-          <DialogDescription>A separate place for runs, connections and automations. You can invite people to it later.</DialogDescription>
+      <DialogContent className="gap-5 rounded-[22px] bg-paper p-6 shadow-float ring-0 sm:max-w-[26rem]">
+        <DialogHeader className="gap-1.5">
+          <DialogTitle className="display text-[26px]">New workspace</DialogTitle>
+          <DialogDescription className="text-[15px] text-slate">A separate place for runs, connections and automations. You can invite people to it later.</DialogDescription>
         </DialogHeader>
-        <form action={action} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="workspace-name">Name</Label>
-            {/* the returned name refills the field: React resets a form after its action runs */}
-            <Input id="workspace-name" name="name" required maxLength={60} defaultValue={state.name} placeholder="e.g. Finance team" autoFocus />
-          </div>
+        <form action={action} className="flex flex-col gap-4">
+          {/* the returned name refills the field: React resets a form after its action runs */}
+          <AuthField id="workspace-name" label="Name" name="name" required maxLength={60} defaultValue={state.name} placeholder="For example, Finance team" autoFocus />
           <FormError message={state.error} />
-          <Button type="submit" className="h-9 w-full" disabled={pending}>
+          <Button type="submit" className="h-11 w-full text-[15px]" disabled={pending}>
             {pending ? "Creating..." : "Create workspace"}
           </Button>
         </form>
