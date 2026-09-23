@@ -1,0 +1,116 @@
+{
+  "id": "question-no-file-pass",
+  "why": "A question, not a task: no file is owed, so the checks must not fail it for writing none, and the judge reads the answer in the report.",
+  "source": "fixtures/runs.json run_01JQ8S6H4A (v1 seed, 'not_applicable' in v1), with a plan and a fuller answer",
+  "expected": {
+    "verdict": "pass",
+    "decidedBy": "judge",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.95,
+      "followedPlan": 0.93
+    },
+    "review": null,
+    "source": "hand-set when the case was written; replaced by live answers with RECORD=1 when the live run agrees"
+  },
+  "run": {
+    "id": "case_question",
+    "prompt": "What is the difference between an LLM agent and a workflow?",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "A workflow runs a fixed sequence of steps that its author wrote down in advance: the path is known before it starts, which makes it predictable, cheap and easy to test. An LLM agent decides its own next step from what it observes, calling tools in a loop until it judges the task done: it can handle inputs nobody planned for, at the cost of predictability, speed and money. In practice most useful systems mix the two - a workflow for the parts that are known, and an agent inside one step where judgment is needed.",
+    "error": null,
+    "numTurns": 2,
+    "durationMs": 12612,
+    "costUsd": 0.0231,
+    "createdAt": "2026-09-22T08:31:02.000Z",
+    "finishedAt": "2026-09-22T08:31:14.612Z"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T08:31:02.000Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T08:31:04.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Explain the difference between an LLM agent and a workflow",
+        "expectedOutputs": [
+          "an answer in the report"
+        ],
+        "sources": [
+          "own knowledge"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Answer the question",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T08:31:06.000Z",
+      "kind": "text",
+      "payload": {
+        "text": "A workflow runs a fixed sequence of steps that its author wrote down in advance: the path is known before it starts, which makes it predictable, cheap and easy to test. An LLM agent decides its own next step from what it observes, calling tools in a loop until it judges the task done: it can handle inputs nobody planned for, at the cost of predictability, speed and money. In practice most useful systems mix the two - a workflow for the parts that are known, and an agent inside one step where judgment is needed."
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T08:31:08.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Explain the difference between an LLM agent and a workflow",
+        "expectedOutputs": [
+          "an answer in the report"
+        ],
+        "sources": [
+          "own knowledge"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Answer the question",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T08:31:10.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 2,
+        "duration_ms": 12612,
+        "total_cost_usd": 0.0231,
+        "result": "A workflow runs a fixed sequence of steps that its author wrote down in advance: the path is known before it starts, which makes it predictable, cheap and easy to test. An LLM agent decides its own next step from what it observes, calling tools in a loop until it judges the task done: it can handle inputs nobody planned for, at the cost of predictability, speed and money. In practice most useful systems mix the two - a workflow for the parts that are known, and an agent inside one step where judgment is needed."
+      }
+    }
+  ],
+  "files": [],
+  "template": null
+}

@@ -41,7 +41,7 @@ export function toEvaluateInput(run: Run, events: RunEvent[], files: { name: str
   };
 }
 
-async function loadRun(runId: string): Promise<LoadedRun | null> {
+export async function loadRun(runId: string): Promise<LoadedRun | null> {
   const [row] = await db.select().from(schema.runs).where(eq(schema.runs.id, runId)).limit(1);
   if (!row) return null;
   const eventRows = await db.select().from(schema.runEvents).where(eq(schema.runEvents.runId, runId)).orderBy(asc(schema.runEvents.seq));
@@ -69,6 +69,6 @@ async function loadRun(runId: string): Promise<LoadedRun | null> {
   };
 }
 
-async function saveVerdict(runId: string, verdict: Verdict): Promise<void> {
+export async function saveVerdict(runId: string, verdict: Verdict): Promise<void> {
   await db.update(schema.runs).set({ verdict }).where(eq(schema.runs.id, runId));
 }

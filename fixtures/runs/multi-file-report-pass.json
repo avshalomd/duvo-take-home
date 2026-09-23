@@ -1,0 +1,338 @@
+{
+  "id": "multi-file-report-pass",
+  "why": "Two files for one task, a table and a prose summary: the checks read each by its type, and the judge must see both to call it answered.",
+  "source": "hand-written for the suite, in the shape the v2 run loop records",
+  "expected": {
+    "verdict": "pass",
+    "decidedBy": "judge",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.91,
+      "followedPlan": 0.92
+    },
+    "review": null,
+    "source": "hand-set when the case was written; replaced by live answers with RECORD=1 when the live run agrees"
+  },
+  "run": {
+    "id": "case_multi_file",
+    "prompt": "Compare the pricing of three managed vector databases - Pinecone, Weaviate Cloud and Qdrant Cloud. Write pricing.csv with vendor, entry_plan, monthly_price_usd, free_tier, url (one row per vendor), and a summary.md of at most 200 words saying which one suits a small team and why.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "Wrote pricing.csv (one row per vendor, list prices from each pricing page today) and summary.md, which recommends starting on Qdrant Cloud's free tier.",
+    "error": null,
+    "numTurns": 9,
+    "durationMs": 48211,
+    "costUsd": 0.1871,
+    "createdAt": "2026-09-22T11:02:00.000Z",
+    "finishedAt": "2026-09-22T11:02:40.000Z"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T11:02:00.000Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T11:02:02.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Compare three managed vector databases on price for a small team",
+        "expectedOutputs": [
+          "pricing.csv with vendor, entry_plan, monthly_price_usd, free_tier, url",
+          "summary.md, at most 200 words"
+        ],
+        "sources": [
+          "web"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Open each vendor's pricing page",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Note the entry plan, its price and the free tier",
+            "status": "pending"
+          },
+          {
+            "index": 2,
+            "title": "Write pricing.csv",
+            "status": "pending"
+          },
+          {
+            "index": 3,
+            "title": "Write summary.md with a recommendation",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T11:02:04.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "name": "WebFetch",
+        "input": {
+          "url": "https://www.pinecone.io/pricing/",
+          "prompt": "entry plan, monthly minimum, free tier"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T11:02:08.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "is_error": false,
+        "preview": "Starter (free), Standard from $50/month minimum, Enterprise from $500/month ..."
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T11:02:10.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "name": "WebFetch",
+        "input": {
+          "url": "https://weaviate.io/pricing",
+          "prompt": "entry plan, monthly price, free tier"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-22T11:02:14.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "is_error": false,
+        "preview": "Flex from $45/month, 14-day free sandbox, Plus and Premium ..."
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-22T11:02:16.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "name": "WebFetch",
+        "input": {
+          "url": "https://qdrant.tech/pricing/",
+          "prompt": "entry plan, monthly price, free tier"
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-22T11:02:20.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "is_error": false,
+        "preview": "Free 1GB cluster forever, Standard from $25/month, Hybrid Cloud ..."
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-22T11:02:22.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Compare three managed vector databases on price for a small team",
+        "expectedOutputs": [
+          "pricing.csv with vendor, entry_plan, monthly_price_usd, free_tier, url",
+          "summary.md, at most 200 words"
+        ],
+        "sources": [
+          "web"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Open each vendor's pricing page",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Note the entry plan, its price and the free tier",
+            "status": "done"
+          },
+          {
+            "index": 2,
+            "title": "Write pricing.csv",
+            "status": "running"
+          },
+          {
+            "index": 3,
+            "title": "Write summary.md with a recommendation",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-22T11:02:24.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_04",
+        "name": "Write",
+        "input": {
+          "file_path": "pricing.csv",
+          "content": "vendor,entry_plan,monthly_price_usd,free_tier,url\nPinecone,Standard,50,yes,https://www.pinecone.io/pricing/\nWeaviate Cloud,Flex,45,14-day trial,https://weaviate.io/pricing\nQdrant Cloud,Standard,25,yes (1 GB cluster),https://qdrant.tech/pricing/\n"
+        }
+      }
+    },
+    {
+      "seq": 11,
+      "at": "2026-09-22T11:02:28.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_04",
+        "is_error": false,
+        "preview": "File created successfully at pricing.csv"
+      }
+    },
+    {
+      "seq": 12,
+      "at": "2026-09-22T11:02:30.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Compare three managed vector databases on price for a small team",
+        "expectedOutputs": [
+          "pricing.csv with vendor, entry_plan, monthly_price_usd, free_tier, url",
+          "summary.md, at most 200 words"
+        ],
+        "sources": [
+          "web"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Open each vendor's pricing page",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Note the entry plan, its price and the free tier",
+            "status": "done"
+          },
+          {
+            "index": 2,
+            "title": "Write pricing.csv",
+            "status": "done"
+          },
+          {
+            "index": 3,
+            "title": "Write summary.md with a recommendation",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 13,
+      "at": "2026-09-22T11:02:32.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_05",
+        "name": "Write",
+        "input": {
+          "file_path": "summary.md",
+          "content": "# Vector databases for a small team\n\nAll three offer a managed service with a usable entry plan. **Qdrant Cloud** is the cheapest way in: a free 1 GB cluster fo ..."
+        }
+      }
+    },
+    {
+      "seq": 14,
+      "at": "2026-09-22T11:02:36.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_05",
+        "is_error": false,
+        "preview": "File created successfully at summary.md"
+      }
+    },
+    {
+      "seq": 15,
+      "at": "2026-09-22T11:02:38.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Compare three managed vector databases on price for a small team",
+        "expectedOutputs": [
+          "pricing.csv with vendor, entry_plan, monthly_price_usd, free_tier, url",
+          "summary.md, at most 200 words"
+        ],
+        "sources": [
+          "web"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Open each vendor's pricing page",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Note the entry plan, its price and the free tier",
+            "status": "done"
+          },
+          {
+            "index": 2,
+            "title": "Write pricing.csv",
+            "status": "done"
+          },
+          {
+            "index": 3,
+            "title": "Write summary.md with a recommendation",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 16,
+      "at": "2026-09-22T11:02:40.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 9,
+        "duration_ms": 48211,
+        "total_cost_usd": 0.1871,
+        "result": "Wrote pricing.csv (one row per vendor, list prices from each pricing page today) and summary.md, which recommends starting on Qdrant Cloud's free tier."
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "pricing.csv",
+      "content": "vendor,entry_plan,monthly_price_usd,free_tier,url\nPinecone,Standard,50,yes,https://www.pinecone.io/pricing/\nWeaviate Cloud,Flex,45,14-day trial,https://weaviate.io/pricing\nQdrant Cloud,Standard,25,yes (1 GB cluster),https://qdrant.tech/pricing/\n"
+    },
+    {
+      "name": "summary.md",
+      "content": "# Vector databases for a small team\n\nAll three offer a managed service with a usable entry plan. **Qdrant Cloud** is the cheapest way in: a free 1 GB cluster for prototypes and a Standard plan from about $25 a month. **Pinecone** costs more at the entry level ($50 minimum on Standard) but is the most hands-off, with serverless indexes and no capacity planning. **Weaviate Cloud** sits between them on price and is the only one with built-in hybrid (keyword plus vector) search on every plan.\n\n**For a small team:** start on Qdrant Cloud's free tier, and move to Pinecone only if operating the cluster becomes the bottleneck. Prices are list prices from each vendor's pricing page on 22 September 2026.\n"
+    }
+  ],
+  "template": null
+}
