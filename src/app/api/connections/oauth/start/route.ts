@@ -5,7 +5,7 @@ import { sessionFromHeaders } from "@/lib/auth/session";
 import { startOAuth } from "@/lib/connections/oauth";
 import { SignInError } from "@/lib/connections/oauth/errors";
 import { STATE_TTL_MS } from "@/lib/connections/oauth/state";
-import { COOKIE_PATH, STATE_COOKIE, backToSettings, callbackUri } from "../redirect";
+import { COOKIE_PATH, STATE_COOKIE, callbackUri, failedBack } from "../redirect";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,9 +15,9 @@ export async function GET(req: NextRequest): Promise<Response> {
   const session = await sessionFromHeaders(req.headers);
   if (!session) return Response.json({ error: "sign in first" }, { status: 401 });
   // The same rule as the settings actions: the page hides the button from members, but anyone can open this link.
-  if (!canChangeSettings(session.role)) return backToSettings(req, { oauth_error: "Only an owner or an admin can sign a connection in" });
+  if (!canChangeSettings(session.role)) return failedBack(req, "not_allowed");
   const id = z.uuid().safeParse(req.nextUrl.searchParams.get("id"));
-  if (!id.success) return backToSettings(req, { oauth_error: "That connection was not found" });
+  if (!id.success) return failedBack(req, "not_found");
 
   try {
     // The workspace comes from the session, so a connection id from another workspace is simply not found.
@@ -32,8 +32,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     });
     return res;
   } catch (e) {
-    if (e instanceof SignInError) return backToSettings(req, { oauth_error: e.message });
+    if (e instanceof SignInError) {
+      console.warn("[oauth] sign-in could not start:", e.message); // the full account, the server's words included
+      return failedBack(req, e.code);
+    }
     console.error("[oauth] start failed", e);
-    return backToSettings(req, { oauth_error: "The sign-in could not start; try again" });
+    return failedBack(req, "start_failed");
   }
 }

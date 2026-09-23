@@ -1,8 +1,37 @@
 import { OAuthError, ServerError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 
-/** A sign-in failure whose message is written for the person: the callback puts it on the settings page as is. */
+/** Why a sign-in step failed, as a code: the routes put only the code in the address back to the settings page. */
+export type SignInCode =
+  | "not_found" // the connection is not this workspace's
+  | "unreachable" // the server did not answer
+  | "unreadable" // its sign-in metadata could not be read
+  | "no_sign_in_needed" // it answers without any sign-in
+  | "token_only" // it wants a token, and offers no OAuth
+  | "other_server" // its metadata claims to protect another server
+  | "register_by_hand" // no dynamic client registration
+  | "registration_refused"
+  | "unsupported" // e.g. no S256 PKCE
+  | "expired" // the sign-in link was used or is too old
+  | "token_refused"; // the server did not accept the code
+
+/**
+ * Every code the OAuth routes send back: a SignInError's, and the routes' own. The settings page has a sentence for
+ * each (settings/connections/oauth-error.ts); anything else in the address gets a general one.
+ */
+export type OAuthErrorCode = SignInCode | "not_allowed" | "cancelled" | "refused" | "incomplete" | "other_browser" | "failed" | "start_failed";
+
+/**
+ * A sign-in failure that is expected and explained: the code says which, for the page to word; the message is the
+ * full account, the server's own words included, for the server log (security QA: a URL must not carry text the
+ * app then shows as its own).
+ */
 export class SignInError extends Error {
   override name = "SignInError";
+  readonly code: SignInCode;
+  constructor(code: SignInCode, message: string) {
+    super(message);
+    this.code = code;
+  }
 }
 
 /**

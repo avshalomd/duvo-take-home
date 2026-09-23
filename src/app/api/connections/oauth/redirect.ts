@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { OAuthErrorCode } from "@/lib/connections/oauth/errors";
 
 /**
  * The cookie that ties a sign-in to the browser that started it. Without it, someone could start a sign-in for
@@ -13,9 +14,14 @@ export function callbackUri(req: Request): string {
   return `${base.replace(/\/+$/, "")}/api/connections/oauth/callback`;
 }
 
-/** Back to the connections page with one message for the person (?signed_in=<name> or ?oauth_error=<sentence>). */
+/** Back to the connections page with one outcome for the person (?signed_in=<name> or ?oauth_error=<code>). */
 export function backToSettings(req: Request, params: Record<string, string>): NextResponse {
   const to = new URL("/settings/connections", req.url);
   for (const [key, value] of Object.entries(params)) to.searchParams.set(key, value);
   return NextResponse.redirect(to, 302);
+}
+
+/** A failed sign-in: only its code travels, and the page words it (settings/connections/oauth-error.ts). */
+export function failedBack(req: Request, code: OAuthErrorCode): NextResponse {
+  return backToSettings(req, { oauth_error: code });
 }
