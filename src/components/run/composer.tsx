@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { applyCommand, commandHint, commandQuery, filterAutomations } from "./command-query";
 import { COMMAND_LIST_ID, CommandList, optionId, type CommandOption } from "./command-list";
+import { mayTakeFocus } from "./first-focus";
 import { useHandover } from "./handover-host";
 import { handoverTitle } from "./handover-title";
 import { HANDOVER_NAME, TITLE_PX, TITLE_TYPE } from "./run-title";
@@ -53,6 +54,12 @@ export function Composer({
   const options = open ? filterAutomations(automations, query) : [];
   const highlighted = Math.min(active, Math.max(options.length - 1, 0));
   const hint = commandHint(text, automations);
+
+  // The first visit's box takes the focus as it appears - not with autoFocus, which took it from a menu the person
+  // had opened while Home streamed in, and closed the menu: only when nobody else is using it (first-focus.ts)
+  useEffect(() => {
+    if (hero && mayTakeFocus(document)) box.current?.focus();
+  }, [hero]);
 
   // the box grows with the brief instead of scrolling inside itself, up to a third of a phone's screen
   useEffect(() => {
@@ -177,7 +184,6 @@ export function Composer({
             name="prompt"
             ref={box}
             rows={hero ? 3 : 1}
-            autoFocus={hero}
             placeholder={hint ? undefined : PLACEHOLDER}
             value={text}
             onChange={(e) => {
