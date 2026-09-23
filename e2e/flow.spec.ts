@@ -67,14 +67,21 @@ test.describe("the layout", () => {
 });
 
 test.describe("the composer", () => {
-  test("typing \\ lists the saved automations, and says how to make one when there are none", async ({ page }) => {
+  test("typing / lists the saved automations, and says how to make one when there are none", async ({ page }) => {
     await page.goto("/");
-    await composer(page).fill("\\");
+    await composer(page).fill("/");
     const list = page.getByRole("listbox", { name: /saved automations/i });
     await expect(list).toBeVisible();
-    await expect(list).toContainText(/no saved automations yet - make one from a finished run|\\[a-z]/i);
+    await expect(list).toContainText(/no saved automations yet - make one from a finished run|\/[a-z]/i);
     await composer(page).press("Escape");
     await expect(list).toBeHidden();
+  });
+
+  // his call, 2026-09-23: commands are "/audit ..."; a backslash is plain text and opens nothing
+  test("a backslash does not open the list", async ({ page }) => {
+    await page.goto("/");
+    await composer(page).fill("\\");
+    await expect(page.getByRole("listbox", { name: /saved automations/i })).toHaveCount(0);
   });
 
   test("instructions that say nothing are refused before any run is started", async ({ page }) => {
@@ -94,9 +101,9 @@ test.describe("the composer", () => {
 
   test("a command that is not a saved automation is refused, naming it", async ({ page }) => {
     await page.goto("/");
-    await composer(page).fill("\\nope-e2e Acme Ltd");
+    await composer(page).fill("/nope-e2e Acme Ltd");
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "\\nope-e2e" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "/nope-e2e" })).toBeVisible();
   });
 
   test("the connections that are on are named under the box, with a way to Settings", async ({ page }) => {

@@ -80,11 +80,11 @@ describe("runTag - the quiet label that says why a run exists", () => {
   const commands = { "auto-1": "audit" };
 
   it("names the command of a saved automation", () => {
-    expect(runTag({ purpose: "automation", automationId: "auto-1" }, commands)).toBe("\\audit");
+    expect(runTag({ purpose: "automation", automationId: "auto-1" }, commands)).toBe("/audit"); // a front slash only
   });
 
   it("says a scheduled run was started by the schedule", () => {
-    expect(runTag({ purpose: "schedule", automationId: "auto-1" }, commands)).toBe("\\audit, scheduled");
+    expect(runTag({ purpose: "schedule", automationId: "auto-1" }, commands)).toBe("/audit, scheduled");
   });
 
   it("still tags an automation run whose automation is gone", () => {
