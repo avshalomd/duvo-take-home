@@ -122,6 +122,15 @@ describe("runChecks", () => {
     expect(failedIds(checks)).toEqual([]);
   });
 
+  it("accepts the chart (.svg) and spreadsheet (.xlsx) files the v2 output tools make", () => {
+    const files = [
+      { name: "prices.svg", content: "<svg xmlns='http://www.w3.org/2000/svg'></svg>" },
+      { name: "prices.xlsx", content: "(application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, 6120 bytes)" },
+    ];
+    const checks = runChecks(input({ prompt: "Chart the prices and export a spreadsheet.", files }));
+    expect(check(checks, "extension")?.ok).toBe(true);
+  });
+
   it("rejects a file type the agent was not allowed to write", () => {
     const checks = runChecks(input({ files: [{ name: "chart.png", content: "\x89PNG" }] }));
     expect(failedIds(checks)).toContain("extension");
