@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { files, runEvents, runs, workspaceSettings } from "@/db/schema";
 import type { Verdict } from "@/contracts/eval";
 import { evaluateRun } from "@/lib/eval/evaluate";
+import { cancelRun } from "@/lib/runs/cancel";
 import { runAutomation } from "./run";
 
 const SESSION = "00000000-0000-4000-8000-00000000h3a1".replace("h", "0");
@@ -250,5 +251,31 @@ describe.skipIf(!process.env.DATABASE_URL)("what a failed run spent", () => {
     expect(run.numTurns).toBe(3);
     expect(run.healAttempts).toBe(1);
     expect((run.verdict as Verdict).verdict).toBe("fail");
+  }, 30_000);
+});
+
+// A Stop that landed between a verdict and the next fix attempt aborted the last attempt's controller, already spent;
+// the fix attempt then ran to its end, paid for, before the run closed as cancelled.
+describe.skipIf(!process.env.DATABASE_URL)("Stop between attempts", () => {
+  it("closes as stopped without starting the fix attempt when Stop lands after the verdict", async () => {
+    const id = await queuedRun(WS, "stopped while the check failed it");
+    vi.mocked(evaluateRun)
+      .mockImplementationOnce(async () => {
+        await cancelRun(WS, id); // pressed while the check was failing the first attempt
+        return FAIL;
+      })
+      .mockResolvedValue(PASS);
+
+    await runAutomation(id);
+
+    const [run] = await db.select().from(runs).where(eq(runs.id, id));
+    expect(calls).toHaveLength(1); // the fix attempt is never paid for
+    expect(run.status).toBe("cancelled");
+    expect(run.error).toBe("Stopped by you");
+    expect(run.verdict).toBeNull();
+    expect(run.costUsd).toBeCloseTo(0.01, 10); // the first attempt's cost is kept
+    expect(run.numTurns).toBe(2);
+    expect(run.healAttempts).toBe(0);
+    expect(await healEvents(id)).toHaveLength(0);
   }, 30_000);
 });
