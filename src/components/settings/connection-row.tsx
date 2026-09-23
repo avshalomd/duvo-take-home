@@ -1,26 +1,34 @@
 "use client";
 
-import { Check, Pencil, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { ChevronDown } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { setConnectionEnabledAction } from "@/app/(app)/settings/actions";
-import { StatusDot } from "@/components/run/status-dot";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { Connection } from "@/contracts/connection";
 import { cn } from "@/lib/utils";
 import { ConnectionDialog } from "./connection-dialog";
-import { connectionState, toolCount, toolWords } from "./connection-label";
+import { asSentence, connectionState, signInWords, toolCount, toolWords } from "./connection-label";
 import { DeleteConnectionDialog } from "./delete-connection-dialog";
+import { rowLine } from "./grouped";
+import { StatusGlyph } from "./status-glyph";
 
-// One server: its name, where it lives, how it is doing in plain words, its tools folded away, and what you can do.
-// A member (canEdit false) sees the same row with the switch read-only and no Sign in, Edit or Delete.
+/**
+ * One server as a row: its status glyph, its name and one line under it, and the switch that decides whether the next
+ * run gets it. The name opens a second level with the tools the last run saw, the address, how it signs in, and Edit
+ * and Delete. A member (canEdit false) sees the same row with the switch read-only and no actions.
+ */
 export function ConnectionRow({ connection, canEdit }: { connection: Connection; canEdit: boolean }) {
   const [enabled, setEnabled] = useState(connection.enabled);
   const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const levelId = useId();
   const status = connectionState(connection);
+  const needsSomething = status.tone === "warn" || status.tone === "bad";
   const tools = connection.tools ?? [];
 
   function toggle(next: boolean) {
@@ -38,44 +46,33 @@ export function ConnectionRow({ connection, canEdit }: { connection: Connection;
   }
 
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
-      <StatusDot tone={status.tone} className="mt-1.5" />
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="truncate text-sm font-medium">{connection.name}</p>
-        {/* wraps rather than truncates: on a phone the status is the part that must stay readable */}
-        <p className="text-xs [overflow-wrap:anywhere] text-muted-foreground">
-          {host(connection.url)} · {status.label}
-        </p>
-        {tools.length > 0 ? (
-          <details className="text-xs text-muted-foreground">
-            <summary className="w-fit cursor-pointer select-none hover:text-foreground">{toolCount(tools.length)}</summary>
-            <ul className="mt-1 flex flex-wrap gap-1">
-              {tools.map((t) => (
-                <li key={t} className="rounded-md bg-muted px-1.5 py-0.5">
-                  {toolWords(t)}
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : (
-          <p className="text-xs text-muted-foreground">{toolCount(0)}</p>
-        )}
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1">
-        {connection.authType === "oauth" &&
-          (connection.signedIn ? (
-            <span className="flex items-center gap-1 px-2 text-xs text-emerald-700 dark:text-emerald-400">
-              <Check className="size-3.5" /> Signed in
+    <li className={rowLine("glyph")}>
+      <div className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
+        <StatusGlyph tone={status.tone} label={asSentence(status.label)} />
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={levelId}
+          onClick={() => setOpen((o) => !o)}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium">{connection.name}</span>
+            {/* one line: what it needs, when it needs something; otherwise where it lives */}
+            <span className={cn("block text-[13px] tracking-[0.01em]", status.tone === "bad" ? "text-crimson" : "text-slate", !needsSomething && "truncate")}>
+              {needsSomething ? asSentence(status.label) : host(connection.url)}
             </span>
-          ) : (
-            canEdit && (
-              // a plain link, not a client navigation: the route answers with a redirect to the service's own sign-in page
-              <a href={`/api/connections/oauth/start?id=${encodeURIComponent(connection.id)}`} className={cn(buttonVariants({ size: "sm" }))}>
-                Sign in
-              </a>
-            )
-          ))}
+          </span>
+          <motion.span animate={{ rotate: open ? 180 : 0 }} className="text-slate" aria-hidden>
+            <ChevronDown className="size-4" />
+          </motion.span>
+        </button>
+        {canEdit && connection.authType === "oauth" && !connection.signedIn && (
+          // a plain link, not a client navigation: the route answers with a redirect to the service's own sign-in page
+          <a href={`/api/connections/oauth/start?id=${encodeURIComponent(connection.id)}`} className={cn(buttonVariants({ size: "sm" }), "px-3.5")}>
+            Sign in
+          </a>
+        )}
         <Switch
           checked={enabled}
           // never disabled while saving: a disabled control loses focus, and the next press goes nowhere (Q69).
@@ -84,20 +81,49 @@ export function ConnectionRow({ connection, canEdit }: { connection: Connection;
           onCheckedChange={toggle}
           aria-label={`Use ${connection.name} in runs`}
           // the pseudo-element gives the 18 px switch a 44 px hit area on a phone (Q75)
-          className="relative mx-2 shrink-0 data-checked:bg-emerald-700 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']"
+          className="relative shrink-0 data-checked:bg-fern before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']"
         />
-        {canEdit && (
-          <>
-            {/* icon-only on a phone, so the name keeps the room; the hidden word still names the button for a screen reader */}
-            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
-              <Pencil /> <span className="sr-only sm:not-sr-only">Edit</span>
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setDeleting(true)} className="text-muted-foreground hover:text-destructive">
-              <Trash2 /> <span className="sr-only sm:not-sr-only">Delete</span>
-            </Button>
-          </>
-        )}
       </div>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id={levelId}
+            // it answers a press, so it may move: in from just above, opacity and transform only (docs/DESIGN-V2.md)
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.12 } }}
+            className="space-y-3 pr-4 pb-4 pl-[58px]"
+          >
+            <div className="space-y-1.5">
+              <p className="text-[13px] font-medium">{asSentence(toolCount(tools.length))}</p>
+              {tools.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5" aria-label="Tools">
+                  {tools.map((t) => (
+                    <li key={t} className="rounded-full bg-muted px-2.5 py-0.5 text-[13px]">
+                      {toolWords(t)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="space-y-0.5 text-[13px] tracking-[0.01em] text-slate">
+              <p className="break-all">{connection.url}</p>
+              <p>{signInWords(connection)}</p>
+            </div>
+            {canEdit && (
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
+                  Edit
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setDeleting(true)} className="text-crimson hover:bg-crimson-wash hover:text-crimson">
+                  Delete
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {canEdit && (
         <>
@@ -109,7 +135,7 @@ export function ConnectionRow({ connection, canEdit }: { connection: Connection;
   );
 }
 
-// The host is the identity of a server; the full path is noise in a list.
+// The host is the identity of a server; the full address is on the second level.
 function host(url: string): string {
   try {
     return new URL(url).host;

@@ -1,41 +1,47 @@
 import type { Member } from "@/contracts/auth";
+import { InsetGroup, rowLine } from "./grouped";
+import { InviteRow } from "./invite-form";
 
 const ROLE: Record<string, string> = { owner: "Owner", admin: "Admin", member: "Member" };
 
-// Who is in the workspace, and what each person may do. Read-only: roles change through Better Auth's own tools for now.
-export function MembersList({ members, currentUserId }: { members: Member[]; currentUserId: string }) {
+// The people of the workspace as rows (initials, name, email, role at the end), with "Invite someone" as the last
+// row for owners and admins. Roles are changed through Better Auth's own tools for now, so the role is a value.
+export function MembersList({ members, currentUserId, canInvite }: { members: Member[]; currentUserId: string; canInvite: boolean }) {
   return (
-    <section className="rounded-xl border bg-background">
-      <div className="border-b px-4 py-3">
-        <h2 className="text-sm font-semibold">Members</h2>
-        <p className="text-xs text-muted-foreground">Everyone here sees the workspace&apos;s runs, automations and connections.</p>
-      </div>
-      {members.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-muted-foreground">No members to show yet.</p>
-      ) : (
-        <ul data-testid="members" className="divide-y">
-          {members.map((m) => (
-            <li key={m.userId} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {m.name}
-                  {m.userId === currentUserId && <span className="font-normal text-muted-foreground"> (you)</span>}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">{m.email}</p>
-              </div>
-              <span className="text-xs text-muted-foreground">{joined(m.joinedAt)}</span>
-              <span className="w-16 text-right text-sm">{ROLE[m.role] ?? m.role}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <InsetGroup
+      title="People in this workspace"
+      data-testid="members"
+      footer={
+        canInvite
+          ? "Everyone here sees the workspace's runs, automations and servers."
+          : "Everyone here sees the workspace's runs, automations and servers. Only an owner or an admin can invite people."
+      }
+    >
+      {members.length === 0 && <li className="px-4 py-4 text-slate">No one to show yet.</li>}
+      {members.map((m) => (
+        <li key={m.userId} className={rowLine("glyph")}>
+          <div className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
+            <span aria-hidden className="grid size-[30px] shrink-0 place-items-center rounded-full bg-graphite/[0.08] text-[12px] font-semibold">
+              {initials(m.name || m.email)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">
+                {m.name}
+                {m.userId === currentUserId && <span className="font-normal text-slate"> (you)</span>}
+              </p>
+              <p className="truncate text-[13px] tracking-[0.01em] text-slate">{m.email}</p>
+            </div>
+            <span className="shrink-0 text-slate">{ROLE[m.role] ?? m.role}</span>
+          </div>
+        </li>
+      ))}
+      {canInvite && <InviteRow />}
+    </InsetGroup>
   );
 }
 
-// A date, not a time: when someone joined matters to the day. UTC, so the server and the browser agree on it.
-function joined(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `joined ${d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`;
+// "Ada Lovelace" -> "AL"; one word -> its first letter. A mark to find a row by, not a picture.
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0]?.[0] ?? "?")).toUpperCase();
 }

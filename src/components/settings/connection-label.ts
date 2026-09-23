@@ -25,11 +25,16 @@ export function connectionState(c: {
   return connectionStatus(c.lastStatus);
 }
 
-export function asSentence(_s: string): string {
-  throw new Error("not implemented yet");
+/** A status as a line of its own under the name: the same words, starting with a capital. */
+export function asSentence(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
-export function signInWords(_c: { authType?: "none" | "bearer" | "oauth"; hasToken: boolean; signedIn?: boolean }): string {
-  throw new Error("not implemented yet");
+
+/** How the server lets the agent in, said the way the Add dialog asks it; shown on the row's second level. */
+export function signInWords(c: { authType?: "none" | "bearer" | "oauth"; hasToken: boolean; signedIn?: boolean }): string {
+  if (c.authType === "bearer") return c.hasToken ? "Signs in with a saved token" : "Signs in with a token, and none is saved yet";
+  if (c.authType === "oauth") return c.signedIn ? "Signed in with the service" : "Signs in with the service, not signed in yet";
+  return "Needs no sign-in";
 }
 
 /** "12 tools". The tool names come from a run's first message, so before any run there is nothing to count. */
