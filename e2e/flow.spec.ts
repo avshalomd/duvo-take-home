@@ -153,6 +153,18 @@ test.describe("the composer", () => {
     await composer(page).press("Escape");
   });
 
+  // his report, 2026-09-23: a hint that wraps ran over the controls under the box, because it was laid over the input
+  test("a command's hint that wraps grows the box instead of running over its controls", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 }); // a phone: the hint takes more than one line
+    await page.goto("/");
+    await composer(page).fill(`/${READY.command} `);
+    const hint = await page.getByTestId("command-hint").boundingBox();
+    const controls = await page.getByTestId("composer-connections").boundingBox();
+    expect(hint && controls).toBeTruthy();
+    expect(hint!.height).toBeGreaterThan(30); // the case under test: the hint really wraps
+    expect(hint!.y + hint!.height).toBeLessThanOrEqual(controls!.y);
+  });
+
   // his call, 2026-09-23: commands are "/audit ..."; a backslash is plain text and opens nothing
   test("a backslash does not open the list", async ({ page }) => {
     await page.goto("/");
