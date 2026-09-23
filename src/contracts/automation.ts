@@ -3,7 +3,7 @@ import { RunStatus } from "./run";
 
 // A saved automation (his flow, 2026-09-23): a normal run -> "Make an automation" -> an LLM drafts the template from
 // the run -> the user edits it -> runs one or two examples and judges them -> approves -> it is callable as
-// "\<command> <input>". No free-form "skills": behaviour a user adds reaches the agent only through a template that
+// "/<command> <input>" (a front slash, as in coding agents - his call, 2026-09-23). No free-form "skills": behaviour a user adds reaches the agent only through a template that
 // was tested on examples and approved by a person, and any edit to it needs a new approved example.
 
 export const CommandName = z
@@ -102,7 +102,7 @@ export type HumanVerdictInput = z.infer<typeof HumanVerdictInput>;
 
 type Ctx = { workspaceId: string; userId: string };
 
-/** "\audit Apple Inc." or "/audit Apple Inc." -> { command: "audit", input: "Apple Inc." }; plain text -> null. */
+/** "/audit Apple Inc." -> { command: "audit", input: "Apple Inc." }; plain text -> null. Only the front slash. */
 export type ParseCommand = (text: string) => ParsedCommand | null;
 /** extract(): generalises a finished run into a draft the user edits. */
 export type DraftAutomation = (run: {

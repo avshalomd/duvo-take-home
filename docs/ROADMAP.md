@@ -10,7 +10,7 @@ What comes after the hour, in the order it would be built. Nothing here is imple
 3. Editable skills: let the user define, externally, a complete automation, an answer format, sub-steps, or any
    other behaviour the agent should have.
 4. Save a run as an automation: a reusable template (plan, output format, sources) the user reviews and edits,
-   then invokes with a command plus input instead of full instructions, e.g. `\audit Acme Ltd`. Still agentic:
+   then invokes with a command plus input instead of full instructions, e.g. `/audit Acme Ltd` (a front slash, as in coding agents). Still agentic:
    the plan and the output format are predefined, the work is done by the agent with the input.
 5. Better visibility into the evaluation: what each check found, whether Jev decided on its own or delegated to
    the LLM review, and what the review concluded and why.
@@ -45,7 +45,7 @@ and a skill that declares the connections it needs.
 ## 1b. Save a run as an automation (his request, after the hour)
 
 Turn a finished run into a reusable automation: its plan, output format and sources become a template the user
-reviews and edits, then invokes with a command plus input instead of full instructions, e.g. `\audit Acme Ltd`.
+reviews and edits, then invokes with a command plus input instead of full instructions, e.g. `/audit Acme Ltd`.
 Still agentic: the plan and the output format are predefined, the agent does the work with the input.
 
 ## 1c. Settings out of the main page

@@ -62,6 +62,26 @@ describe("GET /api/connections/oauth/start", () => {
     expect(h.start).not.toHaveBeenCalled();
   });
 
+  it("refuses a member, who may see the connections but not change them (Q89): no sign-in starts, no cookie is set", async () => {
+    h.session.mockResolvedValue({ userId: "u2", userName: "M", email: "m@example.com", workspaceId: "ws-a", workspaceName: "A", role: "member" });
+
+    const res = await GET(start());
+
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/settings/connections");
+    expect(errorOf(res)).toBe("Only an owner or an admin can sign a connection in");
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(h.start).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin start a sign-in, as the settings actions do", async () => {
+    h.session.mockResolvedValue({ userId: "u3", userName: "Ad", email: "ad@example.com", workspaceId: "ws-a", workspaceName: "A", role: "admin" });
+
+    const res = await GET(start());
+
+    expect(res.headers.get("location")).toBe(AUTHORIZE);
+    expect(h.start).toHaveBeenCalledOnce();
+  });
+
   it("goes back to the connections page when the id is not a connection id", async () => {
     const res = await GET(start("id=not-an-id"));
 
