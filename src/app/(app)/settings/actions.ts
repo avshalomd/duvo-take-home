@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { InviteInput } from "@/contracts/auth";
-import { inviteMember, listMembers } from "@/lib/auth/members";
+import { MEMBER_NOT_FOUND, ONLY_MANAGERS_CHANGE_ROLES, ONLY_MANAGERS_REMOVE } from "@/lib/auth/member-rules";
+import { changeMemberRole, inviteMember, listMembers, removeFromWorkspace } from "@/lib/auth/members";
 import { requireSession } from "@/lib/auth/session";
 import {
   ConnectionNameTakenError,
@@ -16,7 +18,7 @@ import {
 import { updateLimits } from "@/lib/usage/budget";
 import type { FormState } from "../actions";
 import { parseConnectionForm } from "./connection-form";
-import { inviteError, settingsError } from "./errors";
+import { inviteError, memberError, settingsError } from "./errors";
 import { parseLimitsForm } from "./limits-form";
 import { canChangeSettings } from "@/lib/auth/roles";
 
@@ -115,6 +117,45 @@ export async function updateLimitsAction(_prev: FormState, formData: FormData): 
     return { error: settingsError(e) };
   }
   revalidatePath("/settings/limits");
+  return {};
+}
+
+// A membership's id is Better Auth's generated id: letters, digits, - and _. Never an email, which its removal would
+// look up by address instead.
+const MemberId = z.string().regex(/^[\w-]{1,100}$/);
+const MemberRole = z.enum(["member", "admin", "owner"], "Choose Member, Admin or Owner.");
+
+/** Removes someone from the workspace on screen (Q169); the Members page re-renders without them. */
+export async function removeMemberAction(memberId: string): Promise<FormState> {
+  const session = await requireSession();
+  if (!canChangeSettings(session.role)) return { error: ONLY_MANAGERS_REMOVE };
+  const id = MemberId.safeParse(memberId);
+  if (!id.success) return { error: MEMBER_NOT_FOUND };
+
+  try {
+    await removeFromWorkspace(await headers(), session, id.data);
+  } catch (e) {
+    return { error: memberError(e) };
+  }
+  revalidatePath("/settings/members");
+  return {};
+}
+
+/** Makes someone of the workspace on screen a member, an admin or an owner; the page re-renders with the new role. */
+export async function changeMemberRoleAction(memberId: string, role: string): Promise<FormState> {
+  const session = await requireSession();
+  if (!canChangeSettings(session.role)) return { error: ONLY_MANAGERS_CHANGE_ROLES };
+  const id = MemberId.safeParse(memberId);
+  if (!id.success) return { error: MEMBER_NOT_FOUND };
+  const to = MemberRole.safeParse(role);
+  if (!to.success) return { error: to.error.issues[0].message };
+
+  try {
+    await changeMemberRole(await headers(), session, id.data, to.data);
+  } catch (e) {
+    return { error: memberError(e) };
+  }
+  revalidatePath("/settings/members");
   return {};
 }
 

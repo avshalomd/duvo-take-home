@@ -7,13 +7,14 @@ import { invitation, member, organization, user } from "@/db/schema";
 import type { InviteMember, ListMembers, ListWorkspaces, Member, SessionCtx } from "@/contracts/auth";
 import { InviteInput } from "@/contracts/auth";
 import { auth } from "./auth";
+import { MEMBER_NOT_FOUND, MemberChangeError, removalRefusal, roleChangeRefusal } from "./member-rules";
 import { canChangeSettings } from "./roles";
 import { toRole } from "./session-ctx";
 
 /** Who belongs to the workspace, earliest first, so the owner who made it leads the list. */
 export const listMembers: ListMembers = async (workspaceId) => {
   const rows = await db
-    .select({ userId: user.id, name: user.name, email: user.email, role: member.role, joinedAt: member.createdAt })
+    .select({ memberId: member.id, userId: user.id, name: user.name, email: user.email, role: member.role, joinedAt: member.createdAt })
     .from(member)
     .innerJoin(user, eq(member.userId, user.id))
     .where(eq(member.organizationId, workspaceId))
@@ -135,4 +136,35 @@ export async function revokeInvite(requestHeaders: Headers, ctx: SessionCtx, id:
 
 export async function revokeInvitation(ctx: SessionCtx, id: string): Promise<void> {
   return revokeInvite(await headers(), ctx, id);
+}
+
+/** One membership of the active workspace, and how many owners the workspace has now; any other id is "not found". */
+async function membershipIn(workspaceId: string, memberId: string) {
+  const rows = await db.select({ id: member.id, userId: member.userId, role: member.role }).from(member).where(eq(member.organizationId, workspaceId));
+  const found = rows.find((r) => r.id === memberId);
+  if (!found) throw new MemberChangeError(MEMBER_NOT_FOUND);
+  const owners = rows.filter((r) => toRole(r.role) === "owner").length;
+  return { target: { userId: found.userId, role: toRole(found.role) }, owners };
+}
+
+/**
+ * Removes someone from the active workspace (Q169): the app's rules first (member-rules.ts), then Better Auth's own
+ * removal with the asker's headers, so its permission check runs as well. The removed person's sessions still name
+ * the workspace; their next request finds no membership in it and opens a workspace of their own (session.ts).
+ */
+export async function removeFromWorkspace(requestHeaders: Headers, ctx: SessionCtx, memberId: string): Promise<void> {
+  const { target, owners } = await membershipIn(ctx.workspaceId, memberId);
+  const refusal = removalRefusal(ctx, target, owners);
+  if (refusal) throw new MemberChangeError(refusal);
+  // the workspace named, not left to the session: the change is made where the page is, whatever Better Auth thinks is active
+  await auth.api.removeMember({ headers: requestHeaders, body: { memberIdOrEmail: memberId, organizationId: ctx.workspaceId } });
+}
+
+/** Makes someone of the active workspace a member, an admin or an owner, under the same two sets of rules. */
+export async function changeMemberRole(requestHeaders: Headers, ctx: SessionCtx, memberId: string, role: SessionCtx["role"]): Promise<void> {
+  const { target, owners } = await membershipIn(ctx.workspaceId, memberId);
+  const refusal = roleChangeRefusal(ctx, target, role, owners);
+  if (refusal) throw new MemberChangeError(refusal);
+  if (target.role === role) return; // already so: nothing to write
+  await auth.api.updateMemberRole({ headers: requestHeaders, body: { memberId, role, organizationId: ctx.workspaceId } });
 }

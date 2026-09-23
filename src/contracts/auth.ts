@@ -11,7 +11,8 @@ export const SessionCtx = z.object({
 });
 export type SessionCtx = z.infer<typeof SessionCtx>;
 
-export const Member = z.object({ userId: z.string(), name: z.string(), email: z.string(), role: z.string(), joinedAt: z.string() });
+// memberId: the membership's own id (Better Auth's member row), which removing someone and changing a role go by (Q169)
+export const Member = z.object({ memberId: z.string(), userId: z.string(), name: z.string(), email: z.string(), role: z.string(), joinedAt: z.string() });
 export type Member = z.infer<typeof Member>;
 export const WorkspaceSummary = z.object({ id: z.string(), name: z.string(), role: z.string() });
 export type WorkspaceSummary = z.infer<typeof WorkspaceSummary>;
