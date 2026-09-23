@@ -86,8 +86,8 @@ function reviewLine(review: Review | null): Body {
 }
 
 function lowerFirst(s: string): string {
-  // "The CSV parses" -> "the CSV parses"; an acronym at the start ("CSV parses") keeps its capitals
-  return /^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
+  // "The CSV parses" -> "the CSV parses", "A file" -> "a file"; an acronym ("CSV", "URLs": a second capital) stays
+  return /^[A-Z][A-Z]/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
 }
 
 function shorten(text: string): string {
