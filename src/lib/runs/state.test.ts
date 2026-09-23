@@ -118,12 +118,12 @@ describe("deriveState", () => {
   it("reads the turn from the assistant turn the mapper stamped while the run is still going", () => {
     const { run, events } = fixture(NEWS);
     const stamped = events.filter((e) => e.kind !== "finished").map((e, i) => ({ ...e, payload: { ...e.payload, turn: i < 3 ? 1 : 2 } }) as RunEvent);
-    expect(deriveState(run, stamped).turn).toBe(2);
+    expect(deriveState({ ...run, status: "running" }, stamped).turn).toBe(2);
   });
 
   it("still counts tool calls for a running run recorded before the turn was stamped", () => {
     const { run, events } = fixture(NEWS);
-    expect(deriveState(run, events.filter((e) => e.kind !== "finished")).turn).toBe(4); // the four tool calls of the fixture
+    expect(deriveState({ ...run, status: "running" }, events.filter((e) => e.kind !== "finished")).turn).toBe(4); // the four tool calls of the fixture
   });
 
   it("ignores the SDK's own ToolSearch call: it is the harness looking for tools, not the agent working", () => {
