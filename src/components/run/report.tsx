@@ -1,14 +1,14 @@
 import type { Block, Inline } from "./markdown";
 import { parseMarkdown } from "./markdown";
 
-// The agent writes markdown; the person reading it should see prose. The parsing is in markdown.ts and tested;
-// this only maps blocks to elements, which is why there is no library here.
+// The agent writes markdown; the person reading it should see prose, at a reading width of 66 characters. The
+// parsing is in markdown.ts and tested; this only maps blocks to elements, which is why there is no library here.
 export function Report({ text }: { text: string }) {
   const blocks = parseMarkdown(text);
   if (blocks.length === 0) return null;
 
   return (
-    <div data-testid="report" className="space-y-2 text-sm leading-relaxed">
+    <div data-testid="report" className="max-w-[66ch] space-y-3 text-[15px] leading-relaxed">
       {blocks.map((block, i) => (
         <BlockView key={i} block={block} />
       ))}
@@ -19,14 +19,14 @@ export function Report({ text }: { text: string }) {
 function BlockView({ block }: { block: Block }) {
   if (block.kind === "heading")
     return (
-      <p className="mt-3 text-sm font-semibold">
+      <p className="pt-2 text-[15px] font-semibold">
         <Spans spans={block.spans} />
       </p>
     );
   if (block.kind === "list") {
     const List = block.ordered ? "ol" : "ul";
     return (
-      <List className={`ml-4 space-y-1 ${block.ordered ? "list-decimal" : "list-disc"}`}>
+      <List className={`ml-5 space-y-1 ${block.ordered ? "list-decimal" : "list-disc"} marker:text-slate`}>
         {block.items.map((item, i) => (
           <li key={i}>
             <Spans spans={item} />
@@ -35,6 +35,34 @@ function BlockView({ block }: { block: Block }) {
       </List>
     );
   }
+  if (block.kind === "table")
+    return (
+      // a wide table scrolls inside its own frame, so the page never scrolls sideways on a phone
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-[13px] tracking-[0.01em]">
+          <thead>
+            <tr className="border-b border-hairline text-left">
+              {block.header.map((cell, i) => (
+                <th key={i} scope="col" className="py-1.5 pr-4 font-semibold">
+                  <Spans spans={cell} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, r) => (
+              <tr key={r} className="border-b border-hairline last:border-0">
+                {row.map((cell, c) => (
+                  <td key={c} className="py-1.5 pr-4 align-top">
+                    <Spans spans={cell} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   return (
     <p>
       <Spans spans={block.spans} />
@@ -49,7 +77,7 @@ function Spans({ spans }: { spans: Inline[] }) {
         if (span.href)
           return (
             // the agent's sources are worth following, but never in this tab: a report is read, then its links opened
-            <a key={i} href={span.href} target="_blank" rel="noreferrer" className="text-emerald-700 underline underline-offset-2 dark:text-emerald-400">
+            <a key={i} href={span.href} target="_blank" rel="noreferrer" className="text-graphite underline decoration-slate/50 underline-offset-2 hover:decoration-graphite">
               {span.text}
             </a>
           );
@@ -60,8 +88,9 @@ function Spans({ spans }: { spans: Inline[] }) {
             </strong>
           );
         if (span.code)
+          // not monospace: outside Details the app speaks in one typeface (docs/DESIGN-V2.md)
           return (
-            <code key={i} className="rounded bg-muted px-1 py-0.5 font-mono text-[12px]">
+            <code key={i} className="rounded-md bg-mist px-1 py-0.5 text-[0.95em]">
               {span.text}
             </code>
           );

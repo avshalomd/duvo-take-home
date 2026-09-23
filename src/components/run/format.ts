@@ -19,9 +19,14 @@ export function toolLabel(name: string, connections: { name: string }[]): string
   if (!name.startsWith("mcp__")) return name;
   const [, server, ...rest] = name.split("__");
   const tool = rest.join("__");
+  // the app's own servers (the plan and the chart/spreadsheet tools) are not a connection the person added (Q103)
+  if (BUILT_IN_SERVERS.includes(server)) return `${tool} (built in)`;
   const connection = connections.find((c) => slug(c.name) === server);
   return `${connection?.name ?? server}: ${tool}`;
 }
+
+// The keys a connection may not take (RESERVED_KEYS in contracts/connection): they are the app's own tools.
+const BUILT_IN_SERVERS = ["plan", "outputs"];
 
 // One argument only: the timeline is scanned, not read. Which argument matters depends on the tool.
 function toolArg(input: unknown): string {
@@ -53,6 +58,8 @@ export type ToolKind = "search" | "fetch" | "write" | "connection" | "tool";
 
 // Four kinds cover every tool the agent is given; the card shows the kind so a run can be scanned, not read.
 export function toolKind(name: string): ToolKind {
+  if (name.startsWith("mcp__outputs__")) return "write"; // the chart and spreadsheet tools each make a file
+  if (name.startsWith("mcp__plan__")) return "tool";
   if (name.startsWith("mcp__")) return "connection";
   if (name === "WebSearch" || name === "Grep" || name === "Glob") return "search";
   if (name === "WebFetch" || name === "Read") return "fetch";

@@ -38,17 +38,30 @@ export function groupByDay<T extends { createdAt: string }>(runs: T[], now: Date
   return groups.map(({ label, runs }) => ({ label, runs }));
 }
 
-/** Every word of the query must appear in the instructions, in any order and any case. */
-export function matchesSearch(run: Pick<Run, "prompt">, query: string): boolean {
+/**
+ * Every word of the query must appear in the run's text, in any order and any case. The text is the instructions,
+ * the title and the tag, so an automation's run is found by its command and name as well as by its input (Q133).
+ */
+export function matchesSearch(run: { prompt: string; title?: string; tag?: string | null }, query: string): boolean {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const text = run.prompt.toLowerCase();
+  const text = [run.prompt, run.title ?? "", run.tag ?? ""].join(" ").toLowerCase();
   return words.every((w) => text.includes(w));
 }
 
-/** The first line of the instructions; for an automation's run, its input, since the command tag names the rest. */
-export function runTitle(run: Pick<Run, "prompt" | "purpose" | "input">): string {
-  const fromAutomation = run.purpose === "automation" || run.purpose === "schedule";
-  if (fromAutomation && run.input?.trim()) return run.input.trim();
+const FROM_AUTOMATION = ["automation", "schedule", "trial"];
+
+/**
+ * A run's name. For a run of a saved automation - called, scheduled or an example - the instructions are the filled
+ * template, which is nobody's name for it: "<automation name>: <input>" is (Q94, Q95). names maps an automation's id
+ * to its name; a deleted automation leaves the input, and a run with neither falls back to the instructions.
+ */
+export function runTitle(run: Pick<Run, "prompt" | "purpose" | "input" | "automationId">, names: Record<string, string> = {}): string {
+  if (run.purpose && FROM_AUTOMATION.includes(run.purpose)) {
+    const name = run.automationId ? names[run.automationId] : undefined;
+    const input = run.input?.trim();
+    if (name && input) return `${name}: ${input}`;
+    if (name || input) return (name ?? input)!;
+  }
   return run.prompt.split("\n").map((l) => l.trim()).find(Boolean) ?? run.prompt;
 }
 

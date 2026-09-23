@@ -5,7 +5,8 @@ export type Inline = { text: string; bold?: boolean; code?: boolean; href?: stri
 export type Block =
   | { kind: "heading"; level: number; spans: Inline[] }
   | { kind: "paragraph"; spans: Inline[] }
-  | { kind: "list"; ordered: boolean; items: Inline[][] };
+  | { kind: "list"; ordered: boolean; items: Inline[][] }
+  | { kind: "table"; header: Inline[][]; rows: Inline[][][] }; // Q97: agents write comparison tables
 
 // One pass, three alternatives: **bold**, `code`, [text](href). Anything else stays plain text.
 // The href part takes balanced brackets - `(...)` one level deep - so a URL that contains a bracket is consumed
@@ -35,10 +36,18 @@ export function parseInline(text: string): Inline[] {
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const BULLET = /^\s*[-*]\s+(.*)$/;
 const NUMBER = /^\s*\d+[.)]\s+(.*)$/;
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_RULE = /^\s*\|(\s*:?-{3,}:?\s*\|)+\s*$/; // |---|:---:| - the line that makes pipes a table
+
+/** "| a | **b** |" -> the cells' inline spans. */
+function cells(line: string): Inline[][] {
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => parseInline(c.trim()));
+}
 
 export function parseMarkdown(text: string): Block[] {
   const blocks: Block[] = [];
   let paragraph: string[] = [];
+  const lines = text.split("\n");
 
   // a paragraph runs until a blank line or any other block starts: that is the only buffer this parser needs
   const flushParagraph = () => {
@@ -55,9 +64,24 @@ export function parseMarkdown(text: string): Block[] {
     return list;
   };
 
-  for (const line of text.split("\n")) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const heading = HEADING.exec(line);
     const item = BULLET.exec(line) ?? NUMBER.exec(line);
+
+    // a table is a pipe row followed by its separator rule; the rows run until the pipes stop
+    if (TABLE_ROW.test(line) && TABLE_RULE.test(lines[i + 1] ?? "")) {
+      flushParagraph();
+      const header = cells(line);
+      const rows: Inline[][][] = [];
+      for (i += 2; i < lines.length && TABLE_ROW.test(lines[i]); i++) {
+        const row = cells(lines[i]).slice(0, header.length); // a long row is cut, a short one padded below
+        rows.push([...row, ...Array.from({ length: header.length - row.length }, (): Inline[] => [])]);
+      }
+      i--; // the for loop's own i++ moves to the line after the table
+      blocks.push({ kind: "table", header, rows });
+      continue;
+    }
 
     if (!line.trim()) flushParagraph();
     else if (heading) {

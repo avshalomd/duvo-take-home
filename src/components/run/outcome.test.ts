@@ -23,6 +23,11 @@ describe("outcome", () => {
     expect(outcome("failed", "pass")).toEqual({ label: "Something went wrong", tone: "bad" });
   });
 
+  // Q105: "went wrong" and "did not pass" share a colour; their words tell them apart (the rail says them on hover)
+  it("tells a run that broke from a result that did not pass by its words", () => {
+    expect(outcome("failed", null).label).not.toBe(outcome("succeeded", "fail").label);
+  });
+
   // the run rows call outcome() with Run.outcome, which is optional on the contract and absent on old rows
   it("treats a missing verdict field as 'not judged', never as a pass", () => {
     expect(outcome("succeeded", undefined)).toEqual({ label: "Done", tone: "ok" });
@@ -30,9 +35,10 @@ describe("outcome", () => {
 });
 
 describe("outcome - Stop", () => {
-  it("says a stopped run was stopped by you, whatever else is known about it", () => {
-    expect(outcome("cancelled", null)).toEqual({ label: "Stopped by you", tone: "idle" });
-    expect(outcome("cancelled", "pass")).toEqual({ label: "Stopped by you", tone: "idle" });
+  // Q114: another member may have pressed Stop, so it does not say who
+  it("says a stopped run was stopped, whatever else is known about it", () => {
+    expect(outcome("cancelled", null)).toEqual({ label: "Stopped", tone: "idle" });
+    expect(outcome("cancelled", "pass")).toEqual({ label: "Stopped", tone: "idle" });
   });
 
   it("says a run is stopping between the press and the moment it stops", () => {
@@ -43,8 +49,8 @@ describe("outcome - Stop", () => {
 });
 
 describe("statusLabel - the status badge in Details", () => {
-  it("reads the enum as words, and cancelled as stopped by you", () => {
-    expect(statusLabel("cancelled")).toBe("stopped by you");
+  it("reads the enum as words, and cancelled as stopped", () => {
+    expect(statusLabel("cancelled")).toBe("stopped");
     expect(statusLabel("pass_with_notes")).toBe("pass with notes");
     expect(statusLabel("running")).toBe("running");
   });

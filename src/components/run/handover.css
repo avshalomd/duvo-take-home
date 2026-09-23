@@ -1,0 +1,37 @@
+/* The one orchestrated moment (docs/DESIGN-V2.md): pressing Run hands the brief over. The composer shows the brief
+   as an element named "brief-<run id>" for one commit, the same transition removes it and mounts the new run's
+   title under the same name, and React pairs the two: the browser moves the words from the box into the title.
+   These rules only say how that pair moves, and keep everything else still. */
+
+::view-transition-group(.handover) {
+  animation-duration: 520ms;
+  /* critically damped: the words arrive and stop, no overshoot (the --ease-out-soft token) */
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(.handover),
+::view-transition-new(.handover) {
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* nothing else animates: the page changes at once underneath the travelling brief */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* the overlay would swallow clicks while the words travel: let them reach the page */
+::view-transition {
+  pointer-events: none;
+}
+
+/* Reduced motion: no travel. The title appears where it belongs with a 150 ms cross-fade; nothing is skipped. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.handover) {
+    animation: none;
+  }
+  ::view-transition-old(.handover),
+  ::view-transition-new(.handover) {
+    animation-duration: 150ms;
+  }
+}

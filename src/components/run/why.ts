@@ -15,8 +15,12 @@ export type WhyLine = {
 const SURE = 0.8;
 const MAX_QUOTE = 200;
 
-export function whyLines(verdict: Verdict | null, runStatus: string): WhyLine[] {
-  if (!verdict) return noVerdict(runStatus);
+/**
+ * storedOutcome is Run.outcome: the headline of the stored verdict. It is there even when the full verdict is not -
+ * a verdict stored by the first version of the app no longer parses - and then Why? must agree with it (Q91).
+ */
+export function whyLines(verdict: Verdict | null, runStatus: string, storedOutcome?: string | null): WhyLine[] {
+  if (!verdict) return noVerdict(runStatus, storedOutcome ?? null);
   const path = verdict.path ?? inferPath(verdict);
   const decidedBy = verdict.decidedBy ?? inferDecidedBy(verdict);
   return path.flatMap((tier): WhyLine[] => {
@@ -29,12 +33,15 @@ export function whyLines(verdict: Verdict | null, runStatus: string): WhyLine[] 
   });
 }
 
-function noVerdict(runStatus: string): WhyLine[] {
-  const line = (text: string): WhyLine[] => [{ tier: "none", tone: "idle", decided: false, text }];
-  if (runStatus === "cancelled") return line("You stopped the run, so its result was not checked");
-  if (runStatus === "failed") return line("The run stopped before it finished, so there was nothing to check");
-  if (runStatus === "succeeded") return line("This run has not been checked");
-  return []; // still going: the outcome line already says so
+const EARLIER_TONE: Record<string, WhyLine["tone"]> = { pass: "ok", pass_with_notes: "warn", fail: "bad", unknown: "idle" };
+
+// Why? only appears when it adds something (Q102): a stopped or broken run already says so in its outcome line and
+// banner, and a live one has not been checked yet, so for those there is nothing to open.
+function noVerdict(runStatus: string, storedOutcome: string | null): WhyLine[] {
+  if (runStatus !== "succeeded") return [];
+  if (storedOutcome && EARLIER_TONE[storedOutcome])
+    return [{ tier: "none", tone: EARLIER_TONE[storedOutcome], decided: true, text: "Checked by an earlier version of the app, which kept the result but not the reasons" }];
+  return [{ tier: "none", tone: "idle", decided: false, text: "This run has not been checked" }];
 }
 
 // v1 verdicts carry no path: the tiers that ran are the ones that left something behind. Checks always run.

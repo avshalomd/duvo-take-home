@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCommand, commandQuery, commandWord, filterAutomations } from "./command-query";
+import { applyCommand, commandHint, commandQuery, commandWord, describeOutput, emptyListLine, filterAutomations } from "./command-query";
 
 // Commands use a front slash only, "/audit Apple Inc.", as in coding agents (his call, 2026-09-23).
 
@@ -75,5 +75,50 @@ describe("filterAutomations - the list under the box", () => {
 
   it("is empty when nothing matches", () => {
     expect(filterAutomations(list, "zzz")).toEqual([]);
+  });
+});
+
+// Q93: after "/news-digest " the box gave no hint of what to type next
+describe("commandHint - what to type after a chosen command", () => {
+  const ready = [{ command: "audit", hint: "Company name, e.g. Apple Inc." }];
+
+  it("shows the automation's input hint once the command and a space are typed", () => {
+    expect(commandHint("/audit ", ready)).toBe("Company name, e.g. Apple Inc.");
+    expect(commandHint("/Audit  ", ready)).toBe("Company name, e.g. Apple Inc.");
+  });
+
+  it("goes away as soon as the input is typed, and is never shown for an unknown command, a backslash or plain text", () => {
+    expect(commandHint("/audit A", ready)).toBeNull();
+    expect(commandHint("/audit", ready)).toBeNull(); // still choosing: the list is open
+    expect(commandHint("/nope ", ready)).toBeNull();
+    expect(commandHint("\\audit ", ready)).toBeNull();
+    expect(commandHint("Fetch the news ", ready)).toBeNull();
+  });
+});
+
+// Q117: a workspace whose automations were all off or drafts was told it had none
+describe("emptyListLine - what the command list says when it has nothing to offer", () => {
+  it("says there are none yet, and how to make one", () => {
+    expect(emptyListLine({ ready: 0, notReady: 0, query: "" })).toBe("No saved automations yet - make one from a finished run");
+  });
+
+  it("says none is ready when there are drafts or switched-off ones", () => {
+    expect(emptyListLine({ ready: 0, notReady: 2, query: "" })).toBe("None of your 2 automations is ready yet - approve or turn one on in Automations");
+    expect(emptyListLine({ ready: 0, notReady: 1, query: "" })).toBe("Your automation is not ready yet - approve or turn it on in Automations");
+  });
+
+  it("names what was typed when ready ones exist but none matches", () => {
+    expect(emptyListLine({ ready: 3, notReady: 0, query: "zz" })).toBe("No ready automation starts with /zz");
+  });
+});
+
+// Q118: "makes facts.md with three facts about {input}" showed the template's placeholder
+describe("describeOutput - an automation's output line with its input named", () => {
+  it("puts the input's label where the template says {input}", () => {
+    expect(describeOutput("facts.md with three facts about {input}", "Topic")).toBe("facts.md with three facts about the topic");
+  });
+
+  it("leaves a line without a placeholder as it is", () => {
+    expect(describeOutput("news.csv with 8 rows", "Topic")).toBe("news.csv with 8 rows");
   });
 });

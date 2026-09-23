@@ -12,7 +12,7 @@ export function StateSection({ state, connections }: { state: RunState; connecti
 
   return (
     <Section title="State" aside={<StatusBadge status={state.status} />}>
-      <dl data-testid="state-card" className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1.5 text-sm">
+      <dl data-testid="state-card" className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1.5 text-[14px]">
         <Row label="Status">
           {state.status}
           {/* a run that failed before its first turn has no turn count worth showing */}
@@ -20,7 +20,7 @@ export function StateSection({ state, connections }: { state: RunState; connecti
         </Row>
         <Row label="Last tool">
           {state.lastTool ? (
-            <span className="font-mono text-xs">
+            <span className="font-mono text-[12px]">
               {toolLabel(state.lastTool.name, connections)} {state.lastTool.summary}
             </span>
           ) : (
@@ -37,7 +37,7 @@ export function StateSection({ state, connections }: { state: RunState; connecti
             <ul className="space-y-0.5">
               {state.connections.map((c) => (
                 <li key={c.name} className="flex items-center gap-1.5">
-                  <Plug className="size-3 shrink-0 text-muted-foreground" />
+                  <Plug className="size-3 shrink-0 text-slate" />
                   {connectionName(c.name, connections)} - {c.status}, {c.used ? "used by this run" : "not used by this run"}
                 </li>
               ))}
@@ -87,7 +87,7 @@ export function StateSection({ state, connections }: { state: RunState; connecti
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="text-slate">{label}</dt>
       <dd className="min-w-0 break-words">{children}</dd>
     </>
   );

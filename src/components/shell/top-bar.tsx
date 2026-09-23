@@ -1,8 +1,8 @@
 "use client";
 
-import { Workflow } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandMark } from "@/components/auth/brand-mark";
 import { UserMenu } from "@/components/auth/user-menu";
 import { cn } from "@/lib/utils";
 
@@ -16,32 +16,38 @@ const PAGES = [
 // to every page, the runs belong to Home, so Home fills the spot (a portal) instead of the bar reading runs.
 export const TOP_BAR_SLOT = "top-bar-slot";
 
-// The three pages, and who is signed in to which workspace (UserMenu, from the auth package).
+// The three pages, and who is signed in to which workspace (UserMenu, from the auth package). Glass: the page
+// scrolls under it, blurred, and the glass fades out at its lower edge instead of ending on a 1 px line.
 export function TopBar({ userName, workspaceName }: { userName: string; workspaceName: string }) {
   const path = usePathname();
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   return (
-    <header data-testid="app-header" className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+    <header data-testid="app-header" className="sticky top-0 z-30">
       {/* the first thing the keyboard reaches on Home: past the bar and the rail, straight to the open run (Q70) */}
       {path === "/" && (
         <a
           href="#run"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:border focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:ring-[3px] focus:ring-ring/50"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-paper focus:px-4 focus:py-2 focus:text-sm focus:shadow-float focus:ring-[3px] focus:ring-ring/50"
         >
           Skip to the run
         </a>
       )}
-      {/* h-14 is fixed: Home's rail is sticky just under it and sized to the rest of the screen */}
-      <div className="flex h-14 w-full items-center gap-2 px-3 min-[900px]:gap-6 min-[900px]:px-5">
+      {/* the glass reaches 16 px below the bar and is masked away there: the soft edge where content meets it */}
+      <div
+        aria-hidden
+        className="glass pointer-events-none absolute inset-x-0 top-0 -bottom-4 [mask-image:linear-gradient(to_bottom,black_calc(100%-16px),transparent)]"
+      />
+      <div className="relative flex h-14 items-center gap-2 px-3 min-[900px]:gap-5 min-[900px]:px-5">
         <div id={TOP_BAR_SLOT} className="contents min-[900px]:hidden" />
-        <Link href="/" className="flex shrink-0 items-center gap-2 rounded-md text-sm font-semibold tracking-tight focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-700 text-white" aria-hidden>
-            <Workflow className="size-4" />
-          </span>
-          {/* the product name repeats the Automations page's name, so a phone keeps the mark and drops the word */}
-          <span className="max-sm:sr-only">Automations</span>
+        {/* The product's mark, the same tile as on the sign-in page, without its word: the word read as a second
+            link to the Automations page beside the real one (Q113). The name is the link's label instead. */}
+        <Link
+          href="/"
+          aria-label="Automations home"
+          className="shrink-0 rounded-[10px] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&_.display]:hidden"
+        >
+          <BrandMark />
         </Link>
-        {/* the page links never shrink: on a phone the user menu gives way and truncates instead */}
         <nav aria-label="Pages" className="flex shrink-0 items-center gap-0.5">
           {PAGES.map((p) => (
             <Link
@@ -49,9 +55,9 @@ export function TopBar({ userName, workspaceName }: { userName: string; workspac
               href={p.href}
               aria-current={active(p.href) ? "page" : undefined}
               className={cn(
-                "rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:px-2",
+                "rounded-full px-3 py-1.5 text-[14px] text-slate transition-colors hover:text-graphite max-sm:px-2.5",
                 "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-                active(p.href) && "bg-muted font-medium text-foreground",
+                active(p.href) && "bg-paper font-medium text-graphite shadow-tile",
               )}
             >
               {p.label}

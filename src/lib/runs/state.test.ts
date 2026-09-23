@@ -177,6 +177,27 @@ describe("deriveState - per-step checks, guards and a stopped run", () => {
     ]);
   });
 
+  // Q103, Q123: the built-in chart and spreadsheet tools read as a connection, and their files were missing
+  it("keeps the built-in plan and outputs tools out of the connections", () => {
+    const started: RunEvent = {
+      seq: 0, at: "2026-09-22T09:40:00.000Z", kind: "started",
+      payload: { model: "m", tools: [], mcp_servers: [{ name: "deepwiki", status: "connected" }, { name: "plan", status: "connected" }, { name: "outputs", status: "connected" }] },
+    };
+    expect(deriveState(run, [started]).connections.map((c) => c.name)).toEqual(["deepwiki"]);
+  });
+
+  it("lists the files the chart and spreadsheet tools made beside the ones the agent wrote", () => {
+    const tool = (seq: number, name: string, input: unknown): RunEvent => ({ seq, at: "2026-09-22T09:40:00.000Z", kind: "tool_call", payload: { tool_use_id: `t${seq}`, name, input } });
+    const made = [
+      ...events,
+      tool(90, "Write", { file_path: "/tmp/run/notes.md", content: "x" }),
+      tool(91, "mcp__outputs__make_chart", { file: "sales.svg", title: "Sales", kind: "bar", data: [] }),
+      tool(92, "mcp__outputs__make_spreadsheet", { file: "table.xlsx", sheets: [] }),
+      tool(93, "mcp__outputs__make_chart", { file: "sales.svg", title: "Sales, again", kind: "bar", data: [] }),
+    ];
+    expect(deriveState(run, made).files).toEqual(["notes.md", "sales.svg", "table.xlsx"]);
+  });
+
   it("has no guard notices when every call was allowed", () => {
     expect(deriveState(run, [...events, guard(90, "path", "allowed")]).guards).toEqual([]);
   });

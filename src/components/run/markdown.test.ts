@@ -71,3 +71,30 @@ describe("parseMarkdown", () => {
     expect(parseMarkdown("   ")).toEqual([]);
   });
 });
+
+// Q97: a report's comparison table showed as rows of raw pipes
+describe("parseMarkdown - tables", () => {
+  it("reads a pipe table with its separator row into a header and rows, with inline marks in the cells", () => {
+    const text = ["Top stories:", "", "| Title | Source |", "|---|:---:|", "| **Chips** | Reuters |", "| AI act | [EU](https://eu.test) |"].join("\n");
+    expect(parseMarkdown(text)).toEqual([
+      { kind: "paragraph", spans: [{ text: "Top stories:" }] },
+      {
+        kind: "table",
+        header: [[{ text: "Title" }], [{ text: "Source" }]],
+        rows: [
+          [[{ text: "Chips", bold: true }], [{ text: "Reuters" }]],
+          [[{ text: "AI act" }], [{ text: "EU", href: "https://eu.test" }]],
+        ],
+      },
+    ]);
+  });
+
+  it("pads a short row to the header's width and cuts a long one", () => {
+    const [table] = parseMarkdown("| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 |");
+    expect(table).toMatchObject({ rows: [[[{ text: "1" }], []], [[{ text: "1" }], [{ text: "2" }]]] });
+  });
+
+  it("keeps pipes without a separator row as a paragraph: it is prose that happens to contain a pipe", () => {
+    expect(parseMarkdown("| not | a table |")).toEqual([{ kind: "paragraph", spans: [{ text: "| not | a table |" }] }]);
+  });
+});

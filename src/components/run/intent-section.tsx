@@ -5,11 +5,11 @@ import { Empty, Section } from "./section";
 export function IntentSection({ prompt, plan, finished }: { prompt: string; plan: Plan | null; finished: boolean }) {
   return (
     <Section title="Intent">
-      <p className="mb-3 rounded-md bg-muted/60 p-2 font-mono text-xs leading-relaxed text-muted-foreground">
+      <p className="mb-3 rounded-[12px] bg-mist p-3 font-mono text-[12px] leading-relaxed text-slate">
         {prompt}
       </p>
       {plan ? (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-1.5 text-[14px]">
           <p className="font-medium">{plan.intent}</p>
           <Field label="Expected outputs" items={plan.expectedOutputs} />
           <Field label="Sources" items={plan.sources} />
@@ -17,8 +17,8 @@ export function IntentSection({ prompt, plan, finished }: { prompt: string; plan
       ) : (
         <Empty>
           {finished
-            ? "The agent never stated how it read the instructions."
-            : "The agent has not said how it read the instructions yet."}
+            ? "The agent never wrote down how it read the brief."
+            : "The agent has not said how it read the brief yet."}
         </Empty>
       )}
     </Section>
@@ -28,8 +28,8 @@ export function IntentSection({ prompt, plan, finished }: { prompt: string; plan
 function Field({ label, items }: { label: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <p className="text-sm">
-      <span className="text-muted-foreground">{label}: </span>
+    <p className="text-[14px]">
+      <span className="text-slate">{label}: </span>
       {items.join(", ")}
     </p>
   );

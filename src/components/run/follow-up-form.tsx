@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, MessageSquarePlus } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { startTransition, useActionState, useState } from "react";
 import { followUpAction } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
@@ -20,15 +20,16 @@ export function FollowUpForm({ runId, suggestion }: { runId: string; suggestion:
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-2">
+    <form onSubmit={onSubmit} className="space-y-2.5">
       <input type="hidden" name="runId" value={runId} />
-      <label htmlFor="follow-up" className="block text-sm font-medium">
+      <label htmlFor="follow-up" className="sr-only">
         Ask for a change
       </label>
       <Textarea
         id="follow-up"
         name="prompt"
         rows={2}
+        autoFocus // it opened because the person asked to write a change
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -37,27 +38,27 @@ export function FollowUpForm({ runId, suggestion }: { runId: string; suggestion:
             e.currentTarget.form?.requestSubmit();
           }
         }}
-        placeholder="For example: add a column with the source's country"
+        placeholder="What should change? For example: add a column with each source's country"
         aria-invalid={Boolean(state.fieldErrors?.prompt)}
-        className="min-h-14 resize-none text-sm"
+        className="min-h-16 resize-none rounded-[16px] border-0 bg-mist/70 px-4 py-3 text-[15px] shadow-none focus-visible:ring-[3px] dark:bg-mist/70"
       />
       {state.fieldErrors?.prompt && (
-        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="text-[13px] text-crimson">
           {state.fieldErrors.prompt[0]}
         </p>
       )}
       {state.error && (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="text-[14px] text-crimson">
           {state.error}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" variant="outline" disabled={pending} className="max-[899px]:h-10">
-          {pending ? <LoaderCircle className="animate-spin" /> : <MessageSquarePlus />}
+        <Button type="submit" disabled={pending} className="h-9 px-4 max-[899px]:h-10">
+          {pending && <LoaderCircle aria-hidden className="animate-spin" />}
           Send the change
         </Button>
         {suggestion && text !== suggestion && (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setText(suggestion)} className="text-muted-foreground max-[899px]:h-10">
+          <Button type="button" variant="ghost" onClick={() => setText(suggestion)} className="h-9 px-3 text-slate max-[899px]:h-10" title={suggestion}>
             Use the reviewer&apos;s suggestion
           </Button>
         )}
