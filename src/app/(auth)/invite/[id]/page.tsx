@@ -9,7 +9,7 @@ import { withNext } from "@/lib/auth/paths";
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Invitation - Automations" };
+export const metadata: Metadata = { title: "Invitation - Handover" };
 
 const primary = cn(buttonVariants(), "h-11 w-full text-[15px]");
 const secondary = cn(buttonVariants({ variant: "outline" }), "h-11 w-full text-[15px]");
@@ -32,7 +32,7 @@ export default async function InvitePage({ params }: PageProps<"/invite/[id]">) 
   }
 
   const title = `Join ${invitation.workspaceName}`;
-  const description = `${invitation.inviterName} invited ${invitation.email} to work together in ${invitation.workspaceName}.`;
+  const description = `${invitation.inviterName} invited ${invitation.email} to work together in ${invitation.workspaceName} on Handover.`;
 
   if (!ctx) {
     return (

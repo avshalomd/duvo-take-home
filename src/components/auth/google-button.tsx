@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
+import { withNext } from "@/lib/auth/paths";
 
-// Shown only when Google is configured on the server (the page decides). Google sends the browser back to `next`.
+// Shown only when Google is configured on the server (the page decides). Google sends the browser back to `next`,
+// or on a failure (an invite-only refusal among them) to the sign-in page with ?error=<code>, which says it in words.
 export function GoogleButton({ next }: { next: string }) {
   const [leaving, setLeaving] = useState(false);
   return (
@@ -16,7 +18,7 @@ export function GoogleButton({ next }: { next: string }) {
         disabled={leaving}
         onClick={() => {
           setLeaving(true); // the page is about to leave for Google; a second click would start a second sign-in
-          void authClient.signIn.social({ provider: "google", callbackURL: next });
+          void authClient.signIn.social({ provider: "google", callbackURL: next, errorCallbackURL: withNext("/sign-in", next) });
         }}
       >
         Continue with Google

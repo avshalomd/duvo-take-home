@@ -18,8 +18,9 @@ export function e2eEmail(what: string) {
   return `e2e-${what}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}@example.com`;
 }
 
-// The form's error: role="alert" with text. Next's route announcer is an empty role="alert" on every page.
-export const formError = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
+// The form's error: an alert, and the form's own. Next's route announcer is a role="alert" too, and after a
+// client-side navigation it holds the new page's title, so "an alert with text" is not enough to find it.
+export const formError = (page: Page) => page.getByRole("alert").and(page.getByTestId("auth-error"));
 
 export async function signUpThroughUi(page: Page, name: string, email: string) {
   await page.goto("/sign-up");
@@ -47,7 +48,7 @@ function sql() {
  * Members page's job (settings), and createInvite() has its own integration test. Deleted with the owner's workspace.
  */
 export async function inviteByRow(ownerEmail: string, inviteeEmail: string): Promise<string> {
-  const id = `e2e-invite-${Date.now().toString(36)}`;
+  const id = `e2e-invite-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`; // two specs in the same ms
   await sql()`
     insert into invitation (id, organization_id, email, role, status, expires_at, inviter_id)
     select ${id}, m.organization_id, ${inviteeEmail}, 'member', 'pending', now() + interval '1 day', u.id
@@ -72,4 +73,5 @@ export async function deleteUsers(emails: string[]) {
     await db`delete from organization where id = any(${ids})`;
   }
   await db`delete from "user" where email = any(${emails})`;
+  await db`delete from invitation where email = any(${emails})`; // invitations into workspaces they did not own (the demo's)
 }

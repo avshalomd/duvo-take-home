@@ -12,7 +12,7 @@ export function BrandMark() {
           <circle cx="10" cy="16" r="1.9" fill="none" stroke="var(--paper)" strokeOpacity="0.55" strokeWidth="1.2" />
         </svg>
       </span>
-      <span className="display text-[19px]">Automations</span>
+      <span className="display text-[19px]">Handover</span>
     </span>
   );
 }
