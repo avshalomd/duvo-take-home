@@ -2,26 +2,27 @@ import { CornerDownRight, FlaskConical, ThumbsDown, ThumbsUp } from "lucide-reac
 import Link from "next/link";
 import type { Run } from "@/contracts/run";
 
-const linkClass = "underline-offset-2 hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none rounded-sm";
+const link = "rounded-sm underline-offset-2 hover:text-graphite hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
 
-// The small lines under a run's title that say where it came from and what the person made of it.
-export function RunNotes({ run, parentTitle }: { run: Run; parentTitle: string | null }) {
+// The quiet lines under a run's title: where it came from, and what the person made of it. One line each.
+export function RunNotes({ run, parentTitle, automationName }: { run: Run; parentTitle: string | null; automationName: string | null }) {
   const notes: React.ReactNode[] = [];
 
   if (run.parentRunId)
     notes.push(
-      <Link key="parent" href={`/?run=${run.parentRunId}`} className={linkClass}>
-        <CornerDownRight className="mr-1 inline size-3 align-[-1px]" aria-hidden />
+      <Link key="parent" href={`/?run=${run.parentRunId}`} className={link}>
+        <CornerDownRight aria-hidden className="mr-1.5 inline size-3.5 align-[-2px]" />
         Follows up {parentTitle ?? "an earlier run"}
       </Link>,
     );
 
+  // Q95: it names the automation, and stays true after approval - an example is an example of something
   if (run.purpose === "trial") {
-    const text = "Example for an automation being tested";
+    const text = automationName ? `Example for ${automationName}` : "Example for an automation";
     notes.push(
       run.automationId ? (
-        <Link key="trial" href={`/automations/${run.automationId}`} className={linkClass}>
-          <FlaskConical className="mr-1 inline size-3 align-[-1px]" aria-hidden />
+        <Link key="trial" href={`/automations/${run.automationId}`} className={link}>
+          <FlaskConical aria-hidden className="mr-1.5 inline size-3.5 align-[-2px]" />
           {text}
         </Link>
       ) : (
@@ -32,9 +33,10 @@ export function RunNotes({ run, parentTitle }: { run: Run; parentTitle: string |
 
   if (run.humanVerdict) {
     const right = run.humanVerdict === "approved";
+    const Thumb = right ? ThumbsUp : ThumbsDown;
     notes.push(
       <span key="human">
-        {right ? <ThumbsUp className="mr-1 inline size-3 align-[-1px]" aria-hidden /> : <ThumbsDown className="mr-1 inline size-3 align-[-1px]" aria-hidden />}
+        <Thumb aria-hidden className={`mr-1.5 inline size-3.5 align-[-2px] ${right ? "text-fern" : "text-crimson"}`} />
         You marked this: {right ? "looks right" : "not right"}
         {run.humanNote && <span className="italic"> - &ldquo;{run.humanNote}&rdquo;</span>}
       </span>,
@@ -42,5 +44,5 @@ export function RunNotes({ run, parentTitle }: { run: Run; parentTitle: string |
   }
 
   if (notes.length === 0) return null;
-  return <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">{notes}</div>;
+  return <div className="mt-3 flex flex-col gap-1 text-[13px] tracking-[0.01em] text-slate">{notes}</div>;
 }

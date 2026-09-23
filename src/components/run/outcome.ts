@@ -5,8 +5,8 @@ import type { Tone } from "./status-dot";
 // stopping is Run.cancelRequested: Stop was pressed and the runner has not closed the run yet (it checks every 2 s).
 export function outcome(runStatus: string, verdict: string | null | undefined, stopping?: boolean): { label: string; tone: Tone } {
   if (runStatus === "cancelled") return { label: "Stopped", tone: "idle" }; // Q114: not "by you" - another member may have pressed it
-  // a broken run is a problem whatever the judge said, and it looks different from a result that did not pass (Q105)
-  if (runStatus === "failed") return { label: "Something went wrong", tone: "broken" };
+  // a broken run is a problem whatever the judge said; its words, not its colour, set it apart from a failed result
+  if (runStatus === "failed") return { label: "Something went wrong", tone: "bad" };
   const live = runStatus === "queued" || runStatus === "running" || runStatus === "evaluating";
   if (live && stopping) return { label: "Stopping...", tone: "busy" };
   if (runStatus === "queued") return { label: "Getting ready", tone: "idle" };
