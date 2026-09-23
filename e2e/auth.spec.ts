@@ -98,6 +98,20 @@ test("the sign-in pages carry the product's name, Handover", async ({ page }) =>
   await expect(page.getByRole("region", { name: "What Handover does" })).toContainText("Handover");
 });
 
+// Security QA: another site could frame the app (clickjacking).
+test("pages and the API tell the browser they may not be framed, and do not name the framework", async ({ page, request }) => {
+  const res = await page.goto("/sign-in");
+  const pageHeaders = res!.headers();
+  const apiHeaders = (await request.get("/api/runs", { maxRedirects: 0 })).headers();
+  for (const h of [pageHeaders, apiHeaders]) {
+    expect(h["x-frame-options"]).toBe("DENY");
+    expect(h["content-security-policy"]).toBe("frame-ancestors 'none'");
+    expect(h["x-content-type-options"]).toBe("nosniff");
+    expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(h["x-powered-by"]).toBeUndefined();
+  }
+});
+
 test("a signed-out visit to / goes to /sign-in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL((url) => url.pathname === "/sign-in");
