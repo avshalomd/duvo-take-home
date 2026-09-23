@@ -2,11 +2,13 @@
 export const REFRESH_MARGIN_MS = 60 * 1000;
 
 /** When a token handed out now with expires_in seconds stops working, or null when the server did not say. */
-export function expiresAt(_expiresInSeconds: number | undefined, _now: Date): string | null {
-  throw new Error("not implemented: expiresAt");
+export function expiresAt(expiresInSeconds: number | undefined, now: Date): string | null {
+  if (expiresInSeconds === undefined) return null;
+  return new Date(now.getTime() + expiresInSeconds * 1000).toISOString();
 }
 
 /** Whether the access token must be refreshed before it is sent. */
-export function needsRefresh(_expiresAt: string | null, _now: Date): boolean {
-  throw new Error("not implemented: needsRefresh");
+export function needsRefresh(expiresAt: string | null, now: Date): boolean {
+  if (expiresAt === null) return false; // no expiry given: use it until the server refuses it, then the run shows the failure
+  return new Date(expiresAt).getTime() - now.getTime() <= REFRESH_MARGIN_MS;
 }
