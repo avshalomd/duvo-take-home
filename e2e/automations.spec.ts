@@ -26,7 +26,7 @@ test("a finished run becomes a draft automation that can be edited and cannot be
   await page.getByRole("link", { name: SOURCE_RUN }).first().click();
 
   // the loading state is real: the draft is written by a model while the page waits
-  await expect(page.getByText("Writing a first draft")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Writing a first draft" })).toBeVisible();
   await page.waitForURL(/\/automations\/[0-9a-f-]{36}$/, { timeout: 90_000 });
   createdId = new URL(page.url()).pathname.split("/").pop() ?? null;
 
