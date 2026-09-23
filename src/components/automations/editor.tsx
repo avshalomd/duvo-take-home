@@ -93,7 +93,9 @@ export function AutomationEditor({
               readOnly={commandLocked}
               autoCapitalize="none"
               spellCheck={false}
-              className={cn(FIELD, commandLocked && "bg-muted text-slate")}
+              // read, not typed into: a tinted well with no border and the plain cursor. dark: said again, or the
+              // Input's own dark fill wins and it reads as an empty field; the value stays full ink, not placeholder grey
+              className={cn(FIELD, commandLocked && "cursor-default border-transparent bg-graphite/[0.07] text-graphite dark:bg-graphite/[0.07]")}
             />
           </div>
         </Field>
@@ -161,6 +163,12 @@ export function AutomationEditor({
         <p aria-live="polite" className={cn("text-[15px]", (state.error || state.fieldErrors) && "text-crimson")}>
           {state.error ?? (state.fieldErrors ? "Some fields need a change, see above." : null)}
         </p>
+        {/* UX R2: said where the save is pressed, naming what people type: a member's new version waits for an approver */}
+        {!approver && automation.status === "active" && !state.error && !state.fieldErrors && (
+          <p className="text-[13px] tracking-[0.01em] text-slate">
+            Saving a change to the brief takes /{automation.command} out of use until an owner or an admin approves it.
+          </p>
+        )}
       </div>
       <p className="text-[13px] tracking-[0.01em] text-slate">
         Changing what the agent is told makes a new version, which needs a new example

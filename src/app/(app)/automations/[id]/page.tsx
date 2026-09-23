@@ -59,7 +59,11 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   const governs = canGovernAutomations(role);
   // once approved, people call it by its command, even after an edit sent it back to draft (review R2)
   const commandLocked = !governs && hasBeenApproved(automation.status, automation.version, trials);
-  const deleteButton = governs ? <DeleteButton automationId={automation.id} name={automation.name} /> : <p className={SMALL}>An owner or an admin can delete it.</p>;
+  const deleteButton = governs ? (
+    <DeleteButton automationId={automation.id} name={automation.name} command={automation.command} approved={!isDraft} />
+  ) : (
+    <p className={SMALL}>An owner or an admin can delete it.</p>
+  );
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-8 sm:px-6 sm:py-10">
@@ -92,7 +96,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
                   <h2 id="its-runs" className={SECTION}>
                     Its runs
                   </h2>
-                  <History runs={history} />
+                  <History runs={history} callable={automation.status === "active"} />
                 </section>
               </>
             )}
