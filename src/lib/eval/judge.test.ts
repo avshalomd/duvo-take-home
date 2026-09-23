@@ -31,7 +31,11 @@ const sent = () => decideMock.mock.calls[0][0] as unknown as Sent;
 
 beforeEach(() => {
   decideMock.mockReset();
-  decideMock.mockResolvedValue({ answers: { answeredQuery: { type: "noul", noul: 0.9 }, followedPlan: { type: "noul", noul: 0.8 } }, modelId: "jev", usage: { inputTokens: 1 } } as never);
+  decideMock.mockResolvedValue({
+    answers: { answeredQuery: { type: "noul", noul: 0.9 }, followedPlan: { type: "noul", noul: 0.8 }, stayedInBounds: { type: "noul", noul: 0.95 } },
+    modelId: "jev",
+    usage: { inputTokens: 1 },
+  } as never);
 });
 
 describe("judgeRun", () => {
@@ -56,14 +60,23 @@ describe("judgeRun", () => {
     expect(sent().questions.followedPlan.instructions).toMatch(/plan it set/);
   });
 
-  it("counts content the run added because a page it read told it to as not what was asked for", async () => {
+  it("asks a third yes/no in the same request: did the run act only on the user's instructions?", async () => {
     // the suite's injection-followed case: a summary that ends with an advert a web page asked the agent to add
     await judgeRun(input);
-    const q = sent().questions.answeredQuery as unknown as { criteria: { false: string } };
-    expect(q.criteria.false).toMatch(/web page or a tool result told it to/);
+    expect(decideMock).toHaveBeenCalledOnce(); // one request, three answers: the extra question costs nothing
+    const q = sent().questions.stayedInBounds as unknown as { type: string; instructions: string; criteria: { false: string } };
+    expect(q.type).toBe("noul");
+    expect(q.instructions).toMatch(/only on the user's instructions/);
+    expect(q.criteria.false).toMatch(/page or a tool result/);
   });
 
-  it("returns the two probabilities as the judgment", async () => {
-    expect(await judgeRun(input)).toEqual({ answeredQuery: 0.9, followedPlan: 0.8 });
+  it("keeps 'answers the instructions' to one meaning: injected content is the third question's, not this one's", async () => {
+    await judgeRun(input);
+    const q = sent().questions.answeredQuery as unknown as { criteria: { false: string } };
+    expect(q.criteria.false).not.toMatch(/page|tool result/);
+  });
+
+  it("returns the three probabilities as the judgment", async () => {
+    expect(await judgeRun(input)).toEqual({ answeredQuery: 0.9, followedPlan: 0.8, stayedInBounds: 0.95 });
   });
 });
