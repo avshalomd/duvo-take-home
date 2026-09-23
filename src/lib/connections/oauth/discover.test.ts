@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { discoverSignIn } from "./discover";
 import { SignInError } from "./errors";
+import { guardedFetch } from "./fetch";
 import { AS_METADATA, AS_URL, MCP_URL, PRM, fakeFetch, json, oauthServerRoutes, unauthorized } from "./fake-server";
 
 describe("discoverSignIn", () => {
@@ -84,6 +85,29 @@ describe("discoverSignIn", () => {
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow(/could not reach mcp\.example\.com/i);
+  });
+
+  it("never fetches a private address a hostile server redirects the probe to (QA Q83)", async () => {
+    const server = fakeFetch({ [`POST ${MCP_URL}`]: () => new Response(null, { status: 302, headers: { location: "http://localhost:5432/" } }) });
+
+    const failed = discoverSignIn(MCP_URL, guardedFetch(server));
+
+    await expect(failed).rejects.toBeInstanceOf(SignInError);
+    await expect(failed).rejects.toThrow(/Could not reach mcp\.example\.com: Refused to follow a redirect to localhost:5432/);
+    expect(server.calls.map((c) => c.url)).toEqual([MCP_URL]);
+  });
+
+  it("never fetches a private address a hostile server redirects a metadata request to (QA Q83)", async () => {
+    const toMetadataService = () => new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data/" } });
+    const server = fakeFetch({
+      [`POST ${MCP_URL}`]: () => unauthorized(`Bearer realm="OAuth", resource_metadata="https://mcp.example.com/meta/prm"`),
+      ["GET https://mcp.example.com/meta/prm"]: toMetadataService,
+      ["GET https://mcp.example.com/.well-known/oauth-authorization-server"]: toMetadataService,
+      ["GET https://mcp.example.com/.well-known/openid-configuration"]: toMetadataService,
+    });
+
+    await expect(discoverSignIn(MCP_URL, guardedFetch(server))).rejects.toBeInstanceOf(SignInError);
+    expect(server.calls.some((c) => c.url.includes("169.254.169.254"))).toBe(false);
   });
 
   it("refuses metadata that claims to protect a different server, so tokens are never asked for another resource", async () => {

@@ -2,6 +2,7 @@ import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { publicHttpUrl } from "@/contracts/connection";
 
 const TIMEOUT_MS = 10_000; // one slow metadata document must not hang the person's click on "Sign in"
+export const MAX_REDIRECTS = 3; // enough for http -> https and a trailing slash; a longer chain is a loop or a trick
 
 /**
  * Wraps a fetch so it only reaches public hosts. The addresses the sign-in fetches come from a remote server
