@@ -337,7 +337,9 @@ test.describe("a finished run", () => {
     const panel = await openRun(page, runs.followUp);
     const thread = panel.getByTestId("thread");
     await expect(thread.getByRole("listitem")).toHaveCount(3);
-    await expect(thread.getByRole("listitem").nth(1)).toContainText("This step may not have done what it says. It found two facts, not three.");
+    // Q153: said once; the checker's note only repeated the step's own, so it is not added
+    await expect(thread.getByRole("listitem").nth(1)).toContainText("This step may not have done what it says.");
+    await expect(thread.getByRole("listitem").nth(1)).not.toContainText("It found two facts, not three.");
     await expect(thread.getByText(/may not have done what it says/)).toHaveCount(1); // the on-track steps are not flagged
     await expect(panel.getByTestId("plan-progress")).toHaveText("3 of 3 done");
 

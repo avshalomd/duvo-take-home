@@ -169,10 +169,12 @@ export function Composer({
             What should the agent do?
           </label>
         )}
-        <div className="relative">
+        {/* One grid cell holds the input and its hint, so the box is as tall as the taller of the two: laid over the
+            input, a hint that wrapped ran over the controls below (his report, 2026-09-23). */}
+        <div className="relative grid">
           {/* the input's hint after a chosen command (Q93): the typed text drawn invisibly, then the hint */}
           {hint && (
-            <p aria-hidden className={cn("pointer-events-none absolute inset-0 break-words whitespace-pre-wrap", type)}>
+            <p aria-hidden className={cn("pointer-events-none col-start-1 row-start-1 break-words whitespace-pre-wrap", type)}>
               <span className="invisible">{text}</span>
               <span data-testid="command-hint" className="text-slate">
                 {hint}
@@ -199,7 +201,7 @@ export function Composer({
             aria-activedescendant={open && options.length ? optionId(options[highlighted].command) : undefined}
             aria-autocomplete="list"
             className={cn(
-              "relative min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none placeholder:text-slate focus-visible:ring-0 dark:bg-transparent",
+              "relative col-start-1 row-start-1 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none placeholder:text-slate focus-visible:ring-0 dark:bg-transparent",
               type,
               ghost && "text-transparent caret-transparent", // the brief is leaving: its copy below is what moves
             )}
