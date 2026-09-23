@@ -125,6 +125,7 @@ describe("startOAuth", () => {
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow("That connection was not found");
+    await expect(failed).rejects.toMatchObject({ code: "not_found" });
     expect(rows.get(CONNECTION_ID)!.oauth).toBeNull();
   });
 

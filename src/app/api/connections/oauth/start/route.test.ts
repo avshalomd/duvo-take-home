@@ -68,7 +68,7 @@ describe("GET /api/connections/oauth/start", () => {
     const res = await GET(start());
 
     expect(new URL(res.headers.get("location")!).pathname).toBe("/settings/connections");
-    expect(errorOf(res)).toBe("Only an owner or an admin can sign a connection in");
+    expect(errorOf(res)).toBe("not_allowed");
     expect(res.headers.get("set-cookie")).toBeNull();
     expect(h.start).not.toHaveBeenCalled();
   });
@@ -86,16 +86,17 @@ describe("GET /api/connections/oauth/start", () => {
     const res = await GET(start("id=not-an-id"));
 
     expect(new URL(res.headers.get("location")!).pathname).toBe("/settings/connections");
-    expect(errorOf(res)).toBe("That connection was not found");
+    expect(errorOf(res)).toBe("not_found");
     expect(h.start).not.toHaveBeenCalled();
   });
 
-  it("goes back to the connections page with the SignInError's sentence, e.g. a server without OAuth", async () => {
-    h.start.mockRejectedValue(new SignInError("This server does not offer sign-in; add a token instead"));
+  it("goes back to the connections page with the SignInError's code, e.g. a server without OAuth", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    h.start.mockRejectedValue(new SignInError("token_only", "This server does not offer sign-in; add a token instead"));
 
     const res = await GET(start());
 
-    expect(errorOf(res)).toBe("This server does not offer sign-in; add a token instead");
+    expect(errorOf(res)).toBe("token_only");
     expect(res.headers.get("set-cookie")).toBeNull();
   });
 
@@ -105,6 +106,6 @@ describe("GET /api/connections/oauth/start", () => {
 
     const res = await GET(start());
 
-    expect(errorOf(res)).toBe("The sign-in could not start; try again");
+    expect(errorOf(res)).toBe("start_failed");
   });
 });

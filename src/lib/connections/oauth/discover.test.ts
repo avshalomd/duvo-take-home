@@ -70,12 +70,15 @@ describe("discoverSignIn", () => {
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow("This server does not offer sign-in; add a token instead");
+    await expect(failed).rejects.toMatchObject({ code: "token_only" });
   });
 
   it("says a server that answers without any sign-in needs none", async () => {
     const fetchFn = fakeFetch({ [`POST ${MCP_URL}`]: () => json({ jsonrpc: "2.0", id: 1, result: {} }) });
 
-    await expect(discoverSignIn(MCP_URL, fetchFn)).rejects.toThrow("This server works without signing in, so it needs neither a sign-in nor a token");
+    const failed = discoverSignIn(MCP_URL, fetchFn);
+    await expect(failed).rejects.toThrow("This server works without signing in, so it needs neither a sign-in nor a token");
+    await expect(failed).rejects.toMatchObject({ code: "no_sign_in_needed" });
   });
 
   it("says so when the server cannot be reached, naming the host", async () => {
@@ -87,6 +90,7 @@ describe("discoverSignIn", () => {
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow(/could not reach mcp\.example\.com/i);
+    await expect(failed).rejects.toMatchObject({ code: "unreachable" });
   });
 
   it("never fetches a private address a hostile server redirects the probe to (QA Q83)", async () => {
