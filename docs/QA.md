@@ -195,10 +195,11 @@ route a function of its own). Runs now execute in `/api/runner/<id>`, the only f
 
 | id | source | observed | expected | severity | owner | status |
 |---|---|---|---|---|---|---|
-| Q150 | qa-func (live) | a correct, titled bar chart failed "no title": the chart tool wraps a long title into two `<tspan>` lines and the check read only up to the first tag; self-heal then looped on the false failure | a wrapped title counts | blocker | main (eval) | re-check (2ebe4f5, a test renders a wrapped title with the real renderer) |
-| Q151 | qa-func (live) | "Make the bars horizontal" could not be done: the chart tool drew only vertical bars | horizontal bars | major | main (outputs) | re-check (88f1083: kind horizontal-bar) |
-| Q152 | qa-func (live) | a chart-only run's Why? said it "may have followed instructions it found on a page"; it read no page | no such warning when nothing outside was read | major | main (eval) | re-check (f1d8203: the question is asked only when the run searched, fetched or used a connection) |
-| Q153 | qa-func (live) | a doubted step read "This step may not have done what it says. May not have done what it says: ..." | the sentence once | minor | main (home) | re-check (ddd6467) |
-| Q154 | qa-func (live) | a fix attempt called set_plan again and the person's steps left the thread | the plan kept, the fix added as a step | minor | main (engine) | re-check (ddd6467: the fix prompt says keep the plan) |
-| Q155 | qa-func (live) | a report opening with a bold "Report:" line under the page's "Report" heading | the word once | minor | main (home) | re-check (ddd6467) |
-| Q156 | qa-func (live) | an unknown invitation link said "This invitation is closed" | "We could not find this invitation" | minor | main (auth) | re-check (ddd6467, e2e) |
+| Q150 | qa-func (live) | a correct, titled bar chart failed "no title": the chart tool wraps a long title into two `<tspan>` lines and the check read only up to the first tag; self-heal then looped on the false failure | a wrapped title counts | blocker | main (eval) | fixed (2ebe4f5; live on 7ce243f: the same two-line title read in full, the run passed) |
+| Q151 | qa-func (live) | "Make the bars horizontal" could not be done: the chart tool drew only vertical bars | horizontal bars | major | main (outputs) | fixed (88f1083: kind horizontal-bar; live: the follow-up drew horizontal bars and passed) |
+| Q152 | qa-func (live) | a chart-only run's Why? said it "may have followed instructions it found on a page"; it read no page | no such warning when nothing outside was read | major | main (eval) | fixed (f1d8203; live: a chart-only run asked two questions and Why? says nothing about pages) |
+| Q153 | qa-func (live) | a doubted step read "This step may not have done what it says. May not have done what it says: ..." | the sentence once | minor | main (home) | fixed (ddd6467; live on the CSV run) |
+| Q154 | qa-func (live) | a fix attempt called set_plan again and the person's steps left the thread | the plan kept, the fix added as a step | minor | main (engine) | re-check (ddd6467: the fix prompt says keep the plan; no live run needed a fix since) |
+| Q155 | qa-func (live) | a report opening with a bold "Report:" line under the page's "Report" heading | the word once | minor | main (home) | fixed (ddd6467; live: both reports open with a sentence) |
+| Q156 | qa-func (live) | an unknown invitation link said "This invitation is closed" | "We could not find this invitation" | minor | main (auth) | fixed (ddd6467, e2e; live, signed in and out) |
+| Q157 | qa-func (live) | on a horizontal bar chart the value labels "80" and "90" nearly touch | labels apart | minor | main (outputs) | fixed (about five ticks on the value axis; next deploy) |
