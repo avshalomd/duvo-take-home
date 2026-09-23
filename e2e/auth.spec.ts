@@ -180,6 +180,9 @@ test("a new workspace made from the user menu opens at once, and the menu switch
   await page.getByLabel("Name").fill("E2e finance team");
   await page.getByRole("button", { name: "Create workspace" }).click();
   await expect(header).toContainText("E2e finance team");
+  // Home streams in after the top bar, and its empty-state composer takes focus when it appears, which closes a
+  // menu opened before it: wait for Home's question, as a person would see the page finish loading.
+  await expect(page.getByRole("heading", { name: "What should the agent do?" })).toBeVisible();
 
   await header.getByRole("button", { name: /Sam Switcher/ }).click();
   await expect(page.getByRole("menuitemradio", { name: "E2e finance team" })).toHaveAttribute("aria-checked", "true");
