@@ -203,3 +203,4 @@ route a function of its own). Runs now execute in `/api/runner/<id>`, the only f
 | Q155 | qa-func (live) | a report opening with a bold "Report:" line under the page's "Report" heading | the word once | minor | main (home) | fixed (ddd6467; live: both reports open with a sentence) |
 | Q156 | qa-func (live) | an unknown invitation link said "This invitation is closed" | "We could not find this invitation" | minor | main (auth) | fixed (ddd6467, e2e; live, signed in and out) |
 | Q157 | qa-func (live) | on a horizontal bar chart the value labels "80" and "90" nearly touch | labels apart | minor | main (outputs) | fixed (about five ticks on the value axis; next deploy) |
+| Q158 | him (live) | a command's hint that wraps ("/model-scores Comma-separated list of...") runs over the composer's controls | the box grows with the hint | minor | main (home) | fixed (input and hint in one grid cell; e2e at phone width) |
