@@ -26,7 +26,8 @@ export function SettingsTabs() {
             aria-current={active ? "page" : undefined}
             className={cn(
               "relative flex-1 rounded-full px-5 py-1.5 text-center text-sm font-medium transition-[color,transform] duration-100 active:scale-[0.97] sm:flex-none",
-              active ? "text-graphite" : "text-slate hover:text-graphite",
+              // slate on the grey track measured 4.44:1, just under AA's 4.5: a fifth of graphite in it gives 5.5:1
+              active ? "text-graphite" : "text-[color-mix(in_oklab,var(--slate),var(--graphite)_20%)] hover:text-graphite",
             )}
           >
             {/* the pill is shared between the segments (layoutId), so it moves rather than blinks on navigation */}
