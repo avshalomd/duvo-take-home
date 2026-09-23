@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { RequireSession, SessionCtx, SessionFromHeaders } from "@/contracts/auth";
 import { auth } from "./auth";
+import { requestedPath, signInPath } from "./paths";
 import { pickMembership, toSessionCtx } from "./session-ctx";
 import { createPersonalWorkspace, membershipsOf, setActiveWorkspace } from "./workspaces";
 
@@ -38,8 +39,10 @@ async function resolve(requestHeaders: Headers): Promise<SessionCtx | null> {
  * page share one lookup per request instead of reading the session table twice.
  */
 export const requireSession: RequireSession = cache(async () => {
-  const ctx = await resolve(await headers());
-  if (!ctx) redirect("/sign-in");
+  const requestHeaders = await headers();
+  const ctx = await resolve(requestHeaders);
+  // The page that was asked for comes along as ?next= (the proxy recorded it), so signing in returns there (Q130).
+  if (!ctx) redirect(signInPath(requestedPath(requestHeaders)));
   return ctx;
 });
 
