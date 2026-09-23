@@ -1,15 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { AgentLimits } from "@/contracts/agent";
 import type { Verdict } from "@/contracts/eval";
-import { attemptFingerprint, healPrompt, MIN_HEAL_MS, noProgress, runBudgetMs, shouldHeal } from "./heal";
+import { attemptFingerprint, CLOSING_MS, EVAL_MAX_MS, FUNCTION_LIMIT_MS, healPrompt, MIN_HEAL_MS, noProgress, runBudgetMs, SETTLE_MAX_MS, shouldHeal } from "./heal";
 
 describe("runBudgetMs", () => {
-  it("inline, keeps every attempt inside the one wall clock the function allows", () => {
-    expect(runBudgetMs("inline")).toBe(AgentLimits.wallClockMs);
+  // Vercel ends the function at 300 s whatever it is doing: a run still evaluating then stayed "evaluating" for ever.
+  it("inline, leaves room in the function's 300 s for the evaluation, the step checks and the closing writes: 230 s", () => {
+    expect(runBudgetMs("inline")).toBe(230_000);
+    expect(runBudgetMs("inline") + EVAL_MAX_MS + SETTLE_MAX_MS + CLOSING_MS).toBe(FUNCTION_LIMIT_MS);
+    expect(FUNCTION_LIMIT_MS).toBe(300_000); // the runner route's maxDuration
   });
 
   it("in the runner route, the same: the run lives inside one function call there too", () => {
-    expect(runBudgetMs("route")).toBe(AgentLimits.wallClockMs);
+    expect(runBudgetMs("route")).toBe(230_000);
+  });
+
+  it("boxes the evaluation at 50 s and the wait for step checks at 10 s", () => {
+    expect(EVAL_MAX_MS).toBe(50_000);
+    expect(SETTLE_MAX_MS).toBe(10_000);
+  });
+
+  it("still lets a fix attempt start with a minute left, under the agent's own wall clock", () => {
+    expect(MIN_HEAL_MS).toBe(60_000);
+    expect(runBudgetMs("route")).toBeLessThanOrEqual(AgentLimits.wallClockMs);
   });
 
   it("in the worker, allows more but stays under the 10-minute stale lock, so a healing run is never taken for dead", () => {

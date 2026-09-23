@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { files, runEvents, runs, workspaceSettings } from "@/db/schema";
 import type { Verdict } from "@/contracts/eval";
 import { evaluateRun } from "@/lib/eval/evaluate";
+import { checkStep } from "@/lib/eval/step-check";
 import { cancelRun } from "@/lib/runs/cancel";
 import { runAutomation } from "./run";
 
@@ -20,7 +21,7 @@ const calls: { prompt: string; resume?: string }[] = [];
 const hooks: { onAttempt?: (attempt: number) => Promise<void> } = {}; // lets a test look at the run while it heals
 // How an attempt ends: its result message, no result at all (the child died mid-stream), or working until aborted.
 type Ending = "result" | "no-result" | "hang";
-const script: { files: string[]; endings: Ending[] } = { files: [BROKEN, FIXED], endings: [] }; // per attempt; "result" when unset
+const script: { files: string[]; endings: Ending[]; plan: boolean } = { files: [BROKEN, FIXED], endings: [], plan: false }; // per attempt; "result" when unset; plan: a step marked done first
 // What the tests turn: the agent's time budget (to let the wall clock run out) and the SDK's totals for an attempt that
 // sent no result (its transcript's cost-state, which a fake session does not have).
 const knobs = vi.hoisted(() => ({ budgetMs: null as number | null, sdkTotals: null as { costUsd: number; durationMs: number | null } | null }));
@@ -35,6 +36,13 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
       yield { type: "system", subtype: "init", session_id: SESSION, model: "fake", tools: [], mcp_servers: [{ name: "plan", status: "connected" }, { name: "outputs", status: "connected" }], cwd: options.cwd };
       await hooks.onAttempt?.(attempt);
       await writeFile(path.join(options.cwd, "output.csv"), script.files[attempt] ?? FIXED);
+      if (script.plan) {
+        const steps = { intent: "a table", expectedOutputs: ["output.csv"], sources: [], steps: ["Write output.csv"] };
+        yield { type: "assistant", message: { content: [
+          { type: "tool_use", id: `set-${attempt}`, name: "mcp__plan__set_plan", input: steps },
+          { type: "tool_use", id: `done-${attempt}`, name: "mcp__plan__update_step", input: { index: 0, status: "done" } }, // starts a step check
+        ] } };
+      }
       yield { type: "assistant", message: { content: [{ type: "text", text: `Attempt ${attempt + 1}: wrote output.csv.` }] } };
       const ending = script.endings[attempt] ?? "result";
       if (ending === "hang") await new Promise((_, reject) => options.abortController.signal.addEventListener("abort", () => reject(new Error("aborted"))));
@@ -45,13 +53,15 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
 }));
 vi.mock("./heal", async (importOriginal) => {
   const real = await importOriginal<typeof import("./heal")>();
-  return { ...real, runBudgetMs: (mode: "inline" | "queue" | "route") => knobs.budgetMs ?? real.runBudgetMs(mode) };
+  // the evaluation and the wait for step checks boxed in a fraction of a second, so a test can outwait them
+  return { ...real, runBudgetMs: (mode: "inline" | "queue" | "route") => knobs.budgetMs ?? real.runBudgetMs(mode), EVAL_MAX_MS: 400, SETTLE_MAX_MS: 400 };
 });
 vi.mock("./stopped-cost", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./stopped-cost")>()),
   readSdkTotals: vi.fn(async () => knobs.sdkTotals),
 }));
 vi.mock("@/lib/eval/evaluate", () => ({ evaluateRun: vi.fn() }));
+vi.mock("@/lib/eval/step-check", () => ({ checkStep: vi.fn() }));
 vi.mock("@/lib/eval/feedback", () => ({
   isHealable: (v: Verdict, agentFinished: boolean) => agentFinished && v.verdict === "fail",
   feedbackForAgent: (v: Verdict) => v.reasons.join("\n"),
@@ -79,6 +89,7 @@ beforeEach(async () => {
   hooks.onAttempt = undefined;
   script.files = [BROKEN, FIXED];
   script.endings = [];
+  script.plan = false;
   knobs.budgetMs = null;
   knobs.sdkTotals = null;
   await db.insert(workspaceSettings).values({ workspaceId: THREE_WS, autoHealAttempts: 3 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 3 } });
@@ -297,5 +308,42 @@ describe.skipIf(!process.env.DATABASE_URL)("the day's budget and healing", () =>
     expect(run.healAttempts).toBe(0);
     const heals = (await healEvents(id)).map((e) => e.payload as { attempt: number; stopped?: string });
     expect(heals).toEqual([expect.objectContaining({ attempt: 1, stopped: "The workspace's $0.01 budget for today is spent, so healing stopped here." })]);
+  }, 30_000);
+});
+
+// Inline or in the runner route a run lives in one function call, which Vercel ends at 300 s whatever it is doing: a
+// run still waiting on its judge or its step checks then stayed "evaluating" for ever. Both waits are boxed.
+describe.skipIf(!process.env.DATABASE_URL)("what follows the agent is boxed in time", () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const kinds = async (runId: string) => (await db.select().from(runEvents).where(eq(runEvents.runId, runId))).map((e) => e.kind);
+
+  it("closes the run as not checked, never as a pass, when the check takes too long", async () => {
+    vi.mocked(evaluateRun).mockReturnValue(new Promise(() => {})); // a judge that never answers
+    const id = await queuedRun(WS, "a judge that never answers");
+
+    await runAutomation(id);
+
+    const [run] = await db.select().from(runs).where(eq(runs.id, id));
+    expect(run.status).toBe("succeeded"); // the agent's work stands
+    expect(run.finishedAt).not.toBeNull();
+    const v = run.verdict as Verdict;
+    expect(v.verdict).toBe("unknown");
+    expect(v.reasons).toEqual(["Not checked: the check took too long; press Re-evaluate to try again"]);
+  }, 30_000);
+
+  it("closes the run without waiting on a step check still out, and never writes that check after", async () => {
+    script.plan = true;
+    const late = { stepIndex: 0, onTrack: 0.9, note: "Done." };
+    vi.mocked(checkStep).mockImplementation(() => new Promise((r) => setTimeout(() => r(late), 2000)));
+    vi.mocked(evaluateRun).mockResolvedValue(PASS);
+    const id = await queuedRun(WS, "a step check that answers late");
+
+    await runAutomation(id);
+    const [run] = await db.select().from(runs).where(eq(runs.id, id));
+    expect(run.status).toBe("succeeded");
+    expect(await kinds(id)).toContain("plan");
+    await sleep(2500); // the check answers now, after the run closed
+
+    expect(await kinds(id)).not.toContain("check");
   }, 30_000);
 });
