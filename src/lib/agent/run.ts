@@ -34,6 +34,7 @@ import { newlyDone } from "./plan-diff";
 import { PLAN_SERVER_KEY } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
 import { resumeOptions, sessionIdOf } from "./session";
+import { ownCost, readSdkTotals, stoppedTotals } from "./stopped-cost";
 import { SYSTEM_PROMPT } from "./system.prompt";
 import { unknownVerdict } from "./unknown-verdict";
 import { removeRunDir } from "./workspace";
@@ -80,6 +81,7 @@ export const runAutomation: RunAutomation = async (runId) => {
     return;
   }
   const workspaceId = run.workspaceId ?? "";
+  const startedAt = Date.now(); // a stopped run with no totals from the SDK records at least this much time
 
   // Everything before the first message can fail too (a read-only disk, a bad connection row): a run must never
   // stay "running" with no reason, so these steps close the run as failed like the loop below does.
@@ -92,6 +94,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   let prompt = run.prompt; // what the agent is sent
   let instructions = run.prompt; // what the step checks and the evaluator judge the result against
   let resume: Awaited<ReturnType<typeof resumeOptions>> = null;
+  let costBase = 0; // a resumed follow-up's SDK total starts from its parent's: only the rest is this run's cost
   try {
     if (run.automationId) {
       // A saved automation's run keeps to its template: the system prompt says so, the evaluator checks it. First,
@@ -109,7 +112,7 @@ export const runAutomation: RunAutomation = async (runId) => {
     limits = await getLimits(workspaceId);
     if (run.parentRunId) {
       // "Ask for a change": the parent's files go back into the directory and its conversation is continued.
-      ({ prompt, instructions, resume } = await prepareFollowUp(run, dir));
+      ({ prompt, instructions, resume, costBase } = await prepareFollowUp(run, dir));
     }
     await db.update(runs).set({ connectionIds: enabled.map((c) => c.id) }).where(eq(runs.id, runId));
   } catch (err) {
@@ -198,6 +201,16 @@ export const runAutomation: RunAutomation = async (runId) => {
     return found;
   };
 
+  // A stopped run keeps what it cost (QA Q129): the result's figures when the agent had finished, else the SDK's own
+  // totals from the transcript it writes as it shuts down, else the time from start to stop.
+  let sessionId: string | null = null;
+  const closeStopped = async () => {
+    const end = recorded.find((e) => e.kind === "finished")?.payload ?? null;
+    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
+    const turns = Math.max(0, ...recorded.map((e) => Number((e.payload as { turn?: unknown }).turn) || 0));
+    await closeAsCancelled(runId, stoppedTotals({ end, sdk, startedAt, now: Date.now(), turns, costBase }));
+  };
+
   // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
   // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
   try {
@@ -240,8 +253,11 @@ export const runAutomation: RunAutomation = async (runId) => {
     });
 
     for await (const message of q) {
-      const sessionId = sessionIdOf(message);
-      if (sessionId) await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up resumes
+      const id = sessionIdOf(message);
+      if (id) {
+        sessionId = id;
+        await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up resumes
+      }
       await write(map(message, 0, now()));
     }
     deadline.clear(); // the stream is done; nothing left to abort
@@ -250,7 +266,7 @@ export const runAutomation: RunAutomation = async (runId) => {
 
     // An abort can end the stream quietly instead of throwing: Stop is then seen here.
     if (cancel.cancelled()) {
-      await closeAsCancelled(runId);
+      await closeStopped();
       return;
     }
     const end = recorded.find((e) => e.kind === "finished")?.payload;
@@ -263,7 +279,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       error: end.is_error ? end.result || end.subtype : null, // the provider's words when the SDK sent any
       numTurns: end.num_turns,
       durationMs: end.duration_ms,
-      costUsd: end.total_cost_usd,
+      costUsd: ownCost(end.total_cost_usd, costBase),
     });
 
     // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
@@ -273,8 +289,9 @@ export const runAutomation: RunAutomation = async (runId) => {
       runStatus: end.is_error ? "failed" : "succeeded",
       report: end.result || null,
       plan: finalPlan,
-      // a binary file (.xlsx) is judged by its name and size: base64 would tell the judge nothing
-      files: written.map((f) => ({ name: f.name, content: f.encoding === "utf8" ? f.content : `(${f.mime}, ${f.bytes} bytes)` })),
+      // every file as stored, base64 included: the evaluator decides what the judge sees (eval/file-view.ts), and its
+      // spreadsheet check needs the bytes to confirm the .xlsx header
+      files: written.map((f) => ({ name: f.name, content: f.content })),
       today: new Date().toISOString().slice(0, 10),
       // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
       toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
@@ -283,7 +300,7 @@ export const runAutomation: RunAutomation = async (runId) => {
     // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
     const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);
     if (verdict === null || cancel.cancelled()) {
-      await closeAsCancelled(runId); // keeps the report, turns and cost written above; no verdict
+      await closeStopped(); // the result's cost, turns and duration; no verdict
       return;
     }
 
@@ -293,7 +310,7 @@ export const runAutomation: RunAutomation = async (runId) => {
     if (cancel.cancelled()) {
       // Stopped by the user: what the agent wrote so far is kept (and scanned like any other file), with no verdict.
       await storeFiles().catch((e) => console.error(`run ${runId}: files of a stopped run not stored`, e));
-      await closeAsCancelled(runId);
+      await closeStopped();
       return;
     }
     // An abort reads as a generic "aborted" error, so say which limit ended the run.

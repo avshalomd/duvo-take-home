@@ -19,10 +19,24 @@ export function needsSignIn(pathname: string): boolean {
   return true;
 }
 
-/** A sign-in or sign-up link that returns to `next` afterwards. */
-export function withNext(page: "/sign-in" | "/sign-up", next: string): string {
-  if (next === "/") return page; // home is where signing in goes anyway
-  return `${page}?next=${encodeURIComponent(next)}`;
+/**
+ * The request header the proxy writes the requested page into (path and query). A cookie the proxy lets through
+ * can still be stale, and then requireSession() redirects from inside a page, where the URL is not otherwise known.
+ */
+export const NEXT_PATH_HEADER = "x-requested-path";
+
+/** The page the proxy recorded, made safe: a client could send the header itself, so it goes through safeNext. */
+export function requestedPath(headers: Headers): string {
+  return safeNext(headers.get(NEXT_PATH_HEADER) ?? undefined);
+}
+
+/** A sign-in or sign-up link that returns to `next` afterwards, and optionally fills in an email. */
+export function withNext(page: "/sign-in" | "/sign-up", next: string, email?: string): string {
+  const params = new URLSearchParams();
+  if (next !== "/") params.set("next", next); // home is where signing in goes anyway
+  if (email) params.set("email", email);
+  const query = params.toString();
+  return query ? `${page}?${query}` : page;
 }
 
 /** The sign-in page, carrying the page that was asked for (path and query) so sign-in can return there. */

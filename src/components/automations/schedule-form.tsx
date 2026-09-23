@@ -1,77 +1,110 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useSyncExternalStore } from "react";
 import { setScheduleAction, type ActionState } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SCHEDULE_PRESETS } from "@/lib/automations/schedule-presets";
+import { describeChoice, fromUtcCron } from "@/lib/automations/schedule-local";
+import { cn } from "@/lib/utils";
+import { FIELD, SMALL } from "./surfaces";
 
-type Props = { automationId: string; inputLabel: string; schedule: string | null; scheduleInput: string | null };
+type Props = { automationId: string; inputLabel: string; inputExample: string; schedule: string | null; scheduleInput: string | null; nextRunAt: string | null };
 
-const presetOf = (cron: string | null) => (cron ? (SCHEDULE_PRESETS.find((p) => p.cron === cron)?.id ?? "custom") : "none");
+const noSubscribe = () => () => {};
 
-// When it runs by itself. Two presets cover the common case; "custom" takes a cron for anything else. The engine's
-// tick starts the runs; this form only stores the schedule, its input and the next time (computed on the server).
-export function ScheduleForm({ automationId, inputLabel, schedule, scheduleInput }: Props) {
+// The schedule in the viewer's own time (Q107). The browser knows its offset from UTC and the server does not, so
+// the form appears once the page is in the browser (the server snapshot is null) - never a server-side guess.
+export function ScheduleForm(props: Props) {
+  const offset = useSyncExternalStore(noSubscribe, () => new Date().getTimezoneOffset(), () => null);
+  if (offset === null) return <p className={SMALL}>Loading the schedule...</p>;
+  return <ScheduleEditor {...props} offset={offset} />;
+}
+
+// Not keyed by anything that changes on a save, so its state - "Schedule saved." - outlives the page's refresh (Q120).
+function ScheduleEditor({ automationId, inputLabel, inputExample, schedule, scheduleInput, nextRunAt, offset }: Props & { offset: number }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(setScheduleAction, {});
-  const [preset, setPreset] = useState<string>(state.values?.preset ?? presetOf(schedule));
+  const saved = schedule ? fromUtcCron(schedule, offset) : null;
+  const [preset, setPreset] = useState<string>(state.values?.preset ?? (schedule ? (saved?.repeat ?? "custom") : "none"));
+  const v = state.values;
 
   return (
-    // keyed by the values a refused save sent back: they become the inputs' defaults, and Base UI warns when a default changes
-    <form key={JSON.stringify(state.values ?? null)} action={action} className="space-y-3">
-      <input type="hidden" name="id" value={automationId} />
-      <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
-        <div className="space-y-1.5">
-          <Label htmlFor="schedule-preset">When</Label>
-          {/* a native select: it submits with the form and needs no state beyond showing the custom field */}
-          <select
-            id="schedule-preset"
-            name="preset"
-            value={preset}
-            onChange={(e) => setPreset(e.target.value)}
-            className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <option value="none">Only when I run it</option>
-            {SCHEDULE_PRESETS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label} (UTC)
-              </option>
-            ))}
-            <option value="custom">Custom (cron)</option>
-          </select>
-        </div>
-        {preset !== "none" && (
+    <div className="space-y-4">
+      {schedule && (
+        <p className="text-[15px] text-graphite">
+          {saved ? describeChoice(saved) : `A custom schedule (${schedule}, in UTC)`}
+          {scheduleInput ? `, with "${scheduleInput}"` : ""}.
+          {nextRunAt && <span className="text-slate"> Next run: {localWhen(nextRunAt)}.</span>}
+        </p>
+      )}
+      {/* keyed by the values a refused save sent back: they become the inputs' defaults (Base UI warns when a default changes) */}
+      <form key={JSON.stringify(v ?? null)} action={action} className="space-y-4">
+        <input type="hidden" name="id" value={automationId} />
+        <input type="hidden" name="offset" value={offset} />
+        <div className="grid gap-4 sm:grid-cols-[13rem_8rem]">
           <div className="space-y-1.5">
-            <Label htmlFor="schedule-input">{inputLabel} for each scheduled run</Label>
-            <Input id="schedule-input" name="input" defaultValue={state.values?.input ?? scheduleInput ?? ""} className="h-8" />
+            <label htmlFor="schedule-preset" className="text-[13px] font-medium tracking-[0.01em] text-slate">
+              How often
+            </label>
+            {/* a native select: it submits with the form and needs no state beyond showing the fields that apply */}
+            <select
+              id="schedule-preset"
+              name="preset"
+              value={preset}
+              onChange={(e) => setPreset(e.target.value)}
+              className={cn(FIELD, "w-full border border-input outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50")}
+            >
+              <option value="none">Only when I run it</option>
+              <option value="weekdays">Every weekday</option>
+              <option value="mondays">Every Monday</option>
+              <option value="daily">Every day</option>
+              <option value="custom">Custom, as a cron expression</option>
+            </select>
+          </div>
+          {preset !== "none" && preset !== "custom" && (
+            <div className="space-y-1.5">
+              <label htmlFor="schedule-time" className="text-[13px] font-medium tracking-[0.01em] text-slate">
+                At
+              </label>
+              <Input id="schedule-time" name="time" type="time" defaultValue={v?.time ?? saved?.time ?? "08:00"} className={FIELD} />
+            </div>
+          )}
+        </div>
+        {preset === "custom" && (
+          <div className="space-y-1.5">
+            <label htmlFor="schedule-cron" className="text-[13px] font-medium tracking-[0.01em] text-slate">
+              Cron expression, in UTC
+            </label>
+            <Input id="schedule-cron" name="cron" placeholder="0 8 * * 1-5" defaultValue={v?.cron ?? (saved ? "" : (schedule ?? ""))} className={FIELD} />
+            <p className={SMALL}>Minute, hour, day, month, weekday. At most once an hour.</p>
           </div>
         )}
-      </div>
-      {preset === "custom" && (
-        <div className="space-y-1.5">
-          <Label htmlFor="schedule-cron">Cron expression (UTC)</Label>
-          <Input
-            id="schedule-cron"
-            name="cron"
-            placeholder="0 8 * * 1-5"
-            defaultValue={state.values?.cron ?? (presetOf(schedule) === "custom" ? (schedule ?? "") : "")}
-            className="h-8 font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground">minute hour day month weekday. At most once an hour.</p>
+        {preset !== "none" && (
+          <div className="space-y-1.5">
+            <label htmlFor="schedule-input" className="text-[13px] font-medium tracking-[0.01em] text-slate">
+              {inputLabel} for scheduled runs
+            </label>
+            <Input id="schedule-input" name="input" defaultValue={v?.input ?? scheduleInput ?? inputExample} className={FIELD} />
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="outline" disabled={pending} className="h-10 px-5 text-[15px]">
+            {pending && <LoaderCircle className="size-4 animate-spin" />}
+            Save schedule
+          </Button>
+          <p aria-live="polite" className={cn("text-[15px]", state.error ? "text-crimson" : "text-fern")}>
+            {state.error ?? state.message}
+          </p>
         </div>
-      )}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="sm" variant="outline" disabled={pending}>
-          {pending && <LoaderCircle className="size-3.5 animate-spin" />}
-          Save schedule
-        </Button>
-        <p aria-live="polite" className="text-sm">
-          {state.error && <span className="text-red-600 dark:text-red-400">{state.error}</span>}
-          {state.message && <span className="text-emerald-700 dark:text-emerald-400">{state.message}</span>}
-        </p>
-      </div>
-    </form>
+      </form>
+    </div>
   );
+}
+
+// The next run in the viewer's own time and words: "Monday 28 September at 08:00".
+function localWhen(iso: string): string {
+  const d = new Date(iso);
+  const day = d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${day} at ${time}`;
 }

@@ -1,10 +1,9 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import { deleteAutomationAction } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/button";
 
-// Delete asks once, because it cannot be undone. The automation's runs stay: they are the record of what happened.
+// Delete is quiet and asks once, because it cannot be undone. The automation's runs stay: they are the record of what happened.
 export function DeleteButton({ automationId, name }: { automationId: string; name: string }) {
   return (
     <form
@@ -14,8 +13,7 @@ export function DeleteButton({ automationId, name }: { automationId: string; nam
       }}
     >
       <input type="hidden" name="id" value={automationId} />
-      <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground">
-        <Trash2 className="size-3.5" />
+      <Button type="submit" variant="ghost" className="h-10 px-4 text-[15px] text-slate hover:text-crimson">
         Delete
       </Button>
     </form>

@@ -2,7 +2,7 @@ import { ZodError } from "zod";
 import { LlmError } from "@/lib/llm/errors";
 import { RunLimitError } from "@/lib/runs/limits";
 
-/** A refusal written for the person using the app ("Turn on DeepWiki in Settings to run \audit"): shown as it is. */
+/** A refusal written for the person using the app ("Turn on DeepWiki in Settings to run /audit"): shown as it is. */
 export class AutomationError extends Error {
   constructor(message: string) {
     super(message);

@@ -9,7 +9,7 @@ You get the run's instructions, its final plan, its report and the first lines o
 - Find the one specific subject the run was about (a company, a repository, a topic, a place, a period) and make it the input. The automation's instructions must contain the placeholder {input} exactly where that subject goes. If the run had no single subject, pick the part a person would most likely change next time.
 - inputExample: the value the run used for that subject, exactly as it appeared.
 - inputLabel: what the input is, in two to four words ("Company name", "GitHub repository"). inputHint: one short line on what to type, with an example ("The company's registered name, e.g. Apple Inc.").
-- name: a short title of two to four words ("Company audit"). command: what a person types after a backslash to run it: one or two short lower-case words joined by a dash, 2 to 24 characters ("audit", "ai-news").
+- name: a short title of two to four words ("Company audit"). command: what a person types after a slash to run it: one or two short lower-case words joined by a dash, 2 to 24 characters ("audit", "ai-news").
 - description: one plain sentence, for an office worker, on what it does and what it produces.
 - template.instructions: the run's instructions rewritten with {input}. Keep every requirement the run had - file names, columns and their order, counts, time windows, sources - and drop what was only true of that one subject.
 - template.intent: the same sentence as description.

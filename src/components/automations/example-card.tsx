@@ -1,12 +1,14 @@
 "use client";
 
-import { Download, FileText } from "lucide-react";
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { outcome } from "@/components/run/outcome";
-import { StatusDot } from "@/components/run/status-dot";
+import { Thread, threadTone, type ThreadStep } from "@/components/thread/thread";
+import { cn } from "@/lib/utils";
+import { DOT } from "./dot";
+import { LINK, SMALL, TILE } from "./surfaces";
 import { useLiveRun, type LiveRun } from "./use-live-run";
 import { VerdictForm } from "./verdict-form";
-import { exampleWhy } from "./why";
 
 export type ExampleView = LiveRun & {
   runId: string;
@@ -17,31 +19,29 @@ export type ExampleView = LiveRun & {
 
 const FINISHED = ["succeeded", "failed", "cancelled"];
 
-// One example of the current version: its live status, the automatic outcome with a short why, its files, the way to
-// the full run, and the person's own judgment once it has finished.
+// One example of the current version: its input, a mini thread of the agent's plan, the outcome in one line, what it
+// made, the way to the full run, and the person's own judgment once it has finished.
 export function ExampleCard({ automationId, example }: { automationId: string; example: ExampleView }) {
   const run = useLiveRun(example.runId, example);
   const o = outcome(run.status, run.outcome);
-  const why = exampleWhy(run.verdict);
+  const tone = threadTone(run.status, run.outcome);
   const finished = FINISHED.includes(run.status);
+  const steps: ThreadStep[] = (run.plan?.steps ?? []).map((s) => ({ key: s.index, title: s.title, status: s.status }));
 
   return (
-    <li data-testid="example" className="space-y-3 rounded-lg border bg-background p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusDot tone={o.tone} />
-        <span className="font-medium">{example.input}</span>
-        <span data-testid="example-outcome" className="ml-auto text-sm">
-          {o.label}
-        </span>
-      </div>
+    <li data-testid="example" className={cn(TILE, "space-y-4 p-5")}>
+      <p className="text-[17px] leading-6 font-semibold text-graphite">{example.input}</p>
 
-      {why.length > 0 && (
-        <ul className="space-y-0.5 text-sm text-muted-foreground">
-          {why.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+      {steps.length > 0 ? (
+        <Thread steps={steps} tone={tone} size="mini" label={`Plan for ${example.input}`} />
+      ) : (
+        <p className={SMALL}>{finished ? "No plan was recorded." : "Reading the brief..."}</p>
       )}
+
+      <p data-testid="example-outcome" className="flex items-center gap-2 text-[15px] text-graphite">
+        <span aria-hidden className={cn("size-2 rounded-full", DOT[o.tone])} />
+        {o.label}
+      </p>
 
       {run.files.length > 0 && (
         <ul className="flex flex-wrap gap-2">
@@ -51,18 +51,17 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
                 href={`/api/runs/${example.runId}/files/${encodeURIComponent(f.name)}`}
                 download
                 aria-label={`Download ${f.name}`}
-                className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-muted px-3 text-[13px] font-medium text-graphite outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                <FileText className="size-3.5 text-muted-foreground" />
                 {f.name}
-                <Download className="size-3 text-muted-foreground" />
+                <Download aria-hidden className="size-3.5 text-slate" />
               </a>
             </li>
           ))}
         </ul>
       )}
 
-      <Link href={`/?run=${example.runId}`} className="inline-block text-sm text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">
+      <Link href={`/?run=${example.runId}`} className={cn(LINK, "inline-block text-[15px]")}>
         Open the full run
       </Link>
 
@@ -76,7 +75,7 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
           note={example.humanNote}
         />
       ) : (
-        <p className="text-xs text-muted-foreground">When it has finished, check the result and say whether it looks right.</p>
+        <p className={SMALL}>When it has finished, check what it made and say whether it looks right.</p>
       )}
     </li>
   );

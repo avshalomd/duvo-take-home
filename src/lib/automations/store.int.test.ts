@@ -97,7 +97,7 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     const other = await createAutomationDraft(ctx, draftWith("int-other"), null);
     const err = await updateAutomation(WS, other.id, editOf({ ...other, command: taken.command })).catch((e) => e);
     expect(err).toBeInstanceOf(Error);
-    expect(err.message).toMatch(/\\int-taken is already used/);
+    expect(err.message).toMatch(/\/int-taken is already used/);
   });
 
   it("bumps the version when an edit changes what the agent is told, and keeps it for a hint", async () => {
@@ -200,7 +200,7 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
   it("runCommand refuses an unknown command, naming it", async () => {
     const err = await runCommand(ctx, { command: "int-nothing", input: "Apple" }).catch((e) => e);
     expect(err).toBeInstanceOf(Error);
-    expect(err.message).toMatch(/\\int-nothing/);
+    expect(err.message).toMatch(/\/int-nothing/);
   });
 
   it("runCommand refuses a command that is still a draft", async () => {
@@ -214,6 +214,6 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     await approvedTrial(a.id, 1);
     await approveAutomation(WS, a.id);
     const err = await runCommand(ctx, { command: "int-needs", input: "Apple" }).catch((e) => e);
-    expect(err.message).toBe("Turn on [int] Missing server in Settings to run \\int-needs");
+    expect(err.message).toBe("Turn on [int] Missing server in Settings to run /int-needs");
   });
 });

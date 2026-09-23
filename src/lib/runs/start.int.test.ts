@@ -7,9 +7,9 @@ import { jobs, runs, workspaceSettings } from "@/db/schema";
 import { RunLimitError } from "./limits";
 import { startRun } from "./start";
 
-const RACE_WS = "int-engine-start-race";
-const STRANDED_WS = "int-engine-start-stranded";
-const OTHER_WS = "int-engine-start-other";
+const RACE_WS = `int-engine-start-race-${process.pid}`; // per process: other worktrees run these tests against the same database
+const STRANDED_WS = `int-engine-start-stranded-${process.pid}`; // per process: other worktrees run these tests against the same database
+const OTHER_WS = `int-engine-start-other-${process.pid}`; // per process: other worktrees run these tests against the same database
 const ALL = [RACE_WS, STRANDED_WS, OTHER_WS];
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);
 let ip = 0;

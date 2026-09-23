@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsSignIn, safeNext, signInPath, withNext } from "./paths";
+import { NEXT_PATH_HEADER, needsSignIn, requestedPath, safeNext, signInPath, withNext } from "./paths";
 
 describe("needsSignIn", () => {
   it("gates every page of the app", () => {
@@ -51,6 +51,26 @@ describe("withNext", () => {
 
   it("leaves the link bare when the page to return to is home", () => {
     expect(withNext("/sign-up", "/")).toBe("/sign-up");
+  });
+
+  it("can carry an email to fill in, beside the page to return to", () => {
+    expect(withNext("/sign-in", "/", "demo@example.com")).toBe("/sign-in?email=demo%40example.com");
+    expect(withNext("/sign-up", "/invite/abc", "a@b.co")).toBe("/sign-up?next=%2Finvite%2Fabc&email=a%40b.co");
+  });
+});
+
+// Q130: a stale or forged cookie gets past the proxy, so requireSession has to know the page that was asked for.
+describe("requestedPath", () => {
+  it("reads the page the proxy recorded on the request", () => {
+    expect(requestedPath(new Headers({ [NEXT_PATH_HEADER]: "/automations?tab=mine" }))).toBe("/automations?tab=mine");
+  });
+
+  it("answers home when nothing was recorded", () => {
+    expect(requestedPath(new Headers())).toBe("/");
+  });
+
+  it("passes the recorded value through safeNext, so a forged header cannot point off the site", () => {
+    expect(requestedPath(new Headers({ [NEXT_PATH_HEADER]: "//evil.example" }))).toBe("/");
   });
 });
 

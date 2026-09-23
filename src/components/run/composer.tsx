@@ -10,9 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { applyCommand, commandQuery, filterAutomations } from "./command-query";
 import { COMMAND_LIST_ID, CommandList, optionId, type CommandOption } from "./command-list";
 
-const PLACEHOLDER = "Describe a task in plain words, or type \\ to run a saved automation";
+const PLACEHOLDER = "Describe a task in plain words, or type / to run a saved automation";
 
-// The one box on Home: plain instructions start a new run; "\audit Acme Ltd" runs a saved automation on an input.
+// The one box on Home: plain instructions start a new run; "/audit Acme Ltd" runs a saved automation on an input.
 // The server decides which is which (startRunAction); the list under the box only helps to type a command.
 export function Composer({ automations, connections }: { automations: CommandOption[]; connections: string[] }) {
   const [state, action, pending] = useActionState(startRunAction, {});

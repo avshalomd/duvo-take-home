@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { runs } from "@/db/schema";
 import { outcomeOf } from "./outcome";
@@ -22,7 +22,6 @@ const fields = {
   input: runs.input,
   purpose: runs.purpose,
   createdAt: runs.createdAt,
-  automationId: runs.automationId,
 };
 type Picked = { id: string; status: string; verdict: unknown; input: string | null; purpose: string; createdAt: Date };
 const toRun = (r: Picked): AutomationRun => ({
@@ -33,16 +32,6 @@ const toRun = (r: Picked): AutomationRun => ({
   purpose: r.purpose,
   createdAt: r.createdAt.toISOString(),
 });
-
-/** Each automation's most recent run (an example or a real call), for the "last run" line on its card. */
-export async function lastRunPerAutomation(workspaceId: string): Promise<Map<string, AutomationRun>> {
-  const rows = await db
-    .selectDistinctOn([runs.automationId], fields) // Postgres DISTINCT ON: the first row per automation in the order below
-    .from(runs)
-    .where(and(eq(runs.workspaceId, workspaceId), isNotNull(runs.automationId)))
-    .orderBy(runs.automationId, desc(runs.createdAt));
-  return new Map(rows.map((r) => [r.automationId as string, toRun(r)]));
-}
 
 /** An automation's real runs - called by its command, Run now or its schedule - newest first. Examples are not history. */
 export async function automationHistory(workspaceId: string, automationId: string): Promise<AutomationRun[]> {

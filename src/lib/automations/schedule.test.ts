@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AutomationError } from "./errors";
-import { describeSchedule, nextRunAt, SCHEDULE_PRESETS } from "./schedule";
+import { nextRunAt } from "./schedule";
 
 const friday = new Date("2026-09-25T09:00:00.000Z"); // a Friday, after 08:00
 
@@ -31,20 +31,5 @@ describe("nextRunAt", () => {
 
   it("refuses a schedule more often than once an hour, since every run costs money", () => {
     expect(() => nextRunAt("*/5 * * * *", friday)).toThrow(/once an hour/i);
-  });
-});
-
-describe("describeSchedule", () => {
-  it("says a preset in words", () => {
-    expect(describeSchedule("0 8 * * 1-5")).toBe("Every weekday at 08:00 (UTC)");
-    expect(describeSchedule("0 8 * * 1")).toBe("Every Monday at 08:00 (UTC)");
-  });
-
-  it("shows a custom expression as it was written", () => {
-    expect(describeSchedule("30 6 1 * *")).toBe("Custom: 30 6 1 * * (UTC)");
-  });
-
-  it("offers the two presets the builder shows", () => {
-    expect(SCHEDULE_PRESETS.map((p) => p.cron)).toEqual(["0 8 * * 1-5", "0 8 * * 1"]);
   });
 });

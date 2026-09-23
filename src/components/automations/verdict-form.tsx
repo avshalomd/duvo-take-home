@@ -5,6 +5,8 @@ import { useActionState, useState } from "react";
 import { setVerdictAction, type ActionState } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { FIELD, SMALL } from "./surfaces";
 
 type Props = {
   automationId: string;
@@ -14,51 +16,70 @@ type Props = {
   note: string | null;
 };
 
-// The person's own judgment of an example. The automatic check is advice; this is what approval counts. The parent
-// keys this form by the stored verdict, so a saved answer re-mounts it in its "you said" state.
+// The person's own judgment of an example: the automatic check is advice, this is what approval counts. "Looks right"
+// is one press; "Not right" asks what is off first. The parent keys this form by the stored verdict, so a saved
+// answer re-mounts it in its "you said" state.
 export function VerdictForm({ automationId, runId, succeeded, verdict, note }: Props) {
   const [state, action, pending] = useActionState<ActionState, FormData>(setVerdictAction, {});
   const [changing, setChanging] = useState(false);
+  const [explaining, setExplaining] = useState(false);
 
   if (verdict && !changing)
     return (
-      <p className="flex flex-wrap items-center gap-2 text-sm">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px]">
         {verdict === "approved" ? (
-          <span className="inline-flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400">
-            <Check className="size-4" /> You said it looks right
+          <span className="inline-flex items-center gap-1.5 font-medium text-fern">
+            <Check aria-hidden className="size-4" /> You said it looks right
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 font-medium text-red-700 dark:text-red-400">
-            <X className="size-4" /> You said it is not right
+          <span className="inline-flex items-center gap-1.5 font-medium text-crimson">
+            <X aria-hidden className="size-4" /> You said it is not right
           </span>
         )}
-        {note && <span className="text-muted-foreground">- {note}</span>}
-        <Button type="button" variant="link" size="sm" className="h-auto px-0" onClick={() => setChanging(true)}>
+        {note && <span className="text-slate">({note})</span>}
+        <Button type="button" variant="link" size="sm" className="h-auto px-0 text-[15px] text-graphite underline" onClick={() => setChanging(true)}>
           Change
         </Button>
       </p>
     );
 
   return (
-    <form action={action} className="space-y-2">
+    <form action={action} className="space-y-3">
       <input type="hidden" name="automationId" value={automationId} />
       <input type="hidden" name="runId" value={runId} />
-      <label htmlFor={`note-${runId}`} className="text-sm font-medium">
-        Is this what you wanted?
-      </label>
-      <Input id={`note-${runId}`} name="note" placeholder="A note, if something is off (optional)" defaultValue={note ?? ""} className="h-8 text-sm" />
+      {explaining && (
+        <div className="space-y-1.5">
+          <label htmlFor={`note-${runId}`} className="text-[13px] font-medium tracking-[0.01em] text-slate">
+            What is off? (optional)
+          </label>
+          <Input id={`note-${runId}`} name="note" defaultValue={note ?? ""} className={FIELD} autoFocus />
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
-        {/* the clicked button's name and value arrive in the FormData, so one form carries both answers */}
-        <Button type="submit" name="verdict" value="approved" size="sm" disabled={pending || !succeeded} variant="outline">
-          <Check className="size-3.5" /> Looks right
-        </Button>
-        <Button type="submit" name="verdict" value="rejected" size="sm" disabled={pending} variant="outline">
-          <X className="size-3.5" /> Not right
-        </Button>
+        {explaining ? (
+          <>
+            {/* the clicked button's name and value arrive in the FormData: this form's one answer is "rejected" */}
+            <Button type="submit" name="verdict" value="rejected" variant="outline" disabled={pending} className="h-9 px-4 text-crimson">
+              <X aria-hidden /> Mark not right
+            </Button>
+            <Button type="button" variant="ghost" className="h-9 px-3" onClick={() => setExplaining(false)}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="submit" name="verdict" value="approved" variant="outline" disabled={pending || !succeeded} className="h-9 px-4">
+              <Check aria-hidden className="text-fern" /> Looks right
+            </Button>
+            <Button type="button" variant="outline" disabled={pending} className="h-9 px-4" onClick={() => setExplaining(true)}>
+              <X aria-hidden className="text-crimson" /> Not right
+            </Button>
+          </>
+        )}
       </div>
-      {!succeeded && <p className="text-xs text-muted-foreground">This example did not finish well, so it can only be marked not right.</p>}
+      {!succeeded && <p className={SMALL}>This example did not finish well, so it can only be marked not right.</p>}
       {state.error && (
-        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className={cn(SMALL, "text-crimson")}>
           {state.error}
         </p>
       )}

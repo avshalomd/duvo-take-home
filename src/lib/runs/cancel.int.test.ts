@@ -6,8 +6,8 @@ import { jobs, runs } from "@/db/schema";
 import { closeAsCancelled, updateUnlessCancelled } from "@/lib/agent/close";
 import { cancelRun } from "./cancel";
 
-const WS = "int-engine-cancel";
-const OTHER_WS = "int-engine-cancel-other";
+const WS = `int-engine-cancel-${process.pid}`; // per process: other worktrees run these tests against the same database
+const OTHER_WS = `int-engine-cancel-other-${process.pid}`; // per process: other worktrees run these tests against the same database
 
 async function makeRun(what: string, status: string, ws = WS) {
   const [row] = await db.insert(runs).values({ prompt: `[int] ${what}`, status, model: "test", workspaceId: ws }).returning({ id: runs.id });

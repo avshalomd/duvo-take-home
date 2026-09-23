@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   DEMO_EMAIL,
   DEMO_PASSWORD,
@@ -19,6 +19,9 @@ test.use({ storageState: SIGNED_OUT });
 const created: string[] = [];
 test.afterAll(async () => deleteUsers(created));
 
+// The example is drawn at two sizes and CSS shows the one for the screen's width: test the one on screen.
+const visibleThread = (page: Page) => page.getByTestId("thread").filter({ visible: true });
+
 test("signing up creates a personal workspace and lands on Home", async ({ page }) => {
   const email = e2eEmail("signup");
   created.push(email);
@@ -27,13 +30,58 @@ test("signing up creates a personal workspace and lands on Home", async ({ page 
   await expect(page.getByTestId("app-header")).toContainText("Erin's workspace");
 });
 
-test("signing up with an email that already has an account says so", async ({ page }) => {
+// Q110: the way to sign in is a link, and it brings the email along.
+test("signing up with an email that already has an account links to sign-in with the email filled in", async ({ page }) => {
   await page.goto("/sign-up");
   await page.getByLabel("Your name").fill("Someone Else");
   await page.getByLabel("Email").fill(DEMO_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill("another-password");
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(formError(page)).toHaveText("There is already an account with that email. Sign in instead.");
+  await expect(formError(page)).toContainText("There is already an account with that email.");
+  await formError(page).getByRole("link", { name: "Sign in instead" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-in" && url.searchParams.get("email") === DEMO_EMAIL);
+  await expect(page.getByLabel("Email")).toHaveValue(DEMO_EMAIL);
+});
+
+test("sign-in sets the example thread beside the form, and it draws itself through to done", async ({ page }) => {
+  await page.goto("/sign-in");
+  const thread = visibleThread(page);
+  const email = page.getByLabel("Email");
+  await expect(thread).toBeVisible();
+  const [t, f] = [await thread.boundingBox(), await email.boundingBox()];
+  expect(t!.x + t!.width).toBeLessThanOrEqual(f!.x); // left of the form, not above it
+  await expect(thread.getByText("Done", { exact: true })).toHaveCount(3, { timeout: 10_000 });
+});
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the example thread shrinks to a strip above the form, and nothing sticks out sideways", async ({ page }) => {
+    await page.goto("/sign-in");
+    const [t, f] = [await visibleThread(page).boundingBox(), await page.getByLabel("Email").boundingBox()];
+    expect(t!.y + t!.height).toBeLessThanOrEqual(f!.y);
+    expect(t!.height).toBeLessThanOrEqual(120); // a strip, not the desktop illustration
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  });
+
+  // Q113: the phone's top bar has room for one name; it is the workspace's, because that is what the page shows.
+  test("the user menu names the current workspace", async ({ page }) => {
+    await page.goto("/sign-in");
+    await signInThroughUi(page, DEMO_EMAIL, DEMO_PASSWORD);
+    await page.waitForURL((url) => url.pathname === "/");
+    const trigger = page.getByTestId("app-header").getByRole("button", { name: /Demo/ });
+    const box = await trigger.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390); // the trigger fits: no clipped name or chevron
+    await trigger.click();
+    // the top of the menu says which workspace this is, readable (not truncated away), and who is signed in
+    await expect(page.getByTestId("menu-workspace")).toHaveText("Demo workspace");
+    await expect(page.getByTestId("menu-workspace")).toBeInViewport();
+    await expect(page.getByRole("menu")).toContainText(DEMO_EMAIL);
+  });
 });
 
 test("a wrong password shows the error and stays on the sign-in page", async ({ page }) => {
@@ -54,6 +102,15 @@ test("signing in returns to the page that was asked for", async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in\?next=%2Fautomations/);
   await signInThroughUi(page, DEMO_EMAIL, DEMO_PASSWORD);
   await expect(page).toHaveURL((url) => url.pathname === "/automations");
+});
+
+// Q130: the cookie is there (so the proxy lets the request through) but no session matches it.
+test("a stale session cookie on a deep link still returns there after signing in", async ({ page, context, baseURL }) => {
+  await context.addCookies([{ name: "better-auth.session_token", value: "e2e-stale.token", url: baseURL! }]);
+  await page.goto("/automations?tab=mine");
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-in" && url.searchParams.get("next") === "/automations?tab=mine");
+  await signInThroughUi(page, DEMO_EMAIL, DEMO_PASSWORD);
+  await expect(page).toHaveURL((url) => url.pathname === "/automations" && url.searchParams.get("tab") === "mine");
 });
 
 test("a signed-out API call answers 401, not a redirect to a page", async ({ request }) => {
