@@ -110,27 +110,20 @@ describe("runTitle - a short name for a run", () => {
 });
 
 describe("runTag - the quiet label that says why a run exists", () => {
-  const commands = { "auto-1": "audit" };
-
-  // "News digest CSV: el... /news-digest": the tag repeated the name and squeezed out the input, the useful part
-  it("leaves a run of a saved automation untagged: its title already names the automation", () => {
-    expect(runTag({ purpose: "automation", automationId: "auto-1" }, commands)).toBeNull();
+  // "News digest CSV: el... /news-digest": the tag repeated the name and squeezed out the input, the useful part.
+  // Q204: with its automation gone, the run reads as a plain run, titled by its instructions - untagged too
+  it("leaves a run of a saved automation untagged, whether or not the automation still exists", () => {
+    expect(runTag({ purpose: "automation" })).toBeNull();
   });
 
   it("says a scheduled run was started by the schedule", () => {
-    expect(runTag({ purpose: "schedule", automationId: "auto-1" }, commands)).toBe("scheduled");
-    expect(runTag({ purpose: "schedule", automationId: "deleted" }, commands)).toBe("scheduled");
-  });
-
-  // Q204: with its automation gone, the run reads as a plain run, titled by its instructions
-  it("leaves a run whose automation is gone untagged, like a plain run", () => {
-    expect(runTag({ purpose: "automation", automationId: "deleted" }, commands)).toBeNull();
+    expect(runTag({ purpose: "schedule" })).toBe("scheduled");
   });
 
   it("marks follow-ups and examples, and leaves a plain run untagged", () => {
-    expect(runTag({ purpose: "followup", automationId: null }, commands)).toBe("follow-up");
-    expect(runTag({ purpose: "trial", automationId: "auto-1" }, commands)).toBe("example");
-    expect(runTag({ purpose: "adhoc", automationId: null }, commands)).toBeNull();
-    expect(runTag({ automationId: null }, commands)).toBeNull(); // a v1 row has no purpose at all
+    expect(runTag({ purpose: "followup" })).toBe("follow-up");
+    expect(runTag({ purpose: "trial" })).toBe("example");
+    expect(runTag({ purpose: "adhoc" })).toBeNull();
+    expect(runTag({})).toBeNull(); // a v1 row has no purpose at all
   });
 });

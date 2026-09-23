@@ -52,7 +52,7 @@ async function Rail({ workspaceId, selectedId }: { workspaceId: string; selected
     id: r.id,
     prompt: r.prompt,
     title: runTitleOf(r, names),
-    tag: runTagOf(r, commands),
+    tag: runTagOf(r),
     command: r.automationId ? (commands[r.automationId] ?? null) : null,
     status: r.status,
     outcome: r.outcome ?? null,

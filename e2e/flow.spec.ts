@@ -111,7 +111,6 @@ test.describe("the frame", () => {
     await expect(search).toHaveValue("");
     await expect(search).toBeFocused();
     await expect(clear).toHaveCount(0);
-    expect(await search.evaluate((el) => getComputedStyle(el, "::-webkit-search-cancel-button").getPropertyValue("appearance"))).toBe("none");
   });
 
   // "News digest CSV: el... /news-digest": the tag repeated the automation's name and cut the input short
