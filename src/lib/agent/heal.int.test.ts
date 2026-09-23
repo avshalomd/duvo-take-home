@@ -66,6 +66,7 @@ const FAIL_3 = verdict("fail", ["The reviewer asks: rank by likes, not by size"]
 const WS = `int-engine-heal-${process.pid}`; // per process: other worktrees run these tests against the same database
 const OFF_WS = `int-engine-heal-off-${process.pid}`;
 const THREE_WS = `int-engine-heal-three-${process.pid}`; // three attempts allowed: room for an attempt to undo another
+const BROKE_WS = `int-engine-heal-broke-${process.pid}`; // a daily budget of one cent: the first attempt spends it
 
 async function queuedRun(workspaceId: string, what: string) {
   const [row] = await db.insert(runs).values({ prompt: `[int] ${what}`, status: "queued", model: "test", workspaceId }).returning({ id: runs.id });
@@ -84,13 +85,14 @@ beforeEach(async () => {
   vi.mocked(evaluateRun).mockReset();
   await db.insert(workspaceSettings).values({ workspaceId: WS, autoHealAttempts: 2 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 2 } });
   await db.insert(workspaceSettings).values({ workspaceId: OFF_WS, autoHealAttempts: 0 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 0 } });
+  await db.insert(workspaceSettings).values({ workspaceId: BROKE_WS, autoHealAttempts: 2, dailyBudgetUsd: 0.01 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 2, dailyBudgetUsd: 0.01 } });
 });
 afterAll(async () => {
-  const mine = db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS, OFF_WS, THREE_WS]));
+  const mine = db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS, OFF_WS, THREE_WS, BROKE_WS]));
   await db.delete(runEvents).where(inArray(runEvents.runId, mine));
   await db.delete(files).where(inArray(files.runId, mine));
-  await db.delete(runs).where(inArray(runs.workspaceId, [WS, OFF_WS, THREE_WS]));
-  await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OFF_WS, THREE_WS]));
+  await db.delete(runs).where(inArray(runs.workspaceId, [WS, OFF_WS, THREE_WS, BROKE_WS]));
+  await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OFF_WS, THREE_WS, BROKE_WS]));
 });
 
 describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
@@ -277,5 +279,23 @@ describe.skipIf(!process.env.DATABASE_URL)("Stop between attempts", () => {
     expect(run.numTurns).toBe(2);
     expect(run.healAttempts).toBe(0);
     expect(await healEvents(id)).toHaveLength(0);
+  }, 30_000);
+});
+
+// Each fix attempt may cost up to AgentLimits.maxBudgetUsd, and nothing checked the day's money before one.
+describe.skipIf(!process.env.DATABASE_URL)("the day's budget and healing", () => {
+  it("stops healing when the workspace's budget for today is spent, says so, and writes the verdict", async () => {
+    vi.mocked(evaluateRun).mockResolvedValue(FAIL);
+    const id = await queuedRun(BROKE_WS, "a fix the day cannot pay for");
+
+    await runAutomation(id);
+
+    const [run] = await db.select().from(runs).where(eq(runs.id, id));
+    expect(calls).toHaveLength(1); // the fix attempt is never paid for
+    expect(run.status).toBe("succeeded");
+    expect((run.verdict as Verdict).verdict).toBe("fail");
+    expect(run.healAttempts).toBe(0);
+    const heals = (await healEvents(id)).map((e) => e.payload as { attempt: number; stopped?: string });
+    expect(heals).toEqual([expect.objectContaining({ attempt: 1, stopped: "The workspace's $0.01 budget for today is spent, so healing stopped here." })]);
   }, 30_000);
 });
