@@ -77,8 +77,10 @@ export const listConnections: ListConnections = async (workspaceId) => {
   return rows.map(toConnection);
 };
 
+/** Another workspace's id, or one deleted meanwhile, changes nothing and says so rather than reporting success. */
 export const setConnectionEnabled: SetConnectionEnabled = async (workspaceId, id, enabled) => {
-  await db.update(connections).set({ enabled, updatedAt: new Date() }).where(mine(workspaceId, id));
+  const changed = await db.update(connections).set({ enabled, updatedAt: new Date() }).where(mine(workspaceId, id)).returning({ id: connections.id });
+  if (changed.length === 0) throw new ConnectionNotFoundError();
 };
 
 /** The input is already validated with NewConnection in the Server Action; the store writes it. */
@@ -143,9 +145,10 @@ function tokenColumns(e: { authType: AuthType; clearToken?: boolean; typed: stri
   return e.moved ? noToken : {}; // an empty field keeps the saved token, but only on the server it was given for
 }
 
-/** Deleting an id that is not this workspace's deletes nothing, and says nothing either. */
+/** Deleting an id that is not this workspace's (or is already gone) deletes nothing, and says it was not found. */
 export const deleteConnection: DeleteConnection = async (workspaceId, id) => {
-  await db.delete(connections).where(mine(workspaceId, id));
+  const deleted = await db.delete(connections).where(mine(workspaceId, id)).returning({ id: connections.id });
+  if (deleted.length === 0) throw new ConnectionNotFoundError();
 };
 
 /** Server-side only: the token goes into the agent's mcpServers headers and nowhere else. */
