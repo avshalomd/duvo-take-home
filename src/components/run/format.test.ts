@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectionName, formatCost, formatDuration, humanizeTools, toolKind, toolLabel, toolLine } from "./format";
+import { attemptCost, connectionName, formatCost, formatDuration, humanizeTools, toolKind, toolLabel, toolLine } from "./format";
 
 const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
 
@@ -58,6 +58,17 @@ describe("toolKind - the timeline is scanned by what the agent was doing", () =>
 
   it("falls back to tool for anything else", () => {
     expect(toolKind("Bash")).toBe("tool");
+  });
+});
+
+// Q149: a resumed session's finished event carries the SDK's running total; the engine adds the attempt's own cost
+describe("attemptCost - what one attempt cost, for its line in Details", () => {
+  it("is the attempt's own cost when the engine recorded it", () => {
+    expect(attemptCost({ total_cost_usd: 0.16, attempt_cost_usd: 0.06 })).toBe(0.06);
+  });
+
+  it("is the SDK's total for a run recorded before attempts were costed: it had only one", () => {
+    expect(attemptCost({ total_cost_usd: 0.12 })).toBe(0.12);
   });
 });
 

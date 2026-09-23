@@ -1,10 +1,10 @@
 import type { Block, Inline } from "./markdown";
-import { parseMarkdown } from "./markdown";
+import { reportBlocks } from "./markdown";
 
 // The agent writes markdown; the person reading it should see prose, at a reading width of 66 characters. The
 // parsing is in markdown.ts and tested; this only maps blocks to elements, which is why there is no library here.
 export function Report({ text }: { text: string }) {
-  const blocks = parseMarkdown(text);
+  const blocks = reportBlocks(text); // without the agent's own "Report" heading: the page has one (Q144)
   if (blocks.length === 0) return null;
 
   return (
@@ -88,9 +88,10 @@ function Spans({ spans }: { spans: Inline[] }) {
             </strong>
           );
         if (span.code)
-          // not monospace: outside Details the app speaks in one typeface (docs/DESIGN-V2.md)
+          // a tinted token in the body font, not monospace: outside Details the app speaks in one typeface (Q144).
+          // font-[inherit]: the browser's and Tailwind's base styles give <code> a monospace family of its own
           return (
-            <code key={i} className="rounded-md bg-mist px-1 py-0.5 text-[0.95em]">
+            <code key={i} className="rounded-md bg-mist px-1.5 py-0.5 font-[inherit] text-[0.95em] font-medium">
               {span.text}
             </code>
           );

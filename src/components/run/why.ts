@@ -1,15 +1,33 @@
 import type { Check, Judgment, Review, Verdict } from "@/contracts/eval";
+import { fixesRun, ordinal, stoppedLine, type Heal } from "./heal";
 
 // "Why?" under the outcome: one plain line per tier of the evaluator that ran (checks -> judge -> review), in the
 // order it ran, with the tier that decided the outcome marked. Words only: the probabilities stay in Details.
+// Auto-heal's attempts come first, in order: what the check found each time the result was sent back to be fixed.
 
 export type WhyTier = "checks" | "judge" | "review";
 export type WhyLine = {
-  tier: WhyTier | "none";
-  tone: "ok" | "warn" | "bad" | "idle";
+  tier: WhyTier | "heal" | "none";
+  // retry: what an attempt to fix the result was told - work that went on, not a failure (no red while it heals)
+  tone: "ok" | "warn" | "bad" | "idle" | "retry";
   decided: boolean;
   text: string;
 };
+
+const LIVE = ["queued", "running", "evaluating"];
+
+// The attempts, and once the tries are over with a pass, how many fixes it took. The final check's lines follow.
+function healLines(heals: Heal[], verdict: Verdict | null): WhyLine[] {
+  const lines = heals.map((heal): WhyLine => {
+    if (heal.stopped) return { tier: "heal", tone: "idle", decided: false, text: stoppedLine(heal) };
+    const found = heal.reasons.length ? `: ${heal.reasons.join("; ")}` : "";
+    return { tier: "heal", tone: "retry", decided: false, text: `The ${ordinal(heal.attempt)} result did not pass the check${found}` };
+  });
+  const fixes = fixesRun(heals);
+  const passed = verdict?.verdict === "pass" || verdict?.verdict === "pass_with_notes";
+  if (fixes > 0 && passed) lines.push({ tier: "heal", tone: "ok", decided: false, text: `Fixed after ${fixes} ${fixes === 1 ? "attempt" : "attempts"}` });
+  return lines;
+}
 
 // The evaluator's own bar (CONFIDENT in src/lib/eval/evaluate.ts): an answer at or past it either way is "sure".
 const SURE = 0.8;
@@ -19,8 +37,14 @@ const MAX_QUOTE = 200;
  * storedOutcome is Run.outcome: the headline of the stored verdict. It is there even when the full verdict is not -
  * a verdict stored by the first version of the app no longer parses - and then Why? must agree with it (Q91).
  */
-export function whyLines(verdict: Verdict | null, runStatus: string, storedOutcome?: string | null): WhyLine[] {
-  if (!verdict) return noVerdict(runStatus, storedOutcome ?? null);
+export function whyLines(verdict: Verdict | null, runStatus: string, storedOutcome?: string | null, heals: Heal[] = []): WhyLine[] {
+  // while the run fixes its result there is no verdict yet (the engine writes it once the tries are over)
+  if (LIVE.includes(runStatus)) return healLines(heals, null);
+  if (!verdict) return [...healLines(heals, null), ...noVerdict(runStatus, storedOutcome ?? null)];
+  return [...healLines(heals, verdict), ...verdictLines(verdict)];
+}
+
+function verdictLines(verdict: Verdict): WhyLine[] {
   const path = verdict.path ?? inferPath(verdict);
   const decidedBy = verdict.decidedBy ?? inferDecidedBy(verdict);
   return path.flatMap((tier): WhyLine[] => {

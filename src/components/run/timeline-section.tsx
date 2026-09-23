@@ -1,7 +1,7 @@
 import { CircleCheck, CircleDashed, CircleMinus, LoaderCircle } from "lucide-react";
 import type { RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { formatCost, formatDuration } from "./format";
+import { attemptCost, formatCost, formatDuration } from "./format";
 import { LocalTime } from "./local-time";
 import { groupEvents, type EventGroup } from "./group-events";
 import { Empty, Section } from "./section";
@@ -17,8 +17,8 @@ function GroupIcon({ status }: { status: EventGroup["status"] }) {
 
 // The agent's trace, grouped under the plan step it belonged to: the evidence behind the verdict, in the shape
 // the agent itself worked in.
-export function TimelineSection({ events, connections }: { events: RunEvent[]; connections: { name: string }[] }) {
-  const groups = groupEvents(events);
+export function TimelineSection({ events, connections, runStatus }: { events: RunEvent[]; connections: { name: string }[]; runStatus: string }) {
+  const groups = groupEvents(events, runStatus);
   return (
     <Section title="Timeline">
       {groups.length === 0 ? (
@@ -100,6 +100,23 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
             step check {event.payload.stepIndex + 1}: {Math.round(event.payload.onTrack * 100)}% on track - {event.payload.note}
           </p>
         );
+      case "heal":
+        // auto-heal: what the check found, and the exact words the agent was then given - the feedback is for this
+        // reader, the one who asks "what did it tell the agent?"
+        return (
+          <div key={event.seq} className="space-y-1 rounded-[10px] bg-saffron-wash/60 px-2.5 py-2 text-[12px]">
+            <p className="text-slate">The check found: {event.payload.reasons.join("; ") || "no reasons given"}</p>
+            {event.payload.stopped ? (
+              // the engine's own reason for not trying again (Q148); the feedback was never sent
+              <p className="text-graphite">{event.payload.stopped}</p>
+            ) : (
+              <>
+                <p className="text-slate">The agent was told:</p>
+                <pre className="font-mono text-[11px] whitespace-pre-wrap text-graphite">{event.payload.feedback}</pre>
+              </>
+            )}
+          </div>
+        );
       case "started":
         return (
           <p key={event.seq} className="flex gap-2 text-[11px] text-slate">
@@ -117,8 +134,9 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
               event.payload.is_error ? "text-crimson" : "text-fern",
             )}
           >
+            {/* this attempt's own cost (Q149): the run's one total is in the state card above */}
             finished ({event.payload.subtype}) - {formatDuration(event.payload.duration_ms)},{" "}
-            {formatCost(event.payload.total_cost_usd)}
+            {formatCost(attemptCost(event.payload))}
           </p>
         );
       default:

@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 // "Ask for a change": a short note that becomes a follow-up run continuing this one, with its files in place.
-// When the reviewer said what would make the result better, that sentence is one click away.
-export function FollowUpForm({ runId, suggestion }: { runId: string; suggestion: string | null }) {
+// When the reviewer said what would make the result better, that sentence is one click away. When the result did
+// not pass, the box opens on a draft - fix the first thing the check found - for the person to edit.
+export function FollowUpForm({ runId, suggestion, draft = null }: { runId: string; suggestion: string | null; draft?: string | null }) {
   const [state, action, pending] = useActionState(followUpAction, {});
-  const [text, setText] = useState("");
+  const [text, setText] = useState(draft ?? "");
 
   // submitted by hand, not through <form action>, so a refused note stays in the box (React resets action forms)
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {

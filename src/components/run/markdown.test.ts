@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseInline, parseMarkdown } from "./markdown";
+import { parseInline, parseMarkdown, reportBlocks } from "./markdown";
 
 describe("parseInline", () => {
   it("marks **bold**, `code` and [links] and leaves the rest as plain text", () => {
@@ -96,5 +96,21 @@ describe("parseMarkdown - tables", () => {
 
   it("keeps pipes without a separator row as a paragraph: it is prose that happens to contain a pipe", () => {
     expect(parseMarkdown("| not | a table |")).toEqual([{ kind: "paragraph", spans: [{ text: "| not | a table |" }] }]);
+  });
+});
+
+// Q144: the page puts the report under its own "Report" heading, and agents often open with the same word
+describe("reportBlocks - the report as it sits under the page's own heading", () => {
+  it("drops the agent's own opening heading when it only says Report", () => {
+    expect(reportBlocks("# Report\n\nThe Moon is far.")).toEqual([{ kind: "paragraph", spans: [{ text: "The Moon is far." }] }]);
+    expect(reportBlocks("## Final report:\nThe Moon is far.")).toEqual([{ kind: "paragraph", spans: [{ text: "The Moon is far." }] }]);
+  });
+
+  it("keeps an opening heading that says something more", () => {
+    expect(reportBlocks("# Report on the Moon\nFar.")[0]).toMatchObject({ kind: "heading" });
+  });
+
+  it("keeps a heading called Report further down", () => {
+    expect(reportBlocks("Intro.\n\n## Report\nFar.").map((b) => b.kind)).toEqual(["paragraph", "heading", "paragraph"]);
   });
 });

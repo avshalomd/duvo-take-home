@@ -202,6 +202,52 @@ describe("deriveState - per-step checks, guards and a stopped run", () => {
     expect(deriveState(run, [...events, guard(90, "path", "allowed")]).guards).toEqual([]);
   });
 
+  // Auto-heal (his call, 2026-09-23): the run fixes what the check found inside the same run
+  describe("fixing what the check found", () => {
+    const heal = (seq: number, attempt: number, reasons: string[]): RunEvent => ({
+      seq, at: "2026-09-22T09:40:00.000Z", kind: "heal", payload: { attempt, max: 2, reasons, feedback: `Fix: ${reasons.join("; ")}` },
+    });
+    const finished = (seq: number, cost: number, ms: number, turns: number, isError = false): RunEvent => ({
+      seq, at: "2026-09-22T09:41:00.000Z", kind: "finished",
+      payload: { subtype: isError ? "error_max_turns" : "success", is_error: isError, num_turns: turns, duration_ms: ms, total_cost_usd: cost, result: isError ? "ran out of turns" : "done" },
+    });
+
+    it("lists the attempts in order with what the check found, and leaves the agent's instructions to Details", () => {
+      const state = deriveState(run, [...events, heal(90, 1, ["At least 8 rows: 3 rows"]), heal(95, 2, ["At least 8 rows: 6 rows"])]);
+      expect(state.heals).toEqual([
+        { attempt: 1, max: 2, reasons: ["At least 8 rows: 3 rows"] },
+        { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"] },
+      ]);
+    });
+
+    it("has no attempts on a run that never needed one", () => {
+      expect(deriveState(run, events).heals).toEqual([]);
+    });
+
+    // Q149: each finished event carries the SDK's running total of a resumed session; the run row counts each
+    // attempt once (the engine), so the row is the one total and the events are never added up
+    it("takes the run's cost and time from the run row, which counts every attempt once", () => {
+      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3)];
+      const state = deriveState({ ...run, status: "succeeded", costUsd: 0.16, durationMs: 14_000 }, healed);
+      expect(state.costUsd).toBe(0.16);
+      expect(state.durationMs).toBe(14_000);
+    });
+
+    it("falls back to the last attempt's figures for a run row that has none", () => {
+      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3)];
+      const state = deriveState({ ...run, status: "succeeded", costUsd: null, durationMs: null }, healed);
+      expect(state.costUsd).toBe(0.16);
+      expect(state.durationMs).toBe(4_000);
+    });
+
+    it("takes the turns and the error from the last attempt, not the first", () => {
+      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3, true)];
+      const state = deriveState({ ...run, status: "failed" }, healed);
+      expect(state.turn).toBe(3);
+      expect(state.error).toBe("ran out of turns");
+    });
+  });
+
   it("says a stopped run is cancelled, with no error and no step still running", () => {
     const plan: Plan = {
       intent: "x", expectedOutputs: ["y"], sources: [],

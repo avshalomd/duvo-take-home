@@ -1,7 +1,7 @@
 "use client";
 
 import { PanelRight } from "lucide-react";
-import { useActionState, useRef, useState, ViewTransition } from "react";
+import { useActionState, useRef, useState } from "react";
 import { cancelRunAction } from "@/app/(app)/actions";
 import { Thread, threadTone } from "@/components/thread/thread";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { DetailsPanel } from "./details-panel";
 import { Elapsed } from "./elapsed";
 import { FilesSection } from "./files-section";
 import { GuardNotices } from "./guard-notices";
+import { fixesRun, healsOf } from "./heal";
 import type { FileFacts } from "./home-data";
 import { outcome } from "./outcome";
 import { planProgress } from "./plan-progress";
@@ -17,6 +18,8 @@ import { isTerminal, shouldPoll } from "./poll";
 import { Report } from "./report";
 import { RunAgainButton } from "./run-again-button";
 import { RunNotes } from "./run-notes";
+import { RunTitle } from "./run-title";
+import { SHEET_GUTTER } from "./sheet";
 import { StatusDot } from "./status-dot";
 import { StopButton } from "./stop-button";
 import { threadSteps } from "./thread-steps";
@@ -26,7 +29,7 @@ import { useRunPoll } from "./use-run-poll";
 import { whyLines } from "./why";
 import { WhyButton, WhyList } from "./why-section";
 
-const gutter = "px-6 min-[900px]:px-12";
+const gutter = SHEET_GUTTER;
 
 // One run on its sheet, for someone who did not write the brief: what was asked (the title), how it turned out (one
 // line, and Why?), how the work went (the thread), what it made, and what to do next. Everything technical - ids,
@@ -58,9 +61,12 @@ export function RunPanel({
   // the full verdict's headline when it parsed, else the one stored on the run: the rail, this line, Why? and
   // Details then all say the same thing, whatever shape the verdict was stored in (Q91)
   const headline = verdict?.verdict ?? run.outcome ?? null;
-  const result = outcome(run.status, headline, run.cancelRequested);
-  const why = whyLines(verdict, run.status, run.outcome);
+  // auto-heal's attempts, the last one marked if the engine stopped trying instead of making it (Q148)
+  const heals = healsOf(state.heals, events);
+  const result = outcome(run.status, headline, run.cancelRequested, { attempts: fixesRun(heals), max: heals.at(-1)?.max });
+  const why = whyLines(verdict, run.status, run.outcome, heals);
   const progress = planProgress(state.plan);
+  const steps = threadSteps(state.plan, run.status, state.stepChecks, heals);
 
   function closeDetails() {
     setDetailsOpen(false);
@@ -92,13 +98,9 @@ export function RunPanel({
             </div>
           </div>
 
-          {/* The brief as the title. Its name is the one the composer gives the brief as it hands it over, so a new
-              run's title is where the typed words land (handover.css); on any other change it does nothing. */}
-          <ViewTransition name={`brief-${run.id}`} share="handover" default="none">
-            <h1 id="run-title" className="display mt-3 line-clamp-4 text-[28px] min-[900px]:text-[34px]" title={run.prompt}>
-              {title}
-            </h1>
-          </ViewTransition>
+          {/* The brief as the title, two lines at most so the thread below stays in view (Q137); the whole brief is
+              its tooltip and the first line of Details. The same element as the one the brief moves into on Run. */}
+          <RunTitle title={title} brief={run.prompt} />
           <RunNotes run={run} parentTitle={parentTitle} automationName={automationName} />
 
           <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -142,13 +144,11 @@ export function RunPanel({
               </span>
             )}
           </div>
-          {state.plan && state.plan.steps.length > 0 ? (
-            <Thread steps={threadSteps(state.plan, run.status, state.stepChecks)} tone={threadTone(run.status, headline)} />
+          {/* before the plan exists, a live run's thread is its first step, reading the brief (Q138) */}
+          {steps.length > 0 ? (
+            <Thread steps={steps} tone={threadTone(run.status, headline)} />
           ) : (
-            <p className="flex items-center gap-3 text-[15px] text-slate">
-              {!terminal && <StatusDot tone="busy" className="size-2.5" />}
-              {terminal ? "The agent never wrote down a plan for this run." : "The agent is reading your brief..."}
-            </p>
+            <p className="text-[15px] text-slate">The agent never wrote down a plan for this run.</p>
           )}
         </section>
 

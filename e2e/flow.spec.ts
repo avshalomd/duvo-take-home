@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { AUTOMATION, createHomeRuns, deleteHomeRuns, READY, TITLES, type HomeRuns } from "./home-fixture";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { AUTOMATION, createHomeRuns, deleteHomeRuns, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
 
 // The Home page: the rail, the first-visit question, the run sheet with its thread, the floating composer and the
 // Details panel. Runs against a dev server on the local database, signed in as the demo user:
@@ -26,16 +26,17 @@ const composer = (page: Page) => page.getByRole("textbox", { name: /what should 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Runs" });
 
 test.describe("the frame", () => {
-  test("the top bar offers the three pages, marks Home as open, and carries a product mark that is not a second link called Automations", async ({ page }) => {
+  test("the top bar offers the three pages, marks Home as open, and carries the Handover mark as a glyph named by its label", async ({ page }) => {
     await page.goto("/");
     const header = page.getByTestId("app-header");
     const pages = header.getByRole("navigation", { name: "Pages" });
     for (const name of ["Home", "Automations", "Settings"]) await expect(pages.getByRole("link", { name })).toBeVisible();
     await expect(pages.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
-    // Q113: the mark is a glyph with the product's name as its label, not the word beside the Automations page
-    const mark = header.getByRole("link", { name: "Automations home" });
+    // Q113: the mark is a glyph with the product's name as its label, not a word beside the pages.
+    // His call, 2026-09-23: the product is called Handover; the Automations page keeps its name.
+    const mark = header.getByRole("link", { name: "Handover home" });
     await expect(mark).toBeVisible();
-    await expect(mark.getByText("Automations", { exact: true })).toBeHidden(); // the tile shows, its word does not
+    await expect(mark).toHaveText("", { useInnerText: true }); // the tile shows, no word does
   });
 
   test("with no run open, Home asks one question, with the composer under it", async ({ page }) => {
@@ -43,6 +44,26 @@ test.describe("the frame", () => {
     await expect(page.getByRole("heading", { level: 1, name: "What should the agent do?" })).toBeVisible();
     await expect(composer(page)).toBeFocused();
     await expect(page.getByTestId("run-panel")).toHaveCount(0);
+  });
+
+  // Q137: the thread is the product's signature, and the first screen a new user sees had none
+  test("the first visit shows how a run goes, as a quiet thread", async ({ page }) => {
+    await page.goto("/");
+    const how = page.getByRole("list", { name: "How a run goes" });
+    await expect(how).toBeVisible();
+    await expect(how.getByRole("listitem")).toHaveCount(3);
+  });
+
+  // Q137: a long brief took four lines of 34 px and pushed the thread below the fold
+  test("a run's title takes at most two lines, and the whole brief is in its tooltip", async ({ page }) => {
+    await openRun(page, runs.long);
+    const title = page.locator("#run-title");
+    const { height, lineHeight } = await title.evaluate((el) => ({
+      height: el.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(el).lineHeight),
+    }));
+    expect(height).toBeLessThanOrEqual(2 * lineHeight + 1);
+    await expect(title).toHaveAttribute("title", TITLES.long);
   });
 
   test("the saved automations under the question are tokens that fill the box", async ({ page }) => {
@@ -70,8 +91,9 @@ test.describe("the frame", () => {
     await expect(rail(page).getByRole("link")).toHaveCount(1);
     await expect(rail(page).getByRole("link")).toContainText("follow-up");
 
-    await search.fill(`/${AUTOMATION.command}`); // Q133
+    await search.fill(`/${AUTOMATION.command}`); // Q133: the called run, and an example of the same automation
     await expect(rail(page).locator(`a[href="/?run=${runs.audit}"]`)).toBeVisible();
+    await expect(rail(page).locator(`a[href="/?run=${runs.example}"]`)).toBeVisible();
 
     await search.fill("zzzz no run says this");
     await expect(rail(page).getByRole("link")).toHaveCount(0);
@@ -86,6 +108,29 @@ test.describe("the frame", () => {
     await expect(row).toHaveAttribute("aria-current", "true");
     await expect(page.getByTestId("run-panel").getByTestId("outcome")).toHaveText("Stopped");
     await expect(page.locator("#run-title")).toHaveText(TITLES.stopped); // the brief is the title
+  });
+
+  // Q140: the outcome words took the tag's place on hover and squeezed the title to two letters
+  test("hovering a rail row leaves its title as wide as it was, and the outcome is in the row's tooltip", async ({ page }) => {
+    await page.goto("/");
+    const row = rail(page).locator(`a[href="/?run=${runs.parent}"]`);
+    const title = row.getByTestId("rail-title");
+    const before = (await title.boundingBox())!.width;
+    await row.hover();
+    expect((await title.boundingBox())!.width).toBe(before);
+    await expect(row).toHaveAttribute("title", `Done - looks good\n${TITLES.parent}`);
+  });
+
+  // Q143: a press answers with a small give, the same everywhere
+  test("rail rows, New run, the top bar's pages and Why? give a little under a press", async ({ page }) => {
+    const panel = await openRun(page, runs.followUp);
+    const pressable = [
+      rail(page).getByRole("link").first(),
+      page.getByRole("link", { name: "New run" }),
+      page.getByTestId("app-header").getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Automations" }),
+      panel.getByRole("button", { name: /why\?/i }),
+    ];
+    for (const el of pressable) await expect(el).toHaveClass(/active:scale-\[0\.97\]/);
   });
 
   test("a run of a saved automation is named by the automation and its input", async ({ page }) => {
@@ -161,6 +206,80 @@ test.describe("the composer", () => {
     await expect(chips).toContainText(/Using|No connections on/);
     await expect(chips.getByRole("link").first()).toHaveAttribute("href", "/settings/connections");
   });
+
+  // Q147: two names ran together into one ("DeepWiki e2e Settings moved")
+  test("each connection that is on is a chip of its own", async ({ page }) => {
+    await page.goto("/");
+    const names = page.getByTestId("composer-connections").getByTestId("connection-chip");
+    const count = await names.count();
+    test.skip(count === 0, "the demo workspace has no connection switched on");
+    for (let i = 0; i < count; i++) {
+      const background = await names.nth(i).evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(background).not.toBe("rgba(0, 0, 0, 0)");
+    }
+  });
+
+  // Q135: shadcn's md:text-sm made the box 14 px on a desk, while its hint and the brief as it left were 19 px
+  test("the box and its hint share one type size, on the first visit and under a run", async ({ page }) => {
+    const size = (el: Locator) => el.evaluate((node) => getComputedStyle(node).fontSize);
+    await page.goto("/");
+    await composer(page).fill(`/${READY.command} `);
+    expect(await size(composer(page))).toBe("19px");
+    expect(await size(page.getByTestId("command-hint"))).toBe("19px");
+    await openRun(page, runs.followUp);
+    expect(await size(composer(page))).toBe("15px");
+  });
+
+  // Q143: the capsule is where the keyboard is; it says so
+  test("the composer's capsule draws a focus ring while the box has focus", async ({ page }) => {
+    await openRun(page, runs.followUp);
+    const capsule = page.getByTestId("composer-capsule");
+    const ring = () => capsule.evaluate((el) => getComputedStyle(el).outlineStyle);
+    expect(await ring()).toBe("none");
+    await composer(page).focus();
+    await expect.poll(ring).not.toBe("none");
+  });
+});
+
+test.describe("the handover", () => {
+  // Q138: nothing moved for about a second after Run (the server's answer), then two differently wrapped copies
+  // cross-faded, then five seconds of plain text. The start is held on its way to the server here, so what is on
+  // screen is what the press alone did; it is then aborted, so no run is ever started.
+  test("pressing Run moves the brief into a new run's title at once, landing on a thread already at work", async ({ page }) => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/*", async (route) => {
+      const request = route.request();
+      if (request.method() === "POST" && request.headers()["next-action"]) {
+        await held;
+        await route.abort();
+      } else await route.continue();
+    });
+    await page.goto("/");
+    const brief = "[e2e] home handover: list three facts about the Moon";
+    await composer(page).fill(brief);
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const pending = page.getByTestId("run-pending");
+    await expect(pending.getByRole("heading", { level: 1 })).toHaveText(brief);
+    const first = pending.getByTestId("thread").getByRole("listitem").first();
+    await expect(first).toContainText("Reading your brief");
+    await expect(first).toHaveAttribute("aria-current", "step"); // its bead is breathing
+
+    // the start never reached the server: the brief comes back to the box, with the reason
+    release();
+    await expect(composer(page)).toHaveValue(brief);
+    await expect(page.getByRole("alert").filter({ hasText: /could not reach/i })).toBeVisible();
+    await expect(pending).toHaveCount(0);
+  });
+
+  test("a start the server would refuse does not move at all", async ({ page }) => {
+    await page.goto("/");
+    await composer(page).fill("/nope-e2e Acme Ltd");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "/nope-e2e" })).toBeVisible();
+    await expect(page.getByTestId("run-pending")).toHaveCount(0);
+  });
 });
 
 test.describe("a finished run", () => {
@@ -232,6 +351,15 @@ test.describe("a finished run", () => {
     await expect(table).toContainText("238,855 miles");
   });
 
+  // Q144: `table.xlsx` was set in monospace, and a report that opened with "## Report" said Report twice
+  test("the report speaks in one typeface under one Report heading", async ({ page }) => {
+    const panel = await openRun(page, runs.followUp);
+    const report = panel.getByTestId("report");
+    const font = (el: Locator) => el.evaluate((node) => getComputedStyle(node).fontFamily);
+    expect(await font(report.getByText("table.xlsx"))).toBe(await font(report));
+    await expect(panel.getByText("Report", { exact: true })).toHaveCount(1);
+  });
+
   test("the actions row offers Make an automation, and Ask for a change opens a box that refuses a change that says nothing", async ({ page }) => {
     const panel = await openRun(page, runs.followUp);
     const actions = panel.getByTestId("run-actions");
@@ -286,6 +414,57 @@ test.describe("a finished run", () => {
     await expect(panel.getByTestId("outcome")).toHaveText("Something went wrong");
     await expect(panel.getByRole("button", { name: "Run again", exact: true })).toBeVisible(); // Q101
     await expect(panel.getByRole("button", { name: /why\?/i })).toHaveCount(0); // Q102
+  });
+});
+
+// Auto-heal (his call, 2026-09-23): a result the check failed is fixed inside the same run, and the run says pass or
+// fail only when every attempt is used. Until then it is work in progress in every view.
+test.describe("a run that fixes what the check found", () => {
+  test("while it fixes, it reads as progress: the attempt in the outcome line, the thread going on, the reason under Why?", async ({ page }) => {
+    const panel = await openRun(page, runs.healing);
+    await expect(panel.getByTestId("outcome")).toHaveText("Checking the result - fixing what the check found (attempt 1 of 2)");
+    await expect(panel.getByTestId("outcome")).not.toContainText(/did not pass/i);
+    const last = panel.getByTestId("thread").getByRole("listitem").last();
+    await expect(last).toContainText("Fix what the check found (attempt 1 of 2)");
+    await expect(last).toHaveAttribute("aria-current", "step");
+    await panel.getByRole("button", { name: /why\?/i }).click();
+    await expect(panel.getByTestId("why")).toContainText(`The first result did not pass the check: ${HEAL.reason}`);
+  });
+
+  test("a fixed run reads like any good run, Why? notes the fix, and Details shows what the agent was told", async ({ page }) => {
+    const panel = await openRun(page, runs.healed);
+    await expect(panel.getByTestId("outcome")).toHaveText("Done - looks good");
+    await panel.getByRole("button", { name: /why\?/i }).click();
+    await expect(panel.getByTestId("why")).toContainText("Fixed after 1 attempt");
+    await panel.getByRole("button", { name: /details/i }).click();
+    const details = page.getByRole("dialog", { name: /details/i });
+    const timeline = details.getByTestId("timeline");
+    await expect(timeline).toContainText("Fixing what the check found - attempt 1 of 2");
+    await expect(timeline).toContainText(HEAL.feedback);
+    // Q149: each attempt shows its own cost, and the run one total - never the SDK's running total per attempt
+    await expect(timeline).toContainText("$0.050");
+    await expect(details.getByTestId("state-card")).toContainText("$0.170");
+  });
+
+  test("a run the fixes did not save says so once, and Ask for a change starts from what did not pass", async ({ page }) => {
+    const panel = await openRun(page, runs.unfixed);
+    await expect(panel.getByTestId("outcome")).toHaveText("Did not pass after 2 attempts to fix it");
+    await panel.getByTestId("run-actions").getByRole("button", { name: /ask for a change/i }).click();
+    await expect(panel.getByRole("textbox", { name: /ask for a change/i })).toHaveValue("Please fix what did not pass: At least 8 rows: 6 rows");
+  });
+});
+
+test.describe("a run whose fixes stopped making progress", () => {
+  // Q148: the engine stops when a fix undoes an earlier one or fails the same way; it records why, and does not count it
+  test("says it stopped trying in plain words, counts only the fixes made, and keeps the engine's reason for Details", async ({ page }) => {
+    const panel = await openRun(page, runs.stuck);
+    await expect(panel.getByTestId("outcome")).toHaveText("Did not pass after 1 attempt to fix it");
+    await panel.getByRole("button", { name: /why\?/i }).click();
+    await expect(panel.getByTestId("why")).toContainText("Stopped trying: the first fix did not get the result any closer to passing");
+    await panel.getByRole("button", { name: /details/i }).click();
+    const timeline = page.getByRole("dialog", { name: /details/i }).getByTestId("timeline");
+    await expect(timeline).toContainText("Stopped trying - attempt 2 of 2");
+    await expect(timeline).toContainText(HEAL.stopped);
   });
 });
 

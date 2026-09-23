@@ -40,3 +40,51 @@ describe("threadSteps - the plan as the thread draws it", () => {
     expect(threadSteps(plan(["done", "running"]), "succeeded", [])[1].status).toBe("pending");
   });
 });
+
+// Q138: a new run opened on five seconds of plain text before its plan arrived; it opens on a thread already at work
+describe("threadSteps - before the plan", () => {
+  it("gives a live run with no plan yet one step, reading the brief, being worked on", () => {
+    for (const status of ["queued", "running"])
+      expect(threadSteps(null, status, [])).toEqual([{ key: "reading", title: "Reading your brief", status: "running" }]);
+  });
+
+  it("gives a finished run that never wrote a plan no steps at all", () => {
+    expect(threadSteps(null, "succeeded", [])).toEqual([]);
+    expect(threadSteps(null, "failed", [])).toEqual([]);
+  });
+});
+
+// Auto-heal (his call, 2026-09-23): a result the check failed is fixed inside the same run, and the thread goes on
+describe("threadSteps - fixing what the check found", () => {
+  const heals = [
+    { attempt: 1, max: 2, reasons: ["At least 8 rows: 3 rows"] },
+    { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"] },
+  ];
+
+  it("adds a step for each attempt after the plan, the latest one worked on while the run is live", () => {
+    const steps = threadSteps(plan(["done", "done"]), "running", [], heals);
+    expect(steps.slice(2)).toEqual([
+      { key: "heal-1", title: "Fix what the check found (attempt 1 of 2)", status: "done" },
+      { key: "heal-2", title: "Fix what the check found (attempt 2 of 2)", status: "running" },
+    ]);
+  });
+
+  it("draws every attempt done once the run has finished", () => {
+    expect(threadSteps(plan(["done"]), "succeeded", [], heals).slice(1).map((s) => s.status)).toEqual(["done", "done"]);
+  });
+
+  it("says where a stopped run stopped while it was fixing", () => {
+    expect(threadSteps(plan(["done"]), "cancelled", [], heals.slice(0, 1))[1]).toMatchObject({ status: "pending", note: "Stopped here" });
+  });
+
+  // Q148: the engine stops trying when a fix made no progress; that attempt is recorded but never run
+  it("draws an attempt the engine did not make as skipped, saying why in plain words", () => {
+    const stopped = [heals[0], { ...heals[1], stopped: true }];
+    expect(threadSteps(plan(["done"]), "succeeded", [], stopped)[2]).toEqual({
+      key: "heal-2",
+      title: "Fix what the check found (attempt 2 of 2)",
+      status: "skipped",
+      note: "Stopped trying: the first fix did not get the result any closer to passing",
+    });
+  });
+});

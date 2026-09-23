@@ -11,10 +11,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { applyCommand, commandHint, commandQuery, filterAutomations } from "./command-query";
 import { COMMAND_LIST_ID, CommandList, optionId, type CommandOption } from "./command-list";
+import { mayTakeFocus } from "./first-focus";
+import { useHandover } from "./handover-host";
+import { handoverTitle } from "./handover-title";
+import { HANDOVER_NAME, TITLE_PX, TITLE_TYPE } from "./run-title";
+import { titleWidth } from "./sheet";
 import "./handover.css";
 
 const PLACEHOLDER = "Describe a task in plain words, or type / to run a saved automation";
 const QUESTION_ID = "brief-question"; // the first visit's heading, which names the box there
+const UNREACHABLE = "Could not reach the app, so no run was started. Check your connection and press Run again.";
+const SHOWN_WITHIN_MS = 600; // the sheet is up within a frame or two; never hold a start longer than the move itself
 
 // The one box on Home: plain instructions start a new run; "/audit Acme Ltd" runs a saved automation on an input.
 // The server decides which is which (startRunAction). Glass, in two sizes: the hero under the first visit's
@@ -31,10 +38,12 @@ export function Composer({
   connections: string[];
 }) {
   const router = useRouter();
+  const handover = useHandover();
   const [state, setState] = useState<FormState>({});
   const [pending, startPending] = useTransition();
   const [text, setText] = useState("");
-  const [handover, setHandover] = useState<{ id: string; text: string } | null>(null);
+  // the brief as it leaves the box: set as the new run's title will be, for the one commit before it moves
+  const [ghost, setGhost] = useState<{ title: string; width: number } | null>(null);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState<string | null>(null); // Escape hides the list until the text changes
   const box = useRef<HTMLTextAreaElement>(null);
@@ -45,6 +54,12 @@ export function Composer({
   const options = open ? filterAutomations(automations, query) : [];
   const highlighted = Math.min(active, Math.max(options.length - 1, 0));
   const hint = commandHint(text, automations);
+
+  // The first visit's box takes the focus as it appears - not with autoFocus, which took it from a menu the person
+  // had opened while Home streamed in, and closed the menu: only when nobody else is using it (first-focus.ts)
+  useEffect(() => {
+    if (hero && mayTakeFocus(document)) box.current?.focus();
+  }, [hero]);
 
   // the box grows with the brief instead of scrolling inside itself, up to a third of a phone's screen
   useEffect(() => {
@@ -60,23 +75,48 @@ export function Composer({
     box.current?.focus();
   }
 
+  // The handover (Q138): the brief moves into the new run's title at the press, and the server is asked afterwards.
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    const brief = text;
+    // null when the server is going to refuse before any run exists: then nothing moves, the reason just appears
+    const title = handover ? handoverTitle(text, automations) : null;
+    const sheet = e.currentTarget.closest<HTMLElement>("[data-sheet]");
+    let shown: Promise<unknown> = Promise.resolve();
+
+    if (handover && title && sheet) {
+      // 1. The brief, set exactly as the title will be - same width, size and line breaks, scaled down to the box's
+      //    size - replaces the typed text for one commit. Old and new then look alike, so they never double up.
+      flushSync(() => setGhost({ title, width: titleWidth(sheet.clientWidth) }));
+      // 2. One transition takes it away and puts up the new run's sheet, whose title carries the same name: React
+      //    pairs the two and the browser carries the words from here into the title (handover.css).
+      startTransition(() => {
+        setGhost(null);
+        shown = handover.begin(title);
+      });
+    }
+    // 3. Only then the server. A start begun in this same event would share the handover's transition lane, and
+    //    the move would wait for the server's answer - the second of nothing in Q138.
+    void Promise.race([shown, new Promise((r) => setTimeout(r, SHOWN_WITHIN_MS))]).then(() => start(data));
+  }
+
+  function start(data: FormData) {
     startPending(async () => {
-      const result = await startRunAction({}, data);
-      if (!result.startedId) {
-        setState(result); // refused: what was typed stays in the box, with the reason under it
-        return;
+      let result: FormState;
+      try {
+        result = await startRunAction({}, data);
+      } catch {
+        result = { error: UNREACHABLE }; // the request never came back: no run exists
       }
       const id = result.startedId;
-      // The handover. First the brief becomes an element named after the new run, committed at once ...
-      flushSync(() => setHandover({ id, text: brief }));
-      // ... then one transition removes it and opens the run, whose title carries the same name: React pairs the
-      // two and the browser carries the words from here into the title (handover.css says how they move).
+      if (!id) {
+        handover?.end(); // refused: back to the box, with what was typed and the reason under it
+        setState(result);
+        return;
+      }
+      // the real run replaces the sheet that stood in for it, in one commit, once its page is ready
       startTransition(() => {
-        setHandover(null);
+        handover?.end();
         setText("");
         setState({});
         router.push(`/?run=${id}`);
@@ -105,13 +145,21 @@ export function Composer({
     }
   }
 
-  // one type size for the box, the hint behind it and the brief as it leaves, so the three line up exactly
-  const type = hero ? "text-[19px] leading-7" : "text-[15px] leading-6";
+  // One type size for the box, the hint behind it and the brief as it leaves (Q135). The md: sizes are needed: the
+  // shadcn Textarea sets md:text-sm, which beats a plain size class on a desk and made the box 14 px.
+  const size = hero ? 19 : 15;
+  const type = hero ? "text-[19px] md:text-[19px] leading-7" : "text-[15px] md:text-[15px] leading-6";
 
   return (
     <form onSubmit={onSubmit} className="w-full">
       <div
-        className={cn("glass rounded-[26px]", hero ? "px-5 pt-4 pb-3" : "px-4 pt-3 pb-2.5")}
+        data-testid="composer-capsule"
+        // the ring is an outline, not a ring utility: a ring is a box-shadow, and the style below sets box-shadow (Q143)
+        className={cn(
+          // 2 px at 45%: the app's 3 px focus ring reads as a heavy border around something this large
+          "glass rounded-[26px] outline-ring/45 focus-within:outline-2",
+          hero ? "px-5 pt-4 pb-3" : "px-4 pt-3 pb-2.5",
+        )}
         // glass sets its own box-shadow (the light top edge), which would cancel a shadow utility: the edge, a hairline
         // and the float are set together here, or the capsule has no outline at all on white paper
         style={{ boxShadow: "inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--hairline), var(--shadow-float)" }}
@@ -136,7 +184,6 @@ export function Composer({
             name="prompt"
             ref={box}
             rows={hero ? 3 : 1}
-            autoFocus={hero}
             placeholder={hint ? undefined : PLACEHOLDER}
             value={text}
             onChange={(e) => {
@@ -154,13 +201,19 @@ export function Composer({
             className={cn(
               "relative min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none placeholder:text-slate focus-visible:ring-0 dark:bg-transparent",
               type,
-              handover && "text-transparent caret-transparent", // the brief is leaving: its copy below is what moves
+              ghost && "text-transparent caret-transparent", // the brief is leaving: its copy below is what moves
             )}
           />
-          {handover && (
-            <ViewTransition name={`brief-${handover.id}`} share="handover" default="none">
-              <p aria-hidden className={cn("pointer-events-none absolute inset-0 break-words whitespace-pre-wrap", type)}>
-                {handover.text}
+          {ghost && (
+            <ViewTransition name={HANDOVER_NAME} share="handover" default="none">
+              {/* laid out at the title's width and size, then scaled down to the box's: the browser snapshots the
+                  layout and animates the scale, so what moves is the title itself, growing into place */}
+              <p
+                aria-hidden
+                className={cn("pointer-events-none absolute top-0 left-0 origin-top-left", TITLE_TYPE)}
+                style={{ width: ghost.width, transform: `scale(${size / TITLE_PX})` }}
+              >
+                {ghost.title}
               </p>
             </ViewTransition>
           )}
@@ -223,19 +276,26 @@ export function Composer({
 
 // Which connections the next run gets: the ones switched on in Settings. Each one links there.
 function ConnectionChips({ names }: { names: string[] }) {
-  const link = "rounded-full underline-offset-2 hover:text-graphite hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
+  const focus = "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
   return (
-    <div data-testid="composer-connections" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] tracking-[0.01em] text-slate">
+    <div data-testid="composer-connections" className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px] tracking-[0.01em] text-slate">
       <Plug aria-hidden className="size-3.5 shrink-0" />
       {names.length === 0 ? (
-        <Link href="/settings/connections" className={link}>
+        <Link href="/settings/connections" className={cn("rounded-full underline-offset-2 hover:text-graphite hover:underline", focus)}>
           No connections on
         </Link>
       ) : (
         <>
           <span>Using</span>
+          {/* one chip per connection: as plain words, two names ran together into one (Q147) */}
           {names.map((n) => (
-            <Link key={n} href="/settings/connections" className={cn(link, "font-medium text-graphite")} title={`${n} is on - change it in Settings`}>
+            <Link
+              key={n}
+              data-testid="connection-chip"
+              href="/settings/connections"
+              title={`${n} is on - change it in Settings`}
+              className={cn("rounded-full bg-mist px-2 py-0.5 font-medium text-graphite transition-colors hover:bg-mist-deep", focus)}
+            >
               {n}
             </Link>
           ))}

@@ -50,3 +50,33 @@ describe("groupEvents - the timeline is read as the plan, not as a flat log", ()
     expect(groups[1].status).toBe("running");
   });
 });
+
+// Auto-heal: Details shows each attempt to fix the result, with what the agent was told, and the work it did then
+describe("groupEvents - fixing what the check found", () => {
+  const heal = (attempt: number, stopped?: string): RunEvent => ({
+    seq: ++seq, at, kind: "heal",
+    payload: { attempt, max: 2, reasons: ["At least 8 rows: 3 rows"], feedback: "Add rows until there are 8.", ...(stopped ? { stopped } : {}) },
+  });
+  const finished: RunEvent = {
+    seq: 0, at, kind: "finished",
+    payload: { subtype: "success", is_error: false, num_turns: 3, duration_ms: 9000, total_cost_usd: 0.02, result: "Done." },
+  };
+
+  it("opens a group for each attempt, headed by the attempt, holding the heal event and the work that followed", () => {
+    const groups = groupEvents([plan(["running"]), call("Write"), heal(1), call("Write")]);
+    expect(groups.map((g) => g.title)).toEqual(["step 0", "Fixing what the check found - attempt 1 of 2"]);
+    expect(groups[1].events.map((e) => e.kind)).toEqual(["heal", "tool_call"]);
+  });
+
+  it("marks an attempt done once the agent finished it, and running until then", () => {
+    expect(groupEvents([plan(["done"]), heal(1), call("Write")], "running").at(-1)!.status).toBe("running");
+    expect(groupEvents([plan(["done"]), heal(1), call("Write"), { ...finished, seq: ++seq }], "succeeded").at(-1)!.status).toBe("done");
+  });
+
+  // Q148: an attempt the engine recorded and then did not make is not still spinning on a finished run
+  it("marks an attempt the engine stopped as skipped, and names it so", () => {
+    const stopped = groupEvents([plan(["done"]), { ...finished, seq: ++seq }, heal(2, "The fix undid an earlier one.")], "succeeded").at(-1)!;
+    expect(stopped.status).toBe("skipped");
+    expect(stopped.title).toBe("Stopped trying - attempt 2 of 2");
+  });
+});

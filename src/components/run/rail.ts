@@ -40,11 +40,16 @@ export function groupByDay<T extends { createdAt: string }>(runs: T[], now: Date
 
 /**
  * Every word of the query must appear in the run's text, in any order and any case. The text is the instructions,
- * the title and the tag, so an automation's run is found by its command and name as well as by its input (Q133).
+ * the title, the tag and the command of the run's automation, so an automation's run - called, scheduled or an
+ * example, whose tag says "example" - is found by its command and name as well as by its input (Q133).
  */
-export function matchesSearch(run: { prompt: string; title?: string; tag?: string | null }, query: string): boolean {
+export function matchesSearch(
+  run: { prompt: string; title?: string; tag?: string | null; command?: string | null },
+  query: string,
+): boolean {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const text = [run.prompt, run.title ?? "", run.tag ?? ""].join(" ").toLowerCase();
+  const command = run.command ? `/${run.command}` : ""; // with its slash, so "/audit" and "audit" both find it
+  const text = [run.prompt, run.title ?? "", run.tag ?? "", command].join(" ").toLowerCase();
   return words.every((w) => text.includes(w));
 }
 

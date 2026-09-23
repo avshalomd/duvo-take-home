@@ -1,4 +1,4 @@
-import { Check, ChevronDown, CircleHelp, Minus, X } from "lucide-react";
+import { Check, ChevronDown, CircleHelp, Minus, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WhyLine } from "./why";
 
@@ -10,7 +10,8 @@ export function WhyButton({ open, onToggle }: { open: boolean; onToggle: () => v
       onClick={onToggle}
       aria-expanded={open}
       aria-controls="why"
-      className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[14px] text-slate transition-colors hover:text-graphite focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none max-[899px]:min-h-8"
+      // active:scale: the same small give under a press as every other control (Q143)
+      className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[14px] text-slate transition-[color,transform] duration-100 hover:text-graphite focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.97] max-[899px]:min-h-8"
     >
       Why?
       <ChevronDown aria-hidden className={cn("size-3.5 transition-transform duration-200", open && "rotate-180")} />
@@ -23,6 +24,8 @@ const icon: Record<WhyLine["tone"], React.ReactNode> = {
   warn: <CircleHelp aria-hidden className="mt-0.5 size-4 shrink-0 text-saffron" />,
   bad: <X aria-hidden className="mt-0.5 size-4 shrink-0 text-crimson" />,
   idle: <Minus aria-hidden className="mt-0.5 size-4 shrink-0 text-slate" />,
+  // an attempt to fix the result: work that went round again, in the live colour, never the failure red
+  retry: <RotateCcw aria-hidden className="mt-0.5 size-4 shrink-0 text-saffron" />,
 };
 
 export function WhyList({ lines }: { lines: WhyLine[] }) {

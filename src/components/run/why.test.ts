@@ -234,3 +234,43 @@ describe("whyLines - a run with no verdict", () => {
     expect(whyLines(null, "succeeded", "pass_with_notes")[0].tone).toBe("warn");
   });
 });
+
+// Auto-heal: the reasons of each attempt live here, never in the outcome line (his call, 2026-09-23)
+describe("whyLines - a run that fixed what the check found", () => {
+  const heals = [{ attempt: 1, max: 2, reasons: ["At least 8 rows: 3 rows", "The CSV parses: row 4 has 3 columns"] }];
+
+  it("while the run fixes it, lists what the check found, as work in progress and not as a failure", () => {
+    expect(whyLines(null, "running", null, heals)).toEqual([
+      { tier: "heal", tone: "retry", decided: false, text: "The first result did not pass the check: At least 8 rows: 3 rows; The CSV parses: row 4 has 3 columns" },
+    ]);
+  });
+
+  it("once it passed, notes how many attempts the fix took before the tiers of the final check", () => {
+    const lines = whyLines(PASS_BY_JUDGE, "succeeded", "pass", heals);
+    expect(lines.map((l) => l.text)).toContain("Fixed after 1 attempt");
+    expect(lines.filter((l) => l.tier === "heal")).toHaveLength(2);
+    expect(lines.slice(2).map((l) => l.tier)).toEqual(["checks", "judge"]);
+  });
+
+  it("after the last attempt failed, lists every attempt and then the final check, with no 'fixed' line", () => {
+    const two = [...heals, { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"] }];
+    const lines = whyLines(FAIL_BY_CHECKS, "succeeded", "fail", two);
+    expect(lines.map((l) => l.text)).toEqual([
+      "The first result did not pass the check: At least 8 rows: 3 rows; The CSV parses: row 4 has 3 columns",
+      "The second result did not pass the check: At least 8 rows: 6 rows",
+      expect.stringContaining("1 of 2 checks failed"),
+    ]);
+  });
+
+  // Q148: the engine stopped trying because the last fix made no progress
+  it("says plainly when the engine stopped trying, and counts only the fixes it made", () => {
+    const stopped = [...heals, { attempt: 2, max: 2, reasons: ["At least 8 rows: 2 rows"], stopped: true }];
+    const lines = whyLines(FAIL_BY_CHECKS, "succeeded", "fail", stopped);
+    expect(lines.map((l) => l.text)).toContain("Stopped trying: the first fix did not get the result any closer to passing");
+    expect(lines.map((l) => l.text)).not.toContain(expect.stringMatching(/^Fixed after/));
+  });
+
+  it("adds nothing for a run that never needed a fix", () => {
+    expect(whyLines(PASS_BY_JUDGE, "succeeded", "pass", [])).toEqual(whyLines(PASS_BY_JUDGE, "succeeded", "pass"));
+  });
+});

@@ -44,6 +44,17 @@ function cells(line: string): Inline[][] {
   return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => parseInline(c.trim()));
 }
 
+// "Report", "Final report:", "The report" - an opening heading that only names what the page already names (Q144)
+const REPORT_TITLE = /^(the |final )?report:?$/i;
+
+/** The report as the page shows it, under its own "Report" heading: an opening heading that repeats it is dropped. */
+export function reportBlocks(text: string): Block[] {
+  const blocks = parseMarkdown(text);
+  const first = blocks[0];
+  const repeatsTitle = first?.kind === "heading" && REPORT_TITLE.test(first.spans.map((s) => s.text).join("").trim());
+  return repeatsTitle ? blocks.slice(1) : blocks;
+}
+
 export function parseMarkdown(text: string): Block[] {
   const blocks: Block[] = [];
   let paragraph: string[] = [];

@@ -7,14 +7,30 @@ export type EventGroup = {
   events: RunEvent[];
 };
 
+const LIVE = ["queued", "running", "evaluating"];
+
 // The agent works step by step, so the timeline is read step by step: every event is filed under the plan step
-// that was running when it arrived. What happened before the agent had a plan goes under "Planning".
-export function groupEvents(events: RunEvent[]): EventGroup[] {
+// that was running when it arrived. What happened before the agent had a plan goes under "Planning". Each attempt
+// to fix the result (auto-heal) opens its own group, headed by the attempt, with what the agent was told first.
+export function groupEvents(events: RunEvent[], runStatus = "running"): EventGroup[] {
   const groups: EventGroup[] = [];
   let current: EventGroup | null = null;
   let lastPlan: Plan | null = null;
+  let heal: EventGroup | null = null; // the latest attempt: the agent may open step groups inside it, as it redoes steps
 
   for (const event of events) {
+    if (event.kind === "heal") {
+      const { attempt, max, stopped } = event.payload;
+      // the engine stopped trying instead (Q148): it never ran. Otherwise under way until the agent's result for it
+      // arrives; a run that ended without one was stopped or broke in the middle of it
+      const status = stopped ? "skipped" : LIVE.includes(runStatus) ? "running" : "pending";
+      const title = `${stopped ? "Stopped trying" : "Fixing what the check found"} - attempt ${attempt} of ${max}`;
+      heal = { key: `heal-${attempt}`, title, status, events: [event] };
+      current = heal;
+      groups.push(heal);
+      continue;
+    }
+    if (event.kind === "finished" && heal) heal.status = "done";
     if (event.kind === "plan") {
       lastPlan = event.payload;
       const running = event.payload.steps.find((s) => s.status === "running");

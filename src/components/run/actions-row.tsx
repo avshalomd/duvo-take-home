@@ -8,7 +8,7 @@ import type { Run } from "@/contracts/run";
 import { cn } from "@/lib/utils";
 import { FollowUpForm } from "./follow-up-form";
 import { RunAgainButton } from "./run-again-button";
-import { canMakeAutomation } from "./run-actions";
+import { canMakeAutomation, changeSuggestion } from "./run-actions";
 
 const quiet =
   "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[14px] font-medium text-graphite transition-[background-color,transform] duration-100 hover:bg-mist active:scale-[0.97] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none max-[899px]:h-10";
@@ -18,6 +18,7 @@ const quiet =
 export function ActionsRow({ run, verdict, headline }: { run: Run; verdict: Verdict | null; headline: string | null }) {
   const [asking, setAsking] = useState(false);
   const suggestion = verdict?.review?.changeNeeded ?? null;
+  const draft = changeSuggestion(verdict); // a result that did not pass: the box opens on what to fix first
 
   return (
     <div className="border-t border-hairline px-6 py-5 min-[900px]:px-12">
@@ -36,7 +37,7 @@ export function ActionsRow({ run, verdict, headline }: { run: Run; verdict: Verd
       </div>
       {asking && (
         <div className="mt-4 max-w-[40rem]">
-          <FollowUpForm runId={run.id} suggestion={suggestion} />
+          <FollowUpForm runId={run.id} suggestion={suggestion} draft={draft} />
         </div>
       )}
     </div>

@@ -67,6 +67,15 @@ export function toolKind(name: string): ToolKind {
   return "tool";
 }
 
+/**
+ * What one attempt cost (Q149). A heal resumes the same SDK session, whose total_cost_usd keeps running across the
+ * attempts, so the engine records the attempt's own cost beside it; a run from before that had only one attempt,
+ * for which the total is the attempt. The run's one total is Run.costUsd, never a sum of these lines.
+ */
+export function attemptCost(payload: { total_cost_usd: number; attempt_cost_usd?: unknown }): number {
+  return typeof payload.attempt_cost_usd === "number" ? payload.attempt_cost_usd : payload.total_cost_usd;
+}
+
 export function formatDuration(ms: number | null): string {
   if (ms === null || ms === undefined) return "-";
   if (ms < 1000) return `${(ms / 1000).toFixed(1)} s`;
