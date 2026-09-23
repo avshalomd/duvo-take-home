@@ -1,17 +1,18 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// The automations pages are shaped like a header over cards; without this file the Home page's skeleton (the runs
-// grid) would flash on every visit here.
+// Shaped like the gallery (a title over tiles), so nothing jumps when the page arrives; without this file the Home
+// page's skeleton would flash on every visit here.
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-4 py-6" aria-busy="true" aria-label="Loading">
-      <div className="space-y-2">
-        <Skeleton className="h-6 w-40" />
-        <Skeleton className="h-4 w-96 max-w-full" />
+    <div className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-4 py-8 sm:px-6 sm:py-12" aria-busy="true" aria-label="Loading">
+      <div className="space-y-3">
+        <Skeleton className="h-11 w-64 rounded-[12px] bg-paper/70" />
+        <Skeleton className="h-5 w-80 max-w-full rounded-full bg-paper/70" />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Skeleton className="h-48 rounded-xl" />
-        <Skeleton className="h-48 rounded-xl" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="h-32 rounded-[16px] bg-paper/70" />
+        <Skeleton className="h-32 rounded-[16px] bg-paper/70" />
+        <Skeleton className="h-32 rounded-[16px] bg-paper/70" />
       </div>
     </div>
   );

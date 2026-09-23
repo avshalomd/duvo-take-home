@@ -6,7 +6,7 @@ import { AutomationError, readError } from "./errors";
 
 describe("readError", () => {
   it("passes on a message written for the user", () => {
-    expect(readError(new AutomationError("Turn on DeepWiki in Settings to run \\audit"))).toBe("Turn on DeepWiki in Settings to run \\audit");
+    expect(readError(new AutomationError("Turn on DeepWiki in Settings to run /audit"))).toBe("Turn on DeepWiki in Settings to run /audit");
     expect(readError(new LlmError("The model took too long (30 s). Retry.", "timeout"))).toMatch(/too long/);
     expect(readError(new RunLimitError("Three runs are already in progress"))).toMatch(/in progress/);
   });

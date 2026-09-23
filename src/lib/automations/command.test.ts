@@ -2,32 +2,32 @@ import { describe, expect, it } from "vitest";
 import { nextFreeCommand, parseCommand, toCommandName } from "./command";
 
 describe("parseCommand", () => {
-  it("reads a backslash command and the rest of the line as its input", () => {
-    expect(parseCommand("\\audit Apple Inc.")).toEqual({ command: "audit", input: "Apple Inc." });
-  });
-
-  it("accepts a slash as the prefix too", () => {
+  it("reads a slash command and the rest of the line as its input", () => {
     expect(parseCommand("/audit Apple Inc.")).toEqual({ command: "audit", input: "Apple Inc." });
   });
 
+  it("reads text that starts with a backslash as plain text, not a command (his call: the front slash only)", () => {
+    expect(parseCommand("\\audit Apple Inc.")).toBeNull();
+  });
+
   it("keeps the spaces inside the input and trims the ends", () => {
-    expect(parseCommand("\\audit   Acme Holdings Ltd  ")).toEqual({ command: "audit", input: "Acme Holdings Ltd" });
+    expect(parseCommand("/audit   Acme Holdings Ltd  ")).toEqual({ command: "audit", input: "Acme Holdings Ltd" });
   });
 
   it("reads a bare command as a command with an empty input", () => {
-    expect(parseCommand("\\audit")).toEqual({ command: "audit", input: "" });
+    expect(parseCommand("/audit")).toEqual({ command: "audit", input: "" });
   });
 
   it("lower-cases the command, since commands are stored lower-case", () => {
-    expect(parseCommand("\\Audit Apple")).toEqual({ command: "audit", input: "Apple" });
+    expect(parseCommand("/Audit Apple")).toEqual({ command: "audit", input: "Apple" });
   });
 
   it("reads a command with a dash in it", () => {
-    expect(parseCommand("\\ai-news robotics")).toEqual({ command: "ai-news", input: "robotics" });
+    expect(parseCommand("/ai-news robotics")).toEqual({ command: "ai-news", input: "robotics" });
   });
 
   it("keeps a multi-line input whole", () => {
-    expect(parseCommand("\\audit Apple Inc.\nfocus on filings")).toEqual({ command: "audit", input: "Apple Inc.\nfocus on filings" });
+    expect(parseCommand("/audit Apple Inc.\nfocus on filings")).toEqual({ command: "audit", input: "Apple Inc.\nfocus on filings" });
   });
 
   it("answers null for plain text", () => {
@@ -35,7 +35,7 @@ describe("parseCommand", () => {
   });
 
   it("answers null when the prefix is in the middle of the text", () => {
-    expect(parseCommand("please run \\audit Apple Inc.")).toBeNull();
+    expect(parseCommand("please run /audit Apple Inc.")).toBeNull();
   });
 
   it("answers null for a path, which starts with a slash but is not a command", () => {
@@ -43,7 +43,7 @@ describe("parseCommand", () => {
   });
 
   it("answers null for a prefix with no name after it", () => {
-    expect(parseCommand("\\ Apple")).toBeNull();
+    expect(parseCommand("/ Apple")).toBeNull();
     expect(parseCommand("/")).toBeNull();
   });
 });
@@ -55,7 +55,7 @@ describe("toCommandName", () => {
 
   it("turns what a model may write into a valid command", () => {
     expect(toCommandName("/Company Audit")).toBe("company-audit");
-    expect(toCommandName("\\AI news!")).toBe("ai-news");
+    expect(toCommandName("/AI news!")).toBe("ai-news");
   });
 
   it("drops leading digits, since a command starts with a letter", () => {

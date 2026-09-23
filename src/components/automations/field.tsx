@@ -1,19 +1,22 @@
 import type { ReactNode } from "react";
 import { Label } from "@/components/ui/label";
 
-// One labelled field of the editor: the label names the control (by id), the hint and the error describe it.
+// One labelled field of the editor: a small label above, the control, then its hint or its error. The label names the
+// control (by id); the hint and the error describe it.
 export function Field({ id, label, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="text-[13px] font-medium tracking-[0.01em] text-slate">
+        {label}
+      </Label>
       {children}
       {hint && !error && (
-        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+        <p id={`${id}-hint`} className="text-[13px] leading-5 tracking-[0.01em] text-slate">
           {hint}
         </p>
       )}
       {error && (
-        <p id={`${id}-hint`} role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p id={`${id}-hint`} role="alert" className="text-[13px] leading-5 text-crimson">
           {error}
         </p>
       )}

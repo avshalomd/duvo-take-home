@@ -30,6 +30,15 @@ describe("parseEditForm", () => {
     expect(r.edit.template.steps).toEqual(["Search the web for {input}", "Read the filings", "Write audit.md"]);
   });
 
+  it("reads a list sent as one field per row (the editable lists) as one item per field, dropping empty rows", () => {
+    const r = parseEditForm(form({ steps: ["Search the web for {input}", "  ", "Write audit.md"], expectedOutputs: ["audit.md", "a short report"] }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.edit.template.steps).toEqual(["Search the web for {input}", "Write audit.md"]);
+    expect(r.edit.template.expectedOutputs).toEqual(["audit.md", "a short report"]);
+    expect(r.values.steps).toBe("Search the web for {input}\n\nWrite audit.md"); // what was typed, row by row, for a refused save
+  });
+
   it("collects the ticked connections", () => {
     const r = parseEditForm(form({ connections: ["DeepWiki", "GitHub"] }));
     expect(r.ok && r.edit.template.connections).toEqual(["DeepWiki", "GitHub"]);
@@ -40,8 +49,8 @@ describe("parseEditForm", () => {
     expect(r.ok && r.edit.template.intent).toBe("Audits a company");
   });
 
-  it("normalises the command, and takes it with or without the backslash", () => {
-    const r = parseEditForm(form({ command: "\\Audit" }));
+  it("normalises the command, and takes it with or without the slash it is called with", () => {
+    const r = parseEditForm(form({ command: "/Audit" }));
     expect(r.ok && r.edit.command).toBe("audit");
   });
 
