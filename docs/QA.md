@@ -126,15 +126,15 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q87 | reviewer | the budget is counted, then the run inserted, with no lock: parallel starts all pass | count and insert in one transaction under a per-workspace advisory lock | minor | engine | fixed (14b6996: check and insert under a per-workspace advisory lock; 5 parallel starts, 3 pass) |
 | Q88 | eval | `scripts/record-run.ts` records a follow-up with only its change as the prompt (it runs outside Next and cannot load `instructionsOf`) | a recorded follow-up case carries its full instructions | minor | eval | open (no follow-up case in the suite yet; label by hand until then) |
 | Q89 | settings | GET /api/connections/oauth/start checks the session but not the role: a member calling it directly can start a sign-in that writes OAuth credentials | owners and admins only, the same rule as the settings actions | minor | oauth | fixing |
-| Q90 | qa-ux | 5 of today's 8 demo runs read "did not pass" only because their checks were stored before .svg/.xlsx were allowed | re-checked or removed from the demo workspace | major | main (demo data) | open |
+| Q90 | qa-ux | 5 of today's 8 demo runs read "did not pass" only because their checks were stored before .svg/.xlsx were allowed | re-checked or removed from the demo workspace | major | main (demo data) | fixed (scripts/reevaluate.ts on the three chart runs: all pass; the remaining red runs failed for real reasons - a blocked local fetch, a refused injection, a run with no output tools) |
 | Q91 | qa-ux | older seeded runs say "looks good" while Why? says "not checked" and Details "not judged" (an older stored check format) | the three agree | minor | home | redesign |
 | Q92 | qa-ux | the `\` command list at 1280 squeezes the automation's name to nothing behind a long technical "makes ..." line | command and name first, the output line truncated | minor | home | redesign |
 | Q93 | qa-ux | after picking a command the box shows `\news-digest ` with no hint of what to type | the input's label or hint shown after the command | minor | home | redesign |
 | Q94 | qa-ux | an automation run's title is its filled-in instructions | "<automation name>: <input>" | minor | home | redesign |
 | Q95 | qa-ux | example runs show the full prompt in the rail; "Example for an automation being tested" names no automation and stays after approval | the input as the title; "Example for <name>" linking to it | minor | home | redesign |
-| Q96 | qa-ux | tool names in plan step titles ("... using make_chart") | step titles in plain words | minor | guards (system prompt) | open |
+| Q96 | qa-ux | tool names in plan step titles ("... using make_chart") | step titles in plain words | minor | guards (system prompt) | fixing |
 | Q97 | qa-ux | markdown tables in the report render as raw pipes | rendered tables | minor | home | redesign |
-| Q98 | qa-ux | chart labels about 5 px, the x-axis title overlapping a tick label, a tiny pie legend | readable at 390 px | minor | outputs | open |
+| Q98 | qa-ux | chart labels about 5 px, the x-axis title overlapping a tick label, a tiny pie legend | readable at 390 px | minor | outputs | fixing |
 | Q99 | qa-ux | "0.0 KB" for a small file | bytes under 1 KB | minor | home | redesign |
 | Q100 | qa-ux | "No files yet - this run writes its answer in the report below" on finished and failed runs, even with no report | wording per state | minor | home | redesign |
 | Q101 | qa-ux | a failed run says "You can run the same instructions again" but offers only an unlabelled icon | a labelled "Run again" | minor | home | redesign |
