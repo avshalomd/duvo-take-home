@@ -135,3 +135,29 @@ Per file: what it does and why it is built that way. Grows at every merge.
   product feature): 18 recorded runs, replayed with recorded judge answers in `npm run check`, live with `EVAL=1`
   (`docs/EVAL.md`). The live run caught an injected advert passing at 0.80; the judge and review prompts now say that
   what a run read is data, and it fails.
+
+### settings
+- `src/lib/connections/crypto.ts` - AES-256-GCM in a versioned envelope ("v1:"); a missing key and a damaged value
+  give different errors, so a misconfigured server is not mistaken for tampering.
+- `src/lib/connections/store.ts` - tokens are written only into `token_enc`; `scripts/encrypt-tokens.ts` moved the v1
+  plain tokens; only a token-type server keeps a token when edited.
+- `src/lib/usage/budget-rule.ts` - the day's limits are checked before runs in progress, so the reason given is the
+  one that will still be true in a minute.
+
+### home
+- `src/components/run/why.ts` - "Why?" in plain words, one line per tier that ran, no percentages (those are in
+  Details); a v1 verdict without `path` still gets a sensible answer.
+- `src/components/run/use-run-poll.ts` - the event stream first, resumed with `?after=<seq>` when it ends at 280 s;
+  a stream that never delivers falls back to polling every 2 s.
+- `src/components/run/command-query.ts` - text starting with `\` or `/` is always a command: a mistyped command
+  names itself in an error instead of becoming a paid free-text run.
+
+### automations
+- `src/lib/automations/template.ts` `changesThePrompt` - which edits need a new approved example: the template, the
+  name and the input label (they go into the system prompt); not the hint, the example value or the command.
+- `src/lib/automations/store.ts` - approval is written only if the version is still the one whose examples were
+  checked, so an edit saved in between cannot slip through.
+- `src/lib/automations/from-run.ts` - the connections an automation needs are read by code from the run's actual
+  tool calls, not guessed by the model.
+- `src/components/automations/drafting.tsx` - the draft is a Server Action started once the page is on screen, so a
+  prefetch or a crawler fetching the URL never spends a model call.
