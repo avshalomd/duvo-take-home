@@ -128,14 +128,14 @@ describe("a member", () => {
   });
 
   it("renames a draft's command, telling the store it may not rename an approved one", async () => {
-    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft" });
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft", version: 1 });
     expect(await saveAutomationAction({}, form({ ...edit, command: "audit-2" }))).toMatchObject({ ok: true });
     expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }), { mayRenameApproved: false });
   });
 
   // Review R2: an owner approving between the page's read and the save; the store's write refuses, and says why
   it("is refused in plain words when the automation was approved while they renamed it, keeping what they typed", async () => {
-    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft" });
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft", version: 1 });
     store.updateAutomation.mockRejectedValueOnce(new AutomationError(LOCKED));
     const out = await saveAutomationAction({}, form({ ...edit, command: "audit-2" }));
     expect(out).toMatchObject({ error: LOCKED, values: { command: "audit-2" } });
@@ -151,7 +151,7 @@ describe("a member", () => {
   });
 
   it.each(["active", "disabled"] as const)("is refused renaming an approved automation's command (%s), and nothing is written", async (status) => {
-    store.getAutomation.mockResolvedValueOnce({ command: "audit", status });
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status, version: 1 });
     const out = await saveAutomationAction({}, form({ ...edit, command: "audit-2" }));
     expect(out.error).toBe(LOCKED);
     expect(out.values).toMatchObject({ command: "audit-2", name: "Company audit" }); // what was typed stays
@@ -159,7 +159,7 @@ describe("a member", () => {
   });
 
   it("still edits the rest of an approved automation when the command stays", async () => {
-    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "active" });
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "active", version: 1 });
     expect(await saveAutomationAction({}, form({ ...edit, command: "/Audit" }))).toMatchObject({ ok: true }); // the same command, as typed
     expect(store.updateAutomation).toHaveBeenCalled();
   });
@@ -198,7 +198,7 @@ describe.each(["owner", "admin"] as const)("an %s", (role) => {
   });
 
   it("renames an approved automation's command", async () => {
-    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "active" });
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "active", version: 1 });
     expect(await saveAutomationAction({}, form({ ...edit, command: "audit-2" }))).toMatchObject({ ok: true });
     expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }), { mayRenameApproved: true });
   });

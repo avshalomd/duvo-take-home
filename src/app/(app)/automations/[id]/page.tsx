@@ -17,7 +17,7 @@ import { TryExampleForm } from "@/components/automations/try-example-form";
 import { outcome } from "@/components/run/outcome";
 import { requireSession } from "@/lib/auth/session";
 import { approvalProgress } from "@/lib/automations/approval";
-import { canGovernAutomations } from "@/lib/automations/permissions";
+import { canGovernAutomations, hasBeenApproved } from "@/lib/automations/permissions";
 import { automationHistory } from "@/lib/automations/runs";
 import { getAutomation, listTrials } from "@/lib/automations/store";
 import { canApprove } from "@/lib/automations/template";
@@ -56,6 +56,8 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   const isDraft = automation.status === "draft";
   // Q178: a member drafts, edits, tries and judges; approve, turn off, delete and the schedule read as who does them
   const governs = canGovernAutomations(role);
+  // once approved, people call it by its command, even after an edit sent it back to draft (review R2)
+  const commandLocked = !governs && hasBeenApproved(automation.status, automation.version, trials);
   const deleteButton = governs ? <DeleteButton automationId={automation.id} name={automation.name} /> : <p className={SMALL}>An owner or an admin can delete it.</p>;
 
   return (
@@ -66,7 +68,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
           <article className={cn(SHEET, "space-y-10 p-6 sm:p-10")}>
             <Header automation={automation} governs={governs} />
             {isDraft ? (
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} />
+              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
             ) : (
               <>
                 {approved === "1" && automation.status === "active" && <ApprovedNote command={automation.command} />}
@@ -98,7 +100,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
           {!isDraft && (
             // what an edit does is said where it matters: under the editor, and in the save's own message
             <article aria-label="The automation" className={cn(SHEET, "p-6 sm:p-10")}>
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} />
+              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
             </article>
           )}
         </div>

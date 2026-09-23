@@ -46,6 +46,7 @@ export function AutomationEditor({
   pending,
   onCancel,
   approver,
+  commandLocked,
 }: {
   automation: Automation;
   connections: ConnectionChoice[];
@@ -54,11 +55,10 @@ export function AutomationEditor({
   pending: boolean;
   onCancel: () => void;
   approver: boolean;
+  commandLocked: boolean; // Q178: approved before and the viewer a member, who edits the rest and reads the command
 }) {
   const v = state.values ?? valuesOf(automation);
   const err = state.fieldErrors ?? {};
-  // Q178: once approved, people call it by its command; a member edits the rest and reads the command
-  const commandLocked = !approver && automation.status !== "draft";
 
   // the workspace's connections, plus any the template names that Settings no longer has, so none is dropped silently
   const choices: ConnectionChoice[] = [
