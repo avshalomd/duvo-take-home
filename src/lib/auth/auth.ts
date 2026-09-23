@@ -29,6 +29,19 @@ export const auth = betterAuth({
     ? { google: { clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! } }
     : {},
   trustedOrigins: LOCAL_ORIGINS,
+  // Tries per client address and path (Q176). Better Auth turns this on only when NODE_ENV is production and counts in
+  // each server's memory, so on Vercel every function instance kept a count of its own. On everywhere (development and
+  // the tests meet what production does), counted in the rate_limit table (db/schema.ts) that every instance shares.
+  rateLimit: {
+    enabled: true,
+    storage: "database",
+    // Better Auth's own rule for these two, said out loud so an upgrade cannot loosen it: 3 tries per 10 seconds.
+    // Other paths keep its defaults (100 per 10 s; password resets 3 per minute).
+    customRules: {
+      "/sign-in/email": { window: 10, max: 3 },
+      "/sign-up/email": { window: 10, max: 3 },
+    },
+  },
   databaseHooks: {
     user: {
       create: {

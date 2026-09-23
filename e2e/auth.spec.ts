@@ -4,6 +4,7 @@ import {
   DEMO_PASSWORD,
   E2E_PASSWORD,
   SIGNED_OUT,
+  asNewClient,
   closeInvitation,
   deleteUsers,
   e2eEmail,
@@ -16,6 +17,8 @@ import {
 // Getting in and out. Local only (it creates accounts):
 // BASE_URL=http://localhost:3004 npx playwright test e2e/auth.spec.ts
 test.use({ storageState: SIGNED_OUT });
+// every test its own client, so the suite's many sign-ins stay under the per-client limit (asNewClient)
+test.beforeEach(async ({ context }) => context.setExtraHTTPHeaders(asNewClient()));
 
 const created: string[] = [];
 test.afterAll(async () => deleteUsers(created));
@@ -92,6 +95,31 @@ test("a wrong password shows the error and stays on the sign-in page", async ({ 
   await expect(page).toHaveURL(/\/sign-in/);
 });
 
+// Q176: 3 sign-in tries per 10 s per client, counted in the database. This test's browser is one client (beforeEach).
+test("the fourth wrong password in a row says to wait, and another browser can still try", async ({ page, browser }) => {
+  const tryToSignIn = async (p: Page) => {
+    const answered = p.waitForResponse((r) => r.url().endsWith("/api/auth/sign-in/email"));
+    await p.getByRole("button", { name: "Sign in", exact: true }).click();
+    return (await answered).status();
+  };
+  await page.goto("/sign-in");
+  await page.getByLabel("Email").fill(DEMO_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill("not-the-password"); // the form keeps both between tries
+  for (let i = 0; i < 3; i++) expect(await tryToSignIn(page)).toBe(401);
+  expect(await tryToSignIn(page)).toBe(429);
+  await expect(formError(page)).toHaveText("Too many tries. Wait a minute, then try again.");
+
+  const other = await browser.newContext({ storageState: SIGNED_OUT, extraHTTPHeaders: asNewClient() });
+  try {
+    const elsewhere = await other.newPage();
+    await elsewhere.goto("/sign-in");
+    await signInThroughUi(elsewhere, DEMO_EMAIL, "not-the-password");
+    await expect(formError(elsewhere)).toHaveText("That email and password do not match.");
+  } finally {
+    await other.close();
+  }
+});
+
 test("the sign-in pages carry the product's name, Handover", async ({ page }) => {
   await page.goto("/sign-in");
   await expect(page).toHaveTitle("Sign in - Handover");
@@ -157,7 +185,7 @@ test("an invitation link lets a new person create an account and join the worksp
   await signUpThroughUi(page, "Olga Owner", owner);
   const invitationId = await inviteByRow(owner, invitee);
 
-  const guest = await browser.newContext({ storageState: SIGNED_OUT });
+  const guest = await browser.newContext({ storageState: SIGNED_OUT, extraHTTPHeaders: asNewClient() });
   try {
     const guestPage = await guest.newPage();
     await guestPage.goto(`/invite/${invitationId}`);
@@ -186,8 +214,8 @@ test("Better Auth's API hands a plain member no invitation ids, and still hands 
   const plain = e2eEmail("ids-member");
   const pending = e2eEmail("ids-pending");
   created.push(owner, plain, pending);
-  const asOwner = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL! } });
-  const asMember = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL! } });
+  const asOwner = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL!, ...asNewClient() } });
+  const asMember = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL!, ...asNewClient() } });
   try {
     await expect(await asOwner.post("/api/auth/sign-up/email", { data: { name: "Oona Owner", email: owner, password: E2E_PASSWORD } })).toBeOK();
     const joining = await inviteByRow(owner, plain);

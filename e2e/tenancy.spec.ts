@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { DEMO_STATE, SIGNED_OUT, deleteUsers, e2eEmail, signUpThroughUi } from "./auth-helpers";
+import { DEMO_STATE, SIGNED_OUT, asNewClient, deleteUsers, e2eEmail, signUpThroughUi } from "./auth-helpers";
 
 // One workspace cannot read another's runs, through the page or the API. Local only (it creates an account):
 // BASE_URL=http://localhost:3004 npx playwright test e2e/tenancy.spec.ts
 test.use({ storageState: SIGNED_OUT });
+test.beforeEach(async ({ context }) => context.setExtraHTTPHeaders(asNewClient())); // a client of its own: the sign-up limit
 
 const created: string[] = [];
 test.afterAll(async () => deleteUsers(created));

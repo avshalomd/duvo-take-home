@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { invitation, member, organization, session, user } from "@/db/schema";
 import { auth } from "./auth";
 import { INVITATION_COOKIE } from "./invitation-cookie";
-import { createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, revokeInvite } from "./members";
+import { changeMemberRole, createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, removeFromWorkspace, revokeInvite } from "./members";
 import { sessionFromHeaders } from "./session";
 
 const created: string[] = []; // emails, so afterAll deletes only what this file made
@@ -311,6 +311,100 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
 
     await expect(revokeInvite(two.headers, twoCtx, idOf(link))).rejects.toThrow(/no longer pending/);
     expect((await listInvitations(oneCtx)).map((i) => i.link)).toEqual([link]);
+  });
+});
+
+// Q169: owners and admins remove people and change roles from the Members page. Better Auth does the change with the
+// asker's headers (its own permission rules apply); the app's rules (lib/auth/member-rules.ts) are asked first.
+// 20 s a test: each builds a workspace of three people through Better Auth (sign-ups, invitations, acceptances)
+describe.skipIf(!process.env.DATABASE_URL)("removing people and changing roles", { timeout: 20_000 }, () => {
+  /** An owner's workspace with an admin and a plain member in it, each joined by accepting an invitation. */
+  async function team(tag: string) {
+    const owner = await signUp("Olga Owner", email(`${tag}-owner`));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+    async function join(name: string, role: "member" | "admin") {
+      const address = email(`${tag}-${role}`);
+      const { link } = await createInvite(owner.headers, ownerCtx, { email: address, role });
+      const person = await signUp(name, address);
+      await auth.api.acceptInvitation({ body: { invitationId: link.split("/invite/")[1] }, headers: person.headers });
+      return { ...person, ctx: (await sessionFromHeaders(person.headers))! }; // accepting makes the workspace the active one
+    }
+    const admin = await join("Adam Admin", "admin");
+    const plain = await join("Mia Member", "member");
+    const members = await listMembers(ownerCtx.workspaceId);
+    const memberIdOf = (userId: string) => members.find((m) => m.userId === userId)!.memberId;
+    const roles = async () => (await listMembers(ownerCtx.workspaceId)).map((m) => [m.name, m.role]);
+    return { owner, ownerCtx, admin, plain, memberIdOf, roles };
+  }
+
+  it("lists each person with the id of their membership, which the changes are made by", async () => {
+    const { ownerCtx } = await team("rm-ids");
+    const members = await listMembers(ownerCtx.workspaceId);
+    expect(members.every((m) => typeof m.memberId === "string" && m.memberId.length > 0)).toBe(true);
+    expect(new Set(members.map((m) => m.memberId)).size).toBe(3);
+  });
+
+  it("an owner makes a member an admin, then an owner, and the list says so", async () => {
+    const { owner, ownerCtx, plain, memberIdOf, roles } = await team("rm-promote");
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(plain.userId), "admin");
+    expect(await roles()).toContainEqual(["Mia Member", "admin"]);
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(plain.userId), "owner");
+    expect(await roles()).toContainEqual(["Mia Member", "owner"]);
+  });
+
+  it("an owner removes a member: they leave the list, and their next request opens their own workspace instead", async () => {
+    const { owner, ownerCtx, plain, memberIdOf, roles } = await team("rm-remove");
+    expect(plain.ctx.workspaceId).toBe(ownerCtx.workspaceId); // they were looking at the owner's workspace
+
+    await removeFromWorkspace(owner.headers, ownerCtx, memberIdOf(plain.userId));
+    expect((await roles()).map(([name]) => name)).not.toContain("Mia Member");
+
+    const next = await sessionFromHeaders(plain.headers); // no error, no 500: the session falls back to what is theirs
+    expect(next?.workspaceName).toBe("Mia's workspace");
+    expect((await listWorkspaces(plain.userId)).map((w) => w.id)).not.toContain(ownerCtx.workspaceId);
+  });
+
+  it("an admin makes a member an admin and removes another admin", async () => {
+    const { owner, ownerCtx, admin, plain, memberIdOf, roles } = await team("rm-admin-ok");
+    await changeMemberRole(admin.headers, admin.ctx, memberIdOf(plain.userId), "admin");
+    expect(await roles()).toContainEqual(["Mia Member", "admin"]);
+    await removeFromWorkspace(admin.headers, admin.ctx, memberIdOf(plain.userId));
+    expect((await listMembers(ownerCtx.workspaceId)).map((m) => m.userId)).toEqual([owner.userId, admin.userId]);
+  });
+
+  it("an admin can neither remove nor demote the owner, nor make anyone an owner, and nothing changes", async () => {
+    const { owner, admin, plain, memberIdOf, roles } = await team("rm-admin-no");
+    const before = await roles();
+    await expect(removeFromWorkspace(admin.headers, admin.ctx, memberIdOf(owner.userId))).rejects.toThrow("Only an owner can remove an owner.");
+    await expect(changeMemberRole(admin.headers, admin.ctx, memberIdOf(owner.userId), "member")).rejects.toThrow("Only an owner can change an owner's role.");
+    await expect(changeMemberRole(admin.headers, admin.ctx, memberIdOf(plain.userId), "owner")).rejects.toThrow("Only an owner can make someone an owner.");
+    expect(await roles()).toEqual(before);
+  });
+
+  it("a plain member can neither remove nor change anyone", async () => {
+    const { admin, plain, memberIdOf, roles } = await team("rm-plain");
+    const before = await roles();
+    await expect(removeFromWorkspace(plain.headers, plain.ctx, memberIdOf(admin.userId))).rejects.toThrow("Only an owner or an admin can remove people from this workspace.");
+    await expect(changeMemberRole(plain.headers, plain.ctx, memberIdOf(admin.userId), "member")).rejects.toThrow("Only an owner or an admin can change someone's role.");
+    expect(await roles()).toEqual(before);
+  });
+
+  it("nobody removes or changes themselves here, so the only owner always stays", async () => {
+    const { owner, ownerCtx, memberIdOf, roles } = await team("rm-self");
+    const before = await roles();
+    await expect(removeFromWorkspace(owner.headers, ownerCtx, memberIdOf(owner.userId))).rejects.toThrow("You cannot remove yourself here.");
+    await expect(changeMemberRole(owner.headers, ownerCtx, memberIdOf(owner.userId), "admin")).rejects.toThrow("You cannot change your own role here.");
+    expect(await roles()).toEqual(before);
+  });
+
+  it("a membership of another workspace is not found from this one, and stays where it is", async () => {
+    const one = await team("rm-other-a");
+    const two = await team("rm-other-b");
+    const theirs = two.memberIdOf(two.plain.userId);
+    const NOT_FOUND = "That person could not be found in this workspace. Reload the page to see who is in it.";
+    await expect(removeFromWorkspace(one.owner.headers, one.ownerCtx, theirs)).rejects.toThrow(NOT_FOUND);
+    await expect(changeMemberRole(one.owner.headers, one.ownerCtx, theirs, "admin")).rejects.toThrow(NOT_FOUND);
+    expect(await two.roles()).toContainEqual(["Mia Member", "member"]);
   });
 });
 

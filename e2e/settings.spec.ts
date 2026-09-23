@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { neon } from "@neondatabase/serverless";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { deleteUsers, e2eEmail, joinByRow, signedInAs } from "./auth-helpers";
 
 // Settings in a browser: a connection added with a token, edited, switched off and deleted; a limit changed and
 // kept. Runs against a dev server on the demo workspace:
@@ -267,6 +268,83 @@ test("an owner invites someone and gets the link to send them", async ({ page })
   await expect(link).toContainText(`Send this link to ${INVITED}`);
   await expect(link.getByLabel("Invite link")).toHaveValue(/\/invite\/[\w-]+$/);
   await expect(page.getByLabel("Email")).toHaveValue(""); // emptied for the next person
+});
+
+// Q169: owners and admins change roles and remove people. Each person is a fresh "e2e-" account with a browser of
+// their own; the owner's personal workspace is the one changed, so the shared demo workspace is never touched.
+test.describe("changing roles and removing people", () => {
+  const created: string[] = [];
+  test.afterAll(async () => deleteUsers(created));
+
+  const personRow = (page: Page, email: string) => page.getByTestId("members").getByRole("listitem").filter({ hasText: email });
+  const roleMenu = (row: Locator, name: string) => row.getByRole("button", { name: new RegExp(`change ${name}'s role`) });
+
+  test("an owner makes a member an admin, then removes them, and their next page opens their own workspace", async ({ playwright, browser, baseURL }) => {
+    const [owner, mia] = [e2eEmail("members-owner"), e2eEmail("members-mia")];
+    created.push(owner, mia);
+    const olga = await signedInAs(playwright.request, browser, baseURL!, "Olga Owner", owner);
+    const removed = await signedInAs(playwright.request, browser, baseURL!, "Mia Member", mia);
+    try {
+      await joinByRow(owner, mia, "member");
+      await removed.page.goto("/");
+      await expect(removed.page.getByTestId("app-header")).toContainText("Olga's workspace"); // Mia is looking at it
+
+      const page = olga.page;
+      await page.goto("/settings/members");
+      await expect(personRow(page, owner).getByRole("button")).toHaveCount(0); // your own row has no controls
+      const row = personRow(page, mia);
+      await roleMenu(row, "Mia Member").click();
+      await page.getByRole("menuitemradio", { name: /^Admin/ }).click();
+      await expect(page.getByText("Mia Member is now an admin.")).toBeVisible();
+      await expect(row.getByRole("button", { name: /^Admin:/ })).toBeVisible(); // the list says so without a reload
+
+      await roleMenu(row, "Mia Member").click();
+      await page.getByRole("menuitem", { name: "Remove from workspace" }).click();
+      const confirm = page.getByRole("dialog");
+      await expect(confirm).toContainText("Remove Mia Member?");
+      await expect(confirm).toContainText("They lose access to this workspace's runs, automations and connections.");
+      await confirm.getByRole("button", { name: "Remove" }).click();
+      await expect(page.getByText("Mia Member was removed from the workspace.")).toBeVisible();
+      await expect(row).toHaveCount(0);
+
+      await removed.page.reload(); // her session still named Olga's workspace: it opens her own instead, no error
+      await expect(removed.page.getByTestId("app-header")).toContainText("Mia's workspace");
+    } finally {
+      await olga.context.close();
+      await removed.context.close();
+    }
+  });
+
+  test("an admin changes members but not the owner, and is never offered Owner; a member only reads the list", async ({ playwright, browser, baseURL }) => {
+    const [owner, adam, mia] = [e2eEmail("members-owner2"), e2eEmail("members-adam"), e2eEmail("members-mia2")];
+    created.push(owner, adam, mia);
+    const olga = await signedInAs(playwright.request, browser, baseURL!, "Olga Owner", owner);
+    const admin = await signedInAs(playwright.request, browser, baseURL!, "Adam Admin", adam);
+    const plain = await signedInAs(playwright.request, browser, baseURL!, "Mia Member", mia);
+    try {
+      await joinByRow(owner, adam, "admin");
+      await joinByRow(owner, mia, "member");
+
+      const page = admin.page;
+      await page.goto("/settings/members");
+      await expect(personRow(page, owner)).toContainText("Owner");
+      await expect(personRow(page, owner).getByRole("button")).toHaveCount(0);
+      await expect(personRow(page, adam).getByRole("button")).toHaveCount(0);
+      await expect(page.getByText("Only an owner can change an owner.")).toBeVisible();
+      await roleMenu(personRow(page, mia), "Mia Member").click();
+      await expect(page.getByRole("menuitemradio")).toHaveText([/^Member/, /^Admin/]); // no Owner for an admin
+      await expect(page.getByRole("menuitem", { name: "Remove from workspace" })).toBeVisible();
+      await page.keyboard.press("Escape");
+
+      await plain.page.goto("/settings/members");
+      await expect(personRow(plain.page, adam)).toContainText("Admin");
+      await expect(plain.page.getByTestId("members").getByRole("button")).toHaveCount(0); // no role menus, no Invite someone
+    } finally {
+      await olga.context.close();
+      await admin.context.close();
+      await plain.context.close();
+    }
+  });
 });
 
 test("inviting someone who is already a member says so in plain words", async ({ page }) => {
