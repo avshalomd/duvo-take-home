@@ -44,7 +44,8 @@ export function VerdictSection({
             {verdict.judgment && (
               <p className="text-sm text-muted-foreground">
                 Checked by a second model: {pct(verdict.judgment.answeredQuery)} confident it answered the query,{" "}
-                {pct(verdict.judgment.followedPlan)} that it followed the plan.
+                {pct(verdict.judgment.followedPlan)} that it followed the plan
+                {verdict.judgment.stayedInBounds !== undefined && `, ${pct(verdict.judgment.stayedInBounds)} that it acted only on your instructions`}.
               </p>
             )}
 

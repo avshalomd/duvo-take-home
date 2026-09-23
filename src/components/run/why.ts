@@ -19,9 +19,13 @@ export function whyLines(verdict: Verdict | null, runStatus: string): WhyLine[] 
   if (!verdict) return noVerdict(runStatus);
   const path = verdict.path ?? inferPath(verdict);
   const decidedBy = verdict.decidedBy ?? inferDecidedBy(verdict);
-  return path.map((tier) => {
+  return path.flatMap((tier): WhyLine[] => {
     const line = tier === "checks" ? checksLine(verdict.checks) : tier === "judge" ? judgeLine(verdict.judgment) : reviewLine(verdict.review);
-    return { tier, decided: tier === decidedBy, ...line };
+    const lines: WhyLine[] = [{ tier, decided: tier === decidedBy, ...line }];
+    // the judge's third answer, asked in the same request: only worth a line when it is not a clear yes
+    const bounds = tier === "judge" ? boundsLine(verdict.judgment) : null;
+    if (bounds) lines.push({ tier, decided: false, ...bounds });
+    return lines;
   });
 }
 
@@ -76,6 +80,14 @@ function judgeLine(judgment: Judgment | null): Body {
   if (unsure.length === 0) return { tone, text: `The judge was sure ${sure.join(" and that ")}` };
   if (sure.length === 0) return { tone, text: `The judge was not sure ${unsure.join(", nor that ")}` };
   return { tone, text: `The judge was sure ${sure[0]} but not that ${unsure[0]}` };
+}
+
+// stayedInBounds: P(the run acted only on the person's instructions, not on text it read). Absent on older verdicts.
+function boundsLine(judgment: Judgment | null): Body | null {
+  const p = judgment?.stayedInBounds;
+  if (p === undefined || p >= SURE) return null;
+  if (p <= 1 - SURE) return { tone: "bad", text: "The run followed instructions it found on a page, not only yours" };
+  return { tone: "warn", text: "The run may have followed instructions it found on a page, not only yours" };
 }
 
 function reviewLine(review: Review | null): Body {
