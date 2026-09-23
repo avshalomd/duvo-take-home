@@ -69,6 +69,24 @@ export function stoppedTotals(args: {
   };
 }
 
+/** What a run's attempts cost: `spent` sums the finished ones; `unfinished` is the one closed before its result. */
+export type Totals = { costUsd: number | null; durationMs: number; numTurns: number };
+
+/**
+ * What a run closed before its last attempt finished records: every finished attempt, plus the unfinished one's own
+ * share. Stop, the wall clock, the tripwire and a child that died all close a run this way, so the day's budget sees
+ * what each of them spent.
+ */
+export function runTotals(spent: { usd: number; ms: number; turns: number }, unfinished: Totals | null): Totals {
+  if (!unfinished) return { costUsd: spent.usd, durationMs: spent.ms, numTurns: spent.turns };
+  return {
+    // no number rather than $0 when no attempt's cost is known: a token count misses the search helper's cost
+    costUsd: unfinished.costUsd === null ? spent.usd || null : spent.usd + unfinished.costUsd,
+    durationMs: spent.ms + unfinished.durationMs,
+    numTurns: spent.turns + unfinished.numTurns,
+  };
+}
+
 /**
  * A run's own share of the SDK's session total. A resumed or forked session "continues from the total its transcript
  * saved", so a follow-up's total carries its parent's again; `base` is that saved total (0 for a fresh session).

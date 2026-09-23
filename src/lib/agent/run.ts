@@ -40,7 +40,7 @@ import { newlyDone } from "./plan-diff";
 import { PLAN_SERVER_KEY } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
 import { resumeOptions, sessionIdOf } from "./session";
-import { ownCost, readSdkTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
+import { ownCost, readSdkTotals, runTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
 import { SYSTEM_PROMPT } from "./system.prompt";
 import { unknownVerdict } from "./unknown-verdict";
 import { removeRunDir } from "./workspace";
@@ -225,22 +225,18 @@ export const runAutomation: RunAutomation = async (runId) => {
   const maxTurn = (events: RunEvent[]) => Math.max(0, ...events.map((e) => Number((e.payload as { turn?: unknown }).turn) || 0));
   const attemptResult = () => recorded.slice(attemptFrom).find((e) => e.kind === "finished")?.payload ?? null;
 
-  // A stopped run keeps what it cost (QA Q129): the finished attempts, plus the one in progress - its result's figures
-  // when the agent had finished, else the SDK's own totals from its transcript, else the time from start to stop.
+  // A run closed early keeps what it cost (QA Q129) - stopped, cut off by the wall clock, tripped, or a child that
+  // died: the finished attempts, plus the one in progress - its result's figures when the agent had finished, else the
+  // SDK's own totals from its transcript, else the time from the attempt's start to now.
   let sessionId: string | null = null;
+  const totalsSoFar = async () => {
+    if (counted) return runTotals(spent, null);
+    const end = attemptResult();
+    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
+    return runTotals(spent, stoppedTotals({ end, sdk, startedAt: attemptStartedAt, now: Date.now(), turns: maxTurn(recorded) - turnsBefore, costBase: attemptBase }));
+  };
   const closeStopped = async () => {
-    let usd: number | null = spent.usd;
-    let ms = spent.ms;
-    let turns = spent.turns;
-    if (!counted) {
-      const end = attemptResult();
-      const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
-      const current = stoppedTotals({ end, sdk, startedAt: attemptStartedAt, now: Date.now(), turns: maxTurn(recorded) - turnsBefore, costBase: attemptBase });
-      usd = current.costUsd === null ? spent.usd || null : spent.usd + current.costUsd;
-      ms += current.durationMs;
-      turns += current.numTurns;
-    }
-    await closeAsCancelled(runId, { costUsd: usd, durationMs: ms, numTurns: turns, healAttempts: heals });
+    await closeAsCancelled(runId, { ...(await totalsSoFar()), healAttempts: heals });
   };
 
   // The MCP servers this run may see: ours, and the workspace's enabled connections. Anything else trips the wire.
@@ -417,8 +413,10 @@ export const runAutomation: RunAutomation = async (runId) => {
     let error = err instanceof Error ? err.message : String(err);
     if (deadline.expired()) error = `timed out after ${Math.round((Date.now() - startedAt) / 1000)} s`;
     if (tripped) error = tripped;
-    // A heal attempt that failed leaves the last verdict as the run's: its tries are over.
-    await updateUnlessCancelled(runId, { status: "failed", error, verdict: lastVerdict, healAttempts: heals, finishedAt: new Date() });
+    // A heal attempt that failed leaves the last verdict as the run's: its tries are over. What every attempt cost is
+    // recorded too, so the day's budget counts a failed run like any other.
+    const totals = await totalsSoFar();
+    await updateUnlessCancelled(runId, { status: "failed", error, verdict: lastVerdict, healAttempts: heals, ...totals, finishedAt: new Date() });
   } finally {
     deadline.clear();
     cancel.stop();
