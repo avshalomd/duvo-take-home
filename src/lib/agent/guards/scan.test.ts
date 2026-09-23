@@ -44,6 +44,22 @@ describe("scanOutput: personal data is counted, never quarantined", () => {
     expect(scanOutput(text("mix.txt", content)).flags.map((f) => f.kind)).toEqual(["email", "phone", "card", "iban"]);
   });
 
+  // Q142: an .svg is the chart tool's (the write guard refuses a hand-written one), and its numbers are data points.
+  const chart = (inner: string) => text("sales.svg", `<svg xmlns="http://www.w3.org/2000/svg">${inner}</svg>`);
+
+  it("does not count phone, card or IBAN shapes in a chart (.svg): its numbers are data points", () => {
+    const out = scanOutput(chart("<text>4111 1111 1111 1111</text><text>020 7946 0958</text><text>GB82 WEST 1234 5698 7654 32</text>"));
+    expect(out).toEqual({ flags: [], quarantined: false });
+  });
+
+  it("still counts email addresses in a chart, which are labels a person typed, not data points", () => {
+    expect(scanOutput(chart("<text>ada@example.com</text>")).flags).toEqual([{ kind: "email", count: 1, detail: "1 email address" }]);
+  });
+
+  it("still quarantines a chart whose title holds a credential", () => {
+    expect(scanOutput(chart(`<title>${apiKey}</title>`)).quarantined).toBe(true);
+  });
+
   it("does not scan a base64 file (.xlsx): its cells are compressed inside a zip", () => {
     const xlsx = { name: "out.xlsx", content: Buffer.from("ada@example.com " + apiKey).toString("base64"), encoding: "base64" as const };
     expect(scanOutput(xlsx)).toEqual({ flags: [], quarantined: false });
@@ -92,6 +108,23 @@ describe("payment card numbers", () => {
     ["an Amex test number", "378282246310005"],
   ])("counts %s that passes the Luhn check", (_what, value) => {
     expect(countCards(`paid with ${value}.`)).toBe(1);
+  });
+
+  // Q142: a chart was labelled "contains 2 payment card numbers" - its data points had long decimals. Each value
+  // below is a ratio as JavaScript prints it (26/12, 8/7, 17/11) whose decimals happen to pass the Luhn check.
+  it.each([
+    ["the decimals of a data point", "y: 2.1666666666666665"],
+    ["a decimal written with a comma", "1,1428571428571428"],
+    ["decimals inside chart markup", '<text y="2.727272727272727">1.5454545454545454</text>'],
+    ["a decimal with no leading digit", "0.4111111111111111"],
+    ["the digits in front of a decimal point", "4111111111111111.5"],
+  ])("does not take %s for a card number", (_what, value) => {
+    expect(countCards(value)).toBe(0);
+  });
+
+  it("still counts a card in a CSV field and at the end of a sentence", () => {
+    expect(countCards("name,4111111111111111,visa")).toBe(1);
+    expect(countCards("Paid with 5555555555554444.")).toBe(1);
   });
 
   it("does not count a 16-digit order id that fails the Luhn check", () => {

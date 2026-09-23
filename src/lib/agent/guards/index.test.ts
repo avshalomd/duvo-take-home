@@ -125,6 +125,17 @@ describe("buildGuardHooks: each guard records its own decisions", () => {
   });
 });
 
+describe("buildGuardHooks: tool sources outside the workspace (Q134)", () => {
+  it("denies a claude.ai connector and records it as blocked by the connection guard", async () => {
+    const { hooks, records } = setup();
+    const out = await call(hooks, "mcp__claude_ai_Gmail__search_threads", { query: "invoices" });
+    expect(decisionOf(out)).toBe("deny");
+    expect(records).toEqual([
+      expect.objectContaining({ guard: "connection", decision: "blocked", target: "claude_ai_Gmail", reason: expect.stringMatching(/not added to the workspace/) }),
+    ]);
+  });
+});
+
 describe("buildGuardHooks: failures", () => {
   it("keeps the decision when recording it fails: a database hiccup must not open the gate", async () => {
     const { hooks } = setup({ record: async () => Promise.reject(new Error("db down")) });

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { Connection } from "@/contracts/connection";
 import { sameServer } from "@/lib/connections/store-origin";
-import { InsetGroup, rowLine } from "./grouped";
+import { FOCUS_ROW, InsetGroup, rowLine } from "./grouped";
 import { SHEET, SHEET_DESCRIPTION, SHEET_TITLE, SheetActions } from "./sheet";
 import { submitKeepingValues } from "./submit-keeping-values";
 
@@ -228,7 +228,7 @@ function TextRow({
 }) {
   return (
     // the focused row turns paper with an inset ring: the field itself has no border to carry the focus
-    <li className={`${rowLine()} focus-within:bg-paper focus-within:shadow-[inset_0_0_0_2px_var(--ring)]`}>
+    <li className={`${rowLine()} ${FOCUS_ROW} focus-within:bg-paper`}>
       <label className="flex min-h-[48px] items-center gap-3 px-4">
         <span className="w-[72px] shrink-0">{label}</span>
         <input

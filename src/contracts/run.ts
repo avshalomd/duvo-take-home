@@ -58,6 +58,13 @@ export const RunEvent = z.discriminatedUnion("kind", [
     reason: z.string(),
     target: z.string().optional(), // the path, host or connection the call was about
   }) }),
+  // v2: auto-heal - the evaluator failed the result and the agent is fixing it (attempt n of max), with what it was told
+  z.object({ ...Base, kind: z.literal("heal"), payload: z.looseObject({
+    attempt: z.number().int().min(1),
+    max: z.number().int().min(1),
+    reasons: z.array(z.string()), // the verdict's reasons in plain words, as shown under "Why?"
+    feedback: z.string(), // the exact instructions the agent was given
+  }) }),
   // v2: the per-step check - Jev's reading of whether a finished step did what its title says
   z.object({ ...Base, kind: z.literal("check"), payload: z.looseObject({
     stepIndex: z.number().int().min(0),
@@ -119,6 +126,7 @@ export const Run = z.object({
   cancelRequested: z.boolean().optional(),
   humanVerdict: z.enum(["approved", "rejected"]).nullable().optional(), // the person's own judgment
   humanNote: z.string().nullable().optional(),
+  healAttempts: z.number().int().optional(), // how many times the run fixed its own result after a failing verdict
 });
 export type Run = z.infer<typeof Run>;
 
@@ -140,6 +148,7 @@ export const RunState = z.object({
   // v2: the per-step checks by step index (the latest per step), and the guard decisions that were not "allowed"
   stepChecks: z.array(z.object({ stepIndex: z.number().int(), onTrack: z.number(), note: z.string() })).optional(),
   guards: z.array(z.object({ guard: z.string(), decision: z.string(), reason: z.string(), target: z.string().optional() })).optional(),
+  heals: z.array(z.object({ attempt: z.number().int(), max: z.number().int(), reasons: z.array(z.string()) })).optional(), // auto-heal attempts, in order
 });
 export type RunState = z.infer<typeof RunState>;
 

@@ -62,5 +62,13 @@ export const EvaluateInput = z.object({
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
 export type EvaluateRun = (input: EvaluateInput) => Promise<Verdict>;
 
+// Feedback from the evaluator to the agent (his call, 2026-09-23): the same findings drive auto-heal and are carried
+// into "Ask for a change", so the agent is told exactly what failed and what to change, in its own terms.
+/** The verdict turned into instructions for the agent: each failed check with its detail, the reviewer's change. */
+export type FeedbackForAgent = (verdict: Verdict) => string;
+/** Whether a failing verdict is one the agent can fix by working again (bad or missing files, an unfinished task,
+ *  the reviewer's change) - not an unavailable judge, a pass, or a run the agent itself did not finish. */
+export type IsHealable = (verdict: Verdict, agentFinished: boolean) => boolean;
+
 // Re-run the evaluator on a stored run (the Re-evaluate button): loads the run, its plan and files, stores the new verdict.
 export type ReevaluateRun = (runId: string) => Promise<Verdict>;

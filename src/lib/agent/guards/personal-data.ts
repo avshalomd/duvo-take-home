@@ -44,8 +44,10 @@ export function countPhones(text: string): number {
 
 // ---- payment card numbers
 // 13 to 19 digits: in groups of four (Visa, Mastercard), 4-6-5 (Amex), or unbroken. The word boundaries keep a
-// card-length slice of a longer number from matching.
-const CARD = /\b(?:\d{4}([ -]?)\d{4}\1\d{4}\1\d{1,4}|\d{4}([ -]?)\d{6}\2\d{5}|\d{13,19})\b/g;
+// card-length slice of a longer number from matching; the lookarounds keep it from being the half of a decimal
+// (2.1666666666666665 from a chart passed Luhn, Q142): no digit, and no digit-and-point, on either side. A comma
+// or a full stop on its own - a CSV field, the end of a sentence - is still fine.
+const CARD = /(?<!\d[.,]?)\b(?:\d{4}([ -]?)\d{4}\1\d{4}\1\d{1,4}|\d{4}([ -]?)\d{6}\2\d{5}|\d{13,19})\b(?![.,]?\d)/g;
 
 /** The Luhn checksum every card number carries: double every second digit from the right, the sum ends in 0. */
 export function luhn(digits: string): boolean {
