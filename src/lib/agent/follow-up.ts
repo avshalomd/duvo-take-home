@@ -10,7 +10,7 @@ type RunRow = typeof runs.$inferSelect;
 const MAX_THREAD = 20; // a thread of follow-ups longer than this is cut: the oldest changes are the least relevant
 
 /** The instructions a run answers: its own prompt, or for a follow-up the thread's first prompt and every change since. */
-async function instructionsOf(run: RunRow, workspaceId: string): Promise<string> {
+export async function instructionsOf(run: RunRow, workspaceId: string): Promise<string> {
   const changes: string[] = [];
   let current = run;
   for (let hops = 0; current.purpose === "followup" && current.parentRunId && hops < MAX_THREAD; hops++) {
