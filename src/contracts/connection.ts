@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isPrivateHost } from "@/lib/net/address";
 
 // A connection is one of the user's MCP servers over http. The token never leaves the server: the UI gets hasToken.
 export const Transport = z.enum(["http", "sse"]);
@@ -18,17 +19,15 @@ export const Connection = z.object({
 export type Connection = z.infer<typeof Connection>;
 
 // Only a public http(s) host: the SDK child fetches this URL server-side, so loopback, link-local and private
-// ranges would turn a connection into a request into our own network (QA round 3, Q46).
-const PRIVATE_HOST = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|metadata\.google)/i;
-// IPv6 unique-local (fc/fd), link-local (fe80-febf), IPv4-mapped, and *.localhost (the guards package, v2).
-const PRIVATE_HOST_V6 = /\.localhost\.?$|^\[(?:f[cd]|fe[89ab]|::ffff:)/i;
-/** One rule for "a private or local host", shared by the connection form and the agent's url guard. A name that
- *  resolves to a private address is not caught: that needs the DNS lookup the fetch itself makes. */
-export const isPrivateHost = (hostname: string) => PRIVATE_HOST.test(hostname) || PRIVATE_HOST_V6.test(hostname);
+// ranges would turn a connection into a request into our own network (QA round 3, Q46). The rule is by what an
+// address is, not how it is spelled (lib/net/address.ts, security QA); this schema check covers what was typed, and
+// a name that resolves inside is refused where it is looked up: on save, on every sign-in fetch and at run start.
+export { isPrivateHost }; // the rule, re-exported beside the schema that uses it
+export const PRIVATE_ADDRESS = "That address points at a private or local network, which a connection cannot reach";
 export const publicHttpUrl = z
   .url("Give the server's full address, starting with https://")
   .refine((u) => /^https?:\/\//i.test(u), "Only http:// or https:// addresses can be connected")
-  .refine((u) => { try { return !isPrivateHost(new URL(u).hostname); } catch { return false; } }, "That address points at a private or local network, which a connection cannot reach");
+  .refine((u) => { try { return !isPrivateHost(new URL(u).hostname); } catch { return false; } }, PRIVATE_ADDRESS);
 
 const RESERVED_KEYS = ["plan", "outputs"];
 

@@ -34,6 +34,22 @@ test("the API refuses a sign-up without an invitation too, and no account is mad
   expect(signIn.status()).toBe(401);
 });
 
+// Security QA: an invited address alone was enough to make its account (and then take the invitation). The sign-up
+// must come from the invitation's link: its page leaves the invitation in a cookie the sign-up request carries.
+test("the API refuses an invited email's sign-up that did not come from the invitation's link", async ({ request, baseURL }) => {
+  const invitee = e2eEmail("io-nolink");
+  created.push(invitee);
+  await inviteByRow(DEMO_EMAIL, invitee);
+  const res = await request.post("/api/auth/sign-up/email", {
+    data: { name: "Mallory", email: invitee, password: E2E_PASSWORD },
+    headers: { origin: baseURL! },
+  });
+  expect(res.status()).toBe(403);
+  expect((await res.json()).code).toBe("SIGNUP_INVITE_ONLY");
+  const signIn = await request.post("/api/auth/sign-in/email", { data: { email: invitee, password: E2E_PASSWORD }, headers: { origin: baseURL! } });
+  expect(signIn.status()).toBe(401); // no account was made
+});
+
 test("an invitation's link still leads to a sign-up form, and the new account joins the workspace", async ({ page }) => {
   const invitee = e2eEmail("io-invitee");
   created.push(invitee);

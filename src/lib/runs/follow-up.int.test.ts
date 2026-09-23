@@ -1,6 +1,6 @@
 // "Ask for a change", against the real tables. `npm run test:int`. RUNNER=queue, so the follow-up becomes a jobs row
 // instead of an agent run. Runs are "[int] ..." in workspace "int-engine-followup", deleted after.
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, runs, workspaceSettings } from "@/db/schema";
@@ -23,11 +23,16 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.stubEnv("RUNNER", "queue");
 });
-afterAll(async () => {
-  vi.unstubAllEnvs();
+async function clearRuns() {
   const mine = db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS, OTHER_WS]));
   await db.delete(jobs).where(inArray(jobs.runId, mine));
   await db.delete(runs).where(inArray(runs.workspaceId, [WS, OTHER_WS]));
+}
+// After each test too: the runs one leaves in flight would count against the deployment's cap (lib/runs/limits.ts).
+afterEach(clearRuns);
+afterAll(async () => {
+  vi.unstubAllEnvs();
+  await clearRuns();
   await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OTHER_WS]));
 });
 

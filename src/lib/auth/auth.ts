@@ -5,6 +5,8 @@ import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { invitationIdFromCookies } from "./invitation-cookie";
+import { refuseInvitationLists, stripInvitationsForMembers } from "./invitation-privacy";
 import { googleConfigured } from "./providers";
 import { assertMayCreateAccount } from "./signup";
 import { createPersonalWorkspace, firstWorkspaceId } from "./workspaces";
@@ -30,9 +32,11 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // SIGNUP_MODE=invite: no account without a pending invitation, however it is asked for (form, API, Google).
-        before: async (user) => {
-          await assertMayCreateAccount(user.email);
+        // SIGNUP_MODE=invite: no account without the invitation's link, however it is asked for (form, API, Google).
+        // The form's request and Google's callback both carry the cookie the invitation page left.
+        before: async (user, ctx) => {
+          const cookies = (ctx?.headers ?? ctx?.request?.headers)?.get("cookie");
+          await assertMayCreateAccount(user.email, invitationIdFromCookies(cookies));
         },
         // Every new account, by password or by Google, gets its own workspace with the user as owner.
         after: async (user) => {
@@ -51,6 +55,8 @@ export const auth = betterAuth({
       },
     },
   },
+  // Invitation ids go to owners and admins only (lib/auth/invitation-privacy.ts): the plugin would give them to any member.
+  hooks: { before: refuseInvitationLists, after: stripInvitationsForMembers },
   plugins: [organization(), nextCookies()], // nextCookies last: it sets cookies from Server Actions
 });
 

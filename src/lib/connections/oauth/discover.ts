@@ -32,20 +32,20 @@ export async function discoverSignIn(serverUrl: string, fetchFn: FetchLike = pub
   try {
     info = await discoverOAuthServerInfo(serverUrl, { resourceMetadataUrl: probe.resourceMetadataUrl, fetchFn });
   } catch (e) {
-    throw new SignInError(`The server's sign-in details could not be read: ${serverWords(e)}`);
+    throw new SignInError("unreadable", `The server's sign-in details could not be read: ${serverWords(e)}`);
   }
   if (!info.authorizationServerMetadata) {
     // No metadata anywhere: a server that answered the probe needs nothing; one that refused wants a token.
-    throw new SignInError(
-      probe.status < 400 ? "This server works without signing in, so it needs neither a sign-in nor a token" : "This server does not offer sign-in; add a token instead",
-    );
+    throw probe.status < 400
+      ? new SignInError("no_sign_in_needed", "This server works without signing in, so it needs neither a sign-in nor a token")
+      : new SignInError("token_only", "This server does not offer sign-in; add a token instead");
   }
 
   let resource: string | null = null;
   if (info.resourceMetadata) {
     // The tokens are asked for this server only; metadata claiming another resource would get us tokens for it.
     if (!checkResourceAllowed({ requestedResource: resourceUrlFromServerUrl(serverUrl), configuredResource: info.resourceMetadata.resource })) {
-      throw new SignInError(`The server's sign-in metadata names a different server (${info.resourceMetadata.resource}), so it cannot be signed in to safely`);
+      throw new SignInError("other_server", `The server's sign-in metadata names a different server (${info.resourceMetadata.resource}), so it cannot be signed in to safely`);
     }
     resource = info.resourceMetadata.resource;
   }
@@ -65,7 +65,7 @@ async function probeServer(serverUrl: string, fetchFn: FetchLike) {
       body: JSON.stringify(INITIALIZE),
     });
   } catch (e) {
-    throw new SignInError(`Could not reach ${new URL(serverUrl).host}: ${serverWords(e)}`);
+    throw new SignInError("unreachable", `Could not reach ${new URL(serverUrl).host}: ${serverWords(e)}`);
   }
   const hints = res.status === 401 ? extractWWWAuthenticateParams(res) : {};
   await res.body?.cancel(); // a server that answered may be streaming; we only needed the status and the headers

@@ -1,25 +1,40 @@
 import { tokenBucket, type Bucket } from "./rate-limit";
 
 /**
- * Who may start a run. The app has no accounts (QA Q48), so an anonymous visitor could otherwise start runs until
- * the model budget was gone: two limits, both decided here so the Server Action and the route handler share them.
+ * Who may start a run, beyond the workspace's own limits (lib/usage/budget.ts): two limits for the whole deployment,
+ * both decided here so the Server Action and the route handler share them.
  */
-export const MAX_IN_FLIGHT = 3; // agent runs are minutes long and cost up to $1 each
+// Anyone can make an account and workspaces, each with limits of its own, and every run spends the operator's model
+// key (security QA): so the deployment keeps a cap of its own across all workspaces. Six leaves room for two
+// workspaces running their default three at once; agent runs are minutes long and cost up to $1 each.
+export const MAX_IN_FLIGHT = 6;
 export const IN_FLIGHT_STATUSES = ["queued", "running", "evaluating"] as const;
 export const STARTS_PER_IP = 5;
 export const STARTS_WINDOW_MS = 10 * 60_000;
 
-export const IN_FLIGHT_MESSAGE = "Three runs are already in progress - try again in a minute";
-export const RATE_LIMIT_MESSAGE = "Too many runs from this address - try again later";
+export const IN_FLIGHT_MESSAGE = "Handover is busy with other runs right now - try again in a minute";
+
+/** "in about 5 minutes": the wait rounded up to whole minutes, so the person is never told to come back too early. */
+function inWords(ms: number): string {
+  if (ms < 60_000) return "in less than a minute";
+  const minutes = Math.ceil(ms / 60_000);
+  return minutes === 1 ? "in about a minute" : `in about ${minutes} minutes`;
+}
+
+/** Q206: when to try again, as the daily limit says when it resets, instead of "later". */
+export const rateLimitMessage = (waitMs: number) => `Too many runs from this address - try again ${inWords(waitMs)}`;
 
 /** The process-wide bucket. Per instance, and that is the point: it needs no table and no round trip. */
 export const startsByIp = tokenBucket(STARTS_PER_IP, STARTS_WINDOW_MS);
 
-/** A readable reason to refuse the start, or null to let it through. The clock and the count are passed in. */
-export function startBlockReason(args: { inFlight: number; ip: string; now: number; bucket: Bucket }): string | null {
-  // The global cap is checked first so a visitor refused because someone else filled the queue keeps their tokens.
+/**
+ * A readable reason to refuse the start, or null to let it through. `inFlight` is the deployment's count, across
+ * every workspace; `ip` is null for a scheduled start, which has no caller to brake but meets the cap all the same.
+ */
+export function startBlockReason(args: { inFlight: number; ip: string | null; now: number; bucket: Bucket }): string | null {
+  // The deployment's cap is checked first so a visitor refused because others filled it keeps their tokens.
   if (args.inFlight >= MAX_IN_FLIGHT) return IN_FLIGHT_MESSAGE;
-  if (!args.bucket.take(args.ip, args.now)) return RATE_LIMIT_MESSAGE;
+  if (args.ip !== null && !args.bucket.take(args.ip, args.now)) return rateLimitMessage(args.bucket.retryAfter(args.ip, args.now));
   return null;
 }
 

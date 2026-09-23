@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { discoverSignIn } from "./discover";
 import { SignInError } from "./errors";
 import { guardedFetch } from "./fetch";
+
+const allPublic = async () => ({ reach: "public" as const }); // no DNS in unit tests
 import { AS_METADATA, AS_URL, MCP_URL, PRM, fakeFetch, json, oauthServerRoutes, unauthorized } from "./fake-server";
 
 describe("discoverSignIn", () => {
@@ -68,12 +70,15 @@ describe("discoverSignIn", () => {
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow("This server does not offer sign-in; add a token instead");
+    await expect(failed).rejects.toMatchObject({ code: "token_only" });
   });
 
   it("says a server that answers without any sign-in needs none", async () => {
     const fetchFn = fakeFetch({ [`POST ${MCP_URL}`]: () => json({ jsonrpc: "2.0", id: 1, result: {} }) });
 
-    await expect(discoverSignIn(MCP_URL, fetchFn)).rejects.toThrow("This server works without signing in, so it needs neither a sign-in nor a token");
+    const failed = discoverSignIn(MCP_URL, fetchFn);
+    await expect(failed).rejects.toThrow("This server works without signing in, so it needs neither a sign-in nor a token");
+    await expect(failed).rejects.toMatchObject({ code: "no_sign_in_needed" });
   });
 
   it("says so when the server cannot be reached, naming the host", async () => {
@@ -85,12 +90,13 @@ describe("discoverSignIn", () => {
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow(/could not reach mcp\.example\.com/i);
+    await expect(failed).rejects.toMatchObject({ code: "unreachable" });
   });
 
   it("never fetches a private address a hostile server redirects the probe to (QA Q83)", async () => {
     const server = fakeFetch({ [`POST ${MCP_URL}`]: () => new Response(null, { status: 302, headers: { location: "http://localhost:5432/" } }) });
 
-    const failed = discoverSignIn(MCP_URL, guardedFetch(server));
+    const failed = discoverSignIn(MCP_URL, guardedFetch(server, allPublic));
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow(/Could not reach mcp\.example\.com: Refused to follow a redirect to localhost:5432/);
@@ -106,7 +112,7 @@ describe("discoverSignIn", () => {
       ["GET https://mcp.example.com/.well-known/openid-configuration"]: toMetadataService,
     });
 
-    await expect(discoverSignIn(MCP_URL, guardedFetch(server))).rejects.toBeInstanceOf(SignInError);
+    await expect(discoverSignIn(MCP_URL, guardedFetch(server, allPublic))).rejects.toBeInstanceOf(SignInError);
     expect(server.calls.some((c) => c.url.includes("169.254.169.254"))).toBe(false);
   });
 

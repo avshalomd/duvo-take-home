@@ -3,7 +3,12 @@
  * In memory, so it is per server instance and resets on a deploy - enough to stop one visitor spending the
  * budget in a minute, not a substitute for the auth on the roadmap (QA Q48).
  */
-export type Bucket = { take(key: string, now: number): boolean; size(now: number): number };
+export type Bucket = {
+  take(key: string, now: number): boolean;
+  /** Milliseconds until the key may take again: 0 now, else when its oldest start leaves the window (Q206). */
+  retryAfter(key: string, now: number): number;
+  size(now: number): number;
+};
 
 export function tokenBucket(limit: number, windowMs: number): Bucket {
   const seen = new Map<string, number[]>();
@@ -24,6 +29,11 @@ export function tokenBucket(limit: number, windowMs: number): Bucket {
       if (times.length >= limit) return false;
       seen.set(key, [...times, now]);
       return true;
+    },
+    retryAfter(key, now) {
+      prune(now);
+      const times = seen.get(key) ?? [];
+      return times.length < limit ? 0 : times[0] + windowMs - now; // times are in the order taken: the first leaves first
     },
     size(now) {
       prune(now);

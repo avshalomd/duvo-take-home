@@ -4,6 +4,7 @@ import {
   DEMO_PASSWORD,
   E2E_PASSWORD,
   SIGNED_OUT,
+  closeInvitation,
   deleteUsers,
   e2eEmail,
   formError,
@@ -97,6 +98,20 @@ test("the sign-in pages carry the product's name, Handover", async ({ page }) =>
   await expect(page.getByRole("region", { name: "What Handover does" })).toContainText("Handover");
 });
 
+// Security QA: another site could frame the app (clickjacking).
+test("pages and the API tell the browser they may not be framed, and do not name the framework", async ({ page, request }) => {
+  const res = await page.goto("/sign-in");
+  const pageHeaders = res!.headers();
+  const apiHeaders = (await request.get("/api/runs", { maxRedirects: 0 })).headers();
+  for (const h of [pageHeaders, apiHeaders]) {
+    expect(h["x-frame-options"]).toBe("DENY");
+    expect(h["content-security-policy"]).toBe("frame-ancestors 'none'");
+    expect(h["x-content-type-options"]).toBe("nosniff");
+    expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(h["x-powered-by"]).toBeUndefined();
+  }
+});
+
 test("a signed-out visit to / goes to /sign-in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL((url) => url.pathname === "/sign-in");
@@ -164,9 +179,66 @@ test("an invitation link lets a new person create an account and join the worksp
   }
 });
 
+// Security QA: a plain member could read pending invitations' ids from Better Auth's API, then sign up as the invited
+// address and accept one as an admin. Ids go to owners and admins only, over HTTP as in the pages.
+test("Better Auth's API hands a plain member no invitation ids, and still hands them to the owner", async ({ playwright, baseURL }) => {
+  const owner = e2eEmail("ids-owner");
+  const plain = e2eEmail("ids-member");
+  const pending = e2eEmail("ids-pending");
+  created.push(owner, plain, pending);
+  const asOwner = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL! } });
+  const asMember = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL! } });
+  try {
+    await expect(await asOwner.post("/api/auth/sign-up/email", { data: { name: "Oona Owner", email: owner, password: E2E_PASSWORD } })).toBeOK();
+    const joining = await inviteByRow(owner, plain);
+    const pendingId = await inviteByRow(owner, pending);
+    await expect(await asMember.post("/api/auth/sign-up/email", { data: { name: "Pia Plain", email: plain, password: E2E_PASSWORD } })).toBeOK();
+    await expect(await asMember.post("/api/auth/organization/accept-invitation", { data: { invitationId: joining } })).toBeOK();
+
+    expect((await asMember.get("/api/auth/organization/list-invitations")).status()).toBe(403);
+    const full = await asMember.get("/api/auth/organization/get-full-organization");
+    await expect(full).toBeOK();
+    expect((await full.json()).invitations).toEqual([]);
+    expect(await full.text()).not.toContain(pendingId);
+
+    const forOwner = await asOwner.get("/api/auth/organization/list-invitations");
+    expect((await forOwner.json()).map((i: { id: string }) => i.id)).toContain(pendingId);
+  } finally {
+    await asOwner.dispose();
+    await asMember.dispose();
+  }
+});
+
 test("an unknown invitation link says it was not found, not that it closed (production QA, 2026-09-23)", async ({ page }) => {
   await page.goto("/invite/e2e-no-such-invitation");
   await expect(page.getByRole("heading", { name: "We could not find this invitation" })).toBeVisible();
+  // UX QA: signed out there is no workspace to go to; the way on is to sign in
+  await expect(page.getByRole("link", { name: "Go to your workspace" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-in");
+});
+
+test("a used invitation's link, opened signed out, offers to sign in rather than a workspace", async ({ page }) => {
+  const owner = e2eEmail("closed-owner");
+  const invitee = e2eEmail("closed-invitee");
+  created.push(owner, invitee);
+  await signUpThroughUi(page, "Carl Closed", owner);
+  const invitationId = await inviteByRow(owner, invitee);
+  await page.context().clearCookies(); // the invitee's browser, signed out
+  await closeInvitation(invitationId);
+
+  await page.goto(`/invite/${invitationId}`);
+  await expect(page.getByRole("heading", { name: "This invitation is closed" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in");
+  await expect(page.getByRole("link", { name: "Go to your workspace" })).toHaveCount(0);
+});
+
+test("an unknown invitation link, opened signed in, still offers the way back to the workspace", async ({ page }) => {
+  await page.goto("/sign-in");
+  await signInThroughUi(page, DEMO_EMAIL, DEMO_PASSWORD);
+  await page.waitForURL((url) => url.pathname === "/");
+  await page.goto("/invite/e2e-no-such-invitation");
+  await expect(page.getByRole("link", { name: "Go to your workspace" })).toBeVisible();
 });
 
 test("a new workspace made from the user menu opens at once, and the menu switches back", async ({ page }) => {

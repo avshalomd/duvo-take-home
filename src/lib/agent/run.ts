@@ -28,6 +28,7 @@ import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
 import { childEnv, ISOLATION } from "./child-env";
 import { closeAsCancelled, updateUnlessCancelled } from "./close";
+import { reachableConnections } from "./connection-reach";
 import { statusUpdates } from "./connection-status";
 import { startDeadline, within } from "./deadline";
 import { prepareFollowUp } from "./follow-up";
@@ -54,9 +55,13 @@ const EVAL_TOO_LONG = "the check took too long; press Re-evaluate to try again";
  *  On Vercel the code directory is read-only, so the run lives under the function's temp dir instead. */
 export const runDir = (runId: string) => path.join(process.env.VERCEL ? os.tmpdir() : process.cwd(), "runs", runId);
 
-/** The workspace's enabled connections as MCP servers, keyed so their tools arrive as mcp__<key>__<tool>. */
+/**
+ * The workspace's enabled connections as MCP servers, keyed so their tools arrive as mcp__<key>__<tool>. One whose
+ * address now leads inside our network (or cannot be looked up) is left out, and its status says why.
+ */
 async function connectionServers(workspaceId: string) {
-  const enabled = await listEnabledConnectionsWithSecrets(workspaceId);
+  const { usable: enabled, leftOut } = await reachableConnections(await listEnabledConnectionsWithSecrets(workspaceId));
+  for (const c of leftOut) await recordConnectionSeen(c.id, { lastStatus: c.lastStatus });
   const servers: Record<string, { type: "http" | "sse"; url: string; headers?: Record<string, string> }> = {};
   for (const c of enabled) {
     servers[connectionKey(c.name)] = { type: c.transport, url: c.url, headers: await authHeaders(c) }; // the token never leaves the server

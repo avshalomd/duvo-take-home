@@ -95,6 +95,7 @@ describe("completeOAuth", () => {
 
     await expect(again).rejects.toBeInstanceOf(SignInError);
     await expect(again).rejects.toThrow("This sign-in link has expired or was already used; start the sign-in again");
+    await expect(again).rejects.toMatchObject({ code: "expired" });
     expect(tokenCalls(server.calls)).toHaveLength(1);
   });
 
@@ -130,6 +131,7 @@ describe("completeOAuth", () => {
 
     await expect(failed).rejects.toBeInstanceOf(SignInError);
     await expect(failed).rejects.toThrow("The server did not accept the sign-in: Authorization code expired");
+    await expect(failed).rejects.toMatchObject({ code: "token_refused" });
     expect(stored().pending).toBeNull();
     expect(stored().tokens).toBeNull();
   });
