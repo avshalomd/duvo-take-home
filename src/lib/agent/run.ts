@@ -23,6 +23,7 @@ import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
 import { getLimits } from "@/lib/usage/budget";
 import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
+import { childEnv, ISOLATION } from "./child-env";
 import { closeAsCancelled, updateUnlessCancelled } from "./close";
 import { statusUpdates } from "./connection-status";
 import { startDeadline } from "./deadline";
@@ -30,6 +31,7 @@ import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
 import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
+import { tripwireReason, unexpectedServers } from "./mcp-tripwire";
 import { newlyDone } from "./plan-diff";
 import { PLAN_SERVER_KEY } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
@@ -211,6 +213,10 @@ export const runAutomation: RunAutomation = async (runId) => {
     await closeAsCancelled(runId, stoppedTotals({ end, sdk, startedAt, now: Date.now(), turns, costBase }));
   };
 
+  // The MCP servers this run may see: ours, and the workspace's enabled connections. Anything else trips the wire.
+  const allowedServers = [PLAN_SERVER_KEY, OUTPUTS_SERVER_KEY, ...Object.keys(servers)];
+  let tripped: string | null = null;
+
   // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
   // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
   try {
@@ -218,7 +224,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       prompt,
       options: {
         cwd: dir,
-        settingSources: [], // never load this repo's or the user's settings into the child (hooks, CLAUDE.md)
+        ...ISOLATION, // no settings files, only the MCP servers below, no claude.ai connectors (QA Q134)
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         abortController: deadline.controller,
@@ -247,7 +253,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         systemPrompt, // a plain string replaces Claude Code's large preset prompt
         // The user's servers first and ours last: a connection keyed "plan" or "outputs" must never replace our own tools.
         mcpServers: { ...servers, [PLAN_SERVER_KEY]: createPlanServer(), [OUTPUTS_SERVER_KEY]: outputs },
-        env: { ...process.env }, // env REPLACES the child's environment: without the spread it has no API key
+        env: childEnv(process.env), // env REPLACES the child's environment: an allowlist, never the parent's session or keys
         ...resume, // a follow-up: { resume, forkSession } when the parent's session is still on this machine
       },
     });
@@ -258,9 +264,20 @@ export const runAutomation: RunAutomation = async (runId) => {
         sessionId = id;
         await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up resumes
       }
-      await write(map(message, 0, now()));
+      const events = map(message, 0, now());
+      await write(events);
+      // The tripwire: a tool source in init that is neither ours nor the workspace's stops the run before the agent
+      // can call it, whatever let it in (QA Q134).
+      const started = events.find((e) => e.kind === "started");
+      const foreign = started ? unexpectedServers(started.payload.mcp_servers.map((s) => s.name), allowedServers) : [];
+      if (foreign.length) {
+        tripped = tripwireReason(foreign);
+        deadline.controller.abort();
+        break;
+      }
     }
     deadline.clear(); // the stream is done; nothing left to abort
+    if (tripped) throw new Error(tripped);
     await settle();
     const written = await storeFiles();
 
@@ -314,11 +331,10 @@ export const runAutomation: RunAutomation = async (runId) => {
       return;
     }
     // An abort reads as a generic "aborted" error, so say which limit ended the run.
-    const error = deadline.expired()
-      ? `timed out after ${Math.round(AgentLimits.wallClockMs / 1000)} s`
-      : err instanceof Error
-        ? err.message
-        : String(err);
+    // The tripwire's own reason first: its abort must not read as a timeout or a bare "aborted".
+    let error = err instanceof Error ? err.message : String(err);
+    if (deadline.expired()) error = `timed out after ${Math.round(AgentLimits.wallClockMs / 1000)} s`;
+    if (tripped) error = tripped;
     await updateUnlessCancelled(runId, { status: "failed", error, finishedAt: new Date() });
   } finally {
     deadline.clear();
