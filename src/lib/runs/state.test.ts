@@ -144,3 +144,60 @@ describe("deriveState", () => {
     expect(state.currentStep).toBeNull();
   });
 });
+
+// v2: the stepper's per-step marks, the guards' notices and Stop all read from the same events.
+describe("deriveState - per-step checks, guards and a stopped run", () => {
+  const { run, events } = fixture(RUNNING);
+  const check = (seq: number, stepIndex: number, onTrack: number, note: string): RunEvent => ({
+    seq, at: "2026-09-22T09:40:00.000Z", kind: "check", payload: { stepIndex, onTrack, note },
+  });
+  type Decision = "allowed" | "blocked" | "flagged" | "unchecked";
+  const guard = (seq: number, g: "path" | "url" | "write" | "connection", decision: Decision, target?: string): RunEvent => ({
+    seq, at: "2026-09-22T09:40:00.000Z", kind: "guard", payload: { guard: g, tool: "WebFetch", decision, reason: `${g} ${decision}`, target },
+  });
+
+  it("keeps the latest check of each step, in step order", () => {
+    const withChecks = [...events, check(90, 1, 0.9, "read all three"), check(91, 0, 0.3, "found only two"), check(92, 0, 0.8, "found all three")];
+    expect(deriveState(run, withChecks).stepChecks).toEqual([
+      { stepIndex: 0, onTrack: 0.8, note: "found all three" },
+      { stepIndex: 1, onTrack: 0.9, note: "read all three" },
+    ]);
+  });
+
+  it("has no step checks on a run that was never checked", () => {
+    expect(deriveState(run, events).stepChecks).toEqual([]);
+  });
+
+  it("lists the guard decisions that stopped, marked or could not check something, and leaves out the allowed ones", () => {
+    const withGuards = [...events, guard(90, "url", "allowed"), guard(91, "url", "blocked", "evil.example"), guard(92, "connection", "flagged", "github"), guard(93, "write", "unchecked")];
+    expect(deriveState(run, withGuards).guards).toEqual([
+      { guard: "url", decision: "blocked", reason: "url blocked", target: "evil.example" },
+      { guard: "connection", decision: "flagged", reason: "connection flagged", target: "github" },
+      { guard: "write", decision: "unchecked", reason: "write unchecked" },
+    ]);
+  });
+
+  it("has no guard notices when every call was allowed", () => {
+    expect(deriveState(run, [...events, guard(90, "path", "allowed")]).guards).toEqual([]);
+  });
+
+  it("says a stopped run is cancelled, with no error and no step still running", () => {
+    const plan: Plan = {
+      intent: "x", expectedOutputs: ["y"], sources: [],
+      steps: [
+        { index: 0, title: "Find", status: "done" },
+        { index: 1, title: "Read", status: "running" },
+      ],
+    };
+    const stopped: RunEvent[] = [
+      ...events,
+      { seq: 90, at: "2026-09-22T09:40:00.000Z", kind: "plan", payload: plan },
+      { seq: 91, at: "2026-09-22T09:41:00.000Z", kind: "finished", payload: { subtype: "error_during_execution", is_error: true, num_turns: 3, duration_ms: 9000, total_cost_usd: 0.02, result: "aborted by the user" } },
+    ];
+    const state = deriveState({ ...run, status: "cancelled", error: "cancelled" }, stopped);
+    expect(state.status).toBe("cancelled");
+    expect(state.error).toBeNull(); // pressing Stop is not a failure
+    expect(state.currentStep).toBeNull(); // nothing is being worked on any more
+    expect(state.plan?.steps[1].status).toBe("running"); // the plan stays as the agent left it: the stepper says where it stopped
+  });
+});

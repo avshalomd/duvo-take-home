@@ -14,7 +14,7 @@ export function VerdictSection({
   connections: { name: string }[];
   runStatus: string;
 }) {
-  const finished = runStatus === "succeeded" || runStatus === "failed";
+  const finished = runStatus === "succeeded" || runStatus === "failed" || runStatus === "cancelled";
   // the escalation's reasoning is also copied into reasons by the evaluator: show it once, under Review
   const reasons = verdict?.reasons.filter((r) => r !== verdict.review?.reasoning) ?? [];
 
@@ -28,8 +28,9 @@ export function VerdictSection({
         ) : (
           <>
             <ul className="space-y-1 text-sm">
-              {verdict.checks.map((c) => (
-                <li key={c.id} className="flex gap-2">
+              {verdict.checks.map((c, i) => (
+                // not c.id alone: a check that runs once per file ("content") repeats its id
+                <li key={`${c.id}-${i}`} className="flex gap-2">
                   <span className={c.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
                     {c.ok ? "PASS" : "FAIL"}
                   </span>
@@ -44,7 +45,16 @@ export function VerdictSection({
             {verdict.judgment && (
               <p className="text-sm text-muted-foreground">
                 Checked by a second model: {pct(verdict.judgment.answeredQuery)} confident it answered the query,{" "}
-                {pct(verdict.judgment.followedPlan)} that it followed the plan.
+                {pct(verdict.judgment.followedPlan)} that it followed the plan
+                {verdict.judgment.stayedInBounds !== undefined && `, ${pct(verdict.judgment.stayedInBounds)} that it acted only on your instructions`}.
+              </p>
+            )}
+
+            {/* v2 verdicts say which tiers ran and which one decided; a v1 verdict has neither */}
+            {verdict.path && (
+              <p className="text-xs text-muted-foreground">
+                Tiers run: {verdict.path.join(" -> ")}
+                {verdict.decidedBy && `; decided by: ${verdict.decidedBy}`}
               </p>
             )}
 
@@ -63,8 +73,9 @@ export function VerdictSection({
 
             {reasons.length > 0 && (
               <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                {reasons.map((r) => (
-                  <li key={r}>{humanizeTools(r, connections)}</li>
+                {reasons.map((r, i) => (
+                  // the list never reorders, and two failed per-file checks can read the same
+                  <li key={i}>{humanizeTools(r, connections)}</li>
                 ))}
               </ul>
             )}

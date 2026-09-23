@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { outcome } from "./outcome";
+import { outcome, statusLabel } from "./outcome";
 
 describe("outcome", () => {
   it("says what is happening in words an office worker uses, not the status enum", () => {
@@ -26,5 +26,26 @@ describe("outcome", () => {
   // the run rows call outcome() with Run.outcome, which is optional on the contract and absent on old rows
   it("treats a missing verdict field as 'not judged', never as a pass", () => {
     expect(outcome("succeeded", undefined)).toEqual({ label: "Done", tone: "ok" });
+  });
+});
+
+describe("outcome - Stop", () => {
+  it("says a stopped run was stopped by you, whatever else is known about it", () => {
+    expect(outcome("cancelled", null)).toEqual({ label: "Stopped by you", tone: "idle" });
+    expect(outcome("cancelled", "pass")).toEqual({ label: "Stopped by you", tone: "idle" });
+  });
+
+  it("says a run is stopping between the press and the moment it stops", () => {
+    expect(outcome("running", null, true)).toEqual({ label: "Stopping...", tone: "busy" });
+    expect(outcome("queued", null, true)).toEqual({ label: "Stopping...", tone: "busy" });
+    expect(outcome("succeeded", "pass", true)).toEqual({ label: "Done - looks good", tone: "ok" }); // it finished first
+  });
+});
+
+describe("statusLabel - the status badge in Details", () => {
+  it("reads the enum as words, and cancelled as stopped by you", () => {
+    expect(statusLabel("cancelled")).toBe("stopped by you");
+    expect(statusLabel("pass_with_notes")).toBe("pass with notes");
+    expect(statusLabel("running")).toBe("running");
   });
 });

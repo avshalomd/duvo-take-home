@@ -6,6 +6,10 @@ import { StatusBadge } from "./status-badge";
 
 // The key state of the run, derived from the events at whatever point the run is at.
 export function StateSection({ state, connections }: { state: RunState; connections: { name: string }[] }) {
+  const checks = state.stepChecks ?? [];
+  const guards = state.guards ?? [];
+  const stepTitle = (i: number) => state.plan?.steps.find((s) => s.index === i)?.title ?? `step ${i + 1}`;
+
   return (
     <Section title="State" aside={<StatusBadge status={state.status} />}>
       <dl data-testid="state-card" className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1.5 text-sm">
@@ -41,6 +45,33 @@ export function StateSection({ state, connections }: { state: RunState; connecti
           )}
         </Row>
         <Row label="Files">{state.files.length ? state.files.join(", ") : "-"}</Row>
+        <Row label="Step checks">
+          {checks.length === 0 ? (
+            "-"
+          ) : (
+            <ul className="space-y-0.5">
+              {checks.map((c) => (
+                <li key={c.stepIndex} className="tabular-nums">
+                  {stepTitle(c.stepIndex)}: {Math.round(c.onTrack * 100)}% on track - {c.note}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Row>
+        <Row label="Guards">
+          {guards.length === 0 ? (
+            "nothing stopped or flagged"
+          ) : (
+            <ul className="space-y-0.5">
+              {guards.map((g, i) => (
+                <li key={i}>
+                  {g.guard}: {g.decision}
+                  {g.target && ` (${g.target})`} - {g.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Row>
         <Row label="Duration">
           <span className="tabular-nums">{formatDuration(state.durationMs)}</span>
         </Row>
