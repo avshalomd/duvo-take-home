@@ -8,7 +8,7 @@ const session = vi.hoisted(() => ({ role: "member" as SessionCtx["role"] }));
 const store = vi.hoisted(() => ({
   approveAutomation: vi.fn(async () => ({})),
   deleteAutomation: vi.fn(async () => {}),
-  getAutomation: vi.fn(async () => ({ command: "audit" })),
+  getAutomation: vi.fn(async () => ({ command: "audit", status: "draft" })),
   runCommand: vi.fn(async () => ({ id: "run-1" })),
   setAutomationStatus: vi.fn(async () => {}),
   setHumanVerdict: vi.fn(async () => {}),
@@ -116,11 +116,32 @@ describe("a member", () => {
     expect(out.message).toBe("Saved. This is version 2 now: run an example of it, then an owner or an admin approves it.");
   });
 
-  it("runs an example and judges it", async () => {
+  it("runs an example and judges it, recorded as their judgment", async () => {
     expect(await startTrialAction({}, form({ id: ID, input: "Acme Ltd" }))).toEqual({ ok: true });
     expect(store.startTrial).toHaveBeenCalledWith({ workspaceId: "ws-a", userId: "u1" }, ID, "Acme Ltd");
     expect(await setVerdictAction({}, form({ automationId: ID, runId: RUN, verdict: "approved" }))).toEqual({ ok: true });
-    expect(store.setHumanVerdict).toHaveBeenCalledWith("ws-a", { runId: RUN, verdict: "approved", note: undefined });
+    // who judged comes from the session, never from the form
+    expect(store.setHumanVerdict).toHaveBeenCalledWith({ workspaceId: "ws-a", userId: "u1" }, { runId: RUN, verdict: "approved", note: undefined });
+  });
+
+  it("renames a draft's command", async () => {
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft" });
+    expect(await saveAutomationAction({}, form({ ...edit, command: "audit-2" }))).toMatchObject({ ok: true });
+    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }));
+  });
+
+  it.each(["active", "disabled"] as const)("is refused renaming an approved automation's command (%s), and nothing is written", async (status) => {
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status });
+    const out = await saveAutomationAction({}, form({ ...edit, command: "audit-2" }));
+    expect(out.error).toBe("Only an owner or an admin can change the command of an approved automation.");
+    expect(out.values).toMatchObject({ command: "audit-2", name: "Company audit" }); // what was typed stays
+    expect(store.updateAutomation).not.toHaveBeenCalled();
+  });
+
+  it("still edits the rest of an approved automation when the command stays", async () => {
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "active" });
+    expect(await saveAutomationAction({}, form({ ...edit, command: "/Audit" }))).toMatchObject({ ok: true }); // the same command, as typed
+    expect(store.updateAutomation).toHaveBeenCalled();
   });
 
   it("runs a ready automation, which is what approving it was for", async () => {
@@ -154,6 +175,12 @@ describe.each(["owner", "admin"] as const)("an %s", (role) => {
   it("deletes it and goes back to the gallery", async () => {
     await expect(governed.delete()).rejects.toThrow("NEXT_REDIRECT /automations");
     expect(store.deleteAutomation).toHaveBeenCalledWith("ws-a", ID);
+  });
+
+  it("renames an approved automation's command", async () => {
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "active" });
+    expect(await saveAutomationAction({}, form({ ...edit, command: "audit-2" }))).toMatchObject({ ok: true });
+    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }));
   });
 
   it("is told, when an edit makes a new version, to run an example before approving", async () => {

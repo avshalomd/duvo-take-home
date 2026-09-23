@@ -4,8 +4,9 @@ import { DEMO_EMAIL, E2E_PASSWORD, SIGNED_OUT, deleteUsers, e2eEmail, inviteByRo
 
 // Q178: who may do what with an automation, in the browser. A plain member of the demo workspace sees approval, Turn
 // off, Delete and the schedule as plain lines saying who does them, and keeps Edit, Run example and Run; the demo user
-// (the owner) still gets the controls. No agent run: a draft and a ready automation are seeded ("[e2e]"), and they and
-// the member are deleted in afterAll. Local only (it creates an account):
+// (the owner) still gets the controls. A member reads an approved automation's command but cannot rename it, and a
+// judgment says who made it. No agent run: a draft with one finished example and a ready automation are seeded
+// ("[e2e]"), and they and the member are deleted in afterAll. Local only (it creates an account):
 //   BASE_URL=http://localhost:3006 npx playwright test e2e/automations-roles.spec.ts
 test.use({ timezoneId: "Europe/Prague" }); // the seeded schedule's zone, so it reads without a zone name
 
@@ -28,6 +29,7 @@ const template = {
 const memberEmail = e2eEmail("automations-member");
 let draftId = "";
 let readyId = "";
+let trialId = "";
 let member: BrowserContext | null = null;
 
 async function seed(name: string, command: string, ready: boolean): Promise<string> {
@@ -46,6 +48,13 @@ test.beforeAll(async ({ browser }) => {
   test.setTimeout(60_000);
   draftId = await seed(DRAFT, `e2e-roles-d-${stamp}`, false);
   readyId = await seed(READY, `e2e-roles-r-${stamp}`, true);
+  // one finished example of the draft, not judged yet: the member judges it below (no agent run)
+  const [trial] = await sql()`
+    insert into runs (workspace_id, created_by, prompt, status, model, purpose, report, automation_id, automation_version, input, finished_at)
+    values ('demo-workspace', 'demo-user', '[e2e] roles example: facts about Acme Ltd', 'succeeded', 'e2e', 'trial', 'Three facts about Acme Ltd.',
+            ${draftId}, 1, 'Acme Ltd', now())
+    returning id`;
+  trialId = trial.id as string;
 
   // the member joins the demo workspace the way a person does: invited, then an account made from the invitation's page
   const invitationId = await inviteByRow(DEMO_EMAIL, memberEmail);
@@ -63,6 +72,7 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async () => {
   await member?.close();
+  if (trialId) await sql()`delete from runs where id = ${trialId}`;
   await sql()`delete from automations where id = any(${[draftId, readyId].filter(Boolean)})`;
   await deleteUsers([memberEmail]);
 });
@@ -88,11 +98,23 @@ test("a member can edit a draft and run an example, and is told who approves and
   await expect(page.getByTestId("approve-reason")).toHaveText("An owner or an admin approves it once an example looks right.");
   await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
   await expect(page.getByText("An owner or an admin can delete it.")).toBeVisible();
+
+  // a draft's command is anyone's to change
+  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.getByLabel("Command", { exact: true })).toBeEditable();
 });
 
 test("a member can run a ready automation, and sees its switch, schedule and delete as lines saying who does them", async () => {
   const page = await asMember(`/automations/${readyId}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(READY);
+
+  // people call it by its command, so a member edits the rest of it but reads the command
+  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.getByLabel("Command", { exact: true })).not.toBeEditable();
+  await expect(page.getByLabel("Command", { exact: true })).toHaveValue(`e2e-roles-r-${stamp}`);
+  await expect(page.getByText("People call it by this command, so an owner or an admin changes it.")).toBeVisible();
+  await expect(page.getByLabel("Name", { exact: true })).toBeEditable();
+  await page.getByRole("button", { name: "Cancel" }).click();
 
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Turn off" })).toHaveCount(0);
@@ -107,6 +129,21 @@ test("a member can run a ready automation, and sees its switch, schedule and del
   await expect(page.getByText("An owner or an admin sets its schedule.")).toBeVisible();
 });
 
+test("a member judges an example; they read 'You said', and the owner reads the member's name, here and on Home", async ({ page }) => {
+  const mine = await asMember(`/automations/${draftId}`);
+  const example = mine.getByTestId("example").filter({ hasText: "Acme Ltd" });
+  await example.getByRole("button", { name: "Looks right" }).click();
+  await expect(example).toContainText("You said it looks right");
+  await expect(mine.getByTestId("approve-reason")).toHaveText("An example looks right, so an owner or an admin can approve it now.");
+
+  await page.goto(`/automations/${draftId}`);
+  await expect(page.getByTestId("example").filter({ hasText: "Acme Ltd" })).toContainText("e2e Mia Member said it looks right");
+  await expect(page.getByText("You said it looks right")).toHaveCount(0);
+
+  await page.goto(`/?run=${trialId}`);
+  await expect(page.getByTestId("run-panel")).toContainText("e2e Mia Member said it looks right");
+});
+
 test("the owner still gets Approve, Turn off, Delete and the schedule form on the same automations", async ({ page }) => {
   await page.goto(`/automations/${draftId}`);
   await expect(page.getByRole("button", { name: "Approve and save" })).toBeVisible(); // disabled until an example looks right
@@ -117,6 +154,9 @@ test("the owner still gets Approve, Turn off, Delete and the schedule form on th
   await expect(page.getByRole("button", { name: "Turn off" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
   await expect(page.getByText(/An owner or an admin/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.getByLabel("Command", { exact: true })).toBeEditable(); // the owner may rename a ready one
+  await page.getByRole("button", { name: "Cancel" }).click();
   if (await schedulerOff(page)) return;
   await expect(page.getByRole("button", { name: "Save schedule" })).toBeVisible();
 });

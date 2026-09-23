@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canGovernAutomations, refusalFor, type GovernedAct } from "./permissions";
+import { canGovernAutomations, commandRefusal, refusalFor, type GovernedAct } from "./permissions";
 
 // Q178 (his decision): anyone in the workspace drafts, edits, tries and judges an automation; only an owner or an
 // admin approves it, turns it off or on, deletes it or sets its schedule.
@@ -25,5 +25,18 @@ describe("who governs a workspace's automations", () => {
 
   it("treats a role it does not know as a member: an allowlist, so a new role starts without these rights", () => {
     expect(canGovernAutomations("guest" as never)).toBe(false);
+  });
+});
+
+// People call an approved automation by its command, so renaming it takes it from them without an approval step.
+describe("who may change an automation's command", () => {
+  it("anyone, while it is a draft", () => {
+    for (const role of ["owner", "admin", "member"] as const) expect(commandRefusal(role, "draft")).toBeNull();
+  });
+
+  it.each(["active", "disabled"] as const)("only an owner or an admin once it is approved (%s)", (status) => {
+    expect(commandRefusal("owner", status)).toBeNull();
+    expect(commandRefusal("admin", status)).toBeNull();
+    expect(commandRefusal("member", status)).toBe("Only an owner or an admin can change the command of an approved automation.");
   });
 });
