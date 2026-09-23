@@ -7,7 +7,7 @@ import { updateLimitsAction } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { WorkspaceLimits } from "@/contracts/usage";
-import { InsetGroup, rowLine } from "./grouped";
+import { FOCUS_ROW, InsetGroup, rowLine } from "./grouped";
 import { Stepper } from "./stepper";
 import { submitKeepingValues } from "./submit-keeping-values";
 
@@ -95,7 +95,7 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
             )
           }
         >
-          <li className="focus-within:shadow-[inset_0_0_0_2px_var(--ring)]">
+          <li className={FOCUS_ROW}>
             <textarea
               id="deniedDomains"
               name="deniedDomains"
