@@ -76,6 +76,24 @@ test("a connection is added with a token, edited, switched off and deleted", asy
   await expect(page.getByTestId("connections").getByRole("listitem").filter({ hasText: RENAMED })).toHaveCount(0);
 });
 
+test("a refused server keeps the sign-in choice and everything typed, the token included", async ({ page }) => {
+  await open(page, "/settings/connections");
+  await page.getByRole("button", { name: /add a server/i }).click();
+  const add = page.getByRole("dialog");
+  await add.getByLabel("Name").fill("e2e Settings refused");
+  await add.getByLabel("Address").fill("http://192.168.1.4/mcp"); // a private address: refused by the contract
+  await add.getByLabel("With a token").check();
+  await add.getByLabel("Token", { exact: true }).fill(TOKEN);
+  await add.getByRole("button", { name: "Add" }).click();
+
+  await expect(add.getByText(/private or local network/)).toBeVisible();
+  await expect(add.getByLabel("With a token")).toBeChecked(); // React's form reset used to put it back on "No sign-in"
+  await expect(add.getByLabel("Name")).toHaveValue("e2e Settings refused");
+  await expect(add.getByLabel("Token", { exact: true })).toHaveValue(TOKEN);
+  await add.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByTestId("connections")).not.toContainText("e2e Settings refused"); // nothing was created
+});
+
 test("a changed limit is saved and shown again after a reload", async ({ page }) => {
   await open(page, "/settings/limits");
   await expect(page.getByRole("link", { name: "Limits" })).toHaveAttribute("aria-current", "page");
