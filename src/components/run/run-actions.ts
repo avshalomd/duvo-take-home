@@ -1,9 +1,13 @@
 import type { Verdict } from "@/contracts/eval";
 import type { Run } from "@/contracts/run";
 
+/**
+ * "Ask for a change" on a result that did not pass opens with a first draft: fix the first thing the check found. The
+ * person edits it; the follow-up run is also given the whole verdict (the engine), so one reason is enough here.
+ */
 export function changeSuggestion(verdict: Pick<Verdict, "verdict" | "reasons"> | null): string | null {
-  void verdict; // written in the next commit
-  return null;
+  const first = verdict?.verdict === "fail" ? verdict.reasons[0] : undefined;
+  return first ? `Please fix what did not pass: ${first}` : null;
 }
 
 // An automation repeats what a run did, so only a run whose result passed is worth saving as one (Q121) - and not a
