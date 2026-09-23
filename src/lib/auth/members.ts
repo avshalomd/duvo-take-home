@@ -169,6 +169,19 @@ async function membershipIn(tx: Tx, workspaceId: string, askerId: string, member
 }
 
 /**
+ * Closes the pending invitations this person sent from the workspace (review R2). Accepting an invitation does not ask
+ * whether its sender may still invite, so a removed admin could otherwise rejoin through one sent to another address of
+ * theirs. Written in the lock's transaction before Better Auth's call, so a refusal from it rolls this back too (neither
+ * of its calls touches invitations, so nothing waits on these rows).
+ */
+async function closeInvitationsSentBy(tx: Tx, workspaceId: string, userId: string): Promise<void> {
+  await tx
+    .update(invitation)
+    .set({ status: "canceled" }) // Better Auth's own word for a revoked invitation
+    .where(and(eq(invitation.organizationId, workspaceId), eq(invitation.inviterId, userId), eq(invitation.status, "pending")));
+}
+
+/**
  * Removes someone from the active workspace (Q169): the app's rules first (member-rules.ts), then Better Auth's own
  * removal with the asker's headers, so its permission check runs as well. The removed person's sessions still name
  * the workspace; their next request finds no membership in it and opens a workspace of their own (session.ts).
@@ -178,6 +191,7 @@ export async function removeFromWorkspace(requestHeaders: Headers, ctx: SessionC
     const { actor, target, owners } = await membershipIn(tx, ctx.workspaceId, ctx.userId, memberId);
     const refusal = removalRefusal(actor, target, owners);
     if (refusal) throw new MemberChangeError(refusal);
+    await closeInvitationsSentBy(tx, ctx.workspaceId, target.userId);
     // the workspace named, not left to the session: the change is made where the page is, whatever Better Auth thinks is active
     await auth.api.removeMember({ headers: requestHeaders, body: { memberIdOrEmail: memberId, organizationId: ctx.workspaceId } });
   });
@@ -190,6 +204,7 @@ export async function changeMemberRole(requestHeaders: Headers, ctx: SessionCtx,
     const refusal = roleChangeRefusal(actor, target, role, owners);
     if (refusal) throw new MemberChangeError(refusal);
     if (target.role === role) return; // already so: nothing to write
+    if (!canChangeSettings(role)) await closeInvitationsSentBy(tx, ctx.workspaceId, target.userId); // a member cannot invite
     await auth.api.updateMemberRole({ headers: requestHeaders, body: { memberId, role, organizationId: ctx.workspaceId } });
   });
 }
