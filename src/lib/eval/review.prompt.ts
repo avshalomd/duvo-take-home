@@ -27,7 +27,10 @@ CSV that does not parse, a broken chart - is worth nothing to the user. So:
 
 changeNeeded: when responseSuitable is false, what would have to change, in one or two lines, in the user's words.
 Null when it is suitable. reasoning: two or three sentences naming the concrete evidence (the rows, the dates, the
-missing columns) - never "it looks good".`;
+missing columns) - never "it looks good".
+
+changeNeeded and reasoning are read by an office worker, not an engineer: plain words about the work, no tool names
+(say "the page could not be opened", not "WebFetch failed"), no shell or curl, no file paths beyond a file's own name.`;
 
 const HEAD_LINES = 60;
 
