@@ -6,7 +6,9 @@ import { templateChecks } from "./template-checks";
 // reading the instructions and the files. Any failure here ends the evaluation before a model is paid to look at
 // an empty file. Each check carries the detail a user needs to fix the run, not just a red tick.
 
-const ALLOWED_EXTENSIONS = [".txt", ".md", ".csv"]; // the agent is only allowed to write these (DESIGN, Model design)
+// The agent's Write tool is limited to .txt, .md and .csv (DESIGN, Model design); v2's output tools add charts (.svg)
+// and spreadsheets (.xlsx), which our own code renders, so they are allowed here too.
+const ALLOWED_EXTENSIONS = [".txt", ".md", ".csv", ".svg", ".xlsx"];
 const DEFAULT_FRESH_DAYS = 30; // "latest" with no window named: a month is the widest reading of "latest news"
 
 export function runChecks(input: EvaluateInput): Check[] {
@@ -34,7 +36,7 @@ function runChecksOnFiles(input: EvaluateInput): Check[] {
   const wrongType = input.files.filter((f) => !ALLOWED_EXTENSIONS.some((e) => f.name.toLowerCase().endsWith(e)));
   ok(
     "extension",
-    "Only .txt, .md and .csv were written",
+    "Only text, table, chart and spreadsheet files were written",
     wrongType.length === 0,
     wrongType.length ? `not allowed: ${names(wrongType)}` : names(input.files),
   );
