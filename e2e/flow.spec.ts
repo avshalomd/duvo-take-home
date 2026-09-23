@@ -511,7 +511,9 @@ test.describe("a finished run", () => {
     await opener.click();
     const details = page.getByRole("dialog", { name: /details/i });
     await expect(details.getByTestId("timeline")).toBeVisible();
-    await expect(details.getByTestId("state-card")).toContainText(/turn \d+ of \d+/);
+    // Q198: a finished run says its total, not "turn 17 of 25" as if it were still counting
+    await expect(details.getByTestId("state-card")).toContainText(/\b\d+ turns?\b/);
+    await expect(details.getByTestId("state-card")).not.toContainText(/turn \d+ of \d+/);
     await expect(details.getByTestId("state-card")).toContainText("contacts.csv, chart.svg, table.xlsx"); // Q103: the tools' files too, in the order made
     await expect(details.getByTestId("state-card")).not.toContainText("outputs"); // Q103: the built-in tools are not a connection
     await expect(details.getByTestId("verdict")).toContainText("%"); // the probabilities live here

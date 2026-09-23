@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attemptCost, connectionName, formatCost, formatDuration, humanizeTools, relativeToRun, runFolders, toolKind, toolLabel, toolLine } from "./format";
+import { attemptCost, connectionName, formatCost, formatDuration, humanizeTools, relativeToRun, runFolders, toolKind, toolLabel, toolLine, turnsLine } from "./format";
 
 const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
 
@@ -123,6 +123,26 @@ describe("humanizeTools - no mcp__x__y ever reaches the screen", () => {
 
   it("leaves a sentence with no tool ids untouched", () => {
     expect(humanizeTools("the CSV has 10 rows", connections)).toBe("the CSV has 10 rows");
+  });
+});
+
+// Q198: the state's turn is the live turn while the run works and the run's total once it ended; a finished run said
+// "turn 17 of 25", as if it were still counting
+describe("turnsLine - how far the agent went, in turns", () => {
+  it("counts up against the cap while the run works", () => {
+    expect(turnsLine("running", 3, 25)).toBe("turn 3 of 25");
+    expect(turnsLine("evaluating", 9, 25)).toBe("turn 9 of 25");
+  });
+
+  it("says the total once the run has ended, with no cap", () => {
+    expect(turnsLine("succeeded", 17, 25)).toBe("17 turns");
+    expect(turnsLine("failed", 1, 25)).toBe("1 turn");
+    expect(turnsLine("cancelled", 4, 25)).toBe("4 turns");
+  });
+
+  it("says nothing for a run that has not taken a turn", () => {
+    expect(turnsLine("failed", 0, 25)).toBeNull();
+    expect(turnsLine("queued", 0, 25)).toBeNull();
   });
 });
 
