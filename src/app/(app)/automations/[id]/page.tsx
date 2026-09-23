@@ -12,17 +12,20 @@ import { RunForm } from "@/components/automations/run-form";
 import { ScheduleForm } from "@/components/automations/schedule-form";
 import { StateGlyph } from "@/components/automations/state-glyph";
 import { StatusToggle } from "@/components/automations/status-toggle";
-import { LINK, SECTION, SHEET } from "@/components/automations/surfaces";
+import { LINK, SECTION, SHEET, SMALL } from "@/components/automations/surfaces";
 import { TryExampleForm } from "@/components/automations/try-example-form";
 import { outcome } from "@/components/run/outcome";
 import { requireSession } from "@/lib/auth/session";
 import { approvalProgress } from "@/lib/automations/approval";
+import { canGovernAutomations } from "@/lib/automations/permissions";
 import { automationHistory } from "@/lib/automations/runs";
 import { getAutomation, listTrials } from "@/lib/automations/store";
 import { canApprove } from "@/lib/automations/template";
 import { listConnections } from "@/lib/connections/store";
 import { schedulerRunning } from "@/lib/runner/mode";
+import { judgeNames, judgeOf } from "@/lib/runs/judges";
 import { getRun } from "@/lib/runs/queries";
+import { verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +40,7 @@ const SHOWN_EXAMPLES = 6; // each one is read in full for its plan, files and ve
 export default async function AutomationPage({ params, searchParams }: PageProps<"/automations/[id]">) {
   const { id } = await params;
   const { approved } = await searchParams;
-  const { workspaceId } = await requireSession();
+  const { workspaceId, role, userId } = await requireSession();
   const automation = await getAutomation(workspaceId, id);
   // not notFound(): the loading boundary above has already streamed a 200, so a plain message is what the reader gets anyway
   if (!automation) return <Missing />;
@@ -45,10 +48,15 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   const [trials, connections, history] = await Promise.all([listTrials(workspaceId, id), listConnections(workspaceId), automationHistory(workspaceId, id)]);
   const current = trials.filter((t) => t.version === automation.version);
   const older = trials.filter((t) => t.version !== automation.version);
-  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES));
+  // each judgment says who made it: "You said" to them, their name to everyone else (Q178)
+  const names = await judgeNames(trials.map((t) => t.humanVerdictBy));
+  const said = (t: Trial) => (t.humanVerdict ? verdictWords(t.humanVerdict, judgeOf(t.humanVerdictBy, names), userId) : null);
+  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said);
   const approval = canApprove(trials, automation.version);
   const isDraft = automation.status === "draft";
-  const deleteButton = <DeleteButton automationId={automation.id} name={automation.name} />;
+  // Q178: a member drafts, edits, tries and judges; approve, turn off, delete and the schedule read as who does them
+  const governs = canGovernAutomations(role);
+  const deleteButton = governs ? <DeleteButton automationId={automation.id} name={automation.name} /> : <p className={SMALL}>An owner or an admin can delete it.</p>;
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-8 sm:px-6 sm:py-10">
@@ -56,9 +64,9 @@ export default async function AutomationPage({ params, searchParams }: PageProps
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
         <div className="min-w-0 space-y-6">
           <article className={cn(SHEET, "space-y-10 p-6 sm:p-10")}>
-            <Header automation={automation} />
+            <Header automation={automation} governs={governs} />
             {isDraft ? (
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} />
+              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} />
             ) : (
               <>
                 {approved === "1" && automation.status === "active" && <ApprovedNote command={automation.command} />}
@@ -75,7 +83,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
                   <h2 id="schedule" className={SECTION}>
                     Schedule
                   </h2>
-                  <Schedule automation={automation} />
+                  <Schedule automation={automation} governs={governs} />
                 </section>
                 <section aria-labelledby="its-runs" className="space-y-3 border-t border-hairline pt-8">
                   <h2 id="its-runs" className={SECTION}>
@@ -90,7 +98,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
           {!isDraft && (
             // what an edit does is said where it matters: under the editor, and in the save's own message
             <article aria-label="The automation" className={cn(SHEET, "p-6 sm:p-10")}>
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} />
+              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} />
             </article>
           )}
         </div>
@@ -116,13 +124,14 @@ export default async function AutomationPage({ params, searchParams }: PageProps
               ))}
             </ul>
           )}
-          {older.length > 0 && <OlderExamples trials={older} />}
+          {older.length > 0 && <OlderExamples trials={older} said={said} />}
           {isDraft && (
             <ApprovalBar
               automationId={automation.id}
               progress={approvalProgress(trials, automation.version)}
               allowed={approval.ok}
               reason={approval.ok ? null : approval.reason}
+              approver={governs}
             />
           )}
         </aside>
@@ -133,14 +142,20 @@ export default async function AutomationPage({ params, searchParams }: PageProps
 
 // The name as the page's title, the state with what can be done about it, and how it is called: the command, the
 // input's name and its hint side by side.
-function Header({ automation: a }: { automation: Automation }) {
+function Header({ automation: a, governs }: { automation: Automation; governs: boolean }) {
+  const active = a.status === "active";
   return (
     <header className="space-y-5">
       <h1 className="page-title break-words text-graphite">{a.name}</h1>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <StateGlyph status={a.status} className="text-[15px]" />
-        {/* a draft's next step is said once, on the approval bar; a ready one gets its switch here (Q106) */}
-        {a.status !== "draft" && <StatusToggle automationId={a.id} command={a.command} active={a.status === "active"} />}
+        {/* a draft's next step is said once, on the approval bar; a ready one gets its switch here (Q106), or who has it (Q178) */}
+        {a.status !== "draft" &&
+          (governs ? (
+            <StatusToggle automationId={a.id} command={a.command} active={active} />
+          ) : (
+            <p className={SMALL}>{active ? "An owner or an admin can turn it off." : "An owner or an admin can turn it on."}</p>
+          ))}
       </div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-[17px]">
@@ -155,7 +170,7 @@ function Header({ automation: a }: { automation: Automation }) {
 
 // Q84: a schedule only fires when something calls the scheduler (the worker, or the cron route with its secret).
 // Without one the page says so in plain words instead of showing a next run that would never come.
-function Schedule({ automation: a }: { automation: Automation }) {
+function Schedule({ automation: a, governs }: { automation: Automation; governs: boolean }) {
   if (!schedulerRunning())
     return (
       <p className="max-w-[62ch] text-slate">
@@ -172,12 +187,13 @@ function Schedule({ automation: a }: { automation: Automation }) {
       scheduleInput={a.scheduleInput}
       scheduleTz={a.scheduleTz ?? null}
       nextRunAt={a.status === "active" ? a.nextRunAt : null} // an automation that is off has no next run
+      canEdit={governs}
     />
   );
 }
 
 /** The current version's examples with what their cards show: the plan, the files and the verdict, read once here. */
-async function examplesOf(workspaceId: string, trials: Trial[]): Promise<ExampleView[]> {
+async function examplesOf(workspaceId: string, trials: Trial[], said: (t: Trial) => string | null): Promise<ExampleView[]> {
   const found = await Promise.all(trials.map((t) => getRun(workspaceId, t.runId)));
   return trials.flatMap((t, i) => {
     const data = found[i];
@@ -193,13 +209,14 @@ async function examplesOf(workspaceId: string, trials: Trial[]): Promise<Example
         plan: deriveState(data.run, data.events).plan,
         humanVerdict: t.humanVerdict,
         humanNote: t.humanNote,
+        said: said(t),
       },
     ];
   });
 }
 
 // Examples of an earlier version no longer count toward approval; they stay, folded, as the record.
-function OlderExamples({ trials }: { trials: Trial[] }) {
+function OlderExamples({ trials, said }: { trials: Trial[]; said: (t: Trial) => string | null }) {
   return (
     <details className="rounded-[16px] px-1">
       <summary className="cursor-pointer text-[15px] text-slate">
@@ -214,7 +231,7 @@ function OlderExamples({ trials }: { trials: Trial[] }) {
             <span className="text-slate">
               {" "}
               {outcome(t.status, t.outcome).label.toLowerCase()}
-              {t.humanVerdict === "approved" ? ", you said it looked right" : t.humanVerdict === "rejected" ? ", you said it was not right" : ""}
+              {said(t) && `. ${said(t)}`}
             </span>
           </li>
         ))}

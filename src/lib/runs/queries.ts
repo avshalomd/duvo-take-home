@@ -32,6 +32,7 @@ function toRun(row: RunRow): Run {
     parentRunId: row.parentRunId,
     cancelRequested: row.cancelRequestedAt != null,
     humanVerdict: row.humanVerdict === "approved" || row.humanVerdict === "rejected" ? row.humanVerdict : null,
+    humanVerdictBy: row.humanVerdictBy,
     humanNote: row.humanNote,
     healAttempts: row.healAttempts ?? 0, // the rail and the page read the same count of fixes
   };

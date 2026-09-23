@@ -423,12 +423,14 @@ test.describe("a finished run", () => {
     await expect(page.getByRole("dialog", { name: /details/i }).getByTestId("verdict")).toContainText("earlier version of the app");
   });
 
-  test("a follow-up names the run it follows and links to it; the person's own mark is shown", async ({ page }) => {
+  test("a follow-up names the run it follows and links to it; a mark from before judges were recorded reads neutrally", async ({ page }) => {
     const panel = await openRun(page, runs.followUp);
     const link = panel.getByRole("link", { name: /follows up/i });
     await expect(link).toContainText(TITLES.parent);
     await expect(link).toHaveAttribute("href", `/?run=${runs.parent}`);
-    await expect(panel).toContainText("You marked this: looks right");
+    // the fixture's mark has no judge, like rows from before human_verdict_by: never "You" unless it was you
+    await expect(panel).toContainText("Marked: looks right");
+    await expect(panel).not.toContainText("You marked this");
   });
 
   test("the plan is drawn as the thread, a doubted step says so, and a stopped guard is said in plain words", async ({ page }) => {

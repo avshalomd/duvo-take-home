@@ -15,6 +15,7 @@ export type ExampleView = LiveRun & {
   input: string;
   humanVerdict: "approved" | "rejected" | null;
   humanNote: string | null;
+  said: string | null; // the judgment in words, as who made it: "You said it looks right", "Mia said...", "Marked: ..."
 };
 
 const FINISHED = ["succeeded", "failed", "cancelled"];
@@ -67,12 +68,13 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
 
       {finished ? (
         <VerdictForm
-          key={`${example.humanVerdict}-${example.humanNote}`}
+          key={`${example.humanVerdict}-${example.humanNote}-${example.said}`}
           automationId={automationId}
           runId={example.runId}
           succeeded={run.status === "succeeded"}
           verdict={example.humanVerdict}
           note={example.humanNote}
+          said={example.said}
         />
       ) : (
         <p className={SMALL}>When it has finished, check what it made and say whether it looks right.</p>

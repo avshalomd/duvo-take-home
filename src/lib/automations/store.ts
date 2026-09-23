@@ -242,6 +242,7 @@ export const listTrials: ListTrials = async (workspaceId, automationId) => {
       status: RunStatus.catch("failed").parse(r.status),
       outcome: outcomeOf(r.verdict),
       humanVerdict: r.humanVerdict === "approved" || r.humanVerdict === "rejected" ? r.humanVerdict : null,
+      humanVerdictBy: r.humanVerdictBy,
       humanNote: r.humanNote,
       createdAt: r.createdAt.toISOString(),
     }),
@@ -250,8 +251,11 @@ export const listTrials: ListTrials = async (workspaceId, automationId) => {
 
 const FINISHED = ["succeeded", "failed", "cancelled"];
 
-/** The person's judgment of a finished run. "Looks right" needs a run that succeeded; "not right" fits any ending. */
-export const setHumanVerdict: SetHumanVerdict = async (workspaceId, input) => {
+/**
+ * The person's judgment of a finished run, with who made it (the page says "You said" only to them). "Looks right"
+ * needs a run that succeeded; "not right" fits any ending. A second judgment replaces the first, judge included.
+ */
+export const setHumanVerdict: SetHumanVerdict = async ({ workspaceId, userId }, input) => {
   const { runId, verdict, note } = HumanVerdictInput.parse(input);
   const [run] = await db.select({ status: runs.status }).from(runs).where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
   if (!run) throw new AutomationError("That run was not found.");
@@ -259,7 +263,7 @@ export const setHumanVerdict: SetHumanVerdict = async (workspaceId, input) => {
   if (verdict === "approved" && run.status !== "succeeded") throw new AutomationError("This example failed, so it cannot be marked as looks right.");
   await db
     .update(runs)
-    .set({ humanVerdict: verdict, humanNote: note || null, reviewedAt: new Date() })
+    .set({ humanVerdict: verdict, humanVerdictBy: userId, humanNote: note || null, reviewedAt: new Date() })
     .where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
 };
 

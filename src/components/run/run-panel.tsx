@@ -40,6 +40,7 @@ export function RunPanel({
   title,
   parentTitle,
   automationName,
+  verdictLine,
   facts,
   connections,
 }: {
@@ -47,6 +48,7 @@ export function RunPanel({
   title: string;
   parentTitle: string | null;
   automationName: string | null;
+  verdictLine: string | null; // the person's mark as who made it, worded on the server (it knows the viewer and the judge)
   facts: FileFacts;
   connections: { name: string }[];
 }) {
@@ -102,7 +104,7 @@ export function RunPanel({
           {/* The brief as the title, two lines at most so the thread below stays in view (Q137); the whole brief is
               its tooltip and the first line of Details. The same element as the one the brief moves into on Run. */}
           <RunTitle title={title} brief={run.prompt} />
-          <RunNotes run={run} parentTitle={parentTitle} automationName={automationName} />
+          <RunNotes run={run} parentTitle={parentTitle} automationName={automationName} verdictLine={verdictLine} />
 
           <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1">
             {/* role=status: this line changes as the run moves, and that change is the news a screen reader needs (Q68) */}

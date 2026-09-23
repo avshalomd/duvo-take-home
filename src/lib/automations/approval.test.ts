@@ -9,6 +9,7 @@ const trial = (over: Partial<Trial>): Trial => ({
   status: "succeeded",
   outcome: "pass",
   humanVerdict: null,
+  humanVerdictBy: null,
   humanNote: null,
   createdAt: "2026-09-23T10:00:00.000Z",
   ...over,
