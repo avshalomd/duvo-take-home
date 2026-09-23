@@ -8,6 +8,9 @@ export const WorkspaceLimits = z.object({
   stepChecks: z.boolean(),
   strictConnections: z.boolean(),
   deniedDomains: z.array(z.string().trim().toLowerCase().min(3)).max(100),
+  // Auto-heal (his call, 2026-09-23): when the evaluator fails a run, the agent gets the verdict and fixes its own
+  // result, at most this many times. 0 turns it off.
+  autoHealAttempts: z.coerce.number().int().min(0).max(5),
 });
 export type WorkspaceLimits = z.infer<typeof WorkspaceLimits>;
 

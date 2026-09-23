@@ -29,6 +29,7 @@ export const runs = pgTable("runs", {
   humanVerdict: text("human_verdict"), // approved | rejected: the person's own judgment of the result
   humanNote: text("human_note"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  healAttempts: integer("heal_attempts").notNull().default(0), // how many times this run fixed its own result
   prompt: text("prompt").notNull(),
   status: text("status").notNull().default("queued"),
   model: text("model").notNull(),
@@ -119,6 +120,7 @@ export const workspaceSettings = pgTable("workspace_settings", {
   stepChecks: boolean("step_checks").notNull().default(true), // Jev after every finished step
   strictConnections: boolean("strict_connections").notNull().default(false), // block, not flag, a connection the plan did not name
   deniedDomains: jsonb("denied_domains").$type<string[]>().notNull().default([]),
+  autoHealAttempts: integer("auto_heal_attempts").notNull().default(2), // how many times a run may fix its own result after the evaluator fails it (his call, 2026-09-23)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -29,7 +29,7 @@ describe.skipIf(!process.env.DATABASE_URL)("workspace limits and usage", () => {
   });
 
   it("saves every limit and reads it back", async () => {
-    const limits = { dailyBudgetUsd: 2.5, dailyRunLimit: 12, maxInFlight: 2, stepChecks: false, strictConnections: true, deniedDomains: ["pastebin.com"] };
+    const limits = { dailyBudgetUsd: 2.5, dailyRunLimit: 12, maxInFlight: 2, stepChecks: false, strictConnections: true, deniedDomains: ["pastebin.com"], autoHealAttempts: 1 };
     await updateLimits(WS, limits);
     expect(await getLimits(WS)).toEqual(limits);
   });
