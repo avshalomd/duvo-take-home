@@ -15,6 +15,7 @@ import type {
 import { ConnectionEdit } from "@/contracts/connection";
 import { encryptSecret } from "./crypto";
 import { readToken, toConnection } from "./store-map";
+import { sameServer } from "./store-origin";
 
 /** An id that is not a connection of this workspace: another workspace's id reads as missing, never as someone else's row. */
 export class ConnectionNotFoundError extends Error {
@@ -62,8 +63,9 @@ export const addConnection: AddConnection = async (workspaceId, input) => {
 };
 
 /**
- * Edit a connection. The token is kept unless a new one is typed; clearToken removes it. Validated here as well as in
- * the action: the store is the last step before the row, so every caller meets the same URL rules as adding.
+ * Edit a connection. The token is kept unless a new one is typed; clearToken removes it; and an address on another
+ * server drops the saved token and OAuth sign-in (Q80). Validated here as well as in the action: the store is the
+ * last step before the row, so every caller meets the same URL rules as adding.
  */
 export const updateConnection: UpdateConnection = async (workspaceId, id, input) => {
   const edit = ConnectionEdit.parse(input);
@@ -72,16 +74,33 @@ export const updateConnection: UpdateConnection = async (workspaceId, id, input)
 
   const typed = edit.token ? edit.token : null; // "" is an empty field: keep what is saved
   const authType: AuthType = edit.authType ?? (typed ? "bearer" : (toConnection(current).authType ?? "none"));
-  const tokenChange = authType !== "bearer" || edit.clearToken ? noToken : typed ? sealed(typed) : {}; // {} leaves both columns as they are
+  // Credentials were given for one server. Without this, an empty token field would send the saved token to whatever
+  // address was typed, attacker.example included.
+  const moved = !sameServer(current.url, edit.url);
 
   const [row] = await db
     .update(connections)
-    .set({ name: edit.name, url: edit.url, transport: edit.transport, authType, ...tokenChange, updatedAt: new Date() })
+    .set({
+      name: edit.name,
+      url: edit.url,
+      transport: edit.transport,
+      authType,
+      ...tokenColumns({ authType, clearToken: edit.clearToken, typed, moved }),
+      ...(moved ? { oauth: null } : {}), // the new server needs its own sign-in
+      updatedAt: new Date(),
+    })
     .where(mine(workspaceId, id))
     .returning();
   if (!row) throw new ConnectionNotFoundError(); // deleted between the read and the write
   return toConnection(row);
 };
+
+/** The token columns an edit writes; {} leaves both as they are. */
+function tokenColumns(e: { authType: AuthType; clearToken?: boolean; typed: string | null; moved: boolean }) {
+  if (e.authType !== "bearer" || e.clearToken) return noToken;
+  if (e.typed) return sealed(e.typed);
+  return e.moved ? noToken : {}; // an empty field keeps the saved token, but only on the server it was given for
+}
 
 /** Deleting an id that is not this workspace's deletes nothing, and says nothing either. */
 export const deleteConnection: DeleteConnection = async (workspaceId, id) => {

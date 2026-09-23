@@ -14,7 +14,8 @@ import { connectionState, toolCount, toolWords } from "./connection-label";
 import { DeleteConnectionDialog } from "./delete-connection-dialog";
 
 // One server: its name, where it lives, how it is doing in plain words, its tools folded away, and what you can do.
-export function ConnectionRow({ connection }: { connection: Connection }) {
+// A member (canEdit false) sees the same row with the switch read-only and no Sign in, Edit or Delete.
+export function ConnectionRow({ connection, canEdit }: { connection: Connection; canEdit: boolean }) {
   const [enabled, setEnabled] = useState(connection.enabled);
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
@@ -68,31 +69,42 @@ export function ConnectionRow({ connection }: { connection: Connection }) {
               <Check className="size-3.5" /> Signed in
             </span>
           ) : (
-            // a plain link, not a client navigation: the route answers with a redirect to the service's own sign-in page
-            <a href={`/api/connections/oauth/start?id=${encodeURIComponent(connection.id)}`} className={cn(buttonVariants({ size: "sm" }))}>
-              Sign in
-            </a>
+            canEdit && (
+              // a plain link, not a client navigation: the route answers with a redirect to the service's own sign-in page
+              <a href={`/api/connections/oauth/start?id=${encodeURIComponent(connection.id)}`} className={cn(buttonVariants({ size: "sm" }))}>
+                Sign in
+              </a>
+            )
           ))}
         <Switch
           checked={enabled}
           // never disabled while saving: a disabled control loses focus, and the next press goes nowhere (Q69).
           aria-busy={pending}
+          readOnly={!canEdit} // a member still sees on or off, and can focus it, but cannot change it
           onCheckedChange={toggle}
           aria-label={`Use ${connection.name} in runs`}
           // the pseudo-element gives the 18 px switch a 44 px hit area on a phone (Q75)
           className="relative mx-2 shrink-0 data-checked:bg-emerald-700 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']"
         />
-        {/* icon-only on a phone, so the name keeps the room; the hidden word still names the button for a screen reader */}
-        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
-          <Pencil /> <span className="sr-only sm:not-sr-only">Edit</span>
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setDeleting(true)} className="text-muted-foreground hover:text-destructive">
-          <Trash2 /> <span className="sr-only sm:not-sr-only">Delete</span>
-        </Button>
+        {canEdit && (
+          <>
+            {/* icon-only on a phone, so the name keeps the room; the hidden word still names the button for a screen reader */}
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+              <Pencil /> <span className="sr-only sm:not-sr-only">Edit</span>
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setDeleting(true)} className="text-muted-foreground hover:text-destructive">
+              <Trash2 /> <span className="sr-only sm:not-sr-only">Delete</span>
+            </Button>
+          </>
+        )}
       </div>
 
-      <ConnectionDialog open={editing} onOpenChange={setEditing} connection={connection} />
-      <DeleteConnectionDialog open={deleting} onOpenChange={setDeleting} connection={connection} />
+      {canEdit && (
+        <>
+          <ConnectionDialog open={editing} onOpenChange={setEditing} connection={connection} />
+          <DeleteConnectionDialog open={deleting} onOpenChange={setDeleting} connection={connection} />
+        </>
+      )}
     </li>
   );
 }
