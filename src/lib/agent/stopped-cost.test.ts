@@ -115,7 +115,7 @@ describe("withAttemptCost", () => {
   it("adds the attempt's own cost to its finished event and keeps the SDK's raw total", () => {
     const [out] = withAttemptCost([finished], 0.0304);
     expect(out.payload).toMatchObject({ total_cost_usd: 0.0652 });
-    expect((out.payload as { attempt_cost_usd: number }).attempt_cost_usd).toBeCloseTo(0.0348, 10);
+    expect((out.payload as unknown as { attempt_cost_usd: number }).attempt_cost_usd).toBeCloseTo(0.0348, 10);
   });
 
   it("gives the first attempt of a fresh session its whole total", () => {

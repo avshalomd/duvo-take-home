@@ -79,5 +79,8 @@ export function ownCost(sessionTotal: number, base: number): number {
 
 /** An attempt's events, with its own share of the SDK's running total written beside the raw one on `finished`. */
 export function withAttemptCost(events: RunEvent[], base: number): RunEvent[] {
-  throw new Error(`not implemented: withAttemptCost(${events.length}, ${base})`);
+  // The raw fields stay as the SDK sent them (the trace records what came); Details reads attempt_cost_usd (QA Q149).
+  return events.map((e) =>
+    e.kind === "finished" ? { ...e, payload: { ...e.payload, attempt_cost_usd: ownCost(e.payload.total_cost_usd, base) } } : e,
+  );
 }
