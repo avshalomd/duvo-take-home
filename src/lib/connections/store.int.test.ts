@@ -17,7 +17,9 @@ import {
 
 const A = "int-settings-a"; // tenancy: every call names the workspace, as the session would
 const B = "int-settings-b";
-const named = (what: string) => `[int] ${what}`;
+// Not "[int] ...": the oauth package's integration tests delete every "[int]%" connection in any workspace when they
+// finish, and test files run in parallel, so rows named that way vanished mid-test. These are found by workspace.
+const named = (what: string) => `int-settings ${what}`;
 
 afterAll(async () => {
   await db.delete(connections).where(inArray(connections.workspaceId, [A, B]));

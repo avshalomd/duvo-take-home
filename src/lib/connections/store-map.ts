@@ -1,6 +1,9 @@
 import { Transport, type Connection } from "@/contracts/connection";
 import type { connections } from "@/db/schema";
 import { SecretError, decryptSecret } from "./crypto";
+// The oauth module owns its state's shape, so it alone says what "signed in" means. Imported from ./oauth/shape, not the
+// ./oauth index: the index also loads headers.ts, which imports the store, and the store imports this file.
+import { isSignedIn } from "./oauth/shape";
 
 export type ConnectionRow = typeof connections.$inferSelect;
 type AuthType = NonNullable<Connection["authType"]>;
@@ -17,7 +20,7 @@ export function toConnection(row: ConnectionRow): Connection {
     enabled: row.enabled,
     lastStatus: row.lastStatus,
     authType,
-    ...(authType === "oauth" ? { signedIn: oauthSignedIn(row.oauth) } : {}), // the contract says: oauth only
+    ...(authType === "oauth" ? { signedIn: isSignedIn(row.oauth) } : {}), // the contract says: oauth only
     tools: row.tools ?? [],
   };
 }
@@ -35,11 +38,6 @@ export function readToken(row: ConnectionRow): string | null {
     }
   }
   return row.token ?? null;
-}
-
-/** Signed in once the OAuth module has stored tokens in the connection's state (it seals them; only their presence is read here). */
-export function oauthSignedIn(oauth: unknown): boolean {
-  return typeof oauth === "object" && oauth !== null && Boolean((oauth as { tokens?: unknown }).tokens);
 }
 
 function hasToken(row: ConnectionRow): boolean {

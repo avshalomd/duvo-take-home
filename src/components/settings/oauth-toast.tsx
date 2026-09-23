@@ -16,7 +16,7 @@ export function OAuthToast({ signedIn, error }: { signedIn?: string; error?: str
     if (shown.current || (!signedIn && !error)) return;
     shown.current = true;
     if (signedIn) toast.success(`Signed in to ${signedIn}. Runs can use it now.`);
-    else toast.error(`The sign-in did not finish: ${error}`);
+    else toast.error(error); // the callback already words it as a sentence ("The sign-in was cancelled")
     router.replace("/settings/connections", { scroll: false });
   }, [signedIn, error, router]);
 
