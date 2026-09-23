@@ -22,15 +22,15 @@ export function RailSheet({ runs, selectedId }: { runs: RailRun[]; selectedId?: 
     <Sheet open={open} onOpenChange={setOpen}>
       {slot &&
         createPortal(
-          <SheetTrigger render={<Button variant="ghost" size="icon" className="size-10 shrink-0" aria-label="Show runs" />}>
+          <SheetTrigger render={<Button variant="ghost" size="icon" className="size-10 shrink-0 text-slate" aria-label="Show runs" />}>
             <PanelLeft />
           </SheetTrigger>,
           slot,
         )}
       {/* data-[side=left]: the Sheet sets its width under that variant, so the override has to name it too */}
-      <SheetContent side="left" className="gap-0 p-0 data-[side=left]:w-[85vw] data-[side=left]:sm:max-w-xs">
-        <SheetHeader className="border-b px-4 py-3">
-          <SheetTitle>Runs</SheetTitle>
+      <SheetContent side="left" className="gap-0 bg-mist-deep p-0 data-[side=left]:w-[86vw] data-[side=left]:sm:max-w-xs">
+        <SheetHeader className="px-5 pt-4 pb-1">
+          <SheetTitle className="text-[17px] font-semibold">Runs</SheetTitle>
         </SheetHeader>
         {/* picking a run closes the sheet: the run is what the person wanted to see */}
         <RunsRail runs={runs} selectedId={selectedId} onPick={() => setOpen(false)} />
