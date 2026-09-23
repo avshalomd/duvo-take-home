@@ -9,6 +9,7 @@ const MIN_READABLE_PX = 11;
 type Axis = Record<string, unknown>;
 type Enc = { field?: string; title?: unknown; axis?: Axis | null };
 type Loose = {
+  title: { text: string | string[] };
   width: number;
   height: number;
   autosize: { type: string; contains: string };
@@ -56,6 +57,21 @@ describe("chart readability in a small tile (Q98)", () => {
 
   it("gives the pie's legend readable swatches, not dots", () => {
     expect(anyKind("pie").config.legend.symbolSize).toBeGreaterThanOrEqual(120); // area in square px: about 11 px across
+  });
+
+  it("wraps a long title onto a second line at a word break, so it never squeezes the plot", () => {
+    const s = spec({ title: "The five largest EU countries by population", kind: "bar", data: countries, x: "country", y: "population" }) as Loose & {
+      title: { text: string | string[] };
+    };
+    expect(s.title.text).toEqual(["The five largest EU countries by", "population"]);
+    expect(spec({ title: "Fruit sold this week", kind: "bar", data: countries, x: "country", y: "population" }).title).toEqual({
+      text: "Fruit sold this week",
+    });
+  });
+
+  it("caps a title that is still too long at the chart's inner width, where it ends in an ellipsis", () => {
+    const { title, padding } = anyKind("bar").config as Loose["config"] & { title: { limit: number } };
+    expect(title.limit).toBe(CHART_WIDTH - 2 * padding);
   });
 
   it("sets the title larger and heavier than all other text", () => {
