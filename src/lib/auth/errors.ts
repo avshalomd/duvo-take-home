@@ -14,6 +14,11 @@ const MESSAGES: Record<string, string> = {
 
 const FALLBACK = "Something went wrong. Try again in a moment.";
 
+export const INVITE_ONLY = ""; // STUB
+export function oauthErrorMessage(_error: string | undefined): string | null {
+  return null; // STUB
+}
+
 /** The sign-up failed because the email already has an account: the form then offers to sign in instead. */
 export function accountExists(error: { code?: string } | null): boolean {
   return Boolean(error?.code && TAKEN.includes(error.code));

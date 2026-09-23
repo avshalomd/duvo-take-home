@@ -30,6 +30,10 @@ export function requestedPath(headers: Headers): string {
   return safeNext(headers.get(NEXT_PATH_HEADER) ?? undefined);
 }
 
+export function invitationIdFrom(_next: string): string | null {
+  return null; // STUB
+}
+
 /** A sign-in or sign-up link that returns to `next` afterwards, and optionally fills in an email. */
 export function withNext(page: "/sign-in" | "/sign-up", next: string, email?: string): string {
   const params = new URLSearchParams();

@@ -47,7 +47,7 @@ function sql() {
  * Members page's job (settings), and createInvite() has its own integration test. Deleted with the owner's workspace.
  */
 export async function inviteByRow(ownerEmail: string, inviteeEmail: string): Promise<string> {
-  const id = `e2e-invite-${Date.now().toString(36)}`;
+  const id = `e2e-invite-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`; // two specs in the same ms
   await sql()`
     insert into invitation (id, organization_id, email, role, status, expires_at, inviter_id)
     select ${id}, m.organization_id, ${inviteeEmail}, 'member', 'pending', now() + interval '1 day', u.id
@@ -72,4 +72,5 @@ export async function deleteUsers(emails: string[]) {
     await db`delete from organization where id = any(${ids})`;
   }
   await db`delete from "user" where email = any(${emails})`;
+  await db`delete from invitation where email = any(${emails})`; // invitations into workspaces they did not own (the demo's)
 }

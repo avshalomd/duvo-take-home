@@ -91,6 +91,12 @@ test("a wrong password shows the error and stays on the sign-in page", async ({ 
   await expect(page).toHaveURL(/\/sign-in/);
 });
 
+test("the sign-in pages carry the product's name, Handover", async ({ page }) => {
+  await page.goto("/sign-in");
+  await expect(page).toHaveTitle("Sign in - Handover");
+  await expect(page.getByRole("region", { name: "What Handover does" })).toContainText("Handover");
+});
+
 test("a signed-out visit to / goes to /sign-in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL((url) => url.pathname === "/sign-in");

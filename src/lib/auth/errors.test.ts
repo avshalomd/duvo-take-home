@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { accountExists, friendlyAuthError } from "./errors";
+import { INVITE_ONLY, accountExists, friendlyAuthError, oauthErrorMessage } from "./errors";
+
+describe("invite-only sign-up in words", () => {
+  it("is one plain line naming the product and what to do", () => {
+    expect(INVITE_ONLY).toBe("Handover is invite-only. Ask someone in a workspace to send you an invitation.");
+  });
+
+  it("on the sign-up form, points at the invited address when another email was typed", () => {
+    expect(friendlyAuthError({ code: "SIGNUP_INVITE_ONLY", status: 403 })).toBe("There is no invitation for this email. Use the address your invitation was sent to.");
+  });
+
+  it("after Google, says the same line when Google would have made a new account without an invitation", () => {
+    expect(oauthErrorMessage("SIGNUP_INVITE_ONLY")).toBe(INVITE_ONLY);
+  });
+
+  it("after Google, says a calm general line for any other failure, and nothing when there was none", () => {
+    expect(oauthErrorMessage("unable_to_get_user_info")).toBe("Signing in with Google did not work. Try again, or use your email.");
+    expect(oauthErrorMessage(undefined)).toBeNull();
+  });
+});
 
 describe("accountExists", () => {
   it("is true for both of Better Auth's 'already exists' codes and false for anything else", () => {
