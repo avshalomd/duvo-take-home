@@ -1,0 +1,248 @@
+{
+  "id": "csv-no-quotes-conflict",
+  "why": "Q148: the instructions say to add no quotes, and one value contains a comma. The first attempt failed 'The CSV parses'; the heal quoted the value and said why in the report. A readable file wins over an instruction it cannot meet: the reviewer must pass it with a note, not send it back to remove the quotes, which is how the two tiers undid each other's fixes.",
+  "source": "hand-written from the engine's live heal run (Q148): the run as it ended, after heal attempt 1",
+  "expected": {
+    "verdict": "pass_with_notes",
+    "decidedBy": "review",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.7,
+      "followedPlan": 0.9,
+      "stayedInBounds": 0.93
+    },
+    "review": {
+      "taskFinished": true,
+      "responseSuitable": true,
+      "changeNeeded": null,
+      "reasoning": "labs.csv has the four columns and the five labs asked for. One value, \"London, UK\", is quoted against \"without adding any quotes\", but unquoted it would break the CSV, and the report says so; every other value is unquoted as asked."
+    },
+    "source": "hand-set: the reviewer's answer under the Q148 rule (checks' rules are fixed); not yet measured live"
+  },
+  "run": {
+    "id": "case_csv_no_quotes",
+    "prompt": "List the five biggest AI labs in Europe and save them into labs.csv with name, headquarters, founded, url. Write the rows without adding any quotes.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "Wrote labs.csv with the five biggest AI labs in Europe. One value, DeepMind's headquarters \"London, UK\", contains a comma, so it is in double quotes: without them that row would have five values and the file would not be a valid CSV, so the instruction to add no quotes could not be followed for that one value. Every other value is written without quotes, as asked.",
+    "error": null,
+    "numTurns": 8,
+    "durationMs": 55000,
+    "costUsd": 0.08,
+    "createdAt": "2026-09-23T11:40:00.000Z",
+    "finishedAt": "2026-09-23T11:40:27.000Z",
+    "healAttempts": 1
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-23T11:40:00.000Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-23T11:40:02.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "The five biggest AI labs in Europe, in labs.csv",
+        "expectedOutputs": [
+          "labs.csv with name, headquarters, founded, url, no quotes"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for the biggest AI labs in Europe",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Write labs.csv",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-23T11:40:04.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_q148_1",
+        "name": "WebSearch",
+        "input": {
+          "query": "biggest AI labs in Europe by headcount 2026"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-23T11:40:07.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_q148_1",
+        "is_error": false,
+        "preview": "Mistral AI (Paris), Google DeepMind (London, UK), Aleph Alpha (Heidelberg), Stability AI (London), Helsing (Munich) ..."
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-23T11:40:09.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "The five biggest AI labs in Europe, in labs.csv",
+        "expectedOutputs": [
+          "labs.csv with name, headquarters, founded, url, no quotes"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for the biggest AI labs in Europe",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write labs.csv",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-23T11:40:11.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_q148_2",
+        "name": "Write",
+        "input": {
+          "file_path": "labs.csv",
+          "content": "name,headquarters,founded,url\nMistral AI,Paris,2023,https://mistral.ai\nDeepMind,London, UK,2010,https://deepmind.google\nAleph Alpha,Heidelberg,2019,https://aleph-alpha.com\nStability AI,London,2019,https://stability.ai\nHelsing,Munich,2021,https://helsing.ai\n"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-23T11:40:14.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_q148_2",
+        "is_error": false,
+        "preview": "File created successfully at labs.csv"
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-23T11:40:16.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "The five biggest AI labs in Europe, in labs.csv",
+        "expectedOutputs": [
+          "labs.csv with name, headquarters, founded, url, no quotes"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for the biggest AI labs in Europe",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write labs.csv",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-23T11:40:18.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 5,
+        "duration_ms": 21000,
+        "total_cost_usd": 0.05,
+        "result": "Wrote labs.csv with five labs, without quotes as asked."
+      }
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-23T11:40:20.000Z",
+      "kind": "heal",
+      "payload": {
+        "attempt": 1,
+        "max": 2,
+        "reasons": [
+          "The CSV parses: labs.csv: row 3 has 5 fields, the header has 4"
+        ],
+        "feedback": "An automatic check of the result found this to fix:\n- In labs.csv, row 3 has 5 values but the header has 4: a value that contains a comma is not in double quotes. Put every value that contains a comma in double quotes and write labs.csv again. If the instructions say not to use quotes, keep the file valid (quote the value) and say in the report that the instruction could not be followed for that value, and why.\nFix the files in place, keep what was already right, and report what you changed."
+      }
+    },
+    {
+      "seq": 11,
+      "at": "2026-09-23T11:40:22.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_q148_3",
+        "name": "Write",
+        "input": {
+          "file_path": "labs.csv",
+          "content": "name,headquarters,founded,url\nMistral AI,Paris,2023,https://mistral.ai\nDeepMind,\"London, UK\",2010,https://deepmind.google\nAleph Alpha,Heidelberg,2019,https://aleph-alpha.com\nStability AI,London,2019,https://stability.ai\nHelsing,Munich,2021,https://helsing.ai\n"
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "at": "2026-09-23T11:40:25.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_q148_3",
+        "is_error": false,
+        "preview": "File created successfully at labs.csv"
+      }
+    },
+    {
+      "seq": 13,
+      "at": "2026-09-23T11:40:27.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 8,
+        "duration_ms": 34000,
+        "total_cost_usd": 0.08,
+        "result": "Wrote labs.csv with the five biggest AI labs in Europe. One value, DeepMind's headquarters \"London, UK\", contains a comma, so it is in double quotes: without them that row would have five values and the file would not be a valid CSV, so the instruction to add no quotes could not be followed for that one value. Every other value is written without quotes, as asked."
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "labs.csv",
+      "content": "name,headquarters,founded,url\nMistral AI,Paris,2023,https://mistral.ai\nDeepMind,\"London, UK\",2010,https://deepmind.google\nAleph Alpha,Heidelberg,2019,https://aleph-alpha.com\nStability AI,London,2019,https://stability.ai\nHelsing,Munich,2021,https://helsing.ai\n"
+    }
+  ],
+  "template": null
+}

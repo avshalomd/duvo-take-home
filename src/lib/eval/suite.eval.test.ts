@@ -26,7 +26,7 @@ describe.skipIf(process.env.EVAL !== "1")("the offline suite, live", () => {
       const answers: Answers = { judge: null, review: null };
       const verdict = await evaluate(caseInput(c), {
         judge: async (input) => (answers.judge = await judgeRun(input)),
-        review: async (input) => (answers.review = await reviewRun(input)),
+        review: async (input, checks) => (answers.review = await reviewRun(input, checks)),
       });
       const r = row(c, verdict, answers, true);
       live.push(r);

@@ -56,17 +56,23 @@ export function adviceFor(check: Check): string {
   }
 }
 
+// Q148: "without adding any quotes" and a value with a comma cannot both hold, and a file that cannot be read is worth
+// nothing - so the valid file wins and the report says why. This advice cannot see the instructions (the feedback is
+// built from the verdict alone), so it states the rule for the agent, which can.
+const QUOTE_CONFLICT =
+  "If the instructions say not to use quotes, keep the file valid (quote the value) and say in the report that the instruction could not be followed for that value, and why.";
+
 // A ragged row is the common CSV failure (his run, 2026-09-23): a comma inside an unquoted value shifts every cell
 // after it. More values than the header means exactly that; fewer means a value was left out.
 function parsesAdvice(file: string, rest: string): string {
   const ragged = rest.match(/^row (\d+) has (\d+) fields, the header has (\d+)(?: \(and (\d+) more)?/);
   if (!ragged) {
-    return `${file} is not valid CSV (${rest}): put every value that contains a comma or a quote in double quotes, double any quote inside a value, and write ${file} again.`;
+    return `${file} is not valid CSV (${rest}): put every value that contains a comma or a quote in double quotes, double any quote inside a value, and write ${file} again. ${QUOTE_CONFLICT}`;
   }
   const [, row, got, want, more] = ragged;
   const also = more ? ` ${more} more ${more === "1" ? "row has" : "rows have"} the same problem.` : "";
   if (Number(got) > Number(want)) {
-    return `In ${file}, row ${row} has ${got} values but the header has ${want}: a value that contains a comma is not in double quotes.${also} Put every value that contains a comma in double quotes and write ${file} again.`;
+    return `In ${file}, row ${row} has ${got} values but the header has ${want}: a value that contains a comma is not in double quotes.${also} Put every value that contains a comma in double quotes and write ${file} again. ${QUOTE_CONFLICT}`;
   }
   return `In ${file}, row ${row} has ${got} values but the header has ${want}: a value is missing.${also} Give every row a value for every column (nothing between two commas when there is none) and write ${file} again.`;
 }
