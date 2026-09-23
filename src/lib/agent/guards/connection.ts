@@ -1,5 +1,11 @@
 import type { GuardContext } from "@/contracts/guard";
+import { OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
+import { PLAN_SERVER_KEY } from "../plan-state";
 import { allowed, type Verdict } from "./verdict";
+
+// Our own in-process servers, which run.ts adds to every run. Named here by key rather than left to connectionNames,
+// because a connection a user calls "Plan" or "Outputs" gets the same key.
+const OWN_SERVERS = new Set([PLAN_SERVER_KEY, OUTPUTS_SERVER_KEY]);
 
 /**
  * The connection guard, on every mcp__<key>__<tool> call. The plan's `sources` is the agent's own statement of what
@@ -29,10 +35,9 @@ export function connectionCheck(
 ): (tool: string, input?: unknown) => Verdict {
   return (tool) => {
     const key = serverKey(tool);
-    const name = key ? ctx.connectionNames[key] : undefined;
-    // Only the workspace's connections are this guard's business: the plan and output tools are in-process
-    // servers of our own, and they are not in connectionNames.
-    if (!key || !name) return allowed("not a connection");
+    if (!key || OWN_SERVERS.has(key)) return allowed("not a connection");
+    const name = ctx.connectionNames[key];
+    if (!name) return allowed("not a connection"); // only the workspace's connections are this guard's business
 
     const plan = ctx.plan(); // read at call time: the plan arrives after the hooks are built
     if (!plan) {
