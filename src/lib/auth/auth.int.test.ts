@@ -6,6 +6,8 @@ import { db } from "@/db";
 import { invitation, member, organization, session, user } from "@/db/schema";
 import { auth } from "./auth";
 import { INVITATION_COOKIE } from "./invitation-cookie";
+import type { SessionCtx } from "@/contracts/auth";
+import { MemberChangeError } from "./member-rules";
 import { changeMemberRole, createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, removeFromWorkspace, revokeInvite } from "./members";
 import { sessionFromHeaders } from "./session";
 
@@ -405,6 +407,29 @@ describe.skipIf(!process.env.DATABASE_URL)("removing people and changing roles",
     await expect(removeFromWorkspace(one.owner.headers, one.ownerCtx, theirs)).rejects.toThrow(NOT_FOUND);
     await expect(changeMemberRole(one.owner.headers, one.ownerCtx, theirs, "admin")).rejects.toThrow(NOT_FOUND);
     expect(await two.roles()).toContainEqual(["Mia Member", "member"]);
+  });
+
+  // Review R2: the owner count and the write were a read, then a separate write. Two owners acting on each other at
+  // once both read "two owners", both passed, and the workspace was left with none and nobody able to make one.
+  type Act = (by: Headers, ctx: SessionCtx, memberId: string) => Promise<void>;
+  const opposing: [string, Act, string][] = [
+    ["demote", (by, ctx, id) => changeMemberRole(by, ctx, id, "member"), "Only an owner or an admin can change someone's role."],
+    ["remove", (by, ctx, id) => removeFromWorkspace(by, ctx, id), "You are no longer in this workspace. Reload the page."],
+  ];
+  it.each(opposing)("two owners who %s each other at once: one change lands, the other is refused in plain words, and an owner stays", async (what, act, refusal) => {
+    const { owner, ownerCtx, admin, memberIdOf, roles } = await team(`race-${what}`);
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(admin.userId), "owner");
+    const secondCtx = (await sessionFromHeaders(admin.headers))!; // the session reads the new role
+
+    const [first, second] = await Promise.allSettled([
+      act(owner.headers, ownerCtx, memberIdOf(admin.userId)),
+      act(admin.headers, secondCtx, memberIdOf(owner.userId)),
+    ]);
+    const refused = [first, second].filter((r) => r.status === "rejected");
+    expect(refused).toHaveLength(1);
+    expect((refused[0] as PromiseRejectedResult).reason).toBeInstanceOf(MemberChangeError);
+    expect((refused[0] as PromiseRejectedResult).reason.message).toBe(refusal); // the loser learns why, not Better Auth's code
+    expect((await roles()).filter(([, role]) => role === "owner")).toHaveLength(1);
   });
 });
 
