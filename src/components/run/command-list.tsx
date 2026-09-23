@@ -30,7 +30,7 @@ export function CommandList({
     >
       {options.length === 0 ? (
         <p className="px-2 py-2 text-muted-foreground">
-          {hasAny ? `No saved automation starts with \\${query}` : "No saved automations yet - make one from a finished run"}
+          {hasAny ? `No saved automation starts with /${query}` : "No saved automations yet - make one from a finished run"}
         </p>
       ) : (
         options.map((o, i) => (
@@ -46,7 +46,7 @@ export function CommandList({
             }}
             className={cn("flex cursor-pointer items-baseline gap-3 rounded-md px-2 py-1.5", i === active && "bg-muted")}
           >
-            <span className="shrink-0 font-medium text-emerald-800 dark:text-emerald-300">\{o.command}</span>
+            <span className="shrink-0 font-medium text-emerald-800 dark:text-emerald-300">/{o.command}</span>
             <span className="min-w-0 truncate">{o.name}</span>
             {o.produces && <span className="ml-auto shrink-0 truncate text-xs text-muted-foreground max-sm:hidden">makes {o.produces}</span>}
           </div>
