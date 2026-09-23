@@ -3,12 +3,27 @@
 // a server must not be able to bounce our server onto our own network with a 302.
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { describe, expect, it, vi } from "vitest";
-import { MAX_REDIRECTS, guardedFetch } from "./fetch";
+import type { HostVerdict } from "@/lib/net/address";
+import { MAX_REDIRECTS, guardedFetch as guarded } from "./fetch";
 
 const redirect = (location: string, status = 302) => new Response(null, { status, headers: { location } });
 
+// No DNS in unit tests: every name is public here unless a test says where it leads.
+const allPublic = async (): Promise<HostVerdict> => ({ reach: "public" });
+const guardedFetch = (base: Parameters<typeof guarded>[0]) => guarded(base, allPublic);
+const leadsInside = (inside: string) => async (host: string): Promise<HostVerdict> =>
+  host === inside ? { reach: "internal", address: "10.0.0.7" } : { reach: "public" };
+
 describe("guardedFetch", () => {
-  it.each(["http://localhost:3000/token", "http://169.254.169.254/latest/meta-data", "https://10.0.0.5/.well-known/oauth-authorization-server"])(
+  it.each([
+    "http://localhost:3000/token",
+    "http://169.254.169.254/latest/meta-data",
+    "https://10.0.0.5/.well-known/oauth-authorization-server",
+    "http://[::]:3000/token", // Security QA: spellings the old rule let through
+    "http://[::7f00:1]/",
+    "http://100.100.100.200/latest/meta-data",
+    "http://[64:ff9b::a9fe:a9fe]/",
+  ])(
     "refuses %s without sending anything",
     async (url) => {
       const base = vi.fn(async () => new Response("ok"));
@@ -83,5 +98,29 @@ describe("guardedFetch", () => {
     const [, second] = base.mock.calls[1];
     expect(second?.method).toBe("GET");
     expect(second?.body).toBeUndefined();
+  });
+
+  // Security QA: a public-looking name can resolve inside. Each hop is looked up before anything is sent to it.
+  it("refuses a name that resolves to a private address, without sending anything", async () => {
+    const base = vi.fn<FetchLike>(async () => new Response("ok"));
+    await expect(guarded(base, leadsInside("rebind.example.com"))("https://rebind.example.com/.well-known/oauth-authorization-server")).rejects.toThrow(
+      /private or local network/,
+    );
+    expect(base).not.toHaveBeenCalled();
+  });
+
+  it("refuses a redirect to a name that resolves to a private address, before it is fetched", async () => {
+    const base = vi.fn<FetchLike>(async () => redirect("https://rebind.example.com/token"));
+    await expect(guarded(base, leadsInside("rebind.example.com"))("https://auth.example.com/token")).rejects.toThrow(
+      /Refused to follow a redirect to rebind\.example\.com.*private or local network/,
+    );
+    expect(base).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a name whose address could not be looked up, since it was not seen to be public", async () => {
+    const base = vi.fn<FetchLike>(async () => new Response("ok"));
+    const unknown = async (): Promise<HostVerdict> => ({ reach: "unknown" });
+    await expect(guarded(base, unknown)("https://nowhere.example/token")).rejects.toThrow(/could not be found/);
+    expect(base).not.toHaveBeenCalled();
   });
 });

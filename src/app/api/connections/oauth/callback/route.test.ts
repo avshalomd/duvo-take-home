@@ -1,5 +1,6 @@
 // The callback: the server sends the browser back here with ?code&state (or ?error). Whatever happens, the person
-// lands on the connections page with one plain sentence, never an error's own text or a stack.
+// lands on the connections page with a code the page turns into its own sentence: never text of anyone else's in
+// the address (security QA), and never an error's own text or a stack.
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignInError } from "@/lib/connections/oauth/errors";
@@ -58,19 +59,22 @@ describe("GET /api/connections/oauth/callback", () => {
   it("says the sign-in was cancelled when the person declined at the server (error=access_denied)", async () => {
     const res = await GET(callback(`error=access_denied&state=${STATE}`));
 
-    expect(landing(res).error).toBe("The sign-in was cancelled");
+    expect(landing(res).error).toBe("cancelled");
     expect(h.complete).not.toHaveBeenCalled();
   });
 
-  it("passes on the server's own reason for any other refusal", async () => {
-    const res = await GET(callback(`error=invalid_scope&error_description=Unknown%20scope%20admin&state=${STATE}`));
+  it("says the server refused any other way, and keeps the server's own words for the log, out of the address", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const res = await GET(callback(`error=invalid_scope&error_description=Your%20account%20is%20locked%2C%20call%20555&state=${STATE}`));
 
-    expect(landing(res).error).toBe("The server refused the sign-in: Unknown scope admin");
+    expect(landing(res).error).toBe("refused");
+    expect(res.headers.get("location")).not.toMatch(/locked|555/);
+    expect(JSON.stringify(warn.mock.calls)).toContain("Your account is locked, call 555");
   });
 
   it("says the link is incomplete when the code or the state is missing", async () => {
-    expect(landing(await GET(callback(`state=${STATE}`))).error).toBe("The sign-in came back incomplete; start it again");
-    expect(landing(await GET(callback("code=code-1"))).error).toBe("The sign-in came back incomplete; start it again");
+    expect(landing(await GET(callback(`state=${STATE}`))).error).toBe("incomplete");
+    expect(landing(await GET(callback("code=code-1"))).error).toBe("incomplete");
     expect(h.complete).not.toHaveBeenCalled();
   });
 
@@ -79,17 +83,20 @@ describe("GET /api/connections/oauth/callback", () => {
     const other = await GET(callback(`code=code-1&state=${STATE}`, `oauth_state=${"X".repeat(43)}`));
 
     for (const res of [without, other]) {
-      expect(landing(res).error).toBe("This sign-in was not started in this browser, or it took too long; start it again");
+      expect(landing(res).error).toBe("other_browser");
     }
     expect(h.complete).not.toHaveBeenCalled();
   });
 
-  it("shows a SignInError's sentence as it is written", async () => {
-    h.complete.mockRejectedValue(new SignInError("This sign-in link has expired or was already used; start the sign-in again"));
+  it("sends a SignInError's code, and its sentence (with the server's words) only to the log", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    h.complete.mockRejectedValue(new SignInError("token_refused", "The server did not accept the sign-in: Code redeemed at evil.example"));
 
     const res = await GET(callback(`code=code-1&state=${STATE}`));
 
-    expect(landing(res).error).toBe("This sign-in link has expired or was already used; start the sign-in again");
+    expect(landing(res).error).toBe("token_refused");
+    expect(res.headers.get("location")).not.toContain("evil");
+    expect(JSON.stringify(warn.mock.calls)).toContain("Code redeemed at evil.example");
   });
 
   it("shows a plain sentence for any other failure, never the error's own text or stack", async () => {
@@ -98,7 +105,7 @@ describe("GET /api/connections/oauth/callback", () => {
 
     const res = await GET(callback(`code=code-1&state=${STATE}`));
 
-    expect(landing(res).error).toBe("The sign-in failed; start it again");
+    expect(landing(res).error).toBe("failed");
     expect(res.headers.get("location")).not.toContain("ECONNREFUSED");
   });
 });

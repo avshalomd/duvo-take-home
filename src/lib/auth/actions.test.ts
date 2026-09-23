@@ -1,0 +1,53 @@
+// Switching workspaces. Better Auth checks membership too, but answers a stranger's workspace with a thrown error,
+// which reached the browser as a 500 (security QA). Session, members and Better Auth are doubles here.
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const h = vi.hoisted(() => ({
+  setActive: vi.fn(async () => ({})),
+  redirect: vi.fn((to: string) => {
+    throw new Error(`NEXT_REDIRECT ${to}`); // Next's redirect() throws to end the action; so does this stand-in
+  }),
+}));
+
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: h.redirect }));
+vi.mock("./auth", () => ({ auth: { api: { setActiveOrganization: h.setActive } } }));
+vi.mock("./session", () => ({
+  requireSession: async () => ({ userId: "u1", userName: "Sam", email: "sam@example.com", workspaceId: "ws-a", workspaceName: "A", role: "owner" }),
+}));
+vi.mock("./members", () => ({
+  listWorkspaces: async () => [
+    { id: "ws-a", name: "Sam's workspace", role: "owner" },
+    { id: "ws-b", name: "Finance", role: "member" },
+  ],
+  revokeInvitation: vi.fn(),
+}));
+
+import { switchWorkspace, trySwitchWorkspace } from "./actions";
+
+const NOT_YOURS = "You are not a member of that workspace, so it cannot be opened.";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("switching to a workspace the user is not in", () => {
+  it("is refused in plain words, and Better Auth is never asked", async () => {
+    expect(await trySwitchWorkspace("ws-someone-elses")).toEqual({ error: NOT_YOURS });
+    expect(h.setActive).not.toHaveBeenCalled();
+    expect(h.redirect).not.toHaveBeenCalled();
+  });
+
+  it("is refused through the menu's call too, with no error page", async () => {
+    await expect(switchWorkspace("ws-someone-elses")).resolves.toBeUndefined();
+    expect(h.setActive).not.toHaveBeenCalled();
+  });
+});
+
+describe("switching to one of the user's workspaces", () => {
+  it("makes it the active one and opens Home", async () => {
+    await expect(trySwitchWorkspace("ws-b")).rejects.toThrow("NEXT_REDIRECT /");
+    expect(h.setActive).toHaveBeenCalledWith({ headers: expect.any(Headers), body: { organizationId: "ws-b" } });
+  });
+});

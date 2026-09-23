@@ -3,11 +3,11 @@ import { INVITE_ONLY, accountExists, friendlyAuthError, oauthErrorMessage } from
 
 describe("invite-only sign-up in words", () => {
   it("is one plain line naming the product and what to do", () => {
-    expect(INVITE_ONLY).toBe("Handover is invite-only. Ask someone in a workspace to send you an invitation.");
+    expect(INVITE_ONLY).toBe("Handover is invite-only. Open your invitation link, or ask someone in a workspace to invite you.");
   });
 
-  it("on the sign-up form, points at the invited address when another email was typed", () => {
-    expect(friendlyAuthError({ code: "SIGNUP_INVITE_ONLY", status: 403 })).toBe("There is no invitation for this email. Use the address your invitation was sent to.");
+  it("on the sign-up form, points at the invited address and at the link, since either can be what is missing", () => {
+    expect(friendlyAuthError({ code: "SIGNUP_INVITE_ONLY", status: 403 })).toBe("This does not match an invitation. Use the address your invitation was sent to, and open its link in this browser.");
   });
 
   it("after Google, says the same line when Google would have made a new account without an invitation", () => {

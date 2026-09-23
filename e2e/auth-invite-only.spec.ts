@@ -8,7 +8,7 @@ import { DEMO_EMAIL, DEMO_PASSWORD, E2E_PASSWORD, SIGNED_OUT, deleteUsers, e2eEm
 test.skip(process.env.SIGNUP_MODE !== "invite", "run with SIGNUP_MODE=invite, against a server started the same way");
 test.use({ storageState: SIGNED_OUT });
 
-const INVITE_ONLY = "Handover is invite-only. Ask someone in a workspace to send you an invitation.";
+const INVITE_ONLY = "Handover is invite-only. Open your invitation link, or ask someone in a workspace to invite you.";
 const created: string[] = [];
 test.afterAll(async () => deleteUsers(created));
 
@@ -32,6 +32,22 @@ test("the API refuses a sign-up without an invitation too, and no account is mad
   expect((await res.json()).code).toBe("SIGNUP_INVITE_ONLY");
   const signIn = await request.post("/api/auth/sign-in/email", { data: { email, password: E2E_PASSWORD }, headers: { origin: baseURL! } });
   expect(signIn.status()).toBe(401);
+});
+
+// Security QA: an invited address alone was enough to make its account (and then take the invitation). The sign-up
+// must come from the invitation's link: its page leaves the invitation in a cookie the sign-up request carries.
+test("the API refuses an invited email's sign-up that did not come from the invitation's link", async ({ request, baseURL }) => {
+  const invitee = e2eEmail("io-nolink");
+  created.push(invitee);
+  await inviteByRow(DEMO_EMAIL, invitee);
+  const res = await request.post("/api/auth/sign-up/email", {
+    data: { name: "Mallory", email: invitee, password: E2E_PASSWORD },
+    headers: { origin: baseURL! },
+  });
+  expect(res.status()).toBe(403);
+  expect((await res.json()).code).toBe("SIGNUP_INVITE_ONLY");
+  const signIn = await request.post("/api/auth/sign-in/email", { data: { email: invitee, password: E2E_PASSWORD }, headers: { origin: baseURL! } });
+  expect(signIn.status()).toBe(401); // no account was made
 });
 
 test("an invitation's link still leads to a sign-up form, and the new account joins the workspace", async ({ page }) => {
@@ -64,7 +80,7 @@ test("an invitation's sign-up form refuses another email in plain words", async 
   await page.getByLabel("Email").fill(other);
   await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(formError(page)).toHaveText("There is no invitation for this email. Use the address your invitation was sent to.");
+  await expect(formError(page)).toHaveText("This does not match an invitation. Use the address your invitation was sent to, and open its link in this browser.");
 });
 
 test("signing in to an existing account is unchanged", async ({ page }) => {

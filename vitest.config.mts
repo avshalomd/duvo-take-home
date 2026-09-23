@@ -11,6 +11,9 @@ export default defineConfig({
     environment: "node",
     include: integration ? ["src/**/*.int.test.ts"] : ["src/**/*.test.ts", "src/**/*.test.tsx"],
     exclude: integration ? [] : ["src/**/*.int.test.ts", "node_modules/**"],
+    // Integration files one at a time: they share one database, and a start counts every file's runs in flight
+    // against the deployment's cap (lib/runs/limits.ts), so parallel files would fill it for each other.
+    fileParallelism: !integration,
     // `server-only` throws outside a React Server Component bundle; stub it for tests.
     alias: { "server-only": new URL("./src/test/server-only-stub.ts", import.meta.url).pathname },
   },

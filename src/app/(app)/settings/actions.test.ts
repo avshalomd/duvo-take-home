@@ -16,8 +16,13 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/lib/connections/store", () => ({
   ...store,
-  ConnectionNotFoundError: class extends Error {},
+  ConnectionNotFoundError: class extends Error {
+    message = "That connection could not be found. It may have been deleted - reload the page.";
+  },
   ConnectionNameTakenError: class extends Error {},
+  PrivateAddressError: class extends Error {
+    message = "That address points at a private or local network, which a connection cannot reach";
+  },
 }));
 vi.mock("@/lib/auth/members", () => ({ inviteMember: vi.fn(), listMembers: vi.fn(async () => []) }));
 vi.mock("@/lib/usage/budget", () => ({ updateLimits: vi.fn() }));
@@ -79,5 +84,28 @@ describe("the connection actions for an owner or an admin", () => {
     session.role = "owner";
     expect(await writes.add()).toEqual({});
     expect(store.addConnection).toHaveBeenCalledOnce();
+  });
+});
+
+// Security QA: a public-looking name can resolve inside our network. The store looks the host up before it saves;
+// the form then shows its sentence beside the Address field, as it does for a private address typed as numbers.
+describe("a connection address that resolves to a private network", () => {
+  it.each(["add", "edit"] as const)("is shown beside the Address field, with what was typed kept (%s)", async (what) => {
+    session.role = "owner";
+    const { PrivateAddressError } = await import("@/lib/connections/store");
+    (what === "add" ? store.addConnection : store.updateConnection).mockRejectedValueOnce(new PrivateAddressError());
+    const out = await writes[what]();
+    expect(out.fieldErrors?.url).toEqual(["That address points at a private or local network, which a connection cannot reach"]);
+    expect(out.values).toMatchObject({ url: "https://attacker.example/mcp" });
+  });
+});
+
+// Security QA: another workspace's id (or one deleted meanwhile) used to answer {} while nothing changed.
+describe("toggling or deleting a connection that is not this workspace's", () => {
+  it.each(["delete", "toggle"] as const)("says it was not found instead of reporting success (%s)", async (what) => {
+    session.role = "owner";
+    const { ConnectionNotFoundError } = await import("@/lib/connections/store");
+    (what === "delete" ? store.deleteConnection : store.setConnectionEnabled).mockRejectedValueOnce(new ConnectionNotFoundError());
+    expect(await writes[what]()).toEqual({ error: "That connection could not be found. It may have been deleted - reload the page." });
   });
 });

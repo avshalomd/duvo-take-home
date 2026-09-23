@@ -1,12 +1,12 @@
 import "server-only";
-import { sql } from "drizzle-orm";
+import { count, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { transaction } from "@/db";
 import { runs } from "@/db/schema";
 import { FollowUpInput, StartRunInput, type StartRun } from "@/contracts/agent";
 import { AGENT_MODEL } from "@/lib/agent/run";
 import { enqueueRun } from "@/lib/runner/enqueue";
-import { closeAbandonedRuns } from "@/lib/runner/recover";
+import { closeAbandonedRuns, holdsASlot } from "@/lib/runner/recover";
 import { checkBudget } from "@/lib/usage/budget";
 import { clientIp } from "./client-ip";
 import { RunLimitError, startBlockReason, startsByIp } from "./limits";
@@ -41,11 +41,18 @@ export const startRun: StartRun = async (ctx, req, ip) => {
     // A run stranded by a server restart would otherwise hold an in-flight slot for ever (QA Q84).
     await closeAbandonedRuns(new Date(), ctx.workspaceId);
 
-    // The workspace's own limits (runs and cost per day, runs in flight), then the per-address brake from v1.
+    // The workspace's own limits (runs and cost per day, runs in flight), then the deployment's.
     const over = await checkBudget(ctx.workspaceId);
     if (over) throw new RunLimitError(over);
-    // In-flight is the workspace's limit now (checkBudget); the address bucket still stops one client flooding starts.
-    const reason = address === null ? null : startBlockReason({ inFlight: 0, ip: address, now: Date.now(), bucket: startsByIp });
+
+    // The deployment's cap, across every workspace (limits.ts). A second lock, global, held to the commit like the
+    // first, so parallel starts in different workspaces count one after another. Every start takes the workspace lock
+    // first and this one second, so no two starts ever wait on each other in opposite order. The two-key form is its
+    // own key space in Postgres: it can never be the same lock as a workspace's one-key hashtext lock.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('handover:run-starts'), 0)`);
+    const [live] = await tx.select({ n: count() }).from(runs).where(holdsASlot(new Date()));
+    // Then the per-address brake from v1, which stops one client flooding starts (a schedule has no address).
+    const reason = startBlockReason({ inFlight: live.n, ip: address, now: Date.now(), bucket: startsByIp });
     if (reason) throw new RunLimitError(reason);
 
     const [row] = await tx

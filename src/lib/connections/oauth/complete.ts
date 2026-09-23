@@ -20,14 +20,14 @@ const STATE_GONE = "This sign-in link has expired or was already used; start the
 export const completeOAuth: CompleteOAuth = async ({ code, state, redirectUri }) => {
   const row = await findByPendingState(state);
   const blob = row ? readBlob(row.oauth) : null;
-  if (!row || !blob?.pending) throw new SignInError(STATE_GONE);
+  if (!row || !blob?.pending) throw new SignInError("expired", STATE_GONE);
 
   const now = new Date();
   // Single use: the pending sign-in is cleared before anything else, so a replayed callback finds nothing, and an
   // expired one is cleared rather than left to be tried again.
   const consumed = { ...blob, pending: null };
   await setConnectionOAuth(row.workspaceId, row.id, consumed);
-  if (checkState(blob.pending, state, now) !== "ok") throw new SignInError(STATE_GONE);
+  if (checkState(blob.pending, state, now) !== "ok") throw new SignInError("expired", STATE_GONE);
 
   let tokens: OAuthTokens;
   try {
@@ -41,7 +41,7 @@ export const completeOAuth: CompleteOAuth = async ({ code, state, redirectUri })
       fetchFn: publicFetch,
     });
   } catch (e) {
-    throw new SignInError(`The server did not accept the sign-in: ${serverWords(e)}`);
+    throw new SignInError("token_refused", `The server did not accept the sign-in: ${serverWords(e)}`);
   }
 
   await setConnectionOAuth(row.workspaceId, row.id, { ...consumed, tokens: sealTokens(tokens, now), needsSignIn: false });

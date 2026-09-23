@@ -1,6 +1,6 @@
 import "server-only";
 import { APIError } from "better-auth/api";
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { invitation, member, organization, user } from "@/db/schema";
@@ -62,9 +62,15 @@ export async function createInvite(requestHeaders: Headers, ctx: SessionCtx, inp
   const { email, role } = InviteInput.parse(input);
   if (!canChangeSettings(ctx.role)) throw new Error("Only an owner or an admin can invite people to this workspace.");
   try {
+    // Better Auth's resend only renews a pending invitation, role and all: one with another role is revoked first,
+    // so the new invitation (and its new link) carries the role asked for now, and the old link stops working.
+    const pending = await pendingInvitationFor(ctx.workspaceId, email);
+    if (pending && toRole(pending.role ?? "") !== role) {
+      await auth.api.cancelInvitation({ headers: requestHeaders, body: { invitationId: pending.id } });
+    }
     const invitation = await auth.api.createInvitation({
       headers: requestHeaders,
-      // resend: inviting the same address again renews the pending invitation instead of failing
+      // resend: inviting the same address again with the same role renews the pending invitation (same link)
       body: { email, role, organizationId: ctx.workspaceId, resend: true },
     });
     return { link: inviteLink(invitation.id) };
@@ -78,17 +84,36 @@ export async function createInvite(requestHeaders: Headers, ctx: SessionCtx, inp
 
 export const inviteMember: InviteMember = async (ctx, input) => createInvite(await headers(), ctx, input);
 
+/** The workspace's open invitation for this address, if there is one (Better Auth keeps at most one pending). */
+async function pendingInvitationFor(workspaceId: string, email: string) {
+  const [row] = await db
+    .select({ id: invitation.id, role: invitation.role })
+    .from(invitation)
+    .where(
+      and(
+        eq(invitation.organizationId, workspaceId),
+        eq(sql`lower(${invitation.email})`, email.toLowerCase()), // Better Auth stores it in lower case; the form may not
+        eq(invitation.status, "pending"),
+        gt(invitation.expiresAt, new Date()),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
 export type PendingInvitation = { id: string; email: string; role: string; expiresAt: string; link: string };
 
 /**
  * The workspace's invitations nobody has used yet, newest first, each with its link, so it can be copied again
- * after a reload (Q109). Accepted, revoked and expired ones are left out: their links no longer work.
+ * after a reload (Q109). Accepted, revoked and expired ones are left out: their links no longer work. Owners and
+ * admins only: an invitation's id is its link, and a member who read it could accept it as the invited address.
  */
-export async function listInvitations(workspaceId: string): Promise<PendingInvitation[]> {
+export async function listInvitations(ctx: Pick<SessionCtx, "workspaceId" | "role">): Promise<PendingInvitation[]> {
+  if (!canChangeSettings(ctx.role)) throw new Error("Only an owner or an admin can see the pending invitations.");
   const rows = await db
     .select({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt })
     .from(invitation)
-    .where(and(eq(invitation.organizationId, workspaceId), eq(invitation.status, "pending"), gt(invitation.expiresAt, new Date())))
+    .where(and(eq(invitation.organizationId, ctx.workspaceId), eq(invitation.status, "pending"), gt(invitation.expiresAt, new Date())))
     .orderBy(desc(invitation.createdAt));
   return rows.map((r) => ({ ...r, role: toRole(r.role ?? ""), expiresAt: r.expiresAt.toISOString(), link: inviteLink(r.id) }));
 }

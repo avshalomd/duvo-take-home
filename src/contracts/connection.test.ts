@@ -118,8 +118,18 @@ describe("v2: shared host rule and reserved names", () => {
   it("isPrivateHost catches IPv6 private forms and *.localhost as well as the v1 ranges", async () => {
     const { isPrivateHost } = await import("./connection");
     for (const h of ["localhost", "127.0.0.1", "10.1.2.3", "[::1]", "[fd00::1]", "[fe80::1]", "[::ffff:7f00:1]", "app.localhost"]) expect(isPrivateHost(h)).toBe(true);
-    for (const h of ["mcp.deepwiki.com", "example.org", "[2001:db8::1]"]) expect(isPrivateHost(h)).toBe(false);
+    for (const h of ["mcp.deepwiki.com", "example.org", "[2606:4700:4700::1111]"]) expect(isPrivateHost(h)).toBe(false);
   });
+  // Security QA: the rule read spellings, and these addresses into our own network passed it.
+  it.each(["http://[::]:3000/", "http://[::7f00:1]/mcp", "http://100.100.100.200/", "http://[64:ff9b::a9fe:a9fe]/", "http://[::ffff:127.0.0.1]/", "https://0x7f.1/"])(
+    "a connection cannot be pointed at %s",
+    async (url) => {
+      const { NewConnection } = await import("./connection");
+      const parsed = NewConnection.safeParse({ name: "Sneaky", url });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0].message).toMatch(/private or local network/);
+    },
+  );
   it("a connection cannot take the name of a built-in tool server (plan, outputs)", async () => {
     const { NewConnection } = await import("./connection");
     expect(NewConnection.safeParse({ name: "Plan", url: "https://x.example/mcp" }).success).toBe(false);

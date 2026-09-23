@@ -12,7 +12,8 @@ import type {
   SetConnectionOAuth,
   UpdateConnection,
 } from "@/contracts/connection";
-import { ConnectionEdit } from "@/contracts/connection";
+import { ConnectionEdit, PRIVATE_ADDRESS } from "@/contracts/connection";
+import { hostReach } from "@/lib/net/address";
 import { encryptSecret } from "./crypto";
 import { connectionKey } from "./key";
 import { readToken, toConnection } from "./store-map";
@@ -35,6 +36,22 @@ export class ConnectionNameTakenError extends Error {
     super(`That name is already used by ${otherName}`);
     this.name = "ConnectionNameTakenError";
   }
+}
+
+/** The address's name resolves to a private or local network (security QA): the schema only sees what was typed. */
+export class PrivateAddressError extends Error {
+  constructor() {
+    super(PRIVATE_ADDRESS);
+    this.name = "PrivateAddressError";
+  }
+}
+
+/**
+ * Looks the address's host up before the row is written, and refuses it if any address is internal. A name that
+ * does not resolve (yet) is saved: nothing is fetched now, and every run looks it up again before using it.
+ */
+async function ensureNotInternal(url: string): Promise<void> {
+  if ((await hostReach(new URL(url).hostname)).reach === "internal") throw new PrivateAddressError();
 }
 
 /** Throws when another connection of the workspace (not `self`, the one being edited) already has the name's key. */
@@ -60,13 +77,16 @@ export const listConnections: ListConnections = async (workspaceId) => {
   return rows.map(toConnection);
 };
 
+/** Another workspace's id, or one deleted meanwhile, changes nothing and says so rather than reporting success. */
 export const setConnectionEnabled: SetConnectionEnabled = async (workspaceId, id, enabled) => {
-  await db.update(connections).set({ enabled, updatedAt: new Date() }).where(mine(workspaceId, id));
+  const changed = await db.update(connections).set({ enabled, updatedAt: new Date() }).where(mine(workspaceId, id)).returning({ id: connections.id });
+  if (changed.length === 0) throw new ConnectionNotFoundError();
 };
 
 /** The input is already validated with NewConnection in the Server Action; the store writes it. */
 export const addConnection: AddConnection = async (workspaceId, input) => {
   await ensureNameFree(workspaceId, input.name);
+  await ensureNotInternal(input.url);
   const token = input.token ? input.token : null; // the add form sends "" when the field is left empty
   const authType: AuthType = input.authType ?? (token ? "bearer" : "none");
   const [row] = await db
@@ -93,6 +113,7 @@ export const updateConnection: UpdateConnection = async (workspaceId, id, input)
   const [current] = await db.select().from(connections).where(mine(workspaceId, id));
   if (!current) throw new ConnectionNotFoundError();
   await ensureNameFree(workspaceId, edit.name, id); // its own name is not a clash
+  await ensureNotInternal(edit.url);
 
   const typed = edit.token ? edit.token : null; // "" is an empty field: keep what is saved
   const authType: AuthType = edit.authType ?? (typed ? "bearer" : (toConnection(current).authType ?? "none"));
@@ -124,9 +145,10 @@ function tokenColumns(e: { authType: AuthType; clearToken?: boolean; typed: stri
   return e.moved ? noToken : {}; // an empty field keeps the saved token, but only on the server it was given for
 }
 
-/** Deleting an id that is not this workspace's deletes nothing, and says nothing either. */
+/** Deleting an id that is not this workspace's (or is already gone) deletes nothing, and says it was not found. */
 export const deleteConnection: DeleteConnection = async (workspaceId, id) => {
-  await db.delete(connections).where(mine(workspaceId, id));
+  const deleted = await db.delete(connections).where(mine(workspaceId, id)).returning({ id: connections.id });
+  if (deleted.length === 0) throw new ConnectionNotFoundError();
 };
 
 /** Server-side only: the token goes into the agent's mcpServers headers and nowhere else. */

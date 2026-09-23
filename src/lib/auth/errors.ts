@@ -10,15 +10,17 @@ const MESSAGES: Record<string, string> = {
   PASSWORD_TOO_SHORT: "Use at least 8 characters for the password.",
   PASSWORD_TOO_LONG: "That password is too long. Use at most 128 characters.",
   INVALID_EMAIL: "That does not look like an email address.",
-  // the sign-up form is only shown with an invitation, so a refusal there means another email was typed
-  SIGNUP_INVITE_ONLY: "There is no invitation for this email. Use the address your invitation was sent to.",
+  // the sign-up form is only shown with an invitation, so a refusal there means another email was typed, or the link
+  // was opened in another browser (the sign-up needs the id it left in a cookie, Q167); one line for both, so the form
+  // never tells a stranger which emails hold an invitation
+  SIGNUP_INVITE_ONLY: "This does not match an invitation. Use the address your invitation was sent to, and open its link in this browser.",
 };
 
 const FALLBACK = "Something went wrong. Try again in a moment.";
 
 /** The code the server refuses an uninvited sign-up with (lib/auth/signup.ts), and what a person reads for it. */
 export const INVITE_ONLY_CODE = "SIGNUP_INVITE_ONLY";
-export const INVITE_ONLY = "Handover is invite-only. Ask someone in a workspace to send you an invitation.";
+export const INVITE_ONLY = "Handover is invite-only. Open your invitation link, or ask someone in a workspace to invite you.";
 
 /**
  * Google sends a failed sign-in back to the sign-in page as ?error=<code>. The one a person can act on is the

@@ -1,7 +1,7 @@
-import { isPrivateHost } from "@/contracts/connection";
 import type { GuardContext } from "@/contracts/guard";
 import type { Plan } from "@/contracts/run";
 import { LlmError } from "@/lib/llm/errors";
+import { hostReach, isPrivateHost, type Reach } from "@/lib/net/address";
 import { carriedIn, type Carrier } from "./carried";
 import { askJev, JEV_TIMEOUT_MS, type AskExfiltration, type ExfiltrationState } from "./exfiltration";
 import { allowed, type Verdict } from "./verdict";
@@ -24,7 +24,7 @@ export const BLOCK_AT = 0.8;
 export const FLAG_AT = 0.5;
 const PLAN_LINES = 5; // the first steps say what the task is; the whole plan would only dilute the question
 
-// One rule with the connection form (src/contracts/connection.ts): a connection and a fetch must not reach our own network.
+// One rule with the connection form (lib/net/address.ts): a connection and a fetch must not reach our own network.
 export { isPrivateHost };
 
 export function isDeniedHost(hostname: string, denied: string[]): boolean {
@@ -65,6 +65,7 @@ export function urlCheck(
   ctx: Pick<GuardContext, "deniedDomains" | "plan">,
   ask: AskExfiltration = askJev,
   timeoutMs = JEV_TIMEOUT_MS,
+  reach: Reach = hostReach,
 ) {
   return async (_tool: string, input: unknown): Promise<Verdict> => {
     const raw = (input as { url?: unknown } | null)?.url;
@@ -85,6 +86,14 @@ export function urlCheck(
     }
     if (isDeniedHost(host, ctx.deniedDomains)) {
       return { decision: "blocked", reason: `${host} is blocked in this workspace's settings. Use another source.`, target: host };
+    }
+    // A public-looking name can resolve inside our network (security QA): look it up before the fetch does.
+    const verdict = await reach(host);
+    if (verdict.reach === "internal") {
+      return { decision: "blocked", reason: `${host} leads to a private or local address. Only public web pages can be fetched.`, target: host };
+    }
+    if (verdict.reach === "unknown") {
+      return { decision: "blocked", reason: `The address of ${host} could not be found, so it was not fetched. Check the address or use another source.`, target: host };
     }
 
     const carrier = carriedIn(url);

@@ -5,7 +5,14 @@ import { z } from "zod";
 import { InviteInput } from "@/contracts/auth";
 import { inviteMember, listMembers } from "@/lib/auth/members";
 import { requireSession } from "@/lib/auth/session";
-import { ConnectionNameTakenError, addConnection, deleteConnection, setConnectionEnabled, updateConnection } from "@/lib/connections/store";
+import {
+  ConnectionNameTakenError,
+  PrivateAddressError,
+  addConnection,
+  deleteConnection,
+  setConnectionEnabled,
+  updateConnection,
+} from "@/lib/connections/store";
 import { updateLimits } from "@/lib/usage/budget";
 import type { FormState } from "../actions";
 import { parseConnectionForm } from "./connection-form";
@@ -53,6 +60,7 @@ export async function addConnectionAction(_prev: FormState, formData: FormData):
     const { name, url, transport, authType = "none" } = parsed.input;
     const values = { name, url, transport, authType }; // what was typed stays, bar the token
     if (e instanceof ConnectionNameTakenError) return { fieldErrors: { name: [e.message] }, values }; // Q126: beside the field to change
+    if (e instanceof PrivateAddressError) return { fieldErrors: { url: [e.message] }, values }; // the name resolves inside: the address to change
     return { error: settingsError(e), values };
   }
   revalidatePath("/settings/connections");
@@ -71,7 +79,9 @@ export async function updateConnectionAction(_prev: FormState, formData: FormDat
     await updateConnection(workspaceId, id.data, parsed.input); // a new server drops the saved credentials: the store's rule
   } catch (e) {
     const { name, url, transport, authType = "none" } = parsed.input;
-    if (e instanceof ConnectionNameTakenError) return { fieldErrors: { name: [e.message] }, values: { name, url, transport, authType } };
+    const values = { name, url, transport, authType };
+    if (e instanceof ConnectionNameTakenError) return { fieldErrors: { name: [e.message] }, values };
+    if (e instanceof PrivateAddressError) return { fieldErrors: { url: [e.message] }, values };
     return { error: settingsError(e) };
   }
   revalidatePath("/settings/connections");

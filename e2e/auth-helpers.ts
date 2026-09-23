@@ -57,6 +57,11 @@ export async function inviteByRow(ownerEmail: string, inviteeEmail: string): Pro
   return id;
 }
 
+/** Marks an invitation as used, as accepting it would: its link then says the invitation is closed. */
+export async function closeInvitation(id: string) {
+  await sql()`update invitation set status = 'accepted' where id = ${id}`;
+}
+
 /**
  * Deletes the given accounts and the workspaces they own (the demo workspace is owned by the demo user, so an
  * e2e user invited into it never takes it along). Members, sessions and accounts go by cascade.

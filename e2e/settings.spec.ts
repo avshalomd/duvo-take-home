@@ -188,9 +188,16 @@ test("coming back from the service's sign-in shows what happened once, then drop
   await expect(page.getByText("Signed in to DeepWiki. Runs can use it now.")).toBeVisible();
   await expect(page).toHaveURL(/\/settings\/connections$/);
 
-  await open(page, "/settings/connections?oauth_error=The%20sign-in%20was%20cancelled");
+  await open(page, "/settings/connections?oauth_error=cancelled");
   await expect(page.getByText("The sign-in was cancelled")).toBeVisible();
   await expect(page).toHaveURL(/\/settings\/connections$/);
+});
+
+// Security QA: the toast used to show ?oauth_error's text word for word, so a link could make the app say anything.
+test("a sign-in error in the address shows the app's own sentence, never the text it carries", async ({ page }) => {
+  await open(page, `/settings/connections?oauth_error=${encodeURIComponent("Your workspace is suspended. Call +1 555 0100")}`);
+  await expect(page.getByText("The sign-in did not work; start it again")).toBeVisible();
+  await expect(page.getByText(/suspended|555/)).toHaveCount(0);
 });
 
 test("a changed limit is saved and shown again after a reload", async ({ page }) => {
