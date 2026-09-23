@@ -57,6 +57,9 @@ test("a finished run becomes a draft automation that can be edited and cannot be
   await page.goto("/automations");
   await expect(page.getByTestId("gallery")).toBeVisible();
   await expect(page.getByTestId("gallery")).not.toContainText("{input}");
+  // commands are shown with the front slash only (his call), never a backslash
+  await expect(page.getByTestId("gallery")).toContainText("/");
+  await expect(page.getByTestId("gallery")).not.toContainText("\\");
 
   // clean up through the page, which is also the proof that Delete works
   await page.goto(`/automations/${createdId}`);
@@ -103,6 +106,8 @@ test.describe("a ready automation", () => {
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Turn off" })).toBeVisible();
     await expect(page.getByText(/Nothing is deleted/)).toBeVisible();
+    await expect(page.getByText(`/${command}`).first()).toBeVisible(); // how it is called: the front slash
+    await expect(page.locator("main")).not.toContainText(`\\${command}`);
 
     // Q84: without a scheduler the page says so and promises no next run; with one, Q107 and Q120
     const notHere = page.getByText(/Scheduled runs are not switched on here/);

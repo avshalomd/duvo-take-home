@@ -49,8 +49,8 @@ describe("parseEditForm", () => {
     expect(r.ok && r.edit.template.intent).toBe("Audits a company");
   });
 
-  it("normalises the command, and takes it with or without the backslash", () => {
-    const r = parseEditForm(form({ command: "\\Audit" }));
+  it("normalises the command, and takes it with or without the slash it is called with", () => {
+    const r = parseEditForm(form({ command: "/Audit" }));
     expect(r.ok && r.edit.command).toBe("audit");
   });
 
