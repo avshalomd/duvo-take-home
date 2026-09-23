@@ -61,3 +61,32 @@ describe("scheduleAction", () => {
     expect(scheduleAction({ schedule: "nonsense", nextRunAt: at("2026-09-23T10:00:00Z") }, now)).toEqual({ fire: false, next: null });
   });
 });
+
+// A schedule's cron is kept in the local time of the zone it was set in (automations.schedule_tz), so a weekday
+// 08:00 stays 08:00 for the person across daylight saving. Europe/Prague leaves summer time on 2026-10-25.
+describe("schedules in their own time zone", () => {
+  const WEEKDAYS_AT_8 = "0 8 * * 1-5";
+
+  it("reads 08:00 in Prague as 06:00 UTC in summer time", () => {
+    expect(nextRunAfter(WEEKDAYS_AT_8, at("2026-10-22T07:00:00Z"), "Europe/Prague")?.toISOString()).toBe("2026-10-23T06:00:00.000Z");
+  });
+
+  it("keeps 08:00 local across the end of summer time: Friday 06:00 UTC, then Monday 07:00 UTC", () => {
+    const friday = nextRunAfter(WEEKDAYS_AT_8, at("2026-10-22T07:00:00Z"), "Europe/Prague")!;
+    const monday = nextRunAfter(WEEKDAYS_AT_8, friday, "Europe/Prague");
+    expect(monday?.toISOString()).toBe("2026-10-26T07:00:00.000Z");
+  });
+
+  it("reads a schedule saved before zones existed (no zone) in UTC, as before", () => {
+    expect(nextRunAfter(WEEKDAYS_AT_8, at("2026-10-22T07:00:00Z"), null)?.toISOString()).toBe("2026-10-22T08:00:00.000Z");
+  });
+
+  it("answers null for a zone that does not exist, instead of firing at a guessed hour", () => {
+    expect(nextRunAfter(WEEKDAYS_AT_8, at("2026-10-22T07:00:00Z"), "Mars/Olympus")).toBeNull();
+  });
+
+  it("moves a due Prague schedule to the next local 08:00 across the change", () => {
+    const due = { schedule: WEEKDAYS_AT_8, nextRunAt: at("2026-10-23T06:00:00Z"), tz: "Europe/Prague" };
+    expect(scheduleAction(due, at("2026-10-23T06:00:30Z"))).toEqual({ fire: true, next: at("2026-10-26T07:00:00Z") });
+  });
+});
