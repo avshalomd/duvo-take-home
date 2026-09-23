@@ -16,6 +16,7 @@ export type ExampleView = LiveRun & {
   humanVerdict: "approved" | "rejected" | null;
   humanNote: string | null;
   said: string | null; // the judgment in words, as who made it: "You said it looks right", "Mia said...", "Marked as ..."
+  changeLabel: string; // the control that changes it: "Change", or whose judgment it replaces
 };
 
 const FINISHED = ["succeeded", "failed", "cancelled"];
@@ -75,6 +76,7 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
           verdict={example.humanVerdict}
           note={example.humanNote}
           said={example.said}
+          changeLabel={example.changeLabel}
         />
       ) : (
         <p className={SMALL}>When it has finished, check what it made and say whether it looks right.</p>

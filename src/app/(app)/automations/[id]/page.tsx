@@ -25,7 +25,7 @@ import { listConnections } from "@/lib/connections/store";
 import { schedulerRunning } from "@/lib/runner/mode";
 import { judgeNames, judgeOf } from "@/lib/runs/judges";
 import { getRun } from "@/lib/runs/queries";
-import { verdictWords } from "@/lib/runs/verdict-words";
+import { verdictChangeLabel, verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +51,8 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   // each judgment says who made it: "You said" to them, their name to everyone else (Q178)
   const names = await judgeNames(trials.map((t) => t.humanVerdictBy));
   const said = (t: Trial) => (t.humanVerdict ? verdictWords(t.humanVerdict, judgeOf(t.humanVerdictBy, names), userId) : null);
-  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said);
+  const changeLabel = (t: Trial) => verdictChangeLabel(judgeOf(t.humanVerdictBy, names), userId); // whose judgment a change replaces
+  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said, changeLabel);
   const approval = canApprove(trials, automation.version);
   const isDraft = automation.status === "draft";
   // Q178: a member drafts, edits, tries and judges; approve, turn off, delete and the schedule read as who does them
@@ -195,7 +196,12 @@ function Schedule({ automation: a, governs }: { automation: Automation; governs:
 }
 
 /** The current version's examples with what their cards show: the plan, the files and the verdict, read once here. */
-async function examplesOf(workspaceId: string, trials: Trial[], said: (t: Trial) => string | null): Promise<ExampleView[]> {
+async function examplesOf(
+  workspaceId: string,
+  trials: Trial[],
+  said: (t: Trial) => string | null,
+  changeLabel: (t: Trial) => string,
+): Promise<ExampleView[]> {
   const found = await Promise.all(trials.map((t) => getRun(workspaceId, t.runId)));
   return trials.flatMap((t, i) => {
     const data = found[i];
@@ -212,6 +218,7 @@ async function examplesOf(workspaceId: string, trials: Trial[], said: (t: Trial)
         humanVerdict: t.humanVerdict,
         humanNote: t.humanNote,
         said: said(t),
+        changeLabel: changeLabel(t),
       },
     ];
   });

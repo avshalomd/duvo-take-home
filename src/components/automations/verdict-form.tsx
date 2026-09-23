@@ -16,12 +16,13 @@ type Props = {
   verdict: "approved" | "rejected" | null;
   note: string | null;
   said: string | null; // the judgment as who made it, worded on the server where the judge's name is known
+  changeLabel: string; // "Change", or "Replace Olga Owner's judgment" when the viewer would replace a colleague's
 };
 
 // A person's judgment of an example: the automatic check is advice, this is what approval counts. "Looks right" is one
 // press; "Not right" asks what is off first. The parent keys this form by the stored verdict and its words, so a saved
 // answer re-mounts it in its judged state. Anyone may change it; the new judgment is then theirs.
-export function VerdictForm({ automationId, runId, succeeded, verdict, note, said }: Props) {
+export function VerdictForm({ automationId, runId, succeeded, verdict, note, said, changeLabel }: Props) {
   const [state, action, pending] = useActionState<ActionState, FormData>(setVerdictAction, {});
   const [changing, setChanging] = useState(false);
   const [explaining, setExplaining] = useState(false);
@@ -41,7 +42,7 @@ export function VerdictForm({ automationId, runId, succeeded, verdict, note, sai
         )}
         {note && <span className="text-slate">({note})</span>}
         <Button type="button" variant="link" size="sm" className="h-auto px-0 text-[15px] text-graphite underline" onClick={() => setChanging(true)}>
-          Change
+          {changeLabel}
         </Button>
       </p>
     );
