@@ -67,12 +67,8 @@ export async function cancelRunAction(_prev: FormState, formData: FormData): Pro
   if (!runId.success) return { error: "No run selected" };
 
   const { workspaceId } = await requireSession();
-  const data = await getRun(workspaceId, runId.data); // another workspace's run reads as missing
-  if (!data) return { error: "That run no longer exists" };
-  const live = ["queued", "running", "evaluating"].includes(data.run.status);
-  if (!live) return { error: "This run has already finished" };
-
   try {
+    // cancelRun checks the workspace and the status itself, and refuses in words (CancelError): not found, finished
     await cancelRun(workspaceId, runId.data);
   } catch (e) {
     return { error: readable(e) };
@@ -88,11 +84,9 @@ export async function followUpAction(_prev: FormState, formData: FormData): Prom
   if (!input.success) return { fieldErrors: z.flattenError(input.error).fieldErrors, values };
 
   const session = await requireSession();
-  const data = await getRun(session.workspaceId, input.data.runId);
-  if (!data) return { error: "That run no longer exists", values };
-
   let id: string;
   try {
+    // startFollowUp checks the parent is this workspace's and finished, and refuses in words (FollowUpError)
     ({ id } = await startFollowUp({ workspaceId: session.workspaceId, userId: session.userId }, input.data));
   } catch (e) {
     return { error: readable(e), values };

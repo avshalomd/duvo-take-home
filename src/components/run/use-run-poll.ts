@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, shouldPoll } from "./poll";
+import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, shouldPoll, streamUrl } from "./poll";
 import type { RunView } from "./types";
 
 const INTERVAL_MS = 2000;
@@ -54,24 +54,34 @@ export function useRunPoll(initial: RunView): RunView {
       timer = setInterval(fetchFull, INTERVAL_MS);
     }
 
-    if (typeof EventSource === "undefined") startPolling();
-    else {
-      source = new EventSource(`/api/runs/${id}/events`);
+    // Each connection asks for the events after the last one the panel has. The route ends a stream after 280 s
+    // (under the function's limit): a stream that delivered and then ended is opened again from where it stopped;
+    // one that never delivered (a 404, a proxy that buffers) is given up for polling.
+    function listen() {
+      if (closed) return;
+      let delivered = false;
+      source = new EventSource(streamUrl(id, latest.current.events));
       source.onmessage = (m) => {
         const msg = parseStreamMessage(safeJson(m.data));
         if (!msg || msg.run.id !== id) return;
-        setPolled(mergeStreamMessage(latest.current, msg));
+        delivered = true;
+        const next = mergeStreamMessage(latest.current, msg);
+        latest.current = next; // the next message, or a reconnection, must start from this one
+        setPolled(next);
         if (msg.done) {
           source?.close();
           void fetchFull(); // the files and the verdict exist now, and only the full payload carries them
         }
       };
-      // one way down, never back: a stream that failed once is not retried while this run is open
       source.onerror = () => {
-        source?.close();
-        startPolling();
+        source?.close(); // EventSource would retry on its own, without the cursor: we decide instead
+        if (delivered) listen();
+        else startPolling();
       };
     }
+
+    if (typeof EventSource === "undefined") startPolling();
+    else listen();
 
     return () => {
       closed = true;

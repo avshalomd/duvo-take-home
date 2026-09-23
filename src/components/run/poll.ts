@@ -35,9 +35,10 @@ export function parseRunPayload(json: unknown): RunView | null {
   return parsed.data;
 }
 
+/** The run's event stream, asking only for the events after the last one the panel already has (the route's ?after). */
 export function streamUrl(runId: string, events: RunEvent[]): string {
-  void events;
-  return `/api/runs/${runId}/events`;
+  if (events.length === 0) return `/api/runs/${runId}/events`;
+  return `/api/runs/${runId}/events?after=${Math.max(...events.map((e) => e.seq))}`;
 }
 
 export function parseStreamMessage(json: unknown): StreamMessage | null {
