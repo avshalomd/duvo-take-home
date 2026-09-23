@@ -32,7 +32,7 @@ import { statusUpdates } from "./connection-status";
 import { startDeadline } from "./deadline";
 import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
-import { healPrompt, runBudgetMs, shouldHeal } from "./heal";
+import { attemptFingerprint, healPrompt, noProgress, runBudgetMs, shouldHeal, type AttemptFingerprint } from "./heal";
 import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
 import { tripwireReason, unexpectedServers } from "./mcp-tripwire";
@@ -40,7 +40,7 @@ import { newlyDone } from "./plan-diff";
 import { PLAN_SERVER_KEY } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
 import { resumeOptions, sessionIdOf } from "./session";
-import { ownCost, readSdkTotals, stoppedTotals } from "./stopped-cost";
+import { ownCost, readSdkTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
 import { SYSTEM_PROMPT } from "./system.prompt";
 import { unknownVerdict } from "./unknown-verdict";
 import { removeRunDir } from "./workspace";
@@ -216,6 +216,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   let heals = 0;
   const spent = { usd: 0, ms: 0, turns: 0 }; // the attempts whose result is in
   let lastVerdict: Verdict | null = null; // written to runs.verdict once, when the run's tries are over
+  const earlierAttempts: AttemptFingerprint[] = []; // what each failed attempt left, to see an attempt go round again
   let attemptBase = costBase; // what this attempt's SDK total starts from (a resumed session carries the last total)
   let attemptStartedAt = startedAt;
   let attemptFrom = 0; // where this attempt's events begin in `recorded`
@@ -297,7 +298,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         sessionId = id;
         await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up or a heal resumes
       }
-      const events = map(message, 0, now());
+      const events = withAttemptCost(map(message, 0, now()), attemptBase); // each attempt's own cost, for Details
       await write(events);
       // The tripwire: a tool source in init that is neither ours nor the workspace's stops the run before the agent
       // can call it, whatever let it in (QA Q134).
@@ -376,12 +377,24 @@ export const runAutomation: RunAutomation = async (runId) => {
         limit: limits.autoHealAttempts,
         remainingMs: budgetEndsAt - Date.now(),
       });
+      const close = () => updateUnlessCancelled(runId, { status: end.is_error ? "failed" : "succeeded", verdict, healAttempts: heals, finishedAt: new Date() });
       if (!heal) {
-        await updateUnlessCancelled(runId, { status: end.is_error ? "failed" : "succeeded", verdict, healAttempts: heals, finishedAt: new Date() });
+        await close();
         return;
       }
-      heals += 1;
       const feedback = feedbackForAgent(verdict);
+      // No progress, no further attempt (QA Q148): the same files or the same failure as an earlier attempt means the
+      // next one would only go round again. The stop is recorded where the heals are, and the verdict is written now.
+      const print = attemptFingerprint(verdict, written);
+      const stuck = noProgress(print, earlierAttempts);
+      if (stuck) {
+        await write([{ kind: "heal", payload: { attempt: heals + 1, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback, stopped: stuck }, at: now() }]);
+        await chain;
+        await close();
+        return;
+      }
+      earlierAttempts.push(print);
+      heals += 1;
       await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback }, at: now() }]);
       await chain;
       await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
