@@ -3,9 +3,7 @@ import { after } from "next/server";
 import type { EnqueueRun } from "@/contracts/runner";
 import { runAutomation } from "@/lib/agent/run";
 import { insertJob } from "./jobs";
-
-/** Read at call time, not at import: the worker sets RUNNER=queue for itself before it starts anything. */
-export const runnerMode = (): "inline" | "queue" => (process.env.RUNNER === "queue" ? "queue" : "inline");
+import { runnerMode } from "./mode";
 
 /**
  * RUNNER=inline (default): the loop runs in after(), inside the request that started it (v1's path, bounded by the

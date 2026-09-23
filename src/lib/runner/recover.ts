@@ -7,7 +7,9 @@ import { IN_FLIGHT, isInFlight } from "./status";
 
 export const STALE_LOCK_MS = 10 * 60_000; // a run's wall clock is 4 min and its evaluation about 1: 10 min is a dead worker
 export const MAX_ATTEMPTS = 2;
-export const ABANDONED_AFTER_MS = 30 * 60_000;
+// The same reasoning as a stale lock: an inline run cannot outlive its function (300 s on Vercel), so after 10 min
+// with no job it is dead. A queued or claimed run has a live job and is never touched by this rule.
+export const ABANDONED_AFTER_MS = STALE_LOCK_MS;
 
 type Recovered = { requeued: string[]; failed: string[]; cancelled: string[]; done: string[] };
 
@@ -70,14 +72,21 @@ export async function recoverStaleJobs(now: Date): Promise<Recovered> {
 }
 
 /**
- * Runs nobody will ever close: unfinished, older than 30 minutes, and with no job queued or running for them. That
+ * Runs nobody will ever close: unfinished, older than 10 minutes, and with no job queued or running for them. That
  * is an inline run whose server restarted mid-run (after() died with it); a queued run waiting behind others has a
- * job, and a dead worker's run is recoverStaleJobs' case. Returns the ids it closed.
+ * job, and a dead worker's run is recoverStaleJobs' case. With a workspace id it sweeps only that workspace: startRun
+ * calls it that way on every start, so a stranded run never holds an in-flight slot even where nothing calls the
+ * cron route (QA Q84). Returns the ids it closed.
  */
-export async function closeAbandonedRuns(now: Date): Promise<string[]> {
+export async function closeAbandonedRuns(now: Date, workspaceId?: string): Promise<string[]> {
   const cutoff = new Date(now.getTime() - ABANDONED_AFTER_MS);
   const live = db.select({ runId: jobs.runId }).from(jobs).where(inArray(jobs.status, ["queued", "running"]));
-  const abandoned = and(inArray(runs.status, [...IN_FLIGHT]), lt(runs.createdAt, cutoff), notInArray(runs.id, live));
+  const abandoned = and(
+    inArray(runs.status, [...IN_FLIGHT]),
+    lt(runs.createdAt, cutoff),
+    notInArray(runs.id, live),
+    workspaceId === undefined ? undefined : eq(runs.workspaceId, workspaceId), // and() skips an undefined condition
+  );
 
   const stopped = await db
     .update(runs)
