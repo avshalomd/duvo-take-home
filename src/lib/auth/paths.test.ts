@@ -73,6 +73,25 @@ describe("safeNext", () => {
     expect(safeNext("javascript:alert(1)")).toBe("/");
   });
 
+  // Q86: ?next=/%09/evil.example arrives decoded as "/\t/evil.example"; a browser strips the tab and reads "//evil.example".
+  it("refuses another site hidden behind a tab, a newline or a backslash that the browser would strip or flip", () => {
+    expect(safeNext("/\t/evil.example")).toBe("/");
+    expect(safeNext("/\n/evil.example")).toBe("/");
+    expect(safeNext("/\r\n/evil.example")).toBe("/");
+    expect(safeNext("/\t\\evil.example")).toBe("/");
+    expect(safeNext("/\\/evil.example")).toBe("/");
+    expect(safeNext("/\\\\evil.example")).toBe("/");
+  });
+
+  it("refuses any control character, even where it would not change the host", () => {
+    expect(safeNext("/automations\u0000")).toBe("/");
+    expect(safeNext("/auto\tmations")).toBe("/");
+  });
+
+  it("keeps the query and the fragment of a path it accepts", () => {
+    expect(safeNext("/automations?tab=mine#top")).toBe("/automations?tab=mine#top");
+  });
+
   it("refuses the sign-in and sign-up pages themselves, which would loop", () => {
     expect(safeNext("/sign-in")).toBe("/");
     expect(safeNext("/sign-up?next=/")).toBe("/");
