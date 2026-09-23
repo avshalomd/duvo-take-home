@@ -79,12 +79,12 @@ and [docs/CODE-TOUR.md](docs/CODE-TOUR.md) for a per-file tour.
 
 ## Tests
 
-- Unit (`npm run check`, 1,430+ tests): contracts, the message mapper, derived state, the evaluator and its
+- Unit (`npm run check`, 1,620+ tests): contracts, the message mapper, derived state, the evaluator and its
   replayed suite of 20 recorded runs, the guards and scanners, the command parser, templates and approval, schedules
   across daylight saving, crypto, budgets, the UI wording.
-- Integration (`npm run test:int`, 142 tests): tenancy, the stores, jobs and recovery, follow-ups, OAuth rows.
-- End to end (`npx playwright test`, 76 tests): sign-in and invitations, tenancy by URL, Home, the automation builder,
-  Settings.
+- Integration (`npm run test:int`, 178 tests): tenancy, the stores, jobs and recovery, follow-ups, OAuth rows.
+- End to end (`npx playwright test`, 99 tests, plus 8 for invite-only sign-up with `SIGNUP_MODE=invite`): sign-in and
+  invitations, tenancy by URL, Home, the automation builder, Settings.
 - Evaluator suite: 20/20 replayed and 20/20 live ([docs/EVAL.md](docs/EVAL.md)).
 
 ## Not done
@@ -93,4 +93,10 @@ and [docs/CODE-TOUR.md](docs/CODE-TOUR.md) for a per-file tour.
   does not fire them and the automation page says so; locally the worker fires them.
 - An OAuth sign-in has been checked up to the provider's page (Linear, Notion, Sentry), not completed.
 - A follow-up recorded with `npm run record-run` keeps only its change as the prompt (QA Q88).
+- Members can be invited and their invitations revoked, but not removed or given another role from the app yet (Q169).
+- Sign-in rate limiting is Better Auth's default, counted in memory per function instance (Q176).
+- `/api/health?deep=1` is open and makes one tiny model call each time (Q177).
+- Any member of a workspace can edit, approve or delete its automations; whether that should be admins only is open
+  (Q178).
+- With the model down, Details shows no step checks without saying why (Q208).
 - Open QA items are listed in [docs/QA.md](docs/QA.md).

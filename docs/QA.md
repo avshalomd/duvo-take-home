@@ -210,57 +210,59 @@ route a function of its own). Runs now execute in `/api/runner/<id>`, the only f
 Production stayed read-only (anonymous GETs only). Two functional agents (runs and automations; accounts, roles and
 tenancy), a UX review of every screen at 1280 and 390 px in light and dark, and two code reviews (security and
 tenancy; the engine) ran against the local app and its own database. Workspace isolation held on every path tried.
-Fixes are made locally, on branches merged into v2; the next deploy is his call.
+Fixes are made locally, on branches merged into v2; the next deploy is his call. "Fixed locally" means tested
+(`npm run check` 1621, integration 178, e2e 99 plus invite-only 8) but not yet live.
 
 | id | source | observed | expected | severity | owner | status |
 |---|---|---|---|---|---|---|
-| Q159 | reviewer (engine) | on Vercel a run can outlive its 300 s function (agent 240 s, then step checks and an unbounded evaluation); the killed run stays "running"/"evaluating" for ever, and Stop is never read | every run closes: the evaluation time-boxed, the agent's budget leaves room for it, a dead run closed when it is read or stopped | major | engine | fixing |
-| Q160 | reviewer (engine), qa-ux | after a self-heal the run's report is only the fix note ("What I changed: ...") | the whole task's report, with one line on the fix | major | engine | fixing |
-| Q161 | reviewer (engine) | a run ended by the wall clock, the tripwire or a crash records no cost, so the daily budget never sees it | the cost so far recorded on every way out | major | engine | fixing |
-| Q162 | reviewer (engine) | on a follow-up, Make an automation drafts from the change alone and Run again starts a paid run whose brief is only "Make the bars horizontal" | both use the whole thread's instructions | major | engine | fixing |
-| Q163 | reviewer (engine) | `$&`, `$$` or `$'` in a command's input are read as replacement patterns ("{input}" left in the prompt) | the input as typed | minor | engine | fixing |
-| Q164 | reviewer (engine) | a chart field named "revenue.usd" draws no marks, and the chart check passes it | the field drawn; an empty chart fails | minor | engine | fixing |
-| Q165 | reviewer (engine) | a Stop between a verdict and the next fix attempt lets that attempt run to its end | no attempt starts after Stop | minor | engine | fixing |
-| Q166 | reviewer (engine) | fix attempts never re-check the daily budget | healing stops when the budget is used up | minor | engine | fixing |
-| Q167 | qa-func (admin), reviewer (security) | a plain member can read pending invitation ids (members page, Better Auth's list-invitations), sign up with the invited email and join as admin; anyone knowing an invited email can take the account first | ids only for admins; sign-up needs the invitation from the link | major | auth | fixing |
-| Q168 | reviewer (security) | the private-address check reads the spelling only: `[::]`, `[::7f00:1]`, `100.100.100.200`, NAT64 and DNS names that resolve inside pass (connections, OAuth fetches, WebFetch) | addresses parsed and resolved; any internal one refused | major | connections | fixing |
+| Q159 | reviewer (engine) | on Vercel a run can outlive its 300 s function (agent 240 s, then step checks and an unbounded evaluation); the killed run stays "running"/"evaluating" for ever, and Stop is never read | every run closes: the evaluation time-boxed, the agent's budget leaves room for it, a dead run closed when it is read or stopped | major | engine | fixed locally (agent 230 s, evaluation boxed at 50 s, step checks at 10 s; a run past 6 min closed when read or stopped; heal.int, jobs.int, cancel.int, route tests) |
+| Q160 | reviewer (engine), qa-ux | after a self-heal the run's report is only the fix note ("What I changed: ...") | the whole task's report, with one line on the fix | major | engine | fixed locally (the fix and the follow-up prompts ask for the whole task's report; new runs only - the local healed run keeps its old report) |
+| Q161 | reviewer (engine) | a run ended by the wall clock, the tripwire or a crash records no cost, so the daily budget never sees it | the cost so far recorded on every way out | major | engine | fixed locally (one runTotals for Stop and every failure path; heal.int) |
+| Q162 | reviewer (engine) | on a follow-up, Make an automation drafts from the change alone and Run again starts a paid run whose brief is only "Make the bars horizontal" | both use the whole thread's instructions | major | engine | fixed locally (instructionsOf in the draft; Run again sends only the run id; from-run.int, run-again.int) |
+| Q163 | reviewer (engine) | `$&`, `$$` or `$'` in a command's input are read as replacement patterns ("{input}" left in the prompt) | the input as typed | minor | engine | fixed locally (a replacer function; template.test) |
+| Q164 | reviewer (engine) | a chart field named "revenue.usd" draws no marks, and the chart check passes it | the field drawn; an empty chart fails | minor | engine | fixed locally (field names escaped; a chart with rows and no mark fails; chart and check tests) |
+| Q165 | reviewer (engine) | a Stop between a verdict and the next fix attempt lets that attempt run to its end | no attempt starts after Stop | minor | engine | fixed locally (a Stop is read before each attempt; heal.int) |
+| Q166 | reviewer (engine) | fix attempts never re-check the daily budget | healing stops when the budget is used up | minor | engine | fixed locally (the day's budget checked before each fix; heal.int, budget.int) |
+| Q167 | qa-func (admin), reviewer (security) | a plain member can read pending invitation ids (members page, Better Auth's list-invitations), sign up with the invited email and join as admin; anyone knowing an invited email can take the account first | ids only for admins; sign-up needs the invitation from the link | major | auth | fixed locally (Better Auth hooks keep invitation ids for admins; invite-mode sign-up needs the link's id in a cookie; auth.int, e2e invite-only 8/8) |
+| Q168 | reviewer (security) | the private-address check reads the spelling only: `[::]`, `[::7f00:1]`, `100.100.100.200`, NAT64 and DNS names that resolve inside pass (connections, OAuth fetches, WebFetch) | addresses parsed and resolved; any internal one refused | major | connections | fixed locally (node:net BlockList and DNS lookups on save, OAuth fetches, WebFetch and run start; 76 hosts in address.test) |
 | Q169 | qa-func (admin) | an owner or admin cannot remove a member or change a role from the app (only through the auth API) | Remove and a role choice on Members | major | settings | open (a feature, his call) |
-| Q170 | qa-func (admin) | inviting an address again with another role keeps the old role | the new role, or a message | minor | auth | fixing |
-| Q171 | qa-func (admin) | switching to a workspace one is not in is a 500 | refused in plain words | minor | auth | fixing |
-| Q172 | qa-func (admin) | turning off or deleting another workspace's connection by id says nothing went wrong | "This connection was not found" | minor | settings | fixing |
-| Q173 | qa-func (admin) | no frame-ancestors / X-Frame-Options, no nosniff, `x-powered-by` sent: sign-in and Settings can be framed | the headers set | minor | main | fixing |
-| Q174 | reviewer (security) | `?oauth_error=<text>` is shown word for word as the app's own error toast | codes mapped to our sentences | minor | connections | fixing |
-| Q175 | reviewer (security) | no deployment-wide cap on runs in flight: every account can make workspaces, each with its own limits, on one key | a cap across workspaces | minor | engine | fixing |
+| Q170 | qa-func (admin) | inviting an address again with another role keeps the old role | the new role, or a message | minor | auth | fixed locally (the pending one revoked, a new one with the new role; auth.int) |
+| Q171 | qa-func (admin) | switching to a workspace one is not in is a 500 | refused in plain words | minor | auth | fixed locally (trySwitchWorkspace, shown in the menu; actions.test, e2e) |
+| Q172 | qa-func (admin) | turning off or deleting another workspace's connection by id says nothing went wrong | "This connection was not found" | minor | settings | fixed locally (ConnectionNotFoundError; store.int, actions.test) |
+| Q173 | qa-func (admin) | no frame-ancestors / X-Frame-Options, no nosniff, `x-powered-by` sent: sign-in and Settings can be framed | the headers set | minor | main | fixed locally (next.config.ts headers; next-config test, e2e) |
+| Q174 | reviewer (security) | `?oauth_error=<text>` is shown word for word as the app's own error toast | codes mapped to our sentences | minor | connections | fixed locally (codes, the page words them; route tests, e2e) |
+| Q175 | reviewer (security) | no deployment-wide cap on runs in flight: every account can make workspaces, each with its own limits, on one key | a cap across workspaces | minor | engine | fixed locally (six in flight across workspaces under a global lock; start.int) |
 | Q176 | qa-func (admin) | sign-in rate limiting is Better Auth's in-memory default, per function instance | a shared store | minor | auth | open |
 | Q177 | qa-func (admin) | `/api/health?deep=1` is anonymous and makes a model call each time | cached or gated | minor | main | open |
 | Q178 | qa-func (admin) | any member can edit, approve, turn off or delete any automation | his call: members may, or admins only | question | automations | open (his call) |
-| Q179 | qa-ux | a chart's preview box is white in dark mode, so the chart's light text is invisible | the box follows the theme | major | home | fixing |
-| Q180 | qa-ux | the report-only automation /compare-concepts fails "a file was written": "Write a short answer" reads as asking for a file | "write" counts only with a file as its object | major | eval | fixing |
-| Q181 | qa-ux, qa-func | a healed run says "3 of 3 done" above four thread nodes | the count agrees with the thread | minor | home | fixing |
-| Q182 | qa-ux, qa-func | Details on a healed run: two groups keyed "step-2" (React warning) | unique keys | minor | home | fixing |
-| Q183 | qa-ux | tool names in step notes, the report and the reviewer's quoted reasons ("WebFetch blocked ... no shell/curl tool") | plain words | minor | engine | fixing |
-| Q184 | qa-ux | Why? sentences such as "The judge was sure the result does not answer your instructions but not that the plan was finished"; chained colons | one readable sentence each | minor | home | fixing |
-| Q185 | qa-ux | finished runs show a pending "Planning" and "waiting for the result..."; the failed banner points to Details, which has only a raw error | no pending marks on a finished run; the cause in the banner | minor | home | fixing |
-| Q186 | qa-ux | the steps of a run that did not pass are red circles with check marks | steps that ran look done; only the outcome is red | minor | home | fixing |
-| Q187 | qa-ux, qa-func | Details: a local read badged "fetch", the machine's absolute path in tool results, the report as raw markdown pipes | "read", a path inside the run, no raw markdown | minor | home | fixing |
-| Q188 | qa-ux | the / command list covers the Run button; its output line is raw column names | Run visible; plain words | minor | home | fixing |
-| Q189 | qa-ux | the rail search shows the browser's blue clear button | graphite or none | minor | home | fixing |
-| Q190 | qa-ux | an automation run's rail row repeats the command as a tag and truncates the input | no repeated name | minor | home | fixing |
-| Q191 | qa-ux | the unknown-invitation page signed out offers "Go to your workspace" | "Sign in" | minor | auth | fixing |
-| Q192 | qa-ux | the workspace menu's white popover has no visible edge in light mode | a hairline edge | minor | home | fixing |
-| Q193 | qa-ux | inactive Settings tabs at 4.44:1 | 4.5:1 | minor | settings | fixing |
-| Q194 | qa-ux | the sign-in demo card grows as it plays (layout shifts ~22 px) and never reaches done | fixed height, ends green | minor | auth | fixing |
-| Q195 | qa-func | a double-click on Run (or a second Cmd/Ctrl+Enter) started two identical paid runs 0.5 s apart | one press, one run | major | home | fixing |
-| Q196 | qa-func | Check the result again with the model down turned a stored pass into "not checked", silently | the earlier verdict kept, the failure said | minor | eval | fixing |
-| Q197 | qa-func | a command with a 3,900-character input: POST /api/runs answers 500 with an empty body; Home says the brief is over 4000 characters; the input limit is never checked | the input limit enforced in plain words; 400 on the API | minor | automations | fixing |
-| Q198 | qa-func | Details shows "turn 31 of 25"; a healed run shows only its last attempt's turns | one number that agrees with the cap | minor | engine | fixing |
-| Q199 | qa-func | a stopped run's Details show Duration and Cost "-" although both are stored | the stored values | minor | engine | fixing |
-| Q200 | qa-func | a NUL byte in a file name answers 500 on the file route | 404 | minor | engine | fixing |
-| Q201 | qa-func | unknown pages show Next's bare 404 with no way back | an in-app not-found page | minor | home | fixing |
-| Q202 | qa-func | a composer error stays after the text changes | cleared on edit | minor | home | fixing |
-| Q203 | qa-func | an invalid composer draws a square pink border inside the rounded capsule | the error in the capsule's shape | minor | home | fixing |
-| Q204 | qa-func | runs of a deleted automation are titled by the bare input | read as plain runs | minor | home | fixing |
-| Q205 | qa-func | a follow-up's carried-over .xlsx loses its sheet summary | the parent's summary | minor | home | fixing |
-| Q206 | qa-func | "Too many runs from this address" gives no time to retry | when to retry | minor | engine | fixing |
-| Q207 | qa-func | with the model down the step checks vanish silently and "Done - not checked" has no retry on the main view | said in plain words, Check again beside the outcome | minor | home | fixing |
-| Q208 | qa-func | only Cmd/Ctrl+Enter submits, and that is hinted nowhere | a quiet hint near Run | minor | home | fixing |
+| Q179 | qa-ux | a chart's preview box is white in dark mode, so the chart's light text is invisible | the box follows the theme | major | home | fixed locally (the box is paper; e2e light and dark) |
+| Q180 | qa-ux | the report-only automation /compare-concepts fails "a file was written": "Write a short answer" reads as asking for a file | "write" counts only with a file as its object | major | eval | fixed locally (write counts only with a file; checks.test) |
+| Q181 | qa-ux, qa-func | a healed run says "3 of 3 done" above four thread nodes | the count agrees with the thread | minor | home | fixed locally ("4 of 4 done"; screenshot) |
+| Q182 | qa-ux, qa-func | Details on a healed run: two groups keyed "step-2" (React warning) | unique keys | minor | home | fixed locally (one group per visit to a step; group-events.test) |
+| Q183 | qa-ux | tool names in step notes, the report and the reviewer's quoted reasons ("WebFetch blocked ... no shell/curl tool") | plain words | minor | engine | fixed locally (a plain-words rule for the agent and the reviewer; new runs only) |
+| Q184 | qa-ux | Why? sentences such as "The judge was sure the result does not answer your instructions but not that the plan was finished"; chained colons | one readable sentence each | minor | home | fixed locally (why.test, e2e) |
+| Q185 | qa-ux | finished runs show a pending "Planning" and "waiting for the result..."; the failed banner points to Details, which has only a raw error | no pending marks on a finished run; the cause in the banner | minor | home | fixed locally (failure.test, e2e) |
+| Q186 | qa-ux | the steps of a run that did not pass are red circles with check marks | steps that ran look done; only the outcome is red | minor | home | fixed locally (e2e) |
+| Q187 | qa-ux, qa-func | Details: a local read badged "fetch", the machine's absolute path in tool results, the report as raw markdown pipes | "read", a path inside the run, no raw markdown | minor | home | fixed locally (format.test, group-events.test) |
+| Q188 | qa-ux | the / command list covers the Run button; its output line is raw column names | Run visible; plain words | minor | home | fixed locally (e2e, command-query.test) |
+| Q189 | qa-ux | the rail search shows the browser's blue clear button | graphite or none | minor | home | fixed locally (e2e) |
+| Q190 | qa-ux | an automation run's rail row repeats the command as a tag and truncates the input | no repeated name | minor | home | fixed locally (rail.test, e2e) |
+| Q191 | qa-ux | the unknown-invitation page signed out offers "Go to your workspace" | "Sign in" | minor | auth | fixed locally (e2e) |
+| Q192 | qa-ux | the workspace menu's white popover has no visible edge in light mode | a hairline edge | minor | home | fixed locally (screenshot, light and dark) |
+| Q193 | qa-ux | inactive Settings tabs at 4.44:1 | 4.5:1 | minor | settings | fixed locally (5.56:1 light, 7.77:1 dark) |
+| Q194 | qa-ux | the sign-in demo card grows as it plays (layout shifts ~22 px) and never reaches done | fixed height, ends green | minor | auth | fixed locally (e2e sign-in-demo, screenshot) |
+| Q195 | qa-func | a double-click on Run (or a second Cmd/Ctrl+Enter) started two identical paid runs 0.5 s apart | one press, one run | major | home | fixed locally (the composer locks on the press; e2e one press, one start) |
+| Q196 | qa-func | Check the result again with the model down turned a stored pass into "not checked", silently | the earlier verdict kept, the failure said | minor | eval | fixed locally (reevaluate.test, reevaluate.int) |
+| Q197 | qa-func | a command with a 3,900-character input: POST /api/runs answers 500 with an empty body; Home says the brief is over 4000 characters; the input limit is never checked | the input limit enforced in plain words; 400 on the API | minor | automations | fixed locally (store.int, route test) |
+| Q198 | qa-func | Details shows "turn 31 of 25"; a healed run shows only its last attempt's turns | one number that agrees with the cap | minor | engine | fixed locally (state.test, format.test) |
+| Q199 | qa-func | a stopped run's Details show Duration and Cost "-" although both are stored | the stored values | minor | engine | fixed locally (state.test) |
+| Q200 | qa-func | a NUL byte in a file name answers 500 on the file route | 404 | minor | engine | fixed locally (queries.int) |
+| Q201 | qa-func | unknown pages show Next's bare 404 with no way back | an in-app not-found page | minor | home | fixed locally (e2e, screenshot) |
+| Q202 | qa-func | a composer error stays after the text changes | cleared on edit | minor | home | fixed locally (e2e) |
+| Q203 | qa-func | an invalid composer draws a square pink border inside the rounded capsule | the error in the capsule's shape | minor | home | fixed locally (e2e) |
+| Q204 | qa-func | runs of a deleted automation are titled by the bare input | read as plain runs | minor | home | fixed locally (rail.test) |
+| Q205 | qa-func | a follow-up's carried-over .xlsx loses its sheet summary | the parent's summary | minor | home | fixed locally (file-kind.test, e2e) |
+| Q206 | qa-func | "Too many runs from this address" gives no time to retry | when to retry | minor | engine | fixed locally (limits.test) |
+| Q207 | qa-func | tool results in Details show the machine's full path (/Users/.../runs/<id>/countries.csv) | the path inside the run | minor | home | fixed locally (with Q187) |
+| Q208 | qa-func | with the model down the step checks vanish silently and "Done - not checked" has no retry on the main view | said in plain words, Check again beside the outcome | minor | home | partly fixed locally (the outcome says it was not checked, with Check again; e2e) - Details still shows no step checks without saying why |
+| Q209 | qa-func | only Cmd/Ctrl+Enter submits, and that is hinted nowhere | a quiet hint near Run | minor | home | fixed locally (a quiet "⌘ Enter" / "Ctrl Enter" beside Run on desktop; e2e) |
