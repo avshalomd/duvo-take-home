@@ -17,3 +17,16 @@ export function startDeadline(ms: number) {
     clear: () => clearTimeout(timer),
   };
 }
+
+/**
+ * The work's own result, or the fallback's once `ms` have passed, whichever comes first. The work is not stopped - a
+ * model call cannot be - only no longer waited for, so what follows the agent can never outlive the function.
+ */
+export function within<T>(work: Promise<T>, ms: number, fallback: () => T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback()), ms);
+    timer.unref?.(); // the timer must never hold the process open after the run has closed
+  });
+  return Promise.race([work, late]).finally(() => clearTimeout(timer));
+}

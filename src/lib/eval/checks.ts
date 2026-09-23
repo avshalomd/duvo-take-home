@@ -235,9 +235,14 @@ export function connectionNamed(prompt: string): string | null {
   return m ? m[1] : null;
 }
 
-/** A file is expected when the instructions ask for one in so many words; a question-only run owes no file. */
+/**
+ * A file is expected when the instructions ask for one in so many words: a file named or typed (news.csv, "a CSV",
+ * "a spreadsheet", "a file"), or save or export, whose object can only be a file. "Write" on its own is not one:
+ * "write a short, plain-language answer" asks for the report (local run 9c1d8c15), and "write it to a file" or
+ * "write news.csv" name the file anyway. A question-only run owes no file.
+ */
 export function asksForFile(prompt: string): boolean {
-  return /\b(csv|file|save|saved|write|written|export|spreadsheet)\b|\.(md|txt|csv)\b/i.test(prompt);
+  return /\b(csv|file|files|spreadsheet|save|saved|export|exported)\b|\.(md|txt|csv|xlsx)\b/i.test(prompt);
 }
 
 /** "At least 8 rows" is a promise the file either keeps or does not; with no floor named, one row is the floor. */

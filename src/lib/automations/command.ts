@@ -12,6 +12,11 @@ export const parseCommand: ParseCommand = (text) => {
   return { command: m[1].toLowerCase(), input: (m[2] ?? "").trim() }; // commands are stored lower-case
 };
 
+// What may follow a command, the same limit as a schedule's input. Checked on its own, in its own words: a longer one
+// made the filled brief pass the 4000 characters a run takes, and the person read about "instructions" they never
+// wrote (Q197).
+export const MAX_COMMAND_INPUT = 2000;
+
 const MAX = 24; // CommandName's limit
 
 /** Whatever a model or a person wrote ("/Company Audit") as a valid command ("company-audit"). */

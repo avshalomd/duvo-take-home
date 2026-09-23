@@ -66,6 +66,25 @@ describe("renderChartSvg", () => {
     expect(svg).toContain("@media (prefers-color-scheme: dark)");
   });
 
+  // Vega-Lite reads "revenue.usd" as the field usd inside revenue: every value was undefined and nothing was drawn.
+  it("draws one mark per row when a field name has a dot or brackets in it", async () => {
+    const data = [
+      { "region.name": "North", "year.n": 2024, "revenue[usd]": 10 },
+      { "region.name": "South", "year.n": 2025, "revenue[usd]": 20 },
+    ];
+    const marks = { bar: "bar", "horizontal-bar": "bar", pie: "arc mark", line: "point", scatter: "point" } as const;
+    for (const [kind, mark] of Object.entries(marks) as [keyof typeof marks, string][]) {
+      const x = kind === "scatter" ? "year.n" : "region.name";
+      const svg = await renderChartSvg(buildChartSpec({ title: "Revenue", kind, data, x, y: "revenue[usd]" }));
+      expect(svg.split(`aria-roledescription="${mark}"`).length - 1, kind).toBe(2);
+    }
+  });
+
+  it("says on the svg element how many data rows it was drawn from, so the chart check can see a chart that drew none", async () => {
+    const svg = await renderChartSvg(buildChartSpec({ title: "EU population", kind: "bar", data: countries, x: "country", y: "population" }));
+    expect(svg).toMatch(/^<svg[^>]* data-rows="3"/);
+  });
+
   it("escapes the title, so an ampersand from the agent cannot break the SVG", async () => {
     const svg = await renderChartSvg(buildChartSpec({ title: "Sales & costs", kind: "bar", data: countries, x: "country", y: "population" }));
     expect(svg).toContain("Sales &amp; costs");

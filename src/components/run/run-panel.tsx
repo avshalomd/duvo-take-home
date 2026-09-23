@@ -127,7 +127,7 @@ export function RunPanel({
               <p className="min-w-0 flex-1 text-[14px] leading-5">
                 The run stopped before it finished. You can run the same brief again; what went wrong is in Details.
               </p>
-              <RunAgainButton prompt={run.prompt} prominent />
+              <RunAgainButton runId={run.id} prominent />
             </div>
           )}
           <GuardNotices guards={state.guards} />

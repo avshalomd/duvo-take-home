@@ -1,7 +1,7 @@
 // The budget decision, pure: may a run start, given the workspace's limits and what it used today?
 import { describe, expect, it } from "vitest";
 import type { Usage, WorkspaceLimits } from "@/contracts/usage";
-import { budgetBlockReason, nextUtcMidnight, startOfUtcDay } from "./budget-rule";
+import { budgetBlockReason, healBudgetReason, nextUtcMidnight, startOfUtcDay } from "./budget-rule";
 
 const limits: WorkspaceLimits = {
   dailyBudgetUsd: 5,
@@ -89,5 +89,17 @@ describe("the day's boundaries, in UTC", () => {
 
   it("crosses a month end", () => {
     expect(nextUtcMidnight(new Date("2026-09-30T23:59:59.000Z")).toISOString()).toBe("2026-10-01T00:00:00.000Z");
+  });
+});
+
+// Each fix attempt of a run may cost up to AgentLimits.maxBudgetUsd, and nothing checked the day's money before one.
+describe("healBudgetReason", () => {
+  it("lets a fix attempt start while the day's money has room", () => {
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 4.99)).toBeNull();
+  });
+
+  it("stops healing once the day's budget is spent, and says so in plain words", () => {
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 5)).toBe("The workspace's $5.00 budget for today is spent, so healing stopped here.");
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 7.2)).toBe("The workspace's $5.00 budget for today is spent, so healing stopped here.");
   });
 });

@@ -1,4 +1,5 @@
 import { sessionFromHeaders } from "@/lib/auth/session";
+import { sweepIfOverdue } from "@/lib/runner/recover";
 import { getRun } from "@/lib/runs/queries";
 import { nextMessage, parseAfter, sseFrame } from "./diff";
 
@@ -49,9 +50,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     async start(controller) {
       try {
         while (!gone.signal.aborted && Date.now() < until) {
-          const found = await getRun(workspaceId, id);
+          let found = await getRun(workspaceId, id);
           if (gone.signal.aborted) break; // left during the read: there is nobody to send it to
           if (!found) break; // deleted while streaming
+          // A run that has outlived every runner is closed now, while someone watches it, and sent closed.
+          if (await sweepIfOverdue(workspaceId, found.run)) found = (await getRun(workspaceId, id)) ?? found;
           const next = nextMessage(found, after);
           after = next.after;
           controller.enqueue(encoder.encode(sseFrame(next.message)));

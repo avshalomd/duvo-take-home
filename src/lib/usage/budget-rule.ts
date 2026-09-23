@@ -21,6 +21,15 @@ export function budgetBlockReason(limits: DayLimits, usage: Usage): string | nul
   return null;
 }
 
+/**
+ * May a run pay for another fix attempt today? null when it may; otherwise why healing stopped, in plain words. Only
+ * the day's money counts: the run already holds its slot and is counted once among the day's runs.
+ */
+export function healBudgetReason(limits: Pick<WorkspaceLimits, "dailyBudgetUsd">, spentTodayUsd: number): string | null {
+  if (spentTodayUsd < limits.dailyBudgetUsd) return null;
+  return `The workspace's $${limits.dailyBudgetUsd.toFixed(2)} budget for today is spent, so healing stopped here.`;
+}
+
 // Usage is counted per UTC day, so every workspace resets at the same instant whatever the viewer's time zone.
 export function startOfUtcDay(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));

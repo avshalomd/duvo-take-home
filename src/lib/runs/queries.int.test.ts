@@ -69,4 +69,11 @@ describe.skipIf(!process.env.DATABASE_URL)("run reads are scoped to the workspac
     await expect(getRun(WS_A, "not-a-uuid")).resolves.toBeNull();
     await expect(getFile(WS_A, "------------------------------------", FILE)).resolves.toBeNull();
   });
+
+  // Q200: /api/runs/<id>/files/%00 and notes.md%00.csv answered 500: Postgres text cannot hold a NUL byte.
+  it("a file name with a NUL byte in it answers null instead of a database error", async () => {
+    const [id] = created;
+    await expect(getFile(WS_A, id, "\0")).resolves.toBeNull();
+    await expect(getFile(WS_A, id, `${FILE}\0.csv`)).resolves.toBeNull();
+  });
 });

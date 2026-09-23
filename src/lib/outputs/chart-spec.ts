@@ -40,6 +40,12 @@ function titleLines(title: string): string | string[] {
   return [first, rest.join(" ")];
 }
 
+/**
+ * A field name as the spec refers to it. Vega-Lite reads "revenue.usd" as usd inside revenue and "a[0]" as an index,
+ * so every value came back undefined and nothing was drawn; a backslash makes them plain characters of the name.
+ */
+const ref = (field: string) => field.replace(/[.[\]]/g, "\\$&");
+
 /** A field name as an axis or legend title: population_millions reads "Population millions". */
 function words(field: string): string {
   const spaced = field.replace(/[_-]+/g, " ").trim();
@@ -96,7 +102,7 @@ function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area", wi
   const holds = fieldKind(rows, field);
   if (kind !== "bar" && holds === "date") {
     return {
-      field,
+      field: ref(field),
       type: "temporal" as const,
       title: null,
       scale: { type: "utc" as const }, // "2026-09-14" is a UTC midnight: in the server's own zone it moved off the day
@@ -106,7 +112,7 @@ function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area", wi
   if (kind !== "bar" && holds === "number") {
     const whole = rows.every((r) => r[field] === null || Number.isInteger(r[field]));
     return {
-      field,
+      field: ref(field),
       type: "quantitative" as const,
       title: null,
       scale: { zero: false }, // an x axis of years must not start at year 0
@@ -115,7 +121,7 @@ function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area", wi
     };
   }
   return {
-    field,
+    field: ref(field),
     // text is a category; numbers on a bar chart (years) are categories too, and ordinal keeps them in order
     type: kind === "bar" && holds !== "number" ? ("nominal" as const) : ("ordinal" as const),
     sort: null, // the agent's order: the five largest stay largest-first
@@ -149,8 +155,8 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
     throw new Error(`The field "${y}" holds no numbers, so there is nothing to draw. Send the values as numbers.`);
   }
 
-  const yEnc = { field: y, type: "quantitative" as const, title: words(y), axis: valueAxis(values, y) };
-  const color = series ? { color: { field: series, type: "nominal" as const, title: words(series) } } : {};
+  const yEnc = { field: ref(y), type: "quantitative" as const, title: words(y), axis: valueAxis(values, y) };
+  const color = series ? { color: { field: ref(series), type: "nominal" as const, title: words(series) } } : {};
   const base = {
     title: { text: titleLines(title) },
     data: { values },
@@ -166,17 +172,17 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
         ...base,
         mark: { type: "bar" },
         // grouped, not stacked: with a series each value is read on its own against the axis
-        encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color, ...(series ? { xOffset: { field: series } } : {}) },
+        encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color, ...(series ? { xOffset: { field: ref(series) } } : {}) },
       } as TopLevelSpec;
     case "horizontal-bar": {
       // The same fields as a bar chart, turned: categories down the side (level labels, so no slanting), values along
       // the bottom. The value axis keeps its title and short numbers; the category axis needs none.
-      const category = { field: x, type: fieldKind(values, x) === "number" ? ("ordinal" as const) : ("nominal" as const), sort: null, title: null };
+      const category = { field: ref(x), type: fieldKind(values, x) === "number" ? ("ordinal" as const) : ("nominal" as const), sort: null, title: null };
       return {
         ...base,
         mark: { type: "bar" },
         // about five ticks: numbers sit side by side along the bottom, and ten of them ran together ("80 90")
-        encoding: { y: category, x: { ...yEnc, axis: { labelAngle: 0, tickCount: 5, ...valueAxis(values, y) } }, ...color, ...(series ? { yOffset: { field: series } } : {}) },
+        encoding: { y: category, x: { ...yEnc, axis: { labelAngle: 0, tickCount: 5, ...valueAxis(values, y) } }, ...color, ...(series ? { yOffset: { field: ref(series) } } : {}) },
       } as TopLevelSpec;
     }
     case "line":
@@ -189,7 +195,7 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
         mark: { type: "point", filled: true },
         encoding: {
           // x is a quantity here, so it keeps its title, under level labels (titlePadding from the theme)
-          x: { field: x, type: "quantitative", title: words(x), scale: { zero: false }, axis: { labelAngle: 0, titlePadding: 12, ...valueAxis(values, x) } },
+          x: { field: ref(x), type: "quantitative", title: words(x), scale: { zero: false }, axis: { labelAngle: 0, titlePadding: 12, ...valueAxis(values, x) } },
           y: { ...yEnc, scale: { zero: false } },
           ...color,
         },
@@ -201,8 +207,8 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
         // Vega-Lite stacks slices by the colour field's name; the row number keeps them in the agent's order instead
         transform: [{ window: [{ op: "row_number", as: ROW_ORDER }] }],
         encoding: {
-          theta: { field: y, type: "quantitative", stack: true },
-          color: { field: x, type: "nominal", sort: null, title: words(x) }, // the legend in the same order
+          theta: { field: ref(y), type: "quantitative", stack: true },
+          color: { field: ref(x), type: "nominal", sort: null, title: words(x) }, // the legend in the same order
           order: { field: ROW_ORDER, type: "quantitative" },
         },
       } as TopLevelSpec;

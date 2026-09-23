@@ -23,16 +23,16 @@ import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
 import { runnerMode } from "@/lib/runner/mode";
-import { getLimits } from "@/lib/usage/budget";
+import { getLimits, healBudgetStop } from "@/lib/usage/budget";
 import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
 import { childEnv, ISOLATION } from "./child-env";
 import { closeAsCancelled, updateUnlessCancelled } from "./close";
 import { statusUpdates } from "./connection-status";
-import { startDeadline } from "./deadline";
+import { startDeadline, within } from "./deadline";
 import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
-import { attemptFingerprint, healPrompt, noProgress, runBudgetMs, shouldHeal, type AttemptFingerprint } from "./heal";
+import { attemptFingerprint, EVAL_MAX_MS, healPrompt, noProgress, runBudgetMs, SETTLE_MAX_MS, shouldHeal, type AttemptFingerprint } from "./heal";
 import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
 import { tripwireReason, unexpectedServers } from "./mcp-tripwire";
@@ -40,7 +40,7 @@ import { newlyDone } from "./plan-diff";
 import { PLAN_SERVER_KEY } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
 import { resumeOptions, sessionIdOf } from "./session";
-import { ownCost, readSdkTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
+import { ownCost, readSdkTotals, runTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
 import { SYSTEM_PROMPT } from "./system.prompt";
 import { unknownVerdict } from "./unknown-verdict";
 import { removeRunDir } from "./workspace";
@@ -48,6 +48,7 @@ import { removeRunDir } from "./workspace";
 export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const NATIVE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]; // everything else is removed below
 const CANCEL_POLL_MS = 2000; // Stop is felt within 2 s, at one tiny read per run every 2 s
+const EVAL_TOO_LONG = "the check took too long; press Re-evaluate to try again"; // read as "Not checked: ..."
 
 /** One working directory per run, gitignored; bypassPermissions lets the agent write anywhere under it.
  *  On Vercel the code directory is read-only, so the run lives under the function's temp dir instead. */
@@ -162,15 +163,21 @@ export const runAutomation: RunAutomation = async (runId) => {
   };
   const now = () => new Date().toISOString();
 
+  // settle() ends a round: a check begun in an earlier round that answers after it gave up waiting is dropped, so no
+  // event is ever written after the run has closed.
+  let round = 0;
+
   // The per-step check runs beside the agent, never in its way: a slow or failed Jev call records nothing, and
   // nothing in here may throw - an unhandled rejection would take the whole worker process down with it.
   const stepCheck = async (p: Plan, stepIndex: number) => {
+    const mine = round;
     try {
       const startedAt = recorded.findLastIndex((e) => e.kind === "plan" && e.payload.steps[stepIndex]?.status === "running");
       const calls = recorded
         .slice(Math.max(0, startedAt))
         .flatMap((e) => (e.kind === "tool_call" ? [{ name: e.payload.name, input: e.payload.input }] : []));
       const check = await checkStep({ prompt: instructions, plan: p, stepIndex, calls });
+      if (mine !== round) return; // too late: settle() stopped waiting for it, and the run may be closed by now
       await write([{ kind: "check", payload: check, at: now() }]);
     } catch {
       // no check event: the stepper shows the step without a mark
@@ -180,9 +187,11 @@ export const runAutomation: RunAutomation = async (runId) => {
     checks.add(p);
     void p.finally(() => checks.delete(p));
   };
-  // Before the run closes: the checks still in flight land, then every queued write is in.
+  // Before the run goes on: the checks still in flight land, for at most SETTLE_MAX_MS (a function's 300 s has no
+  // room to wait longer), then every queued write is in.
   const settle = async () => {
-    await Promise.allSettled([...checks]);
+    await within(Promise.allSettled([...checks]), SETTLE_MAX_MS, () => []);
+    round += 1;
     await chain;
   };
 
@@ -225,22 +234,18 @@ export const runAutomation: RunAutomation = async (runId) => {
   const maxTurn = (events: RunEvent[]) => Math.max(0, ...events.map((e) => Number((e.payload as { turn?: unknown }).turn) || 0));
   const attemptResult = () => recorded.slice(attemptFrom).find((e) => e.kind === "finished")?.payload ?? null;
 
-  // A stopped run keeps what it cost (QA Q129): the finished attempts, plus the one in progress - its result's figures
-  // when the agent had finished, else the SDK's own totals from its transcript, else the time from start to stop.
+  // A run closed early keeps what it cost (QA Q129) - stopped, cut off by the wall clock, tripped, or a child that
+  // died: the finished attempts, plus the one in progress - its result's figures when the agent had finished, else the
+  // SDK's own totals from its transcript, else the time from the attempt's start to now.
   let sessionId: string | null = null;
+  const totalsSoFar = async () => {
+    if (counted) return runTotals(spent, null);
+    const end = attemptResult();
+    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
+    return runTotals(spent, stoppedTotals({ end, sdk, startedAt: attemptStartedAt, now: Date.now(), turns: maxTurn(recorded) - turnsBefore, costBase: attemptBase }));
+  };
   const closeStopped = async () => {
-    let usd: number | null = spent.usd;
-    let ms = spent.ms;
-    let turns = spent.turns;
-    if (!counted) {
-      const end = attemptResult();
-      const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
-      const current = stoppedTotals({ end, sdk, startedAt: attemptStartedAt, now: Date.now(), turns: maxTurn(recorded) - turnsBefore, costBase: attemptBase });
-      usd = current.costUsd === null ? spent.usd || null : spent.usd + current.costUsd;
-      ms += current.durationMs;
-      turns += current.numTurns;
-    }
-    await closeAsCancelled(runId, { costUsd: usd, durationMs: ms, numTurns: turns, healAttempts: heals });
+    await closeAsCancelled(runId, { ...(await totalsSoFar()), healAttempts: heals });
   };
 
   // The MCP servers this run may see: ours, and the workspace's enabled connections. Anything else trips the wire.
@@ -249,7 +254,6 @@ export const runAutomation: RunAutomation = async (runId) => {
 
   /** One attempt: the agent works (or fixes its work) until its result message, every message recorded as it comes. */
   const runAttempt = async (attemptPrompt: string, attemptResume: { resume: string; forkSession?: boolean } | null) => {
-    deadline = startDeadline(attemptMs());
     attemptStartedAt = Date.now();
     attemptFrom = recorded.length; // the previous attempt settled, so every one of its events is in
     turnsBefore = maxTurn(recorded);
@@ -318,10 +322,28 @@ export const runAutomation: RunAutomation = async (runId) => {
   // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
   // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
   try {
-    let attemptPrompt = prompt;
-    let attemptResume: { resume: string; forkSession?: boolean } | null = resume;
+    // What the next attempt is sent; for a fix, also what its heal event says, written only once the fix starts.
+    let next: { prompt: string; resume: { resume: string; forkSession?: boolean } | null; heal: { reasons: string[]; feedback: string } | null } = {
+      prompt,
+      resume,
+      heal: null,
+    };
     for (;;) {
-      await runAttempt(attemptPrompt, attemptResume);
+      // The attempt's controller first, then the stop check. A Stop the watch saw before this line aborted the last
+      // attempt's controller, already spent, and is caught here; one it sees after aborts this one. A Stop pressed but
+      // not polled yet is read here too: no attempt starts, and none is paid for, on a run the user stopped.
+      deadline.clear();
+      deadline = startDeadline(attemptMs());
+      if (cancel.cancelled() || (await cancelRequested(runId))) {
+        await closeStopped();
+        return;
+      }
+      if (next.heal) {
+        heals += 1;
+        await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, ...next.heal }, at: now() }]);
+        await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
+      }
+      await runAttempt(next.prompt, next.resume);
       const written = await storeFiles();
 
       // An abort can end the stream quietly instead of throwing: Stop is then seen here.
@@ -346,8 +368,9 @@ export const runAutomation: RunAutomation = async (runId) => {
       });
 
       // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
-      // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59).
-      const evaluation = evaluateRun({
+      // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59). So is an
+      // evaluation that takes longer than EVAL_MAX_MS: the function would be ended with the run left open.
+      const judged = evaluateRun({
         prompt: instructions,
         runStatus: end.is_error ? "failed" : "succeeded",
         report: end.result || null,
@@ -360,6 +383,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
         template,
       }).catch(unknownVerdict);
+      const evaluation = within(judged, EVAL_MAX_MS, () => unknownVerdict(new Error(EVAL_TOO_LONG)));
       // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
       const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);
       if (verdict === null || cancel.cancelled()) {
@@ -383,27 +407,26 @@ export const runAutomation: RunAutomation = async (runId) => {
         return;
       }
       const feedback = feedbackForAgent(verdict);
-      // No progress, no further attempt (QA Q148): the same files or the same failure as an earlier attempt means the
-      // next one would only go round again. The stop is recorded where the heals are, and the verdict is written now.
+      // No further attempt when it would only go round again (QA Q148: the same files or the same failure as an earlier
+      // attempt), or when the workspace's money for today is spent: a fix attempt may cost up to maxBudgetUsd, and the
+      // check at the start saw none of it. The stop is recorded where the heals are, and the verdict is written now.
       const print = attemptFingerprint(verdict, written);
-      const stuck = noProgress(print, earlierAttempts);
-      if (stuck) {
-        await write([{ kind: "heal", payload: { attempt: heals + 1, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback, stopped: stuck }, at: now() }]);
-        await chain;
+      const stopped = noProgress(print, earlierAttempts) ?? (await healBudgetStop(workspaceId, runId, spent.usd));
+      if (stopped) {
+        await write([{ kind: "heal", payload: { attempt: heals + 1, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback, stopped }, at: now() }]);
         await close();
         return;
       }
       earlierAttempts.push(print);
-      heals += 1;
-      await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback }, at: now() }]);
-      await chain;
-      await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
       // The same session, not a fork: the run stays one conversation. Where it is gone, the heal prompt carries the
       // instructions too, and the new session's total starts from nothing.
       const same = sessionId ? await resumeOptions(sessionId) : null;
-      attemptResume = same ? { resume: same.resume } : null;
       attemptBase = same ? end.total_cost_usd : 0;
-      attemptPrompt = same ? healPrompt(feedback) : `${prompt}\n\n${healPrompt(feedback)}`;
+      next = {
+        prompt: same ? healPrompt(feedback) : `${prompt}\n\n${healPrompt(feedback)}`,
+        resume: same ? { resume: same.resume } : null,
+        heal: { reasons: verdict.reasons, feedback },
+      };
     }
   } catch (err) {
     await settle().catch(() => undefined);
@@ -417,8 +440,10 @@ export const runAutomation: RunAutomation = async (runId) => {
     let error = err instanceof Error ? err.message : String(err);
     if (deadline.expired()) error = `timed out after ${Math.round((Date.now() - startedAt) / 1000)} s`;
     if (tripped) error = tripped;
-    // A heal attempt that failed leaves the last verdict as the run's: its tries are over.
-    await updateUnlessCancelled(runId, { status: "failed", error, verdict: lastVerdict, healAttempts: heals, finishedAt: new Date() });
+    // A heal attempt that failed leaves the last verdict as the run's: its tries are over. What every attempt cost is
+    // recorded too, so the day's budget counts a failed run like any other.
+    const totals = await totalsSoFar();
+    await updateUnlessCancelled(runId, { status: "failed", error, verdict: lastVerdict, healAttempts: heals, ...totals, finishedAt: new Date() });
   } finally {
     deadline.clear();
     cancel.stop();

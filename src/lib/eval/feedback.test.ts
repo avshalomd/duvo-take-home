@@ -132,9 +132,12 @@ describe("feedbackForAgent", () => {
     expect(text.indexOf("Fill in the TBD entries.")).toBeLessThan(text.indexOf("check the result against them")); // the judge's own phrase
   });
 
-  it("ends by asking for the files fixed in place and a report of the change", () => {
+  // A heal's or a follow-up's own prompt says what to report: "report what you changed" made a healed run's whole
+  // report a note of the fix (run 15f8b99d).
+  it("ends by asking for the files fixed in place, and never for a note of what changed", () => {
     const text = feedbackForAgent(verdictOf([EVERY_CHECK[6][1]()]));
-    expect(text.endsWith("Fix the files in place, keep what was already right, and report what you changed.")).toBe(true);
+    expect(text.endsWith("Fix the files in place and keep what was already right.")).toBe(true);
+    expect(text).not.toMatch(/report what you changed/i);
   });
 
   it("stays short when everything failed", () => {
@@ -143,7 +146,7 @@ describe("feedbackForAgent", () => {
     const text = feedbackForAgent(verdictOf(checks, { review, judgment: { answeredQuery: 0.2, followedPlan: 0.2, stayedInBounds: 0.2 } }));
     expect(text.length).toBeLessThanOrEqual(1200);
     expect(text).toMatch(/more/); // what did not fit is counted, not silently dropped
-    expect(text.endsWith("report what you changed.")).toBe(true);
+    expect(text.endsWith("keep what was already right.")).toBe(true);
   });
 
   it("calls a pass with notes' findings notes, not faults, when it is carried into 'Ask for a change'", () => {
