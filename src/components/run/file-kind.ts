@@ -18,3 +18,27 @@ export function flagLine(flags: FileFlag[] | undefined): string | null {
   const list = personal.length === 1 ? personal[0] : `${personal.slice(0, -1).join(", ")} and ${personal[personal.length - 1]}`;
   return `Contains ${list}`;
 }
+
+export function formatBytes(bytes: number): string {
+  return String(bytes);
+}
+
+export function noFilesLine(status: string, hasReport: boolean): string {
+  void status; void hasReport;
+  return "";
+}
+
+export function csvLine(summary: { rows: number; columns: string[] }): string {
+  void summary;
+  return "";
+}
+
+export function sheetsOf(events: { kind: string; payload: unknown }[], file: string): { name: string; rows: number }[] {
+  void events; void file;
+  return [];
+}
+
+export function sheetsLine(sheets: { name: string; rows: number }[]): string | null {
+  void sheets;
+  return null;
+}

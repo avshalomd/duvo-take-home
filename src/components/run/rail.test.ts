@@ -60,19 +60,38 @@ describe("matchesSearch - the rail's search box", () => {
     expect(matchesSearch(run, "")).toBe(true);
     expect(matchesSearch(run, "   ")).toBe(true);
   });
+
+  // Q133: an automation's run is found by what the person typed - its command, its name, its input
+  it("also matches the title and the command a run was started with", () => {
+    const audit = { prompt: "Audit Acme Ltd: ownership, filings ...", title: "Company audit: Acme Ltd", tag: "\\audit" };
+    expect(matchesSearch(audit, "audit")).toBe(true);
+    expect(matchesSearch(audit, "\\audit acme")).toBe(true);
+    expect(matchesSearch(audit, "company")).toBe(true);
+  });
 });
 
-describe("runTitle - a short name for a run in the rail", () => {
+const NAMES = { "auto-1": "Company audit" };
+
+describe("runTitle - a short name for a run", () => {
   it("is the first line of the instructions", () => {
-    expect(runTitle({ prompt: "\n  Fetch the news\nas CSV", purpose: "adhoc", input: null })).toBe("Fetch the news");
+    expect(runTitle({ prompt: "\n  Fetch the news\nas CSV", purpose: "adhoc", input: null, automationId: null }, NAMES)).toBe("Fetch the news");
   });
 
-  it("is the input for a run of a saved automation, since the command is shown beside it", () => {
-    expect(runTitle({ prompt: "Audit Acme Ltd: ownership, filings ...", purpose: "automation", input: "Acme Ltd" })).toBe("Acme Ltd");
+  // Q94, Q95: the filled-in template is not a name a person gave it
+  it("is the automation's name and the input for a run of a saved automation, a scheduled run and an example", () => {
+    for (const purpose of ["automation", "schedule", "trial"] as const)
+      expect(runTitle({ prompt: "Audit Acme Ltd: ownership, filings ...", purpose, input: "Acme Ltd", automationId: "auto-1" }, NAMES)).toBe(
+        "Company audit: Acme Ltd",
+      );
   });
 
-  it("falls back to the instructions when an automation run has no input", () => {
-    expect(runTitle({ prompt: "Weekly AI digest", purpose: "schedule", input: "" })).toBe("Weekly AI digest");
+  it("is the input alone when the automation is gone, and the name alone when there was no input", () => {
+    expect(runTitle({ prompt: "Audit ...", purpose: "automation", input: "Acme Ltd", automationId: "deleted" }, NAMES)).toBe("Acme Ltd");
+    expect(runTitle({ prompt: "Weekly AI digest", purpose: "schedule", input: "", automationId: "auto-1" }, NAMES)).toBe("Company audit");
+  });
+
+  it("falls back to the instructions when an automation run has neither", () => {
+    expect(runTitle({ prompt: "Weekly AI digest", purpose: "schedule", input: "", automationId: null }, NAMES)).toBe("Weekly AI digest");
   });
 });
 

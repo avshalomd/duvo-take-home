@@ -209,14 +209,10 @@ describe("whyLines - verdicts from v1, recorded before path and decidedBy existe
 });
 
 describe("whyLines - a run with no verdict", () => {
-  it("says a stopped run was not checked because it was stopped", () => {
-    expect(whyLines(null, "cancelled")).toEqual([
-      { tier: "none", tone: "idle", decided: false, text: "You stopped the run, so its result was not checked" },
-    ]);
-  });
-
-  it("says a broken run had nothing to check", () => {
-    expect(whyLines(null, "failed")[0].text).toBe("The run stopped before it finished, so there was nothing to check");
+  // Q102: the outcome line and the failure banner already say it; a Why? that repeats them is noise
+  it("has nothing to add for a stopped or a broken run, so Why? is not offered", () => {
+    expect(whyLines(null, "cancelled")).toEqual([]);
+    expect(whyLines(null, "failed")).toEqual([]);
   });
 
   it("says a finished run has not been checked yet", () => {
@@ -226,5 +222,15 @@ describe("whyLines - a run with no verdict", () => {
   it("has nothing to say while the run is still going", () => {
     expect(whyLines(null, "running")).toEqual([]);
     expect(whyLines(null, "evaluating")).toEqual([]);
+  });
+
+  // Q91: an older stored verdict does not parse any more, but its headline does: the outcome says "looks good",
+  // so Why? may not say "not checked" - it says the result came from an earlier version of the checks
+  it("agrees with the outcome of a run checked by an earlier version of the app", () => {
+    expect(whyLines(null, "succeeded", "pass")).toEqual([
+      { tier: "none", tone: "ok", decided: true, text: "Checked by an earlier version of the app, which kept the result but not the reasons" },
+    ]);
+    expect(whyLines(null, "succeeded", "fail")[0].tone).toBe("bad");
+    expect(whyLines(null, "succeeded", "pass_with_notes")[0].tone).toBe("warn");
   });
 });

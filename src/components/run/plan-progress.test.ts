@@ -17,11 +17,18 @@ describe("planProgress", () => {
 
   it("counts a skipped step as settled: the bar tracks what is left to do", () => {
     expect(planProgress(plan(["done", "skipped", "running", "pending", "pending"]))).toEqual({
-      done: 2,
+      done: 1,
+      skipped: 1,
       total: 5,
       percent: 40,
-      label: "2 of 5 steps",
+      label: "1 of 5 done, 1 skipped",
     });
+  });
+
+  // Q114: "4 of 4" over a plan with a skipped step claimed four steps were done
+  it("says how many steps were done, and how many skipped, separately", () => {
+    expect(planProgress(plan(["done", "done", "done", "skipped"]))?.label).toBe("3 of 4 done, 1 skipped");
+    expect(planProgress(plan(["done", "done"]))?.label).toBe("2 of 2 done");
   });
 
   it("reaches 100% when every step is done", () => {

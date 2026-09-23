@@ -30,3 +30,18 @@ export function filterAutomations<T extends { command: string; name: string }>(l
   const byName = list.filter((a) => !byCommand.includes(a) && a.name.toLowerCase().includes(q));
   return [...byCommand, ...byName];
 }
+
+export function commandHint(text: string, ready: { command: string; hint: string }[]): string | null {
+  void text; void ready;
+  return null;
+}
+
+export function emptyListLine(counts: { ready: number; notReady: number; query: string }): string {
+  void counts;
+  return "";
+}
+
+export function describeOutput(text: string, inputLabel: string): string {
+  void inputLabel;
+  return text;
+}

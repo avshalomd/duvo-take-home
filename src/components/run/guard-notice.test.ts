@@ -1,13 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { guardNotices } from "./guard-notice";
 
-const g = (guard: string, decision: string, target?: string) => ({ guard, decision, reason: "raw reason for Details", target });
+const g = (guard: string, decision: string, target?: string, reason = "raw reason for Details") => ({ guard, decision, reason, target });
+// the url guard's own reasons (src/lib/agent/guards/url.ts), one per cause
+const LEAK = "This address looks like it carries the task's data to another site. Leave the data out of the address.";
+const PRIVATE = "10.0.0.5 is a private or local address. Only public web pages can be fetched.";
+const DENIED = "news.example is blocked in this workspace's settings. Use another source.";
+const SCHEME = "Only web pages (http or https) can be fetched, not file: addresses.";
 
 describe("guardNotices - what the guards did, in words for the person who asked", () => {
   it("says a web page that tried to send data elsewhere was stopped", () => {
-    expect(guardNotices([g("url", "blocked", "evil.example")])).toEqual([
+    expect(guardNotices([g("url", "blocked", "evil.example", LEAK)])).toEqual([
       { text: "A web page tried to make the agent send your data elsewhere. It was stopped.", tone: "warn", count: 1 },
     ]);
+  });
+
+  // Q127: one sentence for every url block blamed a web page for what was a setting or a private address
+  it("says what the url guard stopped by its cause: a private address, a site blocked in Settings, not a web page", () => {
+    expect(guardNotices([g("url", "blocked", "10.0.0.5", PRIVATE)])[0].text).toBe(
+      "The agent tried to open a private or local address. It was stopped.",
+    );
+    expect(guardNotices([g("url", "blocked", "news.example", DENIED)])[0].text).toBe(
+      "The agent tried to open news.example, which is blocked in Settings. It was stopped.",
+    );
+    expect(guardNotices([g("url", "blocked", "file:///etc/passwd", SCHEME)])[0].text).toBe(
+      "The agent tried to open an address that is not a web page. It was stopped.",
+    );
+  });
+
+  it("says plainly that a web address was stopped when the reason is one it does not know", () => {
+    expect(guardNotices([g("url", "blocked", "x.example")])[0].text).toBe("The agent was stopped from opening a web address.");
   });
 
   it("says a suspicious address that was let through was marked", () => {
