@@ -8,13 +8,14 @@ import { readError } from "@/lib/automations/errors";
 import type { EditValues } from "@/lib/automations/form";
 import { parseEditForm } from "@/lib/automations/form";
 import { draftFromRun } from "@/lib/automations/from-run";
-import { commandRefusal, refusalFor } from "@/lib/automations/permissions";
+import { canGovernAutomations, commandRefusal, hasBeenApproved, refusalFor } from "@/lib/automations/permissions";
 import { choiceToCron } from "@/lib/automations/schedule-local";
 import { isTimeZone } from "@/lib/automations/schedule";
 import {
   approveAutomation,
   deleteAutomation,
   getAutomation,
+  listTrials,
   runCommand,
   setAutomationStatus,
   setHumanVerdict,
@@ -68,14 +69,16 @@ export async function saveAutomationAction(_prev: EditState, formData: FormData)
   if (!parsed.ok) return { fieldErrors: parsed.fieldErrors, values: parsed.values };
 
   const { workspaceId } = await ctx();
-  // Q178: a member renames a draft's command, not an approved one's: people call it by that name
+  // Q178: a member renames a draft's command, not one approved before: people call it by that name
   const current = await getAutomation(workspaceId, id.data);
   if (current && current.command !== parsed.edit.command) {
-    const refused = commandRefusal(await role(), current.status);
+    const approvedBefore = hasBeenApproved(current.status, current.version, await listTrials(workspaceId, id.data));
+    const refused = commandRefusal(await role(), approvedBefore);
     if (refused) return { error: refused, values: parsed.values };
   }
   try {
-    const saved = await updateAutomation(workspaceId, id.data, parsed.edit);
+    // the store's write holds the rule again: an approval can land between the check above and this save (review R2)
+    const saved = await updateAutomation(workspaceId, id.data, parsed.edit, { mayRenameApproved: canGovernAutomations(await role()) });
     refresh(id.data);
     const bumped = saved.version !== Number(field(formData, "version")); // the version the form was rendered with
     // a member cannot approve (Q178), so their next step names who does

@@ -67,7 +67,7 @@ describe.skipIf(!process.env.DATABASE_URL)("sign-in and sign-up tries per client
     expect(fourth.status).toBe(429);
     expect(Number(fourth.headers.get("x-retry-after"))).toBeGreaterThan(0);
     expect(Number(fourth.headers.get("x-retry-after"))).toBeLessThanOrEqual(10);
-    expect(friendlyAuthError({ status: fourth.status })).toBe("Too many tries. Wait a minute, then try again.");
+    expect(friendlyAuthError({ status: fourth.status })).toBe("Too many tries. Wait a few seconds, then try again.");
   });
 
   it("does not hold back another client: its wrong password is still only wrong", async () => {

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { InviteInput } from "@/contracts/auth";
 import { MEMBER_NOT_FOUND, ONLY_MANAGERS_CHANGE_ROLES, ONLY_MANAGERS_REMOVE } from "@/lib/auth/member-rules";
 import { changeMemberRole, inviteMember, listMembers, removeFromWorkspace } from "@/lib/auth/members";
-import { requireSession } from "@/lib/auth/session";
+import { leftWorkspaceRefusal, requireSession } from "@/lib/auth/session";
 import {
   ConnectionNameTakenError,
   PrivateAddressError,
@@ -53,6 +53,8 @@ export async function setConnectionEnabledAction(id: string, enabled: boolean): 
 export async function addConnectionAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const workspaceId = await workspaceToChange();
   if (!workspaceId) return { error: CONNECTIONS_READ_ONLY };
+  const left = await leftWorkspaceRefusal(); // names no connection: it would be added to the workspace fallen back to
+  if (left) return { error: left };
   const parsed = parseConnectionForm(formData, "add");
   if (!parsed.ok) return { fieldErrors: parsed.fieldErrors, values: parsed.values };
 
@@ -108,6 +110,8 @@ export async function deleteConnectionAction(id: string): Promise<FormState> {
 export async function updateLimitsAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const workspaceId = await workspaceToChange();
   if (!workspaceId) return { error: "Only an owner or an admin can change the limits." };
+  const left = await leftWorkspaceRefusal(); // the limits of the workspace fallen back to are not the ones on screen
+  if (left) return { error: left };
   const parsed = parseLimitsForm(formData);
   if (!parsed.ok) return { fieldErrors: parsed.fieldErrors, values: parsed.values };
 
@@ -165,6 +169,8 @@ export async function inviteMemberAction(_prev: InviteState, formData: FormData)
   const values = { email: String(formData.get("email") ?? "").trim(), role: String(formData.get("role") ?? "member") };
   const session = await requireSession();
   if (!canChangeSettings(session.role)) return { error: "Only an owner or an admin can invite people to this workspace.", values };
+  const left = await leftWorkspaceRefusal(); // the invitation would be to the workspace fallen back to, not the one on screen
+  if (left) return { error: left, values };
   const parsed = InviteInput.safeParse(values);
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
 

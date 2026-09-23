@@ -39,6 +39,6 @@ export function accountExists(error: { code?: string } | null): boolean {
 
 export function friendlyAuthError(error: { code?: string; status?: number } | null): string {
   if (!error) return FALLBACK;
-  if (error.status === 429) return "Too many tries. Wait a minute, then try again.";
+  if (error.status === 429) return "Too many tries. Wait a few seconds, then try again."; // the window is 10 s (auth.ts)
   return (error.code && MESSAGES[error.code]) || FALLBACK;
 }

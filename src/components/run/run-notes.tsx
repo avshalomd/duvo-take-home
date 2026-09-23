@@ -15,7 +15,7 @@ export function RunNotes({
   run: Run;
   parentTitle: string | null;
   automationName: string | null;
-  verdictLine: string | null; // "You said it looks right", "Mia said it looks right" or "Marked: looks right"
+  verdictLine: string | null; // "You said it looks right", "Mia said it looks right" or "Marked as looking right"
 }) {
   const notes: React.ReactNode[] = [];
 

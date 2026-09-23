@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gte, like, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, like, lt, ne, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { automations, runs } from "@/db/schema";
 import {
@@ -8,6 +8,7 @@ import {
   HumanVerdictInput,
   type ApproveAutomation,
   type Automation,
+  type AutomationEdit,
   type CreateAutomationDraft,
   type GetActiveByCommand,
   type GetAutomation,
@@ -27,6 +28,7 @@ import { startRun } from "@/lib/runs/start";
 import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName } from "./command";
 import { missingConnections } from "./connections";
 import { AutomationError } from "./errors";
+import { APPROVED_COMMAND_LOCKED } from "./permissions";
 import { outcomeOf } from "./outcome";
 import { nextRunAt } from "./schedule";
 import { canApprove, changesThePrompt, fillTemplate } from "./template";
@@ -157,16 +159,32 @@ export const createAutomationDraft: CreateAutomationDraft = async (ctx, draft, f
 /**
  * Saves the editor. An edit that changes what the agent is told bumps the version and sends the automation back to
  * draft, so its earlier examples stop counting and it needs a new approved one (his rule).
+ *
+ * `mayRenameApproved`: whether the caller may change the command of an automation that has been approved (an owner or
+ * an admin, Q178; permissions.ts hasBeenApproved). When they may not and the command changes, the write itself only
+ * matches one never approved (review R2): an approval landing between the caller's check and this save then refuses the
+ * rename instead of letting it through. Not said: refused.
  */
-export const updateAutomation: UpdateAutomation = async (workspaceId, id, edit) => {
+export const updateAutomation = (async (workspaceId: string, id: string, edit: AutomationEdit, { mayRenameApproved = false } = {}) => {
   const current = await mustGet(workspaceId, id);
-  if (edit.command !== current.command) {
+  const renames = edit.command !== current.command;
+  if (renames) {
     const [clash] = await db
       .select({ name: automations.name })
       .from(automations)
       .where(and(eq(automations.workspaceId, workspaceId), eq(automations.command, edit.command), ne(automations.id, id)));
     if (clash) throw new AutomationError(`/${edit.command} is already used by "${clash.name}". Pick another command.`);
   }
+  const neverApproved = and(
+    eq(automations.status, "draft"),
+    // hasBeenApproved in SQL: no example of an earlier version marked looks right, which an approval would have needed
+    notExists(
+      db
+        .select({ one: sql`1` })
+        .from(runs)
+        .where(and(eq(runs.automationId, automations.id), eq(runs.purpose, "trial"), eq(runs.humanVerdict, "approved"), lt(runs.automationVersion, automations.version))),
+    ),
+  );
   const bump = changesThePrompt(current, edit);
   const [row] = await db
     .update(automations)
@@ -181,10 +199,15 @@ export const updateAutomation: UpdateAutomation = async (workspaceId, id, edit) 
       ...(bump ? { version: sql`${automations.version} + 1`, status: "draft", approvedAt: null } : {}),
       updatedAt: new Date(),
     })
-    .where(inWorkspace(workspaceId, id))
+    // read as the row is before this write: an edit that sends it back to draft in the same save does not open the rename
+    .where(and(inWorkspace(workspaceId, id), renames && !mayRenameApproved ? neverApproved : undefined))
     .returning();
+  if (!row) {
+    await mustGet(workspaceId, id); // deleted meanwhile: say that, not the rename rule
+    throw new AutomationError(APPROVED_COMMAND_LOCKED);
+  }
   return toAutomation(row);
-};
+}) satisfies UpdateAutomation;
 
 export const approveAutomation: ApproveAutomation = async (workspaceId, id) => {
   const a = await mustGet(workspaceId, id);

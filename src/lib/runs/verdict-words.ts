@@ -8,5 +8,11 @@ export function verdictWords(verdict: "approved" | "rejected", judge: Judge, vie
   const said = verdict === "approved" ? "looks right" : "is not right";
   if (judge && judge.id === viewerId) return `You said it ${said}`;
   if (judge?.name) return `${judge.name} said it ${said}`;
-  return `Marked: ${verdict === "approved" ? "looks right" : "not right"}`;
+  return verdict === "approved" ? "Marked as looking right" : "Marked as not right";
+}
+
+/** The control that changes a judgment. The new one becomes the viewer's, so a colleague's is named as the one replaced. */
+export function verdictChangeLabel(judge: Judge, viewerId: string): string {
+  if (judge && judge.id !== viewerId && judge.name) return `Replace ${judge.name}'s judgment`;
+  return "Change";
 }

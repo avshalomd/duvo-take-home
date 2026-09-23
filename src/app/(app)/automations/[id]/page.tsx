@@ -17,7 +17,7 @@ import { TryExampleForm } from "@/components/automations/try-example-form";
 import { outcome } from "@/components/run/outcome";
 import { requireSession } from "@/lib/auth/session";
 import { approvalProgress } from "@/lib/automations/approval";
-import { canGovernAutomations } from "@/lib/automations/permissions";
+import { canGovernAutomations, hasBeenApproved } from "@/lib/automations/permissions";
 import { automationHistory } from "@/lib/automations/runs";
 import { getAutomation, listTrials } from "@/lib/automations/store";
 import { canApprove } from "@/lib/automations/template";
@@ -25,7 +25,7 @@ import { listConnections } from "@/lib/connections/store";
 import { schedulerRunning } from "@/lib/runner/mode";
 import { judgeNames, judgeOf } from "@/lib/runs/judges";
 import { getRun } from "@/lib/runs/queries";
-import { verdictWords } from "@/lib/runs/verdict-words";
+import { verdictChangeLabel, verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { cn } from "@/lib/utils";
 
@@ -51,12 +51,19 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   // each judgment says who made it: "You said" to them, their name to everyone else (Q178)
   const names = await judgeNames(trials.map((t) => t.humanVerdictBy));
   const said = (t: Trial) => (t.humanVerdict ? verdictWords(t.humanVerdict, judgeOf(t.humanVerdictBy, names), userId) : null);
-  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said);
+  const changeLabel = (t: Trial) => verdictChangeLabel(judgeOf(t.humanVerdictBy, names), userId); // whose judgment a change replaces
+  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said, changeLabel);
   const approval = canApprove(trials, automation.version);
   const isDraft = automation.status === "draft";
   // Q178: a member drafts, edits, tries and judges; approve, turn off, delete and the schedule read as who does them
   const governs = canGovernAutomations(role);
-  const deleteButton = governs ? <DeleteButton automationId={automation.id} name={automation.name} /> : <p className={SMALL}>An owner or an admin can delete it.</p>;
+  // once approved, people call it by its command, even after an edit sent it back to draft (review R2)
+  const commandLocked = !governs && hasBeenApproved(automation.status, automation.version, trials);
+  const deleteButton = governs ? (
+    <DeleteButton automationId={automation.id} name={automation.name} command={automation.command} approved={!isDraft} />
+  ) : (
+    <p className={SMALL}>An owner or an admin can delete it.</p>
+  );
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-8 sm:px-6 sm:py-10">
@@ -66,7 +73,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
           <article className={cn(SHEET, "space-y-10 p-6 sm:p-10")}>
             <Header automation={automation} governs={governs} />
             {isDraft ? (
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} />
+              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
             ) : (
               <>
                 {approved === "1" && automation.status === "active" && <ApprovedNote command={automation.command} />}
@@ -89,7 +96,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
                   <h2 id="its-runs" className={SECTION}>
                     Its runs
                   </h2>
-                  <History runs={history} />
+                  <History runs={history} callable={automation.status === "active"} />
                 </section>
               </>
             )}
@@ -98,7 +105,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
           {!isDraft && (
             // what an edit does is said where it matters: under the editor, and in the save's own message
             <article aria-label="The automation" className={cn(SHEET, "p-6 sm:p-10")}>
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} />
+              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
             </article>
           )}
         </div>
@@ -193,7 +200,12 @@ function Schedule({ automation: a, governs }: { automation: Automation; governs:
 }
 
 /** The current version's examples with what their cards show: the plan, the files and the verdict, read once here. */
-async function examplesOf(workspaceId: string, trials: Trial[], said: (t: Trial) => string | null): Promise<ExampleView[]> {
+async function examplesOf(
+  workspaceId: string,
+  trials: Trial[],
+  said: (t: Trial) => string | null,
+  changeLabel: (t: Trial) => string,
+): Promise<ExampleView[]> {
   const found = await Promise.all(trials.map((t) => getRun(workspaceId, t.runId)));
   return trials.flatMap((t, i) => {
     const data = found[i];
@@ -210,6 +222,7 @@ async function examplesOf(workspaceId: string, trials: Trial[], said: (t: Trial)
         humanVerdict: t.humanVerdict,
         humanNote: t.humanNote,
         said: said(t),
+        changeLabel: changeLabel(t),
       },
     ];
   });

@@ -95,7 +95,8 @@ test("a member can edit a draft and run an example, and is told who approves and
   await expect(page.getByRole("button", { name: "Run example" })).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Approve and save" })).toHaveCount(0);
-  await expect(page.getByTestId("approve-reason")).toHaveText("An owner or an admin approves it once an example looks right.");
+  // the next step the owner is given too: running, judging and changing it are the member's as well (UX R2)
+  await expect(page.getByTestId("approve-reason")).toHaveText("Check the example's result and mark it as looks right.");
   await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
   await expect(page.getByText("An owner or an admin can delete it.")).toBeVisible();
 
@@ -112,8 +113,11 @@ test("a member can run a ready automation, and sees its switch, schedule and del
   await page.getByRole("button", { name: "Edit" }).click();
   await expect(page.getByLabel("Command", { exact: true })).not.toBeEditable();
   await expect(page.getByLabel("Command", { exact: true })).toHaveValue(`e2e-roles-r-${stamp}`);
+  await expect(page.getByLabel("Command", { exact: true })).toHaveCSS("cursor", "default"); // read, not typed into (UX R2)
   await expect(page.getByText("People call it by this command, so an owner or an admin changes it.")).toBeVisible();
   await expect(page.getByLabel("Name", { exact: true })).toBeEditable();
+  // beside Save, what a save of the brief does to the command people call (UX R2)
+  await expect(page.getByText(`Saving a change to the brief takes /e2e-roles-r-${stamp} out of use until an owner or an admin approves it.`)).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
 
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
@@ -134,10 +138,13 @@ test("a member judges an example; they read 'You said', and the owner reads the 
   const example = mine.getByTestId("example").filter({ hasText: "Acme Ltd" });
   await example.getByRole("button", { name: "Looks right" }).click();
   await expect(example).toContainText("You said it looks right");
-  await expect(mine.getByTestId("approve-reason")).toHaveText("An example looks right, so an owner or an admin can approve it now.");
+  await expect(example.getByRole("button", { name: "Change" })).toBeVisible(); // their own: changing it replaces no one's
+  await expect(mine.getByTestId("approve-reason")).toHaveText("An owner or an admin approves it.");
 
   await page.goto(`/automations/${draftId}`);
-  await expect(page.getByTestId("example").filter({ hasText: "Acme Ltd" })).toContainText("e2e Mia Member said it looks right");
+  const theirs = page.getByTestId("example").filter({ hasText: "Acme Ltd" });
+  await expect(theirs).toContainText("e2e Mia Member said it looks right");
+  await expect(theirs.getByRole("button", { name: "Replace e2e Mia Member's judgment" })).toBeVisible(); // UX R2: whose it replaces
   await expect(page.getByText("You said it looks right")).toHaveCount(0);
 
   await page.goto(`/?run=${trialId}`);
@@ -156,6 +163,7 @@ test("the owner still gets Approve, Turn off, Delete and the schedule form on th
   await expect(page.getByText(/An owner or an admin/)).toHaveCount(0);
   await page.getByRole("button", { name: "Edit" }).click();
   await expect(page.getByLabel("Command", { exact: true })).toBeEditable(); // the owner may rename a ready one
+  await expect(page.getByText(/out of use until an owner or an admin/)).toHaveCount(0); // they approve it themselves
   await page.getByRole("button", { name: "Cancel" }).click();
   if (await schedulerOff(page)) return;
   await expect(page.getByRole("button", { name: "Save schedule" })).toBeVisible();

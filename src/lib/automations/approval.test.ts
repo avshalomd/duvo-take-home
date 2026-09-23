@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Trial } from "@/contracts/automation";
-import { approvalLabel, approvalProgress } from "./approval";
+import { approvalLabel, approvalProgress, memberApprovalLine } from "./approval";
+import { canApprove } from "./template";
 
 const trial = (over: Partial<Trial>): Trial => ({
   runId: Math.random().toString(36),
@@ -38,5 +39,21 @@ describe("approvalLabel", () => {
 
   it("says there is nothing to judge yet when no example of this version exists", () => {
     expect(approvalLabel({ total: 0, right: 0, wrong: 0, open: 0, segments: [] })).toBe("No examples of this version yet");
+  });
+});
+
+// UX R2: with one example not right and one looking right, a member read "An owner or an admin approves it once an
+// example looks right" - false, while the owner saw the real blocker. Running, judging and changing it are theirs too.
+describe("the line a member reads under the approval bar (Q178)", () => {
+  it("is the same next step an owner or an admin is given, while it cannot be approved yet", () => {
+    const blocked = canApprove([trial({ humanVerdict: "rejected" }), trial({ humanVerdict: "approved" })], 2);
+    expect(blocked.ok).toBe(false);
+    const reason = blocked.ok ? null : blocked.reason;
+    expect(memberApprovalLine(false, reason)).toBe("An example of this version is marked not right. Change the automation, then run a new example.");
+    expect(memberApprovalLine(false, "Run an example first.")).toBe("Run an example first.");
+  });
+
+  it("says who approves it once it can be approved", () => {
+    expect(memberApprovalLine(true, null)).toBe("An owner or an admin approves it.");
   });
 });

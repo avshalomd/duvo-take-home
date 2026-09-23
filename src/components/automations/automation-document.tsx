@@ -14,11 +14,13 @@ export function AutomationDocument({
   connections,
   footer,
   approver,
+  commandLocked,
 }: {
   automation: Automation;
   connections: { name: string; enabled: boolean }[];
   footer?: React.ReactNode;
   approver: boolean; // an owner or an admin (Q178): the editor's note says who approves a new version
+  commandLocked: boolean; // the command is read, not edited: approved before, and the viewer is a member
 }) {
   const [state, action, pending] = useActionState<EditState, FormData>(saveAutomationAction, {});
   const [editing, setEditing] = useState(false);
@@ -39,6 +41,7 @@ export function AutomationDocument({
         pending={pending}
         onCancel={() => setEditing(false)}
         approver={approver}
+        commandLocked={commandLocked}
       />
     );
 

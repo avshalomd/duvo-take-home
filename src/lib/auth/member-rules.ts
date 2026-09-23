@@ -18,6 +18,8 @@ export const ONLY_MANAGERS_REMOVE = "Only an owner or an admin can remove people
 export const ONLY_MANAGERS_CHANGE_ROLES = "Only an owner or an admin can change someone's role.";
 // One answer for a membership removed meanwhile and for another workspace's: an id says nothing about other workspaces
 export const MEMBER_NOT_FOUND = "That person could not be found in this workspace. Reload the page to see who is in it.";
+// The asker was removed while their page was open (another owner or admin got there first)
+export const ASKER_GONE = "You are no longer in this workspace. Reload the page.";
 const LAST_OWNER = "A workspace needs an owner. Make someone else an owner first.";
 
 /** `owners`: how many owners the workspace has now. */

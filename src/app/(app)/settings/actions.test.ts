@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionCtx } from "@/contracts/auth";
 
-const session = vi.hoisted(() => ({ role: "member" as SessionCtx["role"] }));
+const session = vi.hoisted(() => ({ role: "member" as SessionCtx["role"], left: false }));
 const store = vi.hoisted(() => ({
   addConnection: vi.fn(async () => ({})),
   updateConnection: vi.fn(async () => ({})),
@@ -13,6 +13,8 @@ const store = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth/session", () => ({
   requireSession: async () => ({ userId: "u1", userName: "Sam", email: "sam@example.com", workspaceId: "ws-a", workspaceName: "A", role: session.role }),
+  // the tab still shows a workspace its user has left; requireSession has fallen back to their own ("ws-a" here)
+  leftWorkspaceRefusal: async () => (session.left ? "You are no longer in that workspace. Reload the page." : null),
 }));
 vi.mock("@/lib/connections/store", () => ({
   ...store,
@@ -31,13 +33,17 @@ vi.mock("@/lib/usage/budget", () => ({ updateLimits: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { MemberChangeError } from "@/lib/auth/member-rules";
+import { inviteMember } from "@/lib/auth/members";
+import { updateLimits } from "@/lib/usage/budget";
 import {
   addConnectionAction,
   changeMemberRoleAction,
   deleteConnectionAction,
+  inviteMemberAction,
   removeMemberAction,
   setConnectionEnabledAction,
   updateConnectionAction,
+  updateLimitsAction,
 } from "./actions";
 
 const ID = "3b368c9a-231d-4fb5-874c-add3059f9c41";
@@ -59,6 +65,7 @@ const writes = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  session.left = false;
 });
 
 describe("the connection actions for a member", () => {
@@ -168,5 +175,25 @@ describe("removing someone and changing a role", () => {
     vi.spyOn(console, "error").mockImplementation(() => {}); // readable() logs it for us
     members.changeMemberRole.mockRejectedValueOnce(new Error("connect ECONNREFUSED db.internal:5432"));
     expect(await changeMemberRoleAction(MEMBER, "member")).toEqual({ error: "Something went wrong on our side - try again" });
+  });
+});
+
+// Review R2: someone removed while their tab was open. The session falls back to their own workspace, and a write that
+// names no record - an invitation, a connection, the limits - landed there unseen. Refused instead, in words.
+describe("a tab that still shows a workspace its user has left", () => {
+  const LEFT = "You are no longer in that workspace. Reload the page.";
+  const idless = {
+    "create an invite link": () => inviteMemberAction({}, form({ email: "guest@example.com", role: "member" })),
+    "add a connection": () => addConnectionAction({}, form({ ...server, token: "t" })),
+    "change the limits": () => updateLimitsAction({}, form({ dailyBudgetUsd: "5", dailyRunLimit: "30", maxInFlight: "3" })),
+  };
+
+  it.each(Object.keys(idless) as (keyof typeof idless)[])("refuses to %s in plain words, and writes nothing to their own workspace", async (what) => {
+    session.role = "owner"; // they own their own workspace, which the session fell back to
+    session.left = true;
+    expect(await idless[what]()).toMatchObject({ error: LEFT });
+    expect(inviteMember).not.toHaveBeenCalled();
+    expect(store.addConnection).not.toHaveBeenCalled();
+    expect(updateLimits).not.toHaveBeenCalled();
   });
 });

@@ -7,8 +7,9 @@ import { DOT } from "./dot";
 import { SMALL } from "./surfaces";
 
 // The automation's real runs, newest first: what it was run on and how it went. Each opens on Home like any run.
-export function History({ runs }: { runs: AutomationRun[] }) {
-  if (runs.length === 0) return <p className="text-slate">No runs yet. Run it above, or call it from Home.</p>;
+// `callable`: it is on. One that is off has no Run above and does not answer on Home, so its empty state offers neither.
+export function History({ runs, callable }: { runs: AutomationRun[]; callable: boolean }) {
+  if (runs.length === 0) return <p className="text-slate">{callable ? "No runs yet. Run it above, or call it from Home." : "No runs yet."}</p>;
   return (
     <ul className="-mx-2">
       {runs.map((r) => {

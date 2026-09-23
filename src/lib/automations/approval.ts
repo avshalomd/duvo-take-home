@@ -12,6 +12,14 @@ export function approvalProgress(trials: Trial[], version: number): ApprovalProg
   return { total: segments.length, right: count("right"), wrong: count("wrong"), open: count("open"), segments };
 }
 
+/**
+ * What a member reads under the bar (Q178): the same next step an owner or an admin is given (canApprove's reason), since
+ * running, judging and changing the automation are theirs too; once it can be approved, who approves it.
+ */
+export function memberApprovalLine(allowed: boolean, reason: string | null): string {
+  return allowed || !reason ? "An owner or an admin approves it." : reason;
+}
+
 /** The bar's words: "1 of 2 looks right, 1 not right". */
 export function approvalLabel(p: ApprovalProgress): string {
   if (p.total === 0) return "No examples of this version yet";

@@ -2,12 +2,12 @@ import "server-only";
 import { APIError } from "better-auth/api";
 import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
 import { headers } from "next/headers";
-import { db } from "@/db";
+import { db, transaction, type Tx } from "@/db";
 import { invitation, member, organization, user } from "@/db/schema";
 import type { InviteMember, ListMembers, ListWorkspaces, Member, SessionCtx } from "@/contracts/auth";
 import { InviteInput } from "@/contracts/auth";
 import { auth } from "./auth";
-import { MEMBER_NOT_FOUND, MemberChangeError, removalRefusal, roleChangeRefusal } from "./member-rules";
+import { ASKER_GONE, MEMBER_NOT_FOUND, MemberChangeError, removalRefusal, roleChangeRefusal } from "./member-rules";
 import { canChangeSettings } from "./roles";
 import { toRole } from "./session-ctx";
 
@@ -138,13 +138,47 @@ export async function revokeInvitation(ctx: SessionCtx, id: string): Promise<voi
   return revokeInvite(await headers(), ctx, id);
 }
 
-/** One membership of the active workspace, and how many owners the workspace has now; any other id is "not found". */
-async function membershipIn(workspaceId: string, memberId: string) {
-  const rows = await db.select({ id: member.id, userId: member.userId, role: member.role }).from(member).where(eq(member.organizationId, workspaceId));
+/**
+ * Role changes and removals of one workspace, one at a time (review R2). The owner count the rules read and Better
+ * Auth's write happen under one lock, so two owners demoting or removing each other at once cannot both read "two
+ * owners" and leave the workspace with none. Better Auth writes through its own connection and commits at once; the
+ * lock is released at our commit, after that write, so the next change in line reads it.
+ */
+async function oneChangeAtATime<T>(workspaceId: string, change: (tx: Tx) => Promise<T>): Promise<T> {
+  return transaction(async (tx) => {
+    // The two-key form is its own key space, so it is never a run start's one-key workspace lock; the constant first
+    // key keeps it apart from the run starts' own two-key lock (lib/runs/start.ts).
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('handover:member-changes'), hashtext(${workspaceId}))`);
+    return change(tx);
+  });
+}
+
+/**
+ * The asker and the person changed, as they are in the workspace now, and how many owners it has; any other id is
+ * "not found". Read under the lock, so a change that landed while the page was open counts: the asker's role is read
+ * here too, not taken from the session, since they may have been demoted or removed meanwhile.
+ */
+async function membershipIn(tx: Tx, workspaceId: string, askerId: string, memberId: string) {
+  const rows = await tx.select({ id: member.id, userId: member.userId, role: member.role }).from(member).where(eq(member.organizationId, workspaceId));
   const found = rows.find((r) => r.id === memberId);
   if (!found) throw new MemberChangeError(MEMBER_NOT_FOUND);
+  const asker = rows.find((r) => r.userId === askerId);
+  if (!asker) throw new MemberChangeError(ASKER_GONE);
   const owners = rows.filter((r) => toRole(r.role) === "owner").length;
-  return { target: { userId: found.userId, role: toRole(found.role) }, owners };
+  return { actor: { userId: askerId, role: toRole(asker.role) }, target: { userId: found.userId, role: toRole(found.role) }, owners };
+}
+
+/**
+ * Closes the pending invitations this person sent from the workspace (review R2). Accepting an invitation does not ask
+ * whether its sender may still invite, so a removed admin could otherwise rejoin through one sent to another address of
+ * theirs. Written in the lock's transaction before Better Auth's call, so a refusal from it rolls this back too (neither
+ * of its calls touches invitations, so nothing waits on these rows).
+ */
+async function closeInvitationsSentBy(tx: Tx, workspaceId: string, userId: string): Promise<void> {
+  await tx
+    .update(invitation)
+    .set({ status: "canceled" }) // Better Auth's own word for a revoked invitation
+    .where(and(eq(invitation.organizationId, workspaceId), eq(invitation.inviterId, userId), eq(invitation.status, "pending")));
 }
 
 /**
@@ -153,18 +187,24 @@ async function membershipIn(workspaceId: string, memberId: string) {
  * the workspace; their next request finds no membership in it and opens a workspace of their own (session.ts).
  */
 export async function removeFromWorkspace(requestHeaders: Headers, ctx: SessionCtx, memberId: string): Promise<void> {
-  const { target, owners } = await membershipIn(ctx.workspaceId, memberId);
-  const refusal = removalRefusal(ctx, target, owners);
-  if (refusal) throw new MemberChangeError(refusal);
-  // the workspace named, not left to the session: the change is made where the page is, whatever Better Auth thinks is active
-  await auth.api.removeMember({ headers: requestHeaders, body: { memberIdOrEmail: memberId, organizationId: ctx.workspaceId } });
+  await oneChangeAtATime(ctx.workspaceId, async (tx) => {
+    const { actor, target, owners } = await membershipIn(tx, ctx.workspaceId, ctx.userId, memberId);
+    const refusal = removalRefusal(actor, target, owners);
+    if (refusal) throw new MemberChangeError(refusal);
+    await closeInvitationsSentBy(tx, ctx.workspaceId, target.userId);
+    // the workspace named, not left to the session: the change is made where the page is, whatever Better Auth thinks is active
+    await auth.api.removeMember({ headers: requestHeaders, body: { memberIdOrEmail: memberId, organizationId: ctx.workspaceId } });
+  });
 }
 
-/** Makes someone of the active workspace a member, an admin or an owner, under the same two sets of rules. */
+/** Makes someone of the active workspace a member, an admin or an owner, under the same rules and the same lock. */
 export async function changeMemberRole(requestHeaders: Headers, ctx: SessionCtx, memberId: string, role: SessionCtx["role"]): Promise<void> {
-  const { target, owners } = await membershipIn(ctx.workspaceId, memberId);
-  const refusal = roleChangeRefusal(ctx, target, role, owners);
-  if (refusal) throw new MemberChangeError(refusal);
-  if (target.role === role) return; // already so: nothing to write
-  await auth.api.updateMemberRole({ headers: requestHeaders, body: { memberId, role, organizationId: ctx.workspaceId } });
+  await oneChangeAtATime(ctx.workspaceId, async (tx) => {
+    const { actor, target, owners } = await membershipIn(tx, ctx.workspaceId, ctx.userId, memberId);
+    const refusal = roleChangeRefusal(actor, target, role, owners);
+    if (refusal) throw new MemberChangeError(refusal);
+    if (target.role === role) return; // already so: nothing to write
+    if (!canChangeSettings(role)) await closeInvitationsSentBy(tx, ctx.workspaceId, target.userId); // a member cannot invite
+    await auth.api.updateMemberRole({ headers: requestHeaders, body: { memberId, role, organizationId: ctx.workspaceId } });
+  });
 }

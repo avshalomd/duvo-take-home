@@ -24,8 +24,8 @@ type Role = SessionCtx["role"];
 const ROLE_NAME: Record<Role, string> = { owner: "Owner", admin: "Admin", member: "Member" };
 // What each role may do, short enough for one line on a phone, so the choice is made knowing what it gives
 const ROLE_MEANS: Record<Role, string> = {
-  member: "Runs and builds automations",
-  admin: "Also manages settings and people",
+  member: "Runs tasks, builds automations and tries them",
+  admin: "Also approves automations and manages settings and people", // Q178: approving is theirs, not a member's
   owner: "Can also make and remove owners",
 };
 const item = "rounded-xl px-2.5 py-2 text-[15px] gap-2.5";
@@ -60,12 +60,9 @@ export function MemberActions({ memberId, name, role, roles, mayRemove }: { memb
   function remove() {
     startTransition(async () => {
       const result = await removeMemberAction(memberId);
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
-      setConfirming(null);
-      toast.success(`${name} was removed from the workspace.`); // the row leaves as the page re-renders
+      setConfirming(null); // either way the question is answered: a refusal is said in the toast, not behind the sheet
+      if (result.error) toast.error(result.error);
+      else toast.success(`${name} was removed from the workspace.`); // the row leaves as the page re-renders
     });
   }
 

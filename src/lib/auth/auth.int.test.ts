@@ -6,8 +6,10 @@ import { db } from "@/db";
 import { invitation, member, organization, session, user } from "@/db/schema";
 import { auth } from "./auth";
 import { INVITATION_COOKIE } from "./invitation-cookie";
+import type { SessionCtx } from "@/contracts/auth";
+import { MemberChangeError } from "./member-rules";
 import { changeMemberRole, createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, removeFromWorkspace, revokeInvite } from "./members";
-import { sessionFromHeaders } from "./session";
+import { resolveSession, sessionFromHeaders } from "./session";
 
 const created: string[] = []; // emails, so afterAll deletes only what this file made
 const PASSWORD = "int-password-123";
@@ -405,6 +407,76 @@ describe.skipIf(!process.env.DATABASE_URL)("removing people and changing roles",
     await expect(removeFromWorkspace(one.owner.headers, one.ownerCtx, theirs)).rejects.toThrow(NOT_FOUND);
     await expect(changeMemberRole(one.owner.headers, one.ownerCtx, theirs, "admin")).rejects.toThrow(NOT_FOUND);
     expect(await two.roles()).toContainEqual(["Mia Member", "member"]);
+  });
+
+  // Review R2: the owner count and the write were a read, then a separate write. Two owners acting on each other at
+  // once both read "two owners", both passed, and the workspace was left with none and nobody able to make one.
+  type Act = (by: Headers, ctx: SessionCtx, memberId: string) => Promise<void>;
+  const opposing: [string, Act, string][] = [
+    ["demote", (by, ctx, id) => changeMemberRole(by, ctx, id, "member"), "Only an owner or an admin can change someone's role."],
+    ["remove", (by, ctx, id) => removeFromWorkspace(by, ctx, id), "You are no longer in this workspace. Reload the page."],
+  ];
+  it.each(opposing)("two owners who %s each other at once: one change lands, the other is refused in plain words, and an owner stays", async (what, act, refusal) => {
+    const { owner, ownerCtx, admin, memberIdOf, roles } = await team(`race-${what}`);
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(admin.userId), "owner");
+    const secondCtx = (await sessionFromHeaders(admin.headers))!; // the session reads the new role
+
+    const [first, second] = await Promise.allSettled([
+      act(owner.headers, ownerCtx, memberIdOf(admin.userId)),
+      act(admin.headers, secondCtx, memberIdOf(owner.userId)),
+    ]);
+    const refused = [first, second].filter((r) => r.status === "rejected");
+    expect(refused).toHaveLength(1);
+    expect((refused[0] as PromiseRejectedResult).reason).toBeInstanceOf(MemberChangeError);
+    expect((refused[0] as PromiseRejectedResult).reason.message).toBe(refusal); // the loser learns why, not Better Auth's code
+    expect((await roles()).filter(([, role]) => role === "owner")).toHaveLength(1);
+  });
+
+  // Review R2: accepting an invitation does not ask whether its sender may still invite, so an admin's pending
+  // invitations outlived their role: removed, they could rejoin through one sent to another address of theirs.
+  const idOf = (link: string) => link.split("/invite/")[1];
+
+  it("removing an admin closes the invitations they sent, so they cannot rejoin through one, and leaves everyone else's open", async () => {
+    const { owner, ownerCtx, admin, memberIdOf } = await team("inv-remove");
+    const theirOtherAddress = email("inv-remove-other");
+    const sentByAdmin = idOf((await createInvite(admin.headers, admin.ctx, { email: theirOtherAddress, role: "admin" })).link);
+    const sentByOwner = idOf((await createInvite(owner.headers, ownerCtx, { email: email("inv-remove-guest"), role: "member" })).link);
+
+    await removeFromWorkspace(owner.headers, ownerCtx, memberIdOf(admin.userId));
+    expect((await getInvitation(sentByAdmin))?.open).toBe(false);
+    expect((await getInvitation(sentByOwner))?.open).toBe(true);
+
+    const again = await signUp("Adam Again", theirOtherAddress);
+    await expect(auth.api.acceptInvitation({ body: { invitationId: sentByAdmin }, headers: again.headers })).rejects.toThrow();
+    expect((await listWorkspaces(again.userId)).map((w) => w.id)).not.toContain(ownerCtx.workspaceId);
+  });
+
+  // Review R2: the removed person's open tab. A page falls back to their own workspace, but a write that names no
+  // record (an invitation, a connection, the limits, a run) fell back with it and landed there unseen.
+  it("a removed person's open tab: its Server Actions learn they left, nothing is written back, and a page load opens their own workspace", async () => {
+    const { owner, ownerCtx, plain, memberIdOf } = await team("left");
+    await removeFromWorkspace(owner.headers, ownerCtx, memberIdOf(plain.userId));
+    const fromAction = new Headers(plain.headers);
+    fromAction.set("next-action", "int-action-id"); // what Next sends with every Server Action
+
+    expect(await resolveSession(fromAction)).toMatchObject({ left: true, ctx: { workspaceName: "Mia's workspace" } });
+    expect((await resolveSession(fromAction))?.left).toBe(true); // not written back: the tab's next write is refused too
+
+    expect((await resolveSession(plain.headers))?.ctx.workspaceName).toBe("Mia's workspace"); // a page load falls back as before
+    expect((await resolveSession(fromAction))?.left).toBe(false); // and writes it back: the page now shows their own, so its actions go ahead
+  });
+
+  it("demoting an admin to member closes the invitations they sent; demoting an owner to admin keeps theirs", async () => {
+    const { owner, ownerCtx, admin, plain, memberIdOf } = await team("inv-demote");
+    const sentByAdmin = idOf((await createInvite(admin.headers, admin.ctx, { email: email("inv-demote-a"), role: "member" })).link);
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(admin.userId), "member");
+    expect((await getInvitation(sentByAdmin))?.open).toBe(false);
+
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(plain.userId), "owner");
+    const secondOwnerCtx = (await sessionFromHeaders(plain.headers))!;
+    const sentBySecondOwner = idOf((await createInvite(plain.headers, secondOwnerCtx, { email: email("inv-demote-b"), role: "member" })).link);
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(plain.userId), "admin");
+    expect((await getInvitation(sentBySecondOwner))?.open).toBe(true); // an admin still invites: nothing to close
   });
 });
 

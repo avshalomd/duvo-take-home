@@ -333,16 +333,49 @@ test.describe("changing roles and removing people", () => {
       await expect(page.getByText("Only an owner can change an owner.")).toBeVisible();
       await roleMenu(personRow(page, mia), "Mia Member").click();
       await expect(page.getByRole("menuitemradio")).toHaveText([/^Member/, /^Admin/]); // no Owner for an admin
+      // what each gives, so the choice is made knowing it (UX R2: approving automations is an admin's too)
+      await expect(page.getByRole("menuitemradio", { name: /^Member/ })).toContainText("Runs tasks, builds automations and tries them");
+      await expect(page.getByRole("menuitemradio", { name: /^Admin/ })).toContainText("Also approves automations and manages settings and people");
       await expect(page.getByRole("menuitem", { name: "Remove from workspace" })).toBeVisible();
       await page.keyboard.press("Escape");
 
       await plain.page.goto("/settings/members");
       await expect(personRow(plain.page, adam)).toContainText("Admin");
       await expect(plain.page.getByTestId("members").getByRole("button")).toHaveCount(0); // no role menus, no Invite someone
+      await expect(plain.page.getByText(/Only an owner or an admin can invite people, change roles or remove someone\./)).toBeVisible();
     } finally {
       await olga.context.close();
       await admin.context.close();
       await plain.context.close();
+    }
+  });
+
+  // UX R2: a refused Remove left its sheet open behind the error
+  test("a Remove refused by the server closes its sheet and says why", async ({ playwright, browser, baseURL }) => {
+    test.setTimeout(60_000); // two sign-ups and a page that may compile first
+    const [owner, mia] = [e2eEmail("members-owner3"), e2eEmail("members-mia3")];
+    created.push(owner, mia);
+    const olga = await signedInAs(playwright.request, browser, baseURL!, "Olga Owner", owner);
+    const her = await signedInAs(playwright.request, browser, baseURL!, "Mia Member", mia);
+    await her.context.close(); // only her account is needed
+    try {
+      await joinByRow(owner, mia, "member");
+      const page = olga.page;
+      await page.goto("/settings/members");
+      await roleMenu(personRow(page, mia), "Mia Member").click();
+      await page.getByRole("menuitem", { name: "Remove from workspace" }).click();
+      const confirm = page.getByRole("dialog");
+      await expect(confirm).toContainText("Remove Mia Member?");
+
+      // someone else removes her while the sheet is open, so the server refuses this one
+      await neon(databaseUrl()!)`
+        delete from member where user_id = (select id from "user" where email = ${mia})
+          and organization_id = (select m.organization_id from member m join "user" u on u.id = m.user_id where u.email = ${owner} and m.role = 'owner')`;
+      await confirm.getByRole("button", { name: "Remove" }).click();
+      await expect(page.getByText("That person could not be found in this workspace. Reload the page to see who is in it.")).toBeVisible();
+      await expect(confirm).toHaveCount(0);
+    } finally {
+      await olga.context.close();
     }
   });
 });
