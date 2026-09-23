@@ -1,6 +1,7 @@
 // The form side of every sign-in screen, on the paper: a title in display type, one plain sentence, the form, and
-// a quiet line pointing elsewhere. No card around it: the paper is the surface.
-export function AuthPanel({ title, description, children, footer }: { title: string; description: string; children: React.ReactNode; footer?: React.ReactNode }) {
+// a quiet line pointing elsewhere. No card around it: the paper is the surface. Without children it is a notice
+// (the invite-only sign-up page).
+export function AuthPanel({ title, description, children, footer }: { title: string; description: string; children?: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-7">
       <div className="flex flex-col gap-2">

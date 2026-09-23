@@ -6,6 +6,7 @@ import { organization } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { googleConfigured } from "./providers";
+import { assertMayCreateAccount } from "./signup";
 import { createPersonalWorkspace, firstWorkspaceId } from "./workspaces";
 
 // Local dev servers: main on 3000, each worktree on 3001+. Better Auth refuses a sign-in whose Origin it does not
@@ -29,6 +30,10 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        // SIGNUP_MODE=invite: no account without a pending invitation, however it is asked for (form, API, Google).
+        before: async (user) => {
+          await assertMayCreateAccount(user.email);
+        },
         // Every new account, by password or by Google, gets its own workspace with the user as owner.
         after: async (user) => {
           await createPersonalWorkspace(user);

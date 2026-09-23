@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NEXT_PATH_HEADER, needsSignIn, requestedPath, safeNext, signInPath, withNext } from "./paths";
+import { NEXT_PATH_HEADER, invitationIdFrom, needsSignIn, requestedPath, safeNext, signInPath, withNext } from "./paths";
 
 describe("needsSignIn", () => {
   it("gates every page of the app", () => {
@@ -71,6 +71,21 @@ describe("requestedPath", () => {
 
   it("passes the recorded value through safeNext, so a forged header cannot point off the site", () => {
     expect(requestedPath(new Headers({ [NEXT_PATH_HEADER]: "//evil.example" }))).toBe("/");
+  });
+});
+
+// Invite-only sign-up: the sign-up page shows its form when it was reached from an invitation's page.
+describe("invitationIdFrom", () => {
+  it("reads the invitation's id from a next that is an invitation page", () => {
+    expect(invitationIdFrom("/invite/abc123")).toBe("abc123");
+    expect(invitationIdFrom("/invite/abc123?from=mail")).toBe("abc123");
+  });
+
+  it("answers null for any other page", () => {
+    expect(invitationIdFrom("/")).toBeNull();
+    expect(invitationIdFrom("/invite/")).toBeNull();
+    expect(invitationIdFrom("/invite/a/b")).toBeNull();
+    expect(invitationIdFrom("/automations")).toBeNull();
   });
 });
 

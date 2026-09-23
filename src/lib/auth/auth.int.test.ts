@@ -3,7 +3,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { member, organization, session, user } from "@/db/schema";
+import { invitation, member, organization, session, user } from "@/db/schema";
 import { auth } from "./auth";
 import { createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, revokeInvite } from "./members";
 import { sessionFromHeaders } from "./session";
@@ -242,5 +242,68 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
 
     await expect(revokeInvite(two.headers, twoCtx, idOf(link))).rejects.toThrow(/no longer pending/);
     expect((await listInvitations(oneCtx.workspaceId)).map((i) => i.link)).toEqual([link]);
+  });
+});
+
+// SIGNUP_MODE=invite (production): no account is made without a pending invitation, by the page, the API or Google.
+describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
+  const idOf = (link: string) => link.split("/invite/")[1];
+  const inviteOnly = { body: { code: "SIGNUP_INVITE_ONLY" } };
+  const accountFor = async (address: string) => (await db.select({ id: user.id }).from(user).where(eq(user.email, address))).length;
+
+  // Owners are made in open mode (the default), then the switch is turned for the call under test only.
+  async function inInviteMode<T>(fn: () => Promise<T>): Promise<T> {
+    process.env.SIGNUP_MODE = "invite";
+    try {
+      return await fn();
+    } finally {
+      delete process.env.SIGNUP_MODE;
+    }
+  }
+
+  it("refuses a sign-up without an invitation, and makes no account", async () => {
+    const address = email("uninvited");
+    await expect(inInviteMode(() => signUp("Una Invited", address))).rejects.toMatchObject(inviteOnly);
+    expect(await accountFor(address)).toBe(0);
+  });
+
+  it("lets an email with a pending invitation sign up, whatever the case it is typed in", async () => {
+    const owner = await signUp("Ingrid Inviter", email("io-owner"));
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const guestEmail = email("io-guest");
+    await createInvite(owner.headers, ctx, { email: guestEmail, role: "member" });
+
+    const guest = await inInviteMode(() => signUp("Gil Guest", guestEmail.toUpperCase()));
+    expect(guest.userId).toBeTruthy();
+    expect(await accountFor(guestEmail)).toBe(1);
+  });
+
+  it("does not open sign-up for a revoked or an expired invitation", async () => {
+    const owner = await signUp("Otto Owner", email("io-owner2"));
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const revokedEmail = email("io-revoked");
+    const revoked = await createInvite(owner.headers, ctx, { email: revokedEmail, role: "member" });
+    await revokeInvite(owner.headers, ctx, idOf(revoked.link));
+    const expiredEmail = email("io-expired");
+    const expired = await createInvite(owner.headers, ctx, { email: expiredEmail, role: "member" });
+    await db.update(invitation).set({ expiresAt: new Date(Date.now() - 60_000) }).where(eq(invitation.id, idOf(expired.link)));
+
+    await expect(inInviteMode(() => signUp("Rae Revoked", revokedEmail))).rejects.toMatchObject(inviteOnly);
+    await expect(inInviteMode(() => signUp("Ed Expired", expiredEmail))).rejects.toMatchObject(inviteOnly);
+    expect(await accountFor(revokedEmail)).toBe(0);
+    expect(await accountFor(expiredEmail)).toBe(0);
+  });
+
+  it("leaves signing in to an existing account unchanged", async () => {
+    const address = email("io-existing");
+    await signUp("Evan Existing", address);
+    const { response } = await inInviteMode(() => auth.api.signInEmail({ body: { email: address, password: PASSWORD }, returnHeaders: true }));
+    expect(response.token).toBeTruthy();
+  });
+
+  it("in open mode anyone can sign up", async () => {
+    const address = email("io-open");
+    await signUp("Olly Open", address);
+    expect(await accountFor(address)).toBe(1);
   });
 });

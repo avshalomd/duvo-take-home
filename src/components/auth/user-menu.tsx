@@ -65,9 +65,7 @@ export function UserMenu({ userName, workspaceName }: { userName: string; worksp
             <Menu.Portal keepMounted>
               <Menu.Positioner align="end" sideOffset={8} className="z-50 outline-none">
                 <Menu.Popup
-                  // backdrop-blur/-saturate repeat what `glass` says: the build keeps only the -webkit- form of the
-                  // utility's backdrop-filter, which Chrome ignores, while Tailwind's own utilities keep both
-                  className="glass w-72 max-w-[calc(100vw-1.5rem)] rounded-[18px] p-1.5 text-graphite shadow-float backdrop-blur-[20px] backdrop-saturate-[1.8] outline-none"
+                  className="glass w-72 max-w-[calc(100vw-1.5rem)] rounded-[18px] p-1.5 text-graphite shadow-float outline-none"
                   render={
                     <motion.div
                       style={{ transformOrigin: "var(--transform-origin)" }} // Base UI puts the trigger's side here

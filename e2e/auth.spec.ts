@@ -91,6 +91,12 @@ test("a wrong password shows the error and stays on the sign-in page", async ({ 
   await expect(page).toHaveURL(/\/sign-in/);
 });
 
+test("the sign-in pages carry the product's name, Handover", async ({ page }) => {
+  await page.goto("/sign-in");
+  await expect(page).toHaveTitle("Sign in - Handover");
+  await expect(page.getByRole("region", { name: "What Handover does" })).toContainText("Handover");
+});
+
 test("a signed-out visit to / goes to /sign-in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL((url) => url.pathname === "/sign-in");
@@ -174,6 +180,9 @@ test("a new workspace made from the user menu opens at once, and the menu switch
   await page.getByLabel("Name").fill("E2e finance team");
   await page.getByRole("button", { name: "Create workspace" }).click();
   await expect(header).toContainText("E2e finance team");
+  // Home streams in after the top bar, and its empty-state composer takes focus when it appears, which closes a
+  // menu opened before it: wait for Home's question, as a person would see the page finish loading.
+  await expect(page.getByRole("heading", { name: "What should the agent do?" })).toBeVisible();
 
   await header.getByRole("button", { name: /Sam Switcher/ }).click();
   await expect(page.getByRole("menuitemradio", { name: "E2e finance team" })).toHaveAttribute("aria-checked", "true");
