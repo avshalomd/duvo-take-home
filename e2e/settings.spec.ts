@@ -89,6 +89,33 @@ test("a refused server keeps the sign-in choice and everything typed, the token 
   await expect(page.getByTestId("connections")).not.toContainText("e2e Settings refused"); // nothing was created
 });
 
+test("moving a connection to another server warns that the saved token stays behind, and then asks for a new one", async ({ page }) => {
+  await open(page, "/settings/connections");
+  await page.getByRole("button", { name: /add a server/i }).click();
+  const add = page.getByRole("dialog");
+  await add.getByLabel("Name").fill("e2e Settings moved");
+  await add.getByLabel("Address").fill("https://example.com/mcp");
+  await add.getByLabel("With a token").check();
+  await add.getByLabel("Token", { exact: true }).fill(TOKEN);
+  await add.getByRole("button", { name: "Add" }).click();
+  await expect(add).toBeHidden();
+
+  const row = page.getByTestId("connections").getByRole("listitem").filter({ hasText: "e2e Settings moved" });
+  await row.getByRole("button", { name: "Edit" }).click();
+  const edit = page.getByRole("dialog");
+  await edit.getByLabel("Address").fill("https://example.com/v2/mcp");
+  await expect(edit.getByText(/different server/)).toHaveCount(0); // the same server: nothing to warn about
+  await edit.getByLabel("Address").fill("https://attacker.example/mcp");
+  await expect(edit.getByText("This is a different server, so the saved token will not be sent to it. Paste a token for the new server.")).toBeVisible();
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(edit).toBeHidden();
+  await expect(row).toContainText("attacker.example · needs a token before a run can use it");
+
+  await row.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(row).toHaveCount(0);
+});
+
 test("a server that signs in with the service offers Sign in, linking to the OAuth start", async ({ page }) => {
   await open(page, "/settings/connections");
   await page.getByRole("button", { name: /add a server/i }).click();
