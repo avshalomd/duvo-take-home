@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { FollowUpInput, StartRunInput } from "@/contracts/agent";
 import { commandWord } from "@/components/run/command-query";
-import { requireSession } from "@/lib/auth/session";
+import { leftWorkspaceRefusal, requireSession } from "@/lib/auth/session";
 import { parseCommand } from "@/lib/automations/command";
 import { runCommand } from "@/lib/automations/store";
 import { reevaluateRun } from "@/lib/eval/reevaluate";
@@ -37,6 +37,8 @@ const RunId = z.uuid(); // ids arrive from hidden fields, which are user input l
 export async function startRunAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const values = { prompt: String(formData.get("prompt") ?? "") };
   const session = await requireSession();
+  const left = await leftWorkspaceRefusal(); // removed while this tab was open: no run in a workspace they are not looking at
+  if (left) return { error: left, values };
   const ctx = { workspaceId: session.workspaceId, userId: session.userId };
 
   // A text that starts like a command is always treated as one: a mistyped command must never quietly become a
