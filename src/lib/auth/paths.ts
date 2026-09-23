@@ -19,10 +19,15 @@ export function needsSignIn(pathname: string): boolean {
   return true;
 }
 
-/** The sign-in page, carrying the page that was asked for so sign-in can return there. */
+/** A sign-in or sign-up link that returns to `next` afterwards. */
+export function withNext(page: "/sign-in" | "/sign-up", next: string): string {
+  if (next === "/") return page; // home is where signing in goes anyway
+  return `${page}?next=${encodeURIComponent(next)}`;
+}
+
+/** The sign-in page, carrying the page that was asked for (path and query) so sign-in can return there. */
 export function signInPath(requested: string): string {
-  if (requested === "/") return "/sign-in"; // home is where sign-in goes anyway
-  return `/sign-in?next=${encodeURIComponent(requested)}`;
+  return withNext("/sign-in", requested);
 }
 
 /** Where to go after signing in: a path inside this app, never another site and never back to sign-in. */
