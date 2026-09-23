@@ -5,7 +5,8 @@ import { workbookBuffer, type SheetArgs } from "./spreadsheet";
 /** Writes the workbook and reads it back the way Excel would see it. */
 async function roundTrip(sheets: SheetArgs) {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(await workbookBuffer(sheets));
+  // exceljs types its input as an ArrayBuffer, and reads a Node Buffer just the same at runtime
+  await wb.xlsx.load((await workbookBuffer(sheets)) as unknown as ArrayBuffer);
   return wb;
 }
 

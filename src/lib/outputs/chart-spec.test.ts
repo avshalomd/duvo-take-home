@@ -81,6 +81,15 @@ describe("buildChartSpec", () => {
     expect(s.encoding.y).toBeUndefined();
   });
 
+  it("stacks the pie's slices in the agent's order, not alphabetically, so the largest-first list reads clockwise", () => {
+    const s = spec({ title: "Share", kind: "pie", data: countries, x: "country", y: "population" }) as Loose & {
+      transform: { window: { op: string; as: string }[] }[];
+    };
+    const rowNumber = s.transform[0].window[0];
+    expect(rowNumber.op).toBe("row_number");
+    expect(s.encoding.order).toMatchObject({ field: rowNumber.as });
+  });
+
   it("draws a scatter plot with two numeric axes and filled points", () => {
     const data = [
       { area: 357, population: 83.4 },
