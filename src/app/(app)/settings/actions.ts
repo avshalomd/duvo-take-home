@@ -5,7 +5,7 @@ import { z } from "zod";
 import { InviteInput } from "@/contracts/auth";
 import { inviteMember, listMembers } from "@/lib/auth/members";
 import { requireSession } from "@/lib/auth/session";
-import { addConnection, deleteConnection, setConnectionEnabled, updateConnection } from "@/lib/connections/store";
+import { ConnectionNameTakenError, addConnection, deleteConnection, setConnectionEnabled, updateConnection } from "@/lib/connections/store";
 import { updateLimits } from "@/lib/usage/budget";
 import type { FormState } from "../actions";
 import { parseConnectionForm } from "./connection-form";
@@ -51,7 +51,9 @@ export async function addConnectionAction(_prev: FormState, formData: FormData):
     await addConnection(workspaceId, parsed.input);
   } catch (e) {
     const { name, url, transport, authType = "none" } = parsed.input;
-    return { error: settingsError(e), values: { name, url, transport, authType } }; // what was typed stays, bar the token
+    const values = { name, url, transport, authType }; // what was typed stays, bar the token
+    if (e instanceof ConnectionNameTakenError) return { fieldErrors: { name: [e.message] }, values }; // Q126: beside the field to change
+    return { error: settingsError(e), values };
   }
   revalidatePath("/settings/connections");
   return {};
@@ -68,6 +70,8 @@ export async function updateConnectionAction(_prev: FormState, formData: FormDat
   try {
     await updateConnection(workspaceId, id.data, parsed.input); // a new server drops the saved credentials: the store's rule
   } catch (e) {
+    const { name, url, transport, authType = "none" } = parsed.input;
+    if (e instanceof ConnectionNameTakenError) return { fieldErrors: { name: [e.message] }, values: { name, url, transport, authType } };
     return { error: settingsError(e) };
   }
   revalidatePath("/settings/connections");

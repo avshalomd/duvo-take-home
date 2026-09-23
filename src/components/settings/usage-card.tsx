@@ -1,46 +1,55 @@
 import type { Usage, WorkspaceLimits } from "@/contracts/usage";
 import { cn } from "@/lib/utils";
+import { InsetGroup } from "./grouped";
 import { meterFill, resetsIn, usd } from "./usage-format";
 
-// Today at a glance: how much of the day's runs and money is used, what is working now, and when it starts over.
+// Today at a glance: two meters, runs and money, side by side in one group; under it, in words, what is working now
+// and when the day starts over.
 export function UsageCard({ usage, limits, now }: { usage: Usage; limits: WorkspaceLimits; now: Date }) {
+  const working =
+    usage.inFlight === 0
+      ? "No runs are working now."
+      : `${usage.inFlight} ${usage.inFlight === 1 ? "run is" : "runs are"} working now, of ${limits.maxInFlight} allowed at the same time.`;
   return (
-    <section data-testid="usage" className="space-y-4 rounded-xl border bg-background p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">Today</h2>
-        <p className="text-xs text-muted-foreground">Starts over at midnight UTC, {resetsIn(usage.resetsAt, now)}.</p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Meter label="Runs today" used={usage.runsToday} limit={limits.dailyRunLimit} text={`${usage.runsToday} of ${limits.dailyRunLimit}`} />
+    <InsetGroup title="Today" data-testid="usage" footer={`${working} The day starts over at midnight UTC, ${resetsIn(usage.resetsAt, now)}.`}>
+      <li className="grid sm:grid-cols-2">
+        <Meter label="Runs" used={usage.runsToday} limit={limits.dailyRunLimit} value={`${usage.runsToday}`} of={`of ${limits.dailyRunLimit}`} />
         <Meter
-          label="Spent today"
+          label="Money"
           used={usage.costTodayUsd}
           limit={limits.dailyBudgetUsd}
-          text={`${usd(usage.costTodayUsd)} of ${usd(limits.dailyBudgetUsd)}`}
+          value={usd(usage.costTodayUsd)}
+          of={`of ${usd(limits.dailyBudgetUsd)}`}
+          // the second meter sits beside the first on a wide screen and under it on a phone: the hairline follows
+          className="border-t border-hairline sm:border-t-0 sm:border-l"
         />
-        <Meter
-          label="Working now"
-          used={usage.inFlight}
-          limit={limits.maxInFlight}
-          text={`${usage.inFlight} of ${limits.maxInFlight} at the same time`}
-        />
-      </div>
-    </section>
+      </li>
+    </InsetGroup>
   );
 }
 
-const fillClass = { ok: "bg-emerald-600", warn: "bg-amber-500", full: "bg-red-500" };
+const fillClass = { ok: "bg-graphite", warn: "bg-saffron", full: "bg-crimson" };
 
-function Meter({ label, used, limit, text }: { label: string; used: number; limit: number; text: string }) {
+function Meter({ label, used, limit, value, of, className }: { label: string; used: number; limit: number; value: string; of: string; className?: string }) {
   const { percent, tone } = meterFill(used, limit);
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium tabular-nums">{text}</span>
-      </div>
-      <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used} aria-valuetext={text} className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className={cn("h-full rounded-full transition-[width]", fillClass[tone])} style={{ width: `${percent}%` }} />
+    <div className={cn("space-y-2.5 px-4 py-4", className)}>
+      <p className="text-[13px] tracking-[0.01em] text-slate">{label}</p>
+      <p className="flex items-baseline gap-1.5 tabular-nums">
+        <span className="text-[26px] leading-none font-semibold tracking-[-0.01em]">{value}</span>
+        <span className="text-slate">{of}</span>
+      </p>
+      <div
+        role="meter"
+        aria-label={`${label} today`}
+        aria-valuemin={0}
+        aria-valuemax={limit}
+        aria-valuenow={used}
+        aria-valuetext={`${value} ${of}`}
+        className="h-1.5 overflow-hidden rounded-full bg-graphite/10"
+      >
+        {/* scaleX, not width: the bar is drawn by a transform, the one property the design lets move */}
+        <div className={cn("h-full origin-left rounded-full", fillClass[tone])} style={{ transform: `scaleX(${percent / 100})` }} />
       </div>
     </div>
   );

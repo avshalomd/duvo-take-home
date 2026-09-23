@@ -5,15 +5,15 @@ import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { updateLimitsAction } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceLimits } from "@/contracts/usage";
+import { InsetGroup, rowLine } from "./grouped";
+import { Stepper } from "./stepper";
 import { submitKeepingValues } from "./submit-keeping-values";
 
-// The workspace's limits and guard switches. Submitted without React's form reset, so a refused value stays as typed
-// next to its error; the form is keyed on the saved limits, so once a save lands its fields start from the saved values.
+// The workspace's limits and guard switches, as rows with a stepper or a switch at the end. Submitted without React's
+// form reset, so a refused value stays as typed next to its error; the form is keyed on the saved limits, so once a
+// save lands its fields start from the saved values. Members see it read-only (the action refuses them anyway).
 export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEdit: boolean }) {
   const [state, action, pending] = useActionState(updateLimitsAction, {});
   const submitted = useRef(false);
@@ -40,148 +40,146 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
         submitted.current = true;
         submitKeepingValues(e, action);
       }}
-      className="space-y-5 rounded-xl border bg-background p-4"
+      className="space-y-8"
     >
-      <fieldset disabled={!canEdit} className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <NumberField
+      <fieldset disabled={!canEdit} className="space-y-8">
+        <InsetGroup title="Each day" footer="When a limit is reached, new runs wait until the day starts over at midnight UTC.">
+          <StepperRow
             name="dailyBudgetUsd"
-            label="Spend per day (USD)"
-            hint="Runs stop starting once today's runs cost this much."
-            step="0.01"
-            min="0"
+            label="Spend per day"
+            detail="In US dollars, for all runs together"
+            prefix="$"
+            step={1}
+            min={0}
+            max={1000}
             defaultValue={String(limits.dailyBudgetUsd)}
             error={errors?.dailyBudgetUsd?.[0]}
           />
-          <NumberField
-            name="dailyRunLimit"
-            label="Runs per day"
-            hint="How many runs can start in one day."
-            step="1"
-            min="1"
-            defaultValue={String(limits.dailyRunLimit)}
-            error={errors?.dailyRunLimit?.[0]}
-          />
-          <NumberField
+          <StepperRow name="dailyRunLimit" label="Runs per day" step={1} min={1} max={1000} defaultValue={String(limits.dailyRunLimit)} error={errors?.dailyRunLimit?.[0]} />
+          <StepperRow
             name="maxInFlight"
             label="Runs at the same time"
-            hint="More have to wait for one to finish."
-            step="1"
-            min="1"
+            detail="More wait for one to finish"
+            step={1}
+            min={1}
+            max={10}
             defaultValue={String(limits.maxInFlight)}
             error={errors?.maxInFlight?.[0]}
           />
-        </div>
+        </InsetGroup>
 
-        <div className="space-y-3">
-          <SwitchField
+        <InsetGroup title="While a run works">
+          <SwitchRow
             name="stepChecks"
             label="Check each step as it finishes"
-            hint="A quick automatic check after every step, so a run that drifts off track is flagged early."
+            detail="A quick automatic check after every step, so a run that drifts off track is flagged early."
             defaultChecked={limits.stepChecks}
           />
-          <SwitchField
+          <SwitchRow
             name="strictConnections"
-            label="Block connections the plan did not name"
-            hint="When off, the run only notes it. When on, the agent is stopped from using them."
+            label="Block servers the plan did not name"
+            detail="When off, the run only notes it. When on, the agent is stopped from using them."
             defaultChecked={limits.strictConnections}
           />
-        </div>
+        </InsetGroup>
 
-        <div className="space-y-1">
-          <Label htmlFor="deniedDomains" className="text-xs">
-            Blocked websites
-          </Label>
-          <p id="deniedDomains-hint" className="text-xs text-muted-foreground">
-            One per line, like example.com. The agent will not open pages on these websites.
-          </p>
-          <Textarea
-            id="deniedDomains"
-            name="deniedDomains"
-            rows={4}
-            placeholder="None yet. For example: pastebin.com" // an example that reads as one, not as a saved value
-            defaultValue={limits.deniedDomains.join("\n")}
-            aria-invalid={Boolean(errors?.deniedDomains)}
-            aria-describedby={errors?.deniedDomains ? "deniedDomains-error" : "deniedDomains-hint"}
-          />
-          {errors?.deniedDomains && <FieldError id="deniedDomains-error" text={errors.deniedDomains[0]} />}
-        </div>
+        <InsetGroup
+          title="Blocked websites"
+          footer={
+            errors?.deniedDomains ? (
+              <p id="deniedDomains-error" role="alert" className="text-crimson">
+                {errors.deniedDomains[0]}
+              </p>
+            ) : (
+              "One per line, like example.com. The agent will not open pages on these websites."
+            )
+          }
+        >
+          <li className="focus-within:shadow-[inset_0_0_0_2px_var(--ring)]">
+            <textarea
+              id="deniedDomains"
+              name="deniedDomains"
+              aria-label="Blocked websites"
+              rows={3}
+              placeholder="None yet. For example: pastebin.com"
+              defaultValue={limits.deniedDomains.join("\n")}
+              aria-invalid={Boolean(errors?.deniedDomains)}
+              aria-describedby={errors?.deniedDomains ? "deniedDomains-error" : undefined}
+              className="block min-h-24 w-full resize-y bg-transparent px-4 py-3 outline-none placeholder:text-slate/70 aria-invalid:text-crimson"
+            />
+          </li>
+        </InsetGroup>
       </fieldset>
 
       {state.error && (
-        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="px-4 text-[13px] text-crimson">
           {state.error}
         </p>
       )}
       {canEdit ? (
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending && <LoaderCircle className="size-3.5 animate-spin" />}
-          {pending ? "Saving..." : "Save limits"}
-        </Button>
+        <div className="flex justify-end">
+          <Button type="submit" size="lg" disabled={pending} className="px-5">
+            {pending && <LoaderCircle className="size-3.5 animate-spin" />}
+            {pending ? "Saving..." : "Save limits"}
+          </Button>
+        </div>
       ) : (
-        <p className="text-xs text-muted-foreground">Only an owner or an admin can change the limits.</p>
+        <p className="px-4 text-[13px] text-slate">Only an owner or an admin can change the limits.</p>
       )}
     </form>
   );
 }
 
-function NumberField({
+function StepperRow({
   name,
   label,
-  hint,
+  detail,
   error,
-  ...input
+  ...stepper
 }: {
   name: string;
   label: string;
-  hint: string;
+  detail?: string;
   error?: string;
-  step: string;
-  min: string;
+  prefix?: string;
+  step: number;
+  min: number;
+  max: number;
   defaultValue: string;
 }) {
   return (
-    <div className="space-y-1">
-      <Label htmlFor={name} className="text-xs">
-        {label}
-      </Label>
-      <Input
-        id={name}
-        name={name}
-        type="number"
-        inputMode="decimal"
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? `${name}-error` : `${name}-hint`}
-        {...input}
-      />
-      {error ? (
-        <FieldError id={`${name}-error`} text={error} />
-      ) : (
-        <p id={`${name}-hint`} className="text-xs text-muted-foreground">
-          {hint}
-        </p>
-      )}
-    </div>
+    <li className={rowLine()}>
+      <div className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <label htmlFor={name} className="block">
+            {label}
+          </label>
+          {/* the error takes the place of the explanation, where the eye already is */}
+          {error ? (
+            <p id={`${name}-error`} role="alert" className="text-[13px] text-crimson">
+              {error}
+            </p>
+          ) : (
+            detail && <p className="text-[13px] tracking-[0.01em] text-slate">{detail}</p>
+          )}
+        </div>
+        <Stepper id={name} name={name} label={label} invalid={Boolean(error)} describedBy={error ? `${name}-error` : undefined} {...stepper} />
+      </div>
+    </li>
   );
 }
 
-function SwitchField({ name, label, hint, defaultChecked }: { name: string; label: string; hint: string; defaultChecked: boolean }) {
+function SwitchRow({ name, label, detail, defaultChecked }: { name: string; label: string; detail: string; defaultChecked: boolean }) {
   return (
-    // the label wraps the switch, so the words are part of the click target and name it for a screen reader
-    <label className="flex cursor-pointer items-start gap-3">
-      <Switch name={name} defaultChecked={defaultChecked} className="mt-0.5 data-checked:bg-emerald-700" />
-      <span className="space-y-0.5">
-        <span className="block text-sm">{label}</span>
-        <span className="block text-xs text-muted-foreground">{hint}</span>
-      </span>
-    </label>
-  );
-}
-
-function FieldError({ id, text }: { id: string; text: string }) {
-  return (
-    <p id={id} role="alert" className="text-xs text-red-600 dark:text-red-400">
-      {text}
-    </p>
+    <li className={rowLine()}>
+      {/* the label wraps the switch, so the words are part of the click target and name it for a screen reader */}
+      <label className="flex min-h-[56px] cursor-pointer items-center gap-3 px-4 py-2.5">
+        <span className="min-w-0 flex-1">
+          <span className="block">{label}</span>
+          <span className="block text-[13px] tracking-[0.01em] text-slate">{detail}</span>
+        </span>
+        <Switch name={name} defaultChecked={defaultChecked} className="shrink-0 data-checked:bg-fern" />
+      </label>
+    </li>
   );
 }
