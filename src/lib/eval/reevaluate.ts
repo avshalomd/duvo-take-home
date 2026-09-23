@@ -1,9 +1,10 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { AutomationTemplate } from "@/contracts/automation";
-import type { EvaluateInput, ReevaluateRun, Verdict } from "@/contracts/eval";
+import { Verdict as VerdictSchema, type EvaluateInput, type ReevaluateRun, type Verdict } from "@/contracts/eval";
 import type { Run, RunEvent } from "@/contracts/run";
 import { db, schema } from "@/db";
 import { instructionsOf } from "@/lib/agent/follow-up";
+import { LlmError } from "@/lib/llm/errors";
 import { evaluateRun } from "./evaluate";
 import { templateOf, toEvaluateInput, toEvents, toFiles, toRun } from "./run-rows";
 
@@ -18,6 +19,7 @@ export type LoadedRun = {
   events: RunEvent[];
   files: { name: string; content: string }[];
   template?: AutomationTemplate | null; // the saved automation the run followed, while it still has the run's version
+  verdict?: Verdict | null; // the verdict stored now, kept when the re-check cannot reach the judge
 };
 export type ReevaluateDeps = {
   load: (runId: string) => Promise<LoadedRun | null>;
@@ -31,6 +33,15 @@ export async function reevaluate(runId: string, deps: ReevaluateDeps): Promise<V
   const loaded = await deps.load(runId);
   if (!loaded) throw new Error(`No run ${runId} to evaluate.`); // names the run: the caller is a route handler
   const verdict = await deps.evaluate({ ...toEvaluateInput(loaded.run, loaded.events, loaded.files), template: loaded.template ?? null });
+  if (verdict.verdict === "unknown") {
+    // The judge or the reviewer could not be reached, which says nothing new about the run (Q196): a verdict already
+    // stored stays, and the person is told the re-check failed instead of seeing a pass turn into "not checked".
+    const earlier = loaded.verdict;
+    if (!earlier || earlier.verdict === "unknown") await deps.save(runId, verdict); // nothing better to keep: the new reason
+    const why = verdict.reasons.at(-1) ?? "the checker could not be reached";
+    const stands = earlier && earlier.verdict !== "unknown" ? " The earlier result stands." : "";
+    throw new LlmError(`The check could not be run again (${why}).${stands}`, "unavailable"); // shown as it is
+  }
   await deps.save(runId, verdict);
   return verdict;
 }
@@ -53,7 +64,14 @@ export async function loadRun(runId: string): Promise<LoadedRun | null> {
   // column"); the thread's first instructions plus every change since are rebuilt by the engine's own function, so
   // the two can never disagree. For any other run instructionsOf() returns its prompt as it is.
   const prompt = row.workspaceId ? await instructionsOf(row, row.workspaceId) : row.prompt;
-  return { run: { ...toRun(row), prompt }, events: toEvents(eventRows), files: toFiles(fileRows), template: templateOf(row, automation) };
+  const stored = VerdictSchema.safeParse(row.verdict); // jsonb is typed only at compile time
+  return {
+    run: { ...toRun(row), prompt },
+    events: toEvents(eventRows),
+    files: toFiles(fileRows),
+    template: templateOf(row, automation),
+    verdict: stored.success ? stored.data : null,
+  };
 }
 
 export async function saveVerdict(runId: string, verdict: Verdict): Promise<void> {

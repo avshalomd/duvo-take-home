@@ -3,22 +3,23 @@
 import { LoaderCircle, RotateCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { startRunAction } from "@/app/(app)/actions";
+import { runAgainAction } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
 
-// "Run again": the same brief as a new run, which then opens. Labelled, never an icon alone (Q101).
-export function RunAgainButton({ prompt, prominent }: { prompt: string; prominent?: boolean }) {
+// "Run again": the same brief as a new run, which then opens. Labelled, never an icon alone (Q101). It sends the run's
+// id only: the server reads the brief, so a follow-up runs its whole thread again, not its last change.
+export function RunAgainButton({ runId, prominent }: { runId: string; prominent?: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   function again() {
     const data = new FormData();
-    data.set("prompt", prompt);
+    data.set("runId", runId);
     start(async () => {
-      const result = await startRunAction({}, data);
+      const result = await runAgainAction({}, data);
       if (result.startedId) router.push(`/?run=${result.startedId}`);
-      else setError(result.error ?? result.fieldErrors?.prompt?.[0] ?? "The run could not start");
+      else setError(result.error ?? "The run could not start");
     });
   }
 

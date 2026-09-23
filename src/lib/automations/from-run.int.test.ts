@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { automations, runs } from "@/db/schema";
 import type { AutomationDraft } from "@/contracts/automation";
+import { followUpInstructions } from "@/lib/agent/follow-up-prompt";
 import { draftFromRun } from "./from-run";
 
 const WS = "int-automations-draft";
@@ -46,6 +47,24 @@ describe.skipIf(!process.env.DATABASE_URL)("draftFromRun (Q119: one draft per pr
     const second = await draftFromRun(ctx, runId, drafter);
     expect(second.id).toBe(first.id);
     expect(calls).toBe(1);
+  });
+
+  // A follow-up's own prompt is only the change: "Make the bars horizontal" drafted an automation of that alone.
+  it("drafts from a follow-up's whole instructions: the first brief and the change, not the change alone", async () => {
+    const [parent] = await db
+      .insert(runs)
+      .values({ workspaceId: WS, prompt: "[int] Chart the five largest EU countries by population", status: "succeeded", model: "int-test" })
+      .returning({ id: runs.id });
+    const [followUp] = await db
+      .insert(runs)
+      .values({ workspaceId: WS, prompt: "Make the bars horizontal", status: "succeeded", model: "int-test", purpose: "followup", parentRunId: parent.id })
+      .returning({ id: runs.id });
+    const seen: string[] = [];
+    await draftFromRun(ctx, followUp.id, async (run) => {
+      seen.push(run.prompt);
+      return draft("int-thread");
+    });
+    expect(seen).toEqual([followUpInstructions("[int] Chart the five largest EU countries by population", "Make the bars horizontal")]);
   });
 
   it("keeps one draft when a reload starts a second one while the first is still being written", async () => {

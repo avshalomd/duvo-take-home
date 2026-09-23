@@ -64,3 +64,14 @@ describe("SYSTEM_PROMPT: output files", () => {
     expect(SYSTEM_PROMPT.length).toBeLessThan(3200);
   });
 });
+
+// Local run 6455137d: a step note read "WebFetch blocked ... no shell/curl tool" and the report named "the WebFetch
+// tool". Notes and the report reach the glance view, which is read by office workers, not engineers.
+describe("SYSTEM_PROMPT: notes and the report in plain words", () => {
+  it("says step notes and the report are for an office worker: no tool names, no shell or curl, no paths", () => {
+    expect(SYSTEM_PROMPT).toMatch(/step notes and the report are read by an office worker/i);
+    expect(SYSTEM_PROMPT).toMatch(/no tool names/i);
+    expect(SYSTEM_PROMPT).toMatch(/no shell or curl/i);
+    expect(SYSTEM_PROMPT).toMatch(/no file paths beyond a file's own name/i);
+  });
+});

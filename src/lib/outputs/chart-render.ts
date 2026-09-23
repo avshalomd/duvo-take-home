@@ -15,6 +15,20 @@ function textWidth(item: { fontSize?: number; limit?: number }, text: unknown): 
   return item.limit && item.limit > 0 ? Math.min(width, item.limit) : width;
 }
 
+/** How many rows of inline data the spec draws from, or null when its data comes from elsewhere. */
+function rowsOf(spec: TopLevelSpec): number | null {
+  const data = "data" in spec ? spec.data : null;
+  return data && "values" in data && Array.isArray(data.values) ? data.values.length : null;
+}
+
+/**
+ * The row count as a data-rows attribute on the <svg> element: the file is all the chart check sees, and axes and a
+ * title with no mark in them read as a chart unless it knows there were rows to draw.
+ */
+function withRows(svg: string, rows: number | null): string {
+  return rows === null ? svg : svg.replace(/^<svg\b/, `<svg data-rows="${rows}"`);
+}
+
 /**
  * A Vega-Lite spec rendered to an SVG string, headlessly: Vega-Lite compiles to a Vega spec, and a Vega View with
  * renderer "none" draws nothing on screen but can still export SVG. No canvas and no browser, so it runs in a
@@ -28,7 +42,7 @@ export async function renderChartSvg(spec: TopLevelSpec): Promise<string> {
   (vega as unknown as { textMetrics: TextMetrics }).textMetrics.width = textWidth;
   const view = new vega.View(vega.parse(compile(spec).spec), { renderer: "none" });
   try {
-    return styleSvg(await view.toSVG()); // the colours for light and dark ride inside the file (Q141)
+    return withRows(styleSvg(await view.toSVG()), rowsOf(spec)); // the colours for light and dark ride inside the file (Q141)
   } finally {
     view.finalize(); // releases the view's timers and listeners; one view per chart
   }

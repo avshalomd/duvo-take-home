@@ -11,12 +11,14 @@ import { resumeOptions } from "./session";
 import { readSdkTotals } from "./stopped-cost";
 
 type RunRow = typeof runs.$inferSelect;
+// Only the fields the thread is walked by, so the contract's Run (a page's, "Make an automation"'s) and a row both fit.
+type ThreadLink = { prompt: string; purpose?: string | null; parentRunId?: string | null };
 const MAX_THREAD = 20; // a thread of follow-ups longer than this is cut: the oldest changes are the least relevant
 
 /** The instructions a run answers: its own prompt, or for a follow-up the thread's first prompt and every change since. */
-export async function instructionsOf(run: RunRow, workspaceId: string): Promise<string> {
+export async function instructionsOf(run: ThreadLink, workspaceId: string): Promise<string> {
   const changes: string[] = [];
-  let current = run;
+  let current: ThreadLink = run;
   for (let hops = 0; current.purpose === "followup" && current.parentRunId && hops < MAX_THREAD; hops++) {
     changes.unshift(current.prompt);
     const [parent] = await db.select().from(runs).where(and(eq(runs.id, current.parentRunId), eq(runs.workspaceId, workspaceId)));

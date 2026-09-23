@@ -104,6 +104,16 @@ describe.skipIf(!process.env.DATABASE_URL)("reevaluateRun's database path", () =
     expect(row.verdict).toEqual(verdict);
   });
 
+  // Q196: a re-check that could not reach the judge must not overwrite the verdict already stored.
+  it("loads the verdict already stored, and keeps it when the judge cannot be reached", async () => {
+    await saveVerdict(plainRun, verdict);
+    expect((await loadRun(plainRun))?.verdict).toEqual(verdict);
+    const unreachable: Verdict = { ...verdict, verdict: "unknown", reasons: ["The judge was unavailable: HTTP 429"], decidedBy: "nobody" };
+    await expect(reevaluate(plainRun, { load: loadRun, evaluate: async () => unreachable, save: saveVerdict })).rejects.toThrow(/earlier result stands/);
+    const [row] = await db.select({ verdict: schema.runs.verdict }).from(schema.runs).where(eq(schema.runs.id, plainRun));
+    expect(row.verdict).toEqual(verdict);
+  });
+
   it("says which run is missing when the id is not in the database", async () => {
     const missing = "00000000-0000-4000-8000-000000000000";
     const evaluate = vi.fn(async () => verdict);

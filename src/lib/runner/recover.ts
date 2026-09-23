@@ -3,13 +3,16 @@ import { and, eq, inArray, isNotNull, isNull, lt, notInArray } from "drizzle-orm
 import { db, transaction } from "@/db";
 import { files, jobs, runEvents, runs } from "@/db/schema";
 import { STOPPED_BY_YOU } from "@/lib/runs/cancel-rule";
+import { runnerMode } from "./mode";
 import { IN_FLIGHT, isInFlight } from "./status";
 
-export const STALE_LOCK_MS = 10 * 60_000; // a run's wall clock is 4 min and its evaluation about 1: 10 min is a dead worker
+export const STALE_LOCK_MS = 10 * 60_000; // a worker's run has 6 min for the agent and under 1 for its evaluation
 export const MAX_ATTEMPTS = 2;
-// The same reasoning as a stale lock: an inline run cannot outlive its function (300 s on Vercel), so after 10 min
-// with no job it is dead. A queued or claimed run has a live job and is never touched by this rule.
-export const ABANDONED_AFTER_MS = STALE_LOCK_MS;
+// Inline or in the runner route a run lives inside one function call, which Vercel ends at 5 minutes whatever it is
+// doing: one still in flight after 6 is dead. With the worker there is no function limit, so the stale lock's 10
+// minutes stays. A queued or claimed run has a live job and is never touched by this rule.
+export const FUNCTION_RUN_DEAD_MS = 6 * 60_000;
+export const abandonedAfterMs = (mode: ReturnType<typeof runnerMode>): number => (mode === "queue" ? STALE_LOCK_MS : FUNCTION_RUN_DEAD_MS);
 
 type Recovered = { requeued: string[]; failed: string[]; cancelled: string[]; done: string[] };
 
@@ -72,14 +75,15 @@ export async function recoverStaleJobs(now: Date): Promise<Recovered> {
 }
 
 /**
- * Runs nobody will ever close: unfinished, older than 10 minutes, and with no job queued or running for them. That
- * is an inline run whose server restarted mid-run (after() died with it); a queued run waiting behind others has a
- * job, and a dead worker's run is recoverStaleJobs' case. With a workspace id it sweeps only that workspace: startRun
- * calls it that way on every start, so a stranded run never holds an in-flight slot even where nothing calls the
- * cron route (QA Q84). Returns the ids it closed.
+ * Runs nobody will ever close: unfinished, older than abandonedAfterMs (6 minutes inline or in the runner route, 10
+ * with the worker), and with no job queued or running for them. That is a run whose function Vercel ended, or whose
+ * server restarted mid-run (after() died with it); a queued run waiting behind others has a job, and a dead worker's
+ * run is recoverStaleJobs' case. With a workspace id it sweeps only that workspace: every start, a read of a run past
+ * the cutoff and Stop call it that way, so a stranded run never holds an in-flight slot, and closes while someone
+ * watches it, even where nothing calls the cron route (QA Q84). Returns the ids it closed.
  */
 export async function closeAbandonedRuns(now: Date, workspaceId?: string): Promise<string[]> {
-  const cutoff = new Date(now.getTime() - ABANDONED_AFTER_MS);
+  const cutoff = new Date(now.getTime() - abandonedAfterMs(runnerMode()));
   const live = db.select({ runId: jobs.runId }).from(jobs).where(inArray(jobs.status, ["queued", "running"]));
   const abandoned = and(
     inArray(runs.status, [...IN_FLIGHT]),
@@ -99,4 +103,17 @@ export async function closeAbandonedRuns(now: Date, workspaceId?: string): Promi
     .where(and(abandoned, isNull(runs.cancelRequestedAt)))
     .returning({ id: runs.id });
   return [...stopped, ...failed].map((r) => r.id);
+}
+
+/**
+ * The sweep for a run someone is watching (its page's stream or poll): once the run has been in flight longer than
+ * any function can hold it, its workspace is swept now instead of at the next start, so a stuck run closes in front
+ * of the person watching it. The age is checked here first, so reading a live run costs no write; with the worker,
+ * recoverStaleJobs closes its runs. Returns whether anything was closed, so the caller reads the run again.
+ */
+export async function sweepIfOverdue(workspaceId: string, run: { status: string; createdAt: string }, now = new Date()): Promise<boolean> {
+  const mode = runnerMode();
+  if (mode === "queue" || !isInFlight(run.status)) return false;
+  if (now.getTime() - Date.parse(run.createdAt) <= abandonedAfterMs(mode)) return false;
+  return (await closeAbandonedRuns(now, workspaceId)).length > 0;
 }

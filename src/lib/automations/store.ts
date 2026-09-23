@@ -24,7 +24,7 @@ import {
 import { RunStatus } from "@/contracts/run";
 import { listConnections } from "@/lib/connections/store";
 import { startRun } from "@/lib/runs/start";
-import { nextFreeCommand, toCommandName } from "./command";
+import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName } from "./command";
 import { missingConnections } from "./connections";
 import { AutomationError } from "./errors";
 import { outcomeOf } from "./outcome";
@@ -296,6 +296,7 @@ export const runCommand: RunCommand = async (ctx, parsed) => {
   }
   const input = parsed.input.trim();
   if (!input) throw new AutomationError(`Add the ${a.inputLabel.toLowerCase()} after the command, e.g. /${command} ${a.inputExample || "..."}`);
+  if (input.length > MAX_COMMAND_INPUT) throw new AutomationError(`Keep the ${a.inputLabel.toLowerCase()} under ${MAX_COMMAND_INPUT} characters.`);
   await refuseMissingConnections(ctx.workspaceId, a, `/${command}`);
   return startRun(ctx, {
     prompt: fillTemplate(a, input).prompt,

@@ -5,6 +5,7 @@ vi.mock("@/lib/runs/queries", () => ({ listRuns: vi.fn(async () => []) }));
 vi.mock("@/lib/runs/start", () => ({ startRun: vi.fn(async () => ({ id: "free-text-run" })) }));
 vi.mock("@/lib/automations/store", () => ({ runCommand: vi.fn(async () => ({ id: "command-run" })) }));
 
+import { StartRunInput } from "@/contracts/agent";
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { runCommand } from "@/lib/automations/store";
 import { AutomationError } from "@/lib/automations/errors";
@@ -93,5 +94,15 @@ describe("POST /api/runs (Q132)", () => {
   it("answers 401 without a session", async () => {
     vi.mocked(sessionFromHeaders).mockResolvedValue(null);
     expect((await json({ prompt: "Fetch the latest AI news" })).status).toBe(401);
+  });
+
+  // Q197: a command whose filled brief was over 4000 characters failed startRun's own validation, and the route
+  // answered 500 with an empty body.
+  it("answers any validation error with 400 and its plain words, never an empty 500", async () => {
+    const tooLong = StartRunInput.safeParse({ prompt: "x".repeat(4001) }).error!;
+    vi.mocked(runCommand).mockRejectedValueOnce(tooLong);
+    const res = await json({ prompt: `/news-digest ${"x".repeat(1900)}` });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Keep the instructions under 4000 characters" });
   });
 });

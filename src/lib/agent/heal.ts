@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { AgentLimits } from "@/contracts/agent";
 import type { Verdict } from "@/contracts/eval";
 
 // Auto-heal (his call, 2026-09-23): when the evaluator fails a run's result, the same agent session gets the findings
@@ -8,13 +7,22 @@ import type { Verdict } from "@/contracts/eval";
 
 export const MIN_HEAL_MS = 60_000; // a shorter attempt would be cut off half way by the wall clock
 
+// Inline or in the runner route, a run lives inside one function call, and Vercel ends that call at 300 s whatever it
+// is doing: a run still evaluating then stayed "evaluating" for ever. So everything that follows the agent's last
+// attempt is boxed in time, and the agent gets what is left of the 300 s:
+//   300 s (the function) - 50 s (the evaluation) - 10 s (step checks still out) - 10 s (files and closing writes) = 230 s
+export const FUNCTION_LIMIT_MS = 300_000; // the runner route's maxDuration
+export const EVAL_MAX_MS = 50_000; // the judge (up to 3 routes) and the reviewer; later, the run says "not checked"
+export const SETTLE_MAX_MS = 10_000; // a step check still waiting on Jev after this is dropped
+export const CLOSING_MS = 10_000; // storing the files, the SDK's totals for a run closed early, the closing update
+
 /**
- * How long a run may spend on the agent, all attempts together. Inline or in the runner route, the run lives inside
- * one function call (300 s on Vercel), so every attempt shares the one wall clock. In the worker there is no function limit, but a
- * job locked for 10 minutes is taken for dead (recover.ts): 6 minutes leaves room for the evaluations.
+ * How long a run may spend on the agent, all attempts together. Inline or in the runner route, every attempt shares
+ * the one function call's 230 s (above). In the worker there is no function limit, but a job locked for 10 minutes
+ * is taken for dead (recover.ts): 6 minutes leaves room for the evaluations.
  */
 export function runBudgetMs(mode: "inline" | "queue" | "route"): number {
-  return mode === "queue" ? 6 * 60_000 : AgentLimits.wallClockMs;
+  return mode === "queue" ? 6 * 60_000 : FUNCTION_LIMIT_MS - EVAL_MAX_MS - SETTLE_MAX_MS - CLOSING_MS;
 }
 
 /** Whether a run the evaluator failed gets another attempt. */
@@ -57,7 +65,9 @@ export function noProgress(current: AttemptFingerprint, earlier: AttemptFingerpr
 
 /**
  * The prompt of a heal attempt. feedbackForAgent already says what failed and ends with what to do, so it is used as
- * it is (QA Q149); only what the session does not know from it is added: where the files are, and the plan tool.
+ * it is (QA Q149); only what the session does not know from it is added: where the files are, the plan tool, and
+ * what the report must be. The attempt's last message becomes the run's report - the one the person reads, the
+ * evaluator judges and a follow-up or "Make an automation" builds on - so it is the whole task's, not the fix's.
  */
 export function healPrompt(feedback: string): string {
   return [
@@ -66,5 +76,9 @@ export function healPrompt(feedback: string): string {
     "Your files are still in your working directory: write each one you change back under the same name. Keep your " +
       "plan as it is and do not call mcp__plan__set_plan again: mark the steps you redo with mcp__plan__update_step " +
       "(running, then done with a note of what you fixed), and check the files yourself before you finish.",
+    "",
+    "Then end with your report for the person on the whole task as it now stands - what you did, what the files hold " +
+      "and anything you could not do - written as your answer to the task, not a note of the fix. At most one closing " +
+      "sentence may say what the check made you fix.",
   ].join("\n");
 }

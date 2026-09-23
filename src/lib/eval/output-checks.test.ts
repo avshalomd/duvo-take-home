@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { TopLevelSpec } from "vega-lite";
 import { describe, expect, it } from "vitest";
 import type { EvaluateInput } from "@/contracts/eval";
 import { renderChartSvg } from "@/lib/outputs/chart-render";
@@ -60,6 +61,27 @@ describe("the chart check", () => {
     const got = check([{ name: "prices.svg", content: `<svg xmlns="http://www.w3.org/2000/svg"><title>Prices</title><rect width="10" height="10"/></svg>` }], "chart");
     expect(got?.ok).toBe(false);
     expect(got?.detail).toMatch(/nothing drawn/);
+  });
+
+  // A field named "revenue.usd" drew axes, a legend and a title and no data (Vega-Lite read it as a nested path), and
+  // the check passed it: the labels counted as content, and an empty mark container as a mark.
+  it("fails a chart drawn from data rows with no mark in it, and says how many rows it had", async () => {
+    const values = [{ "region.name": "North", "revenue.usd": 10 }, { "region.name": "South", "revenue.usd": 20 }];
+    const unescaped = (mark: "arc" | "bar") =>
+      ({
+        title: "Revenue",
+        data: { values },
+        mark,
+        encoding:
+          mark === "arc"
+            ? { theta: { field: "revenue.usd", type: "quantitative" }, color: { field: "region.name", type: "nominal" } }
+            : { x: { field: "region.name", type: "nominal" }, y: { field: "revenue.usd", type: "quantitative" } },
+      }) as TopLevelSpec;
+    for (const mark of ["arc", "bar"] as const) {
+      const got = check([{ name: "revenue.svg", content: await renderChartSvg(unescaped(mark)) }], "chart");
+      expect(got?.ok, `${mark}: ${got?.detail}`).toBe(false);
+      expect(got?.detail).toBe("revenue.svg: no mark drawn from its 2 data rows");
+    }
   });
 
   it("accepts a standard <title> and plain text labels as a chart's title and content", () => {

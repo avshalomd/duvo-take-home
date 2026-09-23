@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, runs } from "@/db/schema";
 import type { CancelRun } from "@/contracts/runner";
+import { closeAbandonedRuns } from "@/lib/runner/recover";
 import { IN_FLIGHT } from "@/lib/runner/status";
 import { cancelDecision, STOPPED_BY_YOU } from "./cancel-rule";
 
@@ -22,7 +23,8 @@ const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 /**
  * Stop a run of this workspace. A queued run is closed here and now, because no loop is watching it yet; a running
  * or evaluating one gets cancel_requested_at, which its loop reads every 2 s before it aborts the agent and closes
- * the run as cancelled with the files written so far.
+ * the run as cancelled with the files written so far. One whose loop is gone (past every runner's limit) is closed
+ * as cancelled here.
  */
 export const cancelRun: CancelRun = async (workspaceId, runId) => {
   if (!isUuid(runId)) throw new CancelError(NOT_FOUND, 404);
@@ -51,4 +53,7 @@ export const cancelRun: CancelRun = async (workspaceId, runId) => {
     .update(runs)
     .set({ cancelRequestedAt: now })
     .where(and(eq(runs.id, runId), inArray(runs.status, [...IN_FLIGHT]), isNull(runs.cancelRequestedAt))); // the first press counts
+  // A run whose function was ended has no loop left to read that request: once it is past every runner's limit, the
+  // sweep closes it here, as stopped (the request above is how it ended).
+  await closeAbandonedRuns(now, workspaceId);
 };

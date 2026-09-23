@@ -1,5 +1,6 @@
 import "server-only";
 import type { Automation, AutomationDraft } from "@/contracts/automation";
+import { instructionsOf } from "@/lib/agent/follow-up";
 import { listConnections } from "@/lib/connections/store";
 import { getFile, getRun } from "@/lib/runs/queries";
 import { usedConnections } from "./connections";
@@ -38,7 +39,9 @@ export async function draftFromRun(
     }),
   );
 
-  const drafted = await draft({ prompt: found.run.prompt, plan, report: found.run.report, files });
+  // A follow-up's own prompt is only its change ("Make the bars horizontal"): the draft needs the whole thread's.
+  const prompt = await instructionsOf(found.run, ctx.workspaceId);
+  const drafted = await draft({ prompt, plan, report: found.run.report, files });
   // checked again after the model: a reload that started while the first press was drafting ends here, on its draft
   const meanwhile = await recentDraftFromRun(ctx.workspaceId, runId, since);
   if (meanwhile) return meanwhile;

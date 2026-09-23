@@ -1,15 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { AgentLimits } from "@/contracts/agent";
 import type { Verdict } from "@/contracts/eval";
-import { attemptFingerprint, healPrompt, MIN_HEAL_MS, noProgress, runBudgetMs, shouldHeal } from "./heal";
+import { attemptFingerprint, CLOSING_MS, EVAL_MAX_MS, FUNCTION_LIMIT_MS, healPrompt, MIN_HEAL_MS, noProgress, runBudgetMs, SETTLE_MAX_MS, shouldHeal } from "./heal";
 
 describe("runBudgetMs", () => {
-  it("inline, keeps every attempt inside the one wall clock the function allows", () => {
-    expect(runBudgetMs("inline")).toBe(AgentLimits.wallClockMs);
+  // Vercel ends the function at 300 s whatever it is doing: a run still evaluating then stayed "evaluating" for ever.
+  it("inline, leaves room in the function's 300 s for the evaluation, the step checks and the closing writes: 230 s", () => {
+    expect(runBudgetMs("inline")).toBe(230_000);
+    expect(runBudgetMs("inline") + EVAL_MAX_MS + SETTLE_MAX_MS + CLOSING_MS).toBe(FUNCTION_LIMIT_MS);
+    expect(FUNCTION_LIMIT_MS).toBe(300_000); // the runner route's maxDuration
   });
 
   it("in the runner route, the same: the run lives inside one function call there too", () => {
-    expect(runBudgetMs("route")).toBe(AgentLimits.wallClockMs);
+    expect(runBudgetMs("route")).toBe(230_000);
+  });
+
+  it("boxes the evaluation at 50 s and the wait for step checks at 10 s", () => {
+    expect(EVAL_MAX_MS).toBe(50_000);
+    expect(SETTLE_MAX_MS).toBe(10_000);
+  });
+
+  it("still lets a fix attempt start with a minute left, under the agent's own wall clock", () => {
+    expect(MIN_HEAL_MS).toBe(60_000);
+    expect(runBudgetMs("route")).toBeLessThanOrEqual(AgentLimits.wallClockMs);
   });
 
   it("in the worker, allows more but stays under the 10-minute stale lock, so a healing run is never taken for dead", () => {
@@ -64,17 +77,29 @@ describe("healPrompt", () => {
     expect(healPrompt(feedback)).toMatch(/keep your plan.*set_plan/i);
   });
 
-  // Q149: feedbackForAgent already opens with its lead and closes with "report what you changed".
+  // Q149: feedbackForAgent already opens with its lead and closes with what to do with the files.
   it("uses the feedback as it is, framed once: no second lead or closing line of its own", () => {
     const real = [
       "An automatic check of the result found this to fix:",
       "- In output.csv, row 3 has 3 values but the header has 2: put every value that contains a comma in double quotes.",
-      "Fix the files in place, keep what was already right, and report what you changed.",
+      "Fix the files in place and keep what was already right.",
     ].join("\n");
     const p = healPrompt(real);
     expect(p.startsWith(real)).toBe(true);
     expect(p.match(/automatic check/gi)).toHaveLength(1);
     expect(p.match(/report/gi)).toHaveLength(1);
+  });
+
+  // The run's report is the fix attempt's last message: a healed run's report read "**What I changed:** Only Spain's
+  // languages field..." (run 15f8b99d), and that note was judged, followed up and made into an automation.
+  it("asks for the report on the whole task as it now stands, for the person, not a note of the fix", () => {
+    const p = healPrompt(feedback);
+    expect(p).toMatch(/report for the person on the whole task as it now stands/i);
+    expect(p).toMatch(/not a note of the fix/i);
+  });
+
+  it("allows at most one closing sentence on what the check made it fix", () => {
+    expect(healPrompt(feedback)).toMatch(/at most one closing sentence may say what the check made you fix/i);
   });
 });
 

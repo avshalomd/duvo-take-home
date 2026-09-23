@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Verdict } from "@/contracts/eval";
 import type { Run, RunEvent } from "@/contracts/run";
+import { LlmError } from "@/lib/llm/errors";
 import { reevaluate, toEvaluateInput } from "./reevaluate";
 
 const run: Run = {
@@ -58,5 +59,22 @@ describe("reevaluate", () => {
     const deps = { load: vi.fn(async () => null), evaluate: vi.fn(async () => verdict), save: vi.fn(async () => {}) };
     await expect(reevaluate("nope", deps)).rejects.toThrow(/nope/);
     expect(deps.evaluate).not.toHaveBeenCalled();
+  });
+
+  // Q196: "Check the result again" with the model down turned a stored pass into "Done - not checked", with no word.
+  const unreachable: Verdict = { ...verdict, verdict: "unknown", reasons: ["The judge was unavailable: HTTP 429"], decidedBy: "nobody" };
+
+  it("keeps the earlier verdict when the judge cannot be reached, and says in plain words the re-check failed", async () => {
+    const deps = { load: vi.fn(async () => ({ run, events, files, verdict })), evaluate: vi.fn(async () => unreachable), save: vi.fn(async () => {}) };
+    const failed = reevaluate("run-1", deps);
+    await expect(failed).rejects.toThrow("The check could not be run again (The judge was unavailable: HTTP 429). The earlier result stands.");
+    await expect(failed).rejects.toBeInstanceOf(LlmError); // an error written for the person: the action shows it as it is
+    expect(deps.save).not.toHaveBeenCalled();
+  });
+
+  it("stores 'not checked' when there was no earlier result, and still says the re-check failed", async () => {
+    const deps = { load: vi.fn(async () => ({ run, events, files, verdict: null })), evaluate: vi.fn(async () => unreachable), save: vi.fn(async () => {}) };
+    await expect(reevaluate("run-1", deps)).rejects.toThrow(/could not be run again/);
+    expect(deps.save).toHaveBeenCalledWith("run-1", unreachable);
   });
 });

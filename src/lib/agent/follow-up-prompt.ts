@@ -65,6 +65,10 @@ export function carryOverPrompt(parent: ParentRun, change: string): string {
     "Set a plan for the change first. Read the files you need, make the change, and write each changed file back " +
       "under the same name unless the user asks for a new file. Leave the other files as they are.",
     ...(found.length ? ["Fix what it found as part of this change, and check the files yourself before you finish."] : []),
+    // This run's report stands for the whole thread: it is judged against every instruction so far, and it is what
+    // "Make an automation" and the next change read.
+    "End with your report for the person on the whole task as it now stands - the earlier report brought up to date, " +
+      "not only this change. At most one closing sentence may say what this change did.",
     "",
     "The user now asks for this change:",
     change,

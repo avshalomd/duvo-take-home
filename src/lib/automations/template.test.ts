@@ -24,6 +24,15 @@ describe("fillTemplate", () => {
     expect(fillTemplate(twice, "Acme").prompt).toBe("Compare Acme with the market; name Acme in the title.");
   });
 
+  // replaceAll with a string reads $&, $$ and $' in the replacement as patterns: "/audit Johnson $& Sons" kept "{input}"
+  it("puts an input with $ patterns in as typed, in the prompt and in the steps", () => {
+    const typed = "Johnson $& Sons $$ $' $` $1";
+    const { prompt, systemAddendum } = fillTemplate(audit, typed);
+    expect(prompt).toBe(`Audit ${typed}: ownership, filings and the news of the last 90 days. Write audit.md.`);
+    expect(systemAddendum).toContain(`1. Search the web for ${typed}`);
+    expect(systemAddendum).not.toContain("{input}");
+  });
+
   it("names the automation and its input in the system addendum", () => {
     const { systemAddendum } = fillTemplate(audit, "Apple Inc.");
     expect(systemAddendum).toContain('This run follows the saved automation "Company audit".');

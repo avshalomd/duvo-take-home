@@ -74,6 +74,7 @@ export const getRun: GetRun = async (workspaceId, id) => {
 
 export const getFile: GetFile = async (workspaceId, runId, name) => {
   if (!isUuid(runId)) return null;
+  if (name.includes("\0")) return null; // Postgres text cannot hold a NUL, so no stored name has one: it threw (Q200)
   const [owner] = await db.select({ id: runs.id }).from(runs).where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
   if (!owner) return null;
   const [row] = await db.select().from(files).where(and(eq(files.runId, runId), eq(files.name, name)));

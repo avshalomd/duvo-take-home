@@ -17,11 +17,17 @@ export function chartCheck(file: File): Check {
   const title = titleOf(svg);
   if (!title.text) problems.push("no title");
   // Marks are the data vega draws, each labelled role="graphics-symbol" (a bar, a point, a slice). The title and the
-  // axes carry the same role, so they are left out: a chart of axes and a title has drawn no data.
-  const marks = [...svg.matchAll(/<[^>]*\brole="graphics-symbol"[^>]*>/g)].filter((m) => !/aria-roledescription="(title|axis|legend)"/.test(m[0])).length;
+  // axes carry the same role, so they are left out: a chart of axes and a title has drawn no data. So is a mark
+  // container: vega gives an empty one that role too, and an empty slice layer counted as a slice.
+  const marks = [...svg.matchAll(/<[^>]*\brole="graphics-symbol"[^>]*>/g)].filter(
+    (m) => !/aria-roledescription="(title|axis|legend|[^"]*mark container)"/.test(m[0]),
+  ).length;
   // Text labels are the axis labels and legends; a title drawn as text is not a label.
   const labels = [...svg.matchAll(TEXT)].filter((m) => textOf(m[1])).length - (title.drawn ? 1 : 0);
-  if (!broken && marks + labels <= 0) problems.push("nothing drawn: no mark and no text label");
+  // The chart tool writes how many rows it drew from (chart-render.ts): with rows, axes and a title are not enough.
+  const rows = Number(svg.match(/<svg\b[^>]*\sdata-rows="(\d+)"/)?.[1] ?? 0);
+  if (!broken && rows > 0 && marks === 0) problems.push(`no mark drawn from its ${rows} data ${rows === 1 ? "row" : "rows"}`);
+  else if (!broken && marks + labels <= 0) problems.push("nothing drawn: no mark and no text label");
   return {
     id: "chart",
     label: `${file.name} is a readable chart`,

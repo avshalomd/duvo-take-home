@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { files, jobs, runEvents, runs } from "@/db/schema";
 import { enqueueRun } from "./enqueue";
 import { claimJob, finishJob } from "./jobs";
-import { closeAbandonedRuns, recoverStaleJobs } from "./recover";
+import { closeAbandonedRuns, recoverStaleJobs, sweepIfOverdue } from "./recover";
 
 const WS = `int-engine-jobs-${process.pid}`; // per process: other worktrees run these tests against the same database
 const Y2K = Date.parse("2000-01-01T00:00:00Z");
@@ -163,7 +163,32 @@ describe.skipIf(!process.env.DATABASE_URL)("stale-lock recovery", () => {
 
 describe.skipIf(!process.env.DATABASE_URL)("abandoned runs", () => {
   afterAll(cleanup);
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
   const now = t(45);
+
+  // Inline or in the runner route a run lives in one function call, which Vercel ends at 5 minutes: a run still in
+  // flight after 6 is dead, and waiting 10 left it "evaluating" in front of the person all that time.
+  it("in the runner route, closes a run in flight for over 6 minutes: its function was ended at 5", async () => {
+    vi.stubEnv("RUNNER", "route");
+    const runId = await makeRun("outlived its function", { status: "evaluating", createdAt: t(38) }); // 7 minutes before now
+    expect(await closeAbandonedRuns(now, WS)).toContain(runId);
+    expect((await runRow(runId)).status).toBe("failed");
+  });
+
+  it("inline, the same 6 minutes: the run lives in the request's function", async () => {
+    vi.stubEnv("RUNNER", "");
+    const runId = await makeRun("outlived its request", { status: "running", createdAt: t(38) });
+    expect(await closeAbandonedRuns(now, WS)).toContain(runId);
+  });
+
+  it("with the worker, leaves a run in flight for 7 minutes alone: a worker has no function limit", async () => {
+    vi.stubEnv("RUNNER", "queue");
+    const runId = await makeRun("a worker's long run", { status: "running", createdAt: t(38) });
+    expect(await closeAbandonedRuns(now, WS)).not.toContain(runId);
+    expect((await runRow(runId)).status).toBe("running");
+  });
 
   it("closes a run left running for over 10 minutes with no job (the inline server restarted)", async () => {
     const runId = await makeRun("abandoned", { status: "running", createdAt: t(30) }); // 15 minutes before now
@@ -190,5 +215,40 @@ describe.skipIf(!process.env.DATABASE_URL)("abandoned runs", () => {
     const runId = await makeRun("finished long ago", { status: "succeeded", createdAt: t(0) });
     expect(await closeAbandonedRuns(now, WS)).not.toContain(runId);
     expect((await runRow(runId)).status).toBe("succeeded");
+  });
+});
+
+// A stuck run closed only on the next start in its workspace: the person watching it saw "evaluating" for ever.
+describe.skipIf(!process.env.DATABASE_URL)("a watched run that has outlived every runner", () => {
+  afterAll(cleanup);
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  const now = t(45);
+  const seen = (createdAt: Date, status = "running") => ({ status, createdAt: createdAt.toISOString() });
+
+  it("is closed when it is read, with the rest of its workspace's abandoned runs", async () => {
+    vi.stubEnv("RUNNER", "route");
+    const watched = await makeRun("watched while stuck", { status: "evaluating", createdAt: t(38) });
+    const other = await makeRun("stuck beside it", { status: "running", createdAt: t(20) });
+    expect(await sweepIfOverdue(WS, seen(t(38), "evaluating"), now)).toBe(true);
+    expect((await runRow(watched)).status).toBe("failed");
+    expect((await runRow(other)).status).toBe("failed");
+  });
+
+  it("sweeps nothing while the watched run is young enough to be alive", async () => {
+    vi.stubEnv("RUNNER", "route");
+    const old = await makeRun("stuck, not watched", { status: "running", createdAt: t(20) });
+    expect(await sweepIfOverdue(WS, seen(t(42)), now)).toBe(false);
+    expect((await runRow(old)).status).toBe("running"); // no sweep ran: a young run's read costs no write
+  });
+
+  it("sweeps nothing for a finished run, or with the worker, whose own recovery closes its runs", async () => {
+    vi.stubEnv("RUNNER", "route");
+    expect(await sweepIfOverdue(WS, seen(t(0), "succeeded"), now)).toBe(false);
+    vi.stubEnv("RUNNER", "queue");
+    const old = await makeRun("a worker's run", { status: "running", createdAt: t(20) });
+    expect(await sweepIfOverdue(WS, seen(t(20)), now)).toBe(false);
+    expect((await runRow(old)).status).toBe("running");
   });
 });

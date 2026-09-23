@@ -11,7 +11,9 @@ import { CONFIDENT } from "./evaluate";
 // A fail's findings are faults; a pass with notes carried into "Ask for a change" has notes, and says so.
 const leadFor = (verdict: Verdict) =>
   verdict.verdict === "fail" ? "An automatic check of the result found this to fix:" : "An automatic check of the result noted:";
-const CLOSE = "Fix the files in place, keep what was already right, and report what you changed.";
+// No word on the report: the heal prompt and the follow-up prompt each say what theirs holds. "Report what you
+// changed" made a healed run's whole report a note of the fix (run 15f8b99d).
+const CLOSE = "Fix the files in place and keep what was already right.";
 const BUDGET = 1200; // characters: long enough for five or six exact findings, short enough to stay the agent's focus
 const ITEM_MAX = 400; // one long finding (a reviewer's essay) cannot crowd out the rest; the CSV quoting advice is ~370
 const MORE_ROOM = 60; // kept free for the line that counts what did not fit

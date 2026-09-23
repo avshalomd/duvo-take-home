@@ -4,13 +4,14 @@ import { afterAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { runs, workspaceSettings } from "@/db/schema";
-import { DEFAULT_LIMITS, checkBudget, getLimits, getUsage, updateLimits } from "./budget";
+import { DEFAULT_LIMITS, checkBudget, getLimits, getUsage, healBudgetStop, updateLimits } from "./budget";
 import { startOfUtcDay } from "./budget-rule";
 
 const WS = "int-settings-budget";
 const FRESH = "int-settings-budget-fresh";
 const OTHER = "int-settings-budget-other";
-const ALL = [WS, FRESH, OTHER];
+const HEAL = "int-settings-budget-heal";
+const ALL = [WS, FRESH, OTHER, HEAL];
 
 afterAll(async () => {
   await db.delete(runs).where(inArray(runs.workspaceId, ALL));
@@ -62,5 +63,16 @@ describe.skipIf(!process.env.DATABASE_URL)("workspace limits and usage", () => {
   it("lets a run start when there is room", async () => {
     await updateLimits(WS, { ...(await getLimits(WS)), dailyRunLimit: 100, maxInFlight: 5, dailyBudgetUsd: 10 });
     expect(await checkBudget(WS)).toBeNull();
+  });
+});
+
+describe.skipIf(!process.env.DATABASE_URL)("healBudgetStop: may a run pay for another fix attempt?", () => {
+  it("counts the workspace's other runs today and this run's own spend so far, its row's stale cost not twice", async () => {
+    await updateLimits(HEAL, { ...DEFAULT_LIMITS, dailyBudgetUsd: 1 });
+    await addRun(HEAL, "succeeded", 0.6); // another run today
+    const [mine] = await db.insert(runs).values({ workspaceId: HEAL, prompt: "[int] budget", status: "evaluating", model: "test", costUsd: 0.3 }).returning({ id: runs.id });
+
+    expect(await healBudgetStop(HEAL, mine.id, 0.3)).toBeNull(); // 0.9 of 1
+    expect(await healBudgetStop(HEAL, mine.id, 0.45)).toBe("The workspace's $1.00 budget for today is spent, so healing stopped here.");
   });
 });

@@ -130,7 +130,7 @@ export function RunPanel({
                 {failureCause(run.error) ?? "The run stopped before it finished."} You can run the same brief again; the technical detail is in
                 Details.
               </p>
-              <RunAgainButton prompt={run.prompt} prominent />
+              <RunAgainButton runId={run.id} prominent />
             </div>
           )}
           <GuardNotices guards={state.guards} />

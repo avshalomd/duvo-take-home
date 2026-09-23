@@ -69,6 +69,7 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
 
   const last = calls[calls.length - 1];
   const stopped = run.status === "cancelled";
+  const firstAttempt = run.status === "running" && !finished; // the agent is on its first attempt: no totals exist yet
   // a stopped run is working on nothing, whatever its last plan said: the stepper shows where it stopped instead
   const currentStep: PlanStep | null = stopped ? null : (plan?.steps.find((s) => s.status === "running") ?? null);
 
@@ -86,10 +87,11 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
 
   return {
     status: run.status,
-    // The turn the mapper stamped on the events, which is the SDK's own count; runs recorded before it was
-    // stamped have no turn on their payloads, so they fall back to counting tool calls.
-    // On a finished run the SDK's own num_turns is the count the cap applied to; while it runs, the mapper's stamp.
-    turn: finished?.num_turns ?? maxTurn(events) ?? calls.length,
+    // While an attempt runs: the turn the mapper stamped on the events (runs recorded before it was stamped fall back
+    // to counting tool calls). Once the agent is done: the run's own total over every attempt, the number Details'
+    // footer shows (Q198). Neither is the count the per-attempt cap applies to - the SDK's num_turns reached 31 on a
+    // run capped at 25 (e1c010fb) - so it is the run's turns, not a position against maxTurns.
+    turn: run.status === "running" ? (maxTurn(events) ?? calls.length) : (run.numTurns ?? finished?.num_turns ?? maxTurn(events) ?? calls.length),
     maxTurns: AgentLimits.maxTurns,
     plan,
     currentStep,
@@ -99,11 +101,11 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
       .filter((s) => !BUILT_IN_SERVERS.includes(s.name)) // the plan and outputs tools are ours, not the person's connections
       .map((s) => ({ name: s.name, status: s.status, used: calls.some((c) => c.name.startsWith(`mcp__${s.name}__`)) })),
     files,
-    // Once an attempt has finished, the run row is the one total: the engine counts each attempt once. A finished
-    // event carries the SDK's running total of a resumed session, so adding the events up would count the first
-    // attempt twice (Q149). Before any attempt has finished there is nothing to show yet.
-    costUsd: finished ? (run.costUsd ?? finished.total_cost_usd) : null,
-    durationMs: finished ? (run.durationMs ?? finished.duration_ms) : null,
+    // The run row is the one total: the engine counts each attempt once. A finished event carries the SDK's running
+    // total of a resumed session, so adding the events up would count the first attempt twice (Q149). A stopped run
+    // has its totals on the row with no finished event at all (Q199). A run on its first attempt has nothing yet.
+    costUsd: firstAttempt ? null : (run.costUsd ?? finished?.total_cost_usd ?? null),
+    durationMs: firstAttempt ? null : (run.durationMs ?? finished?.duration_ms ?? null),
     // The agent's own last words are the most useful error we have; run.error carries a crash before any result.
     // Pressing Stop aborts the agent, which reports an error; it is the person's choice, not a failure to show.
     error: stopped ? null : finished?.is_error ? finished.result || finished.subtype : run.error,

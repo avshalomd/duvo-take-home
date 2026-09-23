@@ -46,4 +46,12 @@ describe("REVIEW_INSTRUCTIONS", () => {
     expect(REVIEW_INSTRUCTIONS).toMatch(/valid file whose report says what was done instead and why/);
     expect(REVIEW_INSTRUCTIONS).toMatch(/finished and suitable/);
   });
+
+  // Local run 6455137d: the reviewer's reasons, quoted in Why?, named the agent's tools. An office worker reads them.
+  it("asks for changeNeeded and reasoning in plain words for an office worker: no tool names, no shell or curl, no paths", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/changeNeeded and reasoning are read by an office worker/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/no tool names/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/no shell or curl/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/no file paths beyond a file's own name/i);
+  });
 });
