@@ -4,6 +4,7 @@ import {
   DEMO_PASSWORD,
   E2E_PASSWORD,
   SIGNED_OUT,
+  closeInvitation,
   deleteUsers,
   e2eEmail,
   formError,
@@ -197,6 +198,33 @@ test("Better Auth's API hands a plain member no invitation ids, and still hands 
 test("an unknown invitation link says it was not found, not that it closed (production QA, 2026-09-23)", async ({ page }) => {
   await page.goto("/invite/e2e-no-such-invitation");
   await expect(page.getByRole("heading", { name: "We could not find this invitation" })).toBeVisible();
+  // UX QA: signed out there is no workspace to go to; the way on is to sign in
+  await expect(page.getByRole("link", { name: "Go to your workspace" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-in");
+});
+
+test("a used invitation's link, opened signed out, offers to sign in rather than a workspace", async ({ page }) => {
+  const owner = e2eEmail("closed-owner");
+  const invitee = e2eEmail("closed-invitee");
+  created.push(owner, invitee);
+  await signUpThroughUi(page, "Carl Closed", owner);
+  const invitationId = await inviteByRow(owner, invitee);
+  await page.context().clearCookies(); // the invitee's browser, signed out
+  await closeInvitation(invitationId);
+
+  await page.goto(`/invite/${invitationId}`);
+  await expect(page.getByRole("heading", { name: "This invitation is closed" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in");
+  await expect(page.getByRole("link", { name: "Go to your workspace" })).toHaveCount(0);
+});
+
+test("an unknown invitation link, opened signed in, still offers the way back to the workspace", async ({ page }) => {
+  await page.goto("/sign-in");
+  await signInThroughUi(page, DEMO_EMAIL, DEMO_PASSWORD);
+  await page.waitForURL((url) => url.pathname === "/");
+  await page.goto("/invite/e2e-no-such-invitation");
+  await expect(page.getByRole("link", { name: "Go to your workspace" })).toBeVisible();
 });
 
 test("a new workspace made from the user menu opens at once, and the menu switches back", async ({ page }) => {
