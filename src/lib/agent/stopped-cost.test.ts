@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { costStateOf, readSdkTotals, stoppedTotals } from "./stopped-cost";
+import { costStateOf, ownCost, readSdkTotals, stoppedTotals } from "./stopped-cost";
 
 // The shape the CLI wrote for a run stopped mid-way on 2026-09-23 (cancel check db56bab3): its own total, written as
 // it shut down after the abort - $0.0529 on claude-sonnet-5 plus $0.0459 on the web-search helper model.
@@ -75,5 +75,27 @@ describe("stoppedTotals (Q129)", () => {
 
   it("uses start-to-stop time when the SDK gave a cost but no duration", () => {
     expect(stoppedTotals({ end: null, sdk: { costUsd: 0.02, durationMs: null }, startedAt, now, turns: 1 }).durationMs).toBe(42_000);
+  });
+});
+
+// Found while checking Q129 on the follow-up of 2026-09-23 (6b1e55df): a resumed session's SDK total starts from the
+// parent's saved total ($0.0217 parent + $0.0262 own = the $0.0479 the result reported), so a follow-up's own cost
+// is its total minus the total its session was resumed from.
+describe("ownCost", () => {
+  it("records only a resumed follow-up's own share, not its parent's again", () => {
+    expect(ownCost(0.0478918, 0.021683)).toBeCloseTo(0.0262088, 7);
+  });
+
+  it("is the whole total for a run that resumed nothing", () => {
+    expect(ownCost(0.0217, 0)).toBe(0.0217);
+  });
+
+  it("is never negative, whatever the SDK reported", () => {
+    expect(ownCost(0.01, 0.02)).toBe(0);
+  });
+
+  it("applies to a stopped follow-up too", () => {
+    const t = stoppedTotals({ end: null, sdk: { costUsd: 0.05, durationMs: 1000 }, startedAt: 0, now: 2000, turns: 1, costBase: 0.02 });
+    expect(t.costUsd).toBeCloseTo(0.03, 10);
   });
 });
