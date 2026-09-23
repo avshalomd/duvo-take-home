@@ -8,7 +8,11 @@ export type CancelWatch = {
  * Stop, beside the wall clock: every `everyMs` it asks whether the user pressed Stop, and on yes it aborts the same
  * AbortController the deadline uses, so the SDK sees one abort whatever caused it.
  */
-export function watchCancel(opts: { isRequested: () => Promise<boolean>; controller: AbortController; everyMs: number }): CancelWatch {
+export function watchCancel(opts: {
+  isRequested: () => Promise<boolean>;
+  controller: { abort: () => void }; // the current attempt's: an auto-heal attempt gets a fresh AbortController
+  everyMs: number;
+}): CancelWatch {
   let cancelled = false;
   let asking = false; // a slow read must not stack a second one on top of it
   let resolve!: () => void;

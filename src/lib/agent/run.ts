@@ -4,10 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, transaction } from "@/db";
 import { files as filesTable, runEvents, runs } from "@/db/schema";
 import { AgentLimits, type RunAutomation } from "@/contracts/agent";
 import type { AutomationTemplate } from "@/contracts/automation";
+import type { Verdict } from "@/contracts/eval";
 import type { GuardRecord } from "@/contracts/guard";
 import type { OutputFile } from "@/contracts/outputs";
 import type { Plan, RunEvent } from "@/contracts/run";
@@ -17,9 +18,11 @@ import { listEnabledConnectionsWithSecrets, recordConnectionSeen } from "@/lib/c
 import { connectionKey } from "@/lib/connections/key";
 import { authHeaders } from "@/lib/connections/oauth";
 import { evaluateRun } from "@/lib/eval/evaluate";
+import { feedbackForAgent, isHealable } from "@/lib/eval/feedback";
 import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
+import { runnerMode } from "@/lib/runner/mode";
 import { getLimits } from "@/lib/usage/budget";
 import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
@@ -29,6 +32,7 @@ import { statusUpdates } from "./connection-status";
 import { startDeadline } from "./deadline";
 import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
+import { healPrompt, runBudgetMs, shouldHeal } from "./heal";
 import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
 import { tripwireReason, unexpectedServers } from "./mcp-tripwire";
@@ -124,7 +128,7 @@ export const runAutomation: RunAutomation = async (runId) => {
     return;
   }
 
-  const map = createMapper();
+  const map = createMapper(); // one mapper for every attempt: the plan and the turn count carry on across heals
   let seq = 1;
   const recorded: RunEvent[] = []; // kept so the closing update reads the plan and the result from the same events
   let plan: Plan | null = null;
@@ -186,42 +190,71 @@ export const runAutomation: RunAutomation = async (runId) => {
     await write([{ kind: "guard", payload: r, at: now() }]);
   };
 
-  // The wall clock the SDK does not keep: turns and budget cannot stop a tool that simply hangs. Stop aborts the
-  // same controller, so the SDK sees one abort and the catch below tells the two apart.
-  const deadline = startDeadline(AgentLimits.wallClockMs);
-  const cancel = watchCancel({ isRequested: () => cancelRequested(runId), controller: deadline.controller, everyMs: CANCEL_POLL_MS });
+  // The wall clock the SDK does not keep: turns and budget cannot stop a tool that simply hangs. Every attempt gets
+  // its own (an aborted controller cannot be reused), cut to what is left of the run's budget. Stop aborts the
+  // current one, so the SDK sees one abort and the catch below tells the causes apart.
+  const budgetEndsAt = startedAt + runBudgetMs(runnerMode());
+  const attemptMs = () => Math.min(AgentLimits.wallClockMs, Math.max(0, budgetEndsAt - Date.now()));
+  let deadline = startDeadline(attemptMs());
+  const cancel = watchCancel({ isRequested: () => cancelRequested(runId), controller: { abort: () => deadline.controller.abort() }, everyMs: CANCEL_POLL_MS });
   const outputs = createOutputsServer(dir);
   const connectionNames = Object.fromEntries(enabled.map((c) => [connectionKey(c.name), c.name]));
 
-  // The files are stored once, whichever way the run ends: a stopped run keeps what the agent wrote so far.
-  let stored: OutputFile[] | null = null;
+  // The run's files are what is in its directory now: stored after every attempt, replacing the rows before, so an
+  // auto-heal's fixed file is never listed beside the broken one. One transaction, so a reader never sees none.
   const storeFiles = async (): Promise<OutputFile[]> => {
-    if (stored) return stored;
     const found = await collectFiles(dir);
-    if (found.length) await db.insert(filesTable).values(found.map((f) => ({ runId, ...f, ...scanOutput(f) })));
-    stored = found;
+    const rows = found.map((f) => ({ runId, ...f, ...scanOutput(f) }));
+    await transaction(async (tx) => {
+      await tx.delete(filesTable).where(eq(filesTable.runId, runId));
+      if (rows.length) await tx.insert(filesTable).values(rows);
+    });
     return found;
   };
 
-  // A stopped run keeps what it cost (QA Q129): the result's figures when the agent had finished, else the SDK's own
-  // totals from the transcript it writes as it shuts down, else the time from start to stop.
+  // Auto-heal (his call, 2026-09-23): the attempts of this one run, and what the finished ones cost together.
+  let heals = 0;
+  const spent = { usd: 0, ms: 0, turns: 0 }; // the attempts whose result is in
+  let lastVerdict: Verdict | null = null; // written to runs.verdict once, when the run's tries are over
+  let attemptBase = costBase; // what this attempt's SDK total starts from (a resumed session carries the last total)
+  let attemptStartedAt = startedAt;
+  let attemptFrom = 0; // where this attempt's events begin in `recorded`
+  let turnsBefore = 0; // the mapper's turn count when this attempt began
+  let counted = false; // this attempt's result is already in `spent`
+  const maxTurn = (events: RunEvent[]) => Math.max(0, ...events.map((e) => Number((e.payload as { turn?: unknown }).turn) || 0));
+  const attemptResult = () => recorded.slice(attemptFrom).find((e) => e.kind === "finished")?.payload ?? null;
+
+  // A stopped run keeps what it cost (QA Q129): the finished attempts, plus the one in progress - its result's figures
+  // when the agent had finished, else the SDK's own totals from its transcript, else the time from start to stop.
   let sessionId: string | null = null;
   const closeStopped = async () => {
-    const end = recorded.find((e) => e.kind === "finished")?.payload ?? null;
-    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
-    const turns = Math.max(0, ...recorded.map((e) => Number((e.payload as { turn?: unknown }).turn) || 0));
-    await closeAsCancelled(runId, stoppedTotals({ end, sdk, startedAt, now: Date.now(), turns, costBase }));
+    let usd: number | null = spent.usd;
+    let ms = spent.ms;
+    let turns = spent.turns;
+    if (!counted) {
+      const end = attemptResult();
+      const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
+      const current = stoppedTotals({ end, sdk, startedAt: attemptStartedAt, now: Date.now(), turns: maxTurn(recorded) - turnsBefore, costBase: attemptBase });
+      usd = current.costUsd === null ? spent.usd || null : spent.usd + current.costUsd;
+      ms += current.durationMs;
+      turns += current.numTurns;
+    }
+    await closeAsCancelled(runId, { costUsd: usd, durationMs: ms, numTurns: turns, healAttempts: heals });
   };
 
   // The MCP servers this run may see: ours, and the workspace's enabled connections. Anything else trips the wire.
   const allowedServers = [PLAN_SERVER_KEY, OUTPUTS_SERVER_KEY, ...Object.keys(servers)];
   let tripped: string | null = null;
 
-  // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
-  // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
-  try {
+  /** One attempt: the agent works (or fixes its work) until its result message, every message recorded as it comes. */
+  const runAttempt = async (attemptPrompt: string, attemptResume: { resume: string; forkSession?: boolean } | null) => {
+    deadline = startDeadline(attemptMs());
+    attemptStartedAt = Date.now();
+    attemptFrom = recorded.length; // the previous attempt settled, so every one of its events is in
+    turnsBefore = maxTurn(recorded);
+    counted = false;
     const q = query({
-      prompt,
+      prompt: attemptPrompt,
       options: {
         cwd: dir,
         ...ISOLATION, // no settings files, only the MCP servers below, no claude.ai connectors (QA Q134)
@@ -247,14 +280,14 @@ export const runAutomation: RunAutomation = async (runId) => {
           plan: () => plan,
           record: recordGuard,
         }),
-        maxTurns: AgentLimits.maxTurns,
+        maxTurns: AgentLimits.maxTurns, // per attempt, like the budget: each query has its own
         maxBudgetUsd: AgentLimits.maxBudgetUsd,
         model: AGENT_MODEL,
         systemPrompt, // a plain string replaces Claude Code's large preset prompt
         // The user's servers first and ours last: a connection keyed "plan" or "outputs" must never replace our own tools.
         mcpServers: { ...servers, [PLAN_SERVER_KEY]: createPlanServer(), [OUTPUTS_SERVER_KEY]: outputs },
         env: childEnv(process.env), // env REPLACES the child's environment: an allowlist, never the parent's session or keys
-        ...resume, // a follow-up: { resume, forkSession } when the parent's session is still on this machine
+        ...attemptResume, // a follow-up resumes its parent's session; a heal resumes this run's own
       },
     });
 
@@ -262,7 +295,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       const id = sessionIdOf(message);
       if (id) {
         sessionId = id;
-        await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up resumes
+        await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up or a heal resumes
       }
       const events = map(message, 0, now());
       await write(events);
@@ -279,49 +312,86 @@ export const runAutomation: RunAutomation = async (runId) => {
     deadline.clear(); // the stream is done; nothing left to abort
     if (tripped) throw new Error(tripped);
     await settle();
-    const written = await storeFiles();
+  };
 
-    // An abort can end the stream quietly instead of throwing: Stop is then seen here.
-    if (cancel.cancelled()) {
-      await closeStopped();
-      return;
+  // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
+  // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
+  try {
+    let attemptPrompt = prompt;
+    let attemptResume: { resume: string; forkSession?: boolean } | null = resume;
+    for (;;) {
+      await runAttempt(attemptPrompt, attemptResume);
+      const written = await storeFiles();
+
+      // An abort can end the stream quietly instead of throwing: Stop is then seen here.
+      if (cancel.cancelled()) {
+        await closeStopped();
+        return;
+      }
+      const end = attemptResult();
+      // No result message means the child died mid-stream. That is a failure, not a success with no report.
+      if (!end) throw new Error("the agent ended without a result");
+      spent.usd += ownCost(end.total_cost_usd, attemptBase);
+      spent.ms += end.duration_ms;
+      spent.turns += end.num_turns;
+      counted = true;
+      await updateUnlessCancelled(runId, {
+        status: "evaluating", // visible while the judge runs: the agent is done but the verdict is not
+        report: end.result || null,
+        error: end.is_error ? end.result || end.subtype : null, // the provider's words when the SDK sent any
+        numTurns: spent.turns,
+        durationMs: spent.ms,
+        costUsd: spent.usd, // every attempt of the run, each counted once
+      });
+
+      // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
+      // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59).
+      const evaluation = evaluateRun({
+        prompt: instructions,
+        runStatus: end.is_error ? "failed" : "succeeded",
+        report: end.result || null,
+        plan: (recorded.filter((e) => e.kind === "plan").at(-1)?.payload ?? null) as Plan | null,
+        // every file as stored, base64 included: the evaluator decides what the judge sees (eval/file-view.ts), and its
+        // spreadsheet check needs the bytes to confirm the .xlsx header
+        files: written.map((f) => ({ name: f.name, content: f.content })),
+        today: new Date().toISOString().slice(0, 10),
+        // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
+        toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
+        template,
+      }).catch(unknownVerdict);
+      // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
+      const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);
+      if (verdict === null || cancel.cancelled()) {
+        await closeStopped(); // the attempts' cost, turns and duration; no verdict
+        return;
+      }
+      lastVerdict = verdict;
+
+      // Auto-heal: a result the agent can fix goes back to the same session with the findings, inside this run. The
+      // failing verdict lives only in the heal event; runs.verdict waits until the tries are over (his words: "the
+      // run should say pass or fail only if all the auto-heal tries are exhausted").
+      const heal = shouldHeal({
+        healable: isHealable(verdict, !end.is_error),
+        healsSoFar: heals,
+        limit: limits.autoHealAttempts,
+        remainingMs: budgetEndsAt - Date.now(),
+      });
+      if (!heal) {
+        await updateUnlessCancelled(runId, { status: end.is_error ? "failed" : "succeeded", verdict, healAttempts: heals, finishedAt: new Date() });
+        return;
+      }
+      heals += 1;
+      const feedback = feedbackForAgent(verdict);
+      await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback }, at: now() }]);
+      await chain;
+      await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
+      // The same session, not a fork: the run stays one conversation. Where it is gone, the heal prompt carries the
+      // instructions too, and the new session's total starts from nothing.
+      const same = sessionId ? await resumeOptions(sessionId) : null;
+      attemptResume = same ? { resume: same.resume } : null;
+      attemptBase = same ? end.total_cost_usd : 0;
+      attemptPrompt = same ? healPrompt(feedback) : `${prompt}\n\n${healPrompt(feedback)}`;
     }
-    const end = recorded.find((e) => e.kind === "finished")?.payload;
-    // No result message means the child died mid-stream. That is a failure, not a success with no report.
-    if (!end) throw new Error("the agent ended without a result");
-    const finalPlan = (recorded.filter((e) => e.kind === "plan").at(-1)?.payload ?? null) as Plan | null;
-    await updateUnlessCancelled(runId, {
-      status: "evaluating", // visible while the judge runs: the run is done but the verdict is not
-      report: end.result || null,
-      error: end.is_error ? end.result || end.subtype : null, // the provider's words when the SDK sent any
-      numTurns: end.num_turns,
-      durationMs: end.duration_ms,
-      costUsd: ownCost(end.total_cost_usd, costBase),
-    });
-
-    // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
-    // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59).
-    const evaluation = evaluateRun({
-      prompt: instructions,
-      runStatus: end.is_error ? "failed" : "succeeded",
-      report: end.result || null,
-      plan: finalPlan,
-      // every file as stored, base64 included: the evaluator decides what the judge sees (eval/file-view.ts), and its
-      // spreadsheet check needs the bytes to confirm the .xlsx header
-      files: written.map((f) => ({ name: f.name, content: f.content })),
-      today: new Date().toISOString().slice(0, 10),
-      // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
-      toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
-      template,
-    }).catch(unknownVerdict);
-    // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
-    const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);
-    if (verdict === null || cancel.cancelled()) {
-      await closeStopped(); // the result's cost, turns and duration; no verdict
-      return;
-    }
-
-    await updateUnlessCancelled(runId, { status: end.is_error ? "failed" : "succeeded", verdict, finishedAt: new Date() });
   } catch (err) {
     await settle().catch(() => undefined);
     if (cancel.cancelled()) {
@@ -330,12 +400,12 @@ export const runAutomation: RunAutomation = async (runId) => {
       await closeStopped();
       return;
     }
-    // An abort reads as a generic "aborted" error, so say which limit ended the run.
-    // The tripwire's own reason first: its abort must not read as a timeout or a bare "aborted".
+    // An abort reads as a generic "aborted" error, so say which limit ended the run; the tripwire's own reason first.
     let error = err instanceof Error ? err.message : String(err);
-    if (deadline.expired()) error = `timed out after ${Math.round(AgentLimits.wallClockMs / 1000)} s`;
+    if (deadline.expired()) error = `timed out after ${Math.round((Date.now() - startedAt) / 1000)} s`;
     if (tripped) error = tripped;
-    await updateUnlessCancelled(runId, { status: "failed", error, finishedAt: new Date() });
+    // A heal attempt that failed leaves the last verdict as the run's: its tries are over.
+    await updateUnlessCancelled(runId, { status: "failed", error, verdict: lastVerdict, healAttempts: heals, finishedAt: new Date() });
   } finally {
     deadline.clear();
     cancel.stop();
