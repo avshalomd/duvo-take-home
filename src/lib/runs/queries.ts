@@ -1,10 +1,11 @@
-// A real uuid shape, not just 36 hex-or-dash characters: 36 dashes reached Postgres and threw (QA, round 2).
-const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 import { asc, desc, eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
 import { RunEvent, type GetFile, type GetRun, type ListRuns, type Run, type RunStatus } from "@/contracts/run";
 import { Verdict } from "@/contracts/eval";
+
+// A real uuid shape, not just 36 hex-or-dash characters: 36 dashes reached Postgres and threw (QA, round 2).
+const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 type RunRow = typeof runs.$inferSelect;
 
