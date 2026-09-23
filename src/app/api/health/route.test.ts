@@ -1,13 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MockLanguageModelV4 } from "ai/test";
 import { apiError, failingModel, scriptedModel } from "@/lib/llm/test-models";
 
 // The deep check exists so "configured" is never mistaken for "usable" - and when the model is NOT usable, the
 // reason has to be the provider's own words. No database and no network here: both modules are replaced.
 const model = vi.hoisted(() => ({ current: null as unknown }));
-vi.mock("@/db", () => ({ db: { execute: async () => [] }, dbConfigured: true }));
+const database = vi.hoisted(() => ({ execute: vi.fn(async () => []) }));
+vi.mock("@/db", () => ({ db: database, dbConfigured: true }));
 vi.mock("@/lib/ai", () => ({ aiProvider: () => "openrouter", getModel: () => model.current }));
 
-import { GET } from "./route";
+// The route keeps the model's answer for a minute in module memory (Q177): each test imports a fresh copy of it.
+let GET: typeof import("./route").GET;
+beforeEach(async () => {
+  vi.resetModules();
+  database.execute.mockClear();
+  ({ GET } = await import("./route"));
+});
 
 describe("GET /api/health", () => {
   it("does not call the model unless deep=1", async () => {
@@ -27,7 +35,7 @@ describe("GET /api/health", () => {
   it("reports a usable model on deep=1", async () => {
     model.current = scriptedModel(["ok"]);
     const body = await (await GET(new Request("http://x/api/health?deep=1"))).json();
-    expect(body.ai.usable).toBe(true);
+    expect(body.ai).toEqual({ provider: "openrouter", usable: true }); // the shape deploy-handover.sh reads, unchanged
   });
 
   it("names the provider's reason when the model is down, not the gateway's summary", async () => {
@@ -39,5 +47,16 @@ describe("GET /api/health", () => {
     expect(body.ai.usable).toBe(false);
     expect(body.ai.error).toMatch(/unavailable for free/);
     expect(body.ai.error).not.toMatch(/Provider returned error/);
+  });
+
+  it("makes one model call for repeated deep checks within a minute, and still asks the database every time (Q177)", async () => {
+    const counted = scriptedModel(["ok"]);
+    model.current = counted;
+    for (let i = 0; i < 3; i++) {
+      const body = await (await GET(new Request("http://x/api/health?deep=1"))).json();
+      expect(body).toMatchObject({ ok: true, database: "up", ai: { provider: "openrouter", usable: true } });
+    }
+    expect((counted as MockLanguageModelV4).doGenerateCalls).toHaveLength(1);
+    expect(database.execute).toHaveBeenCalledTimes(3);
   });
 });
