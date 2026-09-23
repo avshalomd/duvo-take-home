@@ -9,7 +9,7 @@ import { INVITATION_COOKIE } from "./invitation-cookie";
 import type { SessionCtx } from "@/contracts/auth";
 import { MemberChangeError } from "./member-rules";
 import { changeMemberRole, createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, removeFromWorkspace, revokeInvite } from "./members";
-import { sessionFromHeaders } from "./session";
+import { resolveSession, sessionFromHeaders } from "./session";
 
 const created: string[] = []; // emails, so afterAll deletes only what this file made
 const PASSWORD = "int-password-123";
@@ -449,6 +449,21 @@ describe.skipIf(!process.env.DATABASE_URL)("removing people and changing roles",
     const again = await signUp("Adam Again", theirOtherAddress);
     await expect(auth.api.acceptInvitation({ body: { invitationId: sentByAdmin }, headers: again.headers })).rejects.toThrow();
     expect((await listWorkspaces(again.userId)).map((w) => w.id)).not.toContain(ownerCtx.workspaceId);
+  });
+
+  // Review R2: the removed person's open tab. A page falls back to their own workspace, but a write that names no
+  // record (an invitation, a connection, the limits, a run) fell back with it and landed there unseen.
+  it("a removed person's open tab: its Server Actions learn they left, nothing is written back, and a page load opens their own workspace", async () => {
+    const { owner, ownerCtx, plain, memberIdOf } = await team("left");
+    await removeFromWorkspace(owner.headers, ownerCtx, memberIdOf(plain.userId));
+    const fromAction = new Headers(plain.headers);
+    fromAction.set("next-action", "int-action-id"); // what Next sends with every Server Action
+
+    expect(await resolveSession(fromAction)).toMatchObject({ left: true, ctx: { workspaceName: "Mia's workspace" } });
+    expect((await resolveSession(fromAction))?.left).toBe(true); // not written back: the tab's next write is refused too
+
+    expect((await resolveSession(plain.headers))?.ctx.workspaceName).toBe("Mia's workspace"); // a page load falls back as before
+    expect((await resolveSession(fromAction))?.left).toBe(false); // and writes it back: the page now shows their own, so its actions go ahead
   });
 
   it("demoting an admin to member closes the invitations they sent; demoting an owner to admin keeps theirs", async () => {
