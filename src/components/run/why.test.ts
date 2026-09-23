@@ -262,6 +262,14 @@ describe("whyLines - a run that fixed what the check found", () => {
     ]);
   });
 
+  // Q148: the engine stopped trying because the last fix made no progress
+  it("says plainly when the engine stopped trying, and counts only the fixes it made", () => {
+    const stopped = [...heals, { attempt: 2, max: 2, reasons: ["At least 8 rows: 2 rows"], stopped: true }];
+    const lines = whyLines(FAIL_BY_CHECKS, "succeeded", "fail", stopped);
+    expect(lines.map((l) => l.text)).toContain("Stopped trying: the first fix did not get the result any closer to passing");
+    expect(lines.map((l) => l.text)).not.toContain(expect.stringMatching(/^Fixed after/));
+  });
+
   it("adds nothing for a run that never needed a fix", () => {
     expect(whyLines(PASS_BY_JUDGE, "succeeded", "pass", [])).toEqual(whyLines(PASS_BY_JUDGE, "succeeded", "pass"));
   });

@@ -224,11 +224,25 @@ describe("deriveState - per-step checks, guards and a stopped run", () => {
       expect(deriveState(run, events).heals).toEqual([]);
     });
 
-    it("counts the cost and time of every attempt, and takes the turns and the error from the last one", () => {
-      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.05, 4_000, 3, true)];
-      const state = deriveState({ ...run, status: "succeeded" }, healed);
-      expect(state.costUsd).toBeCloseTo(0.15);
+    // Q149: each finished event carries the SDK's running total of a resumed session; the run row counts each
+    // attempt once (the engine), so the row is the one total and the events are never added up
+    it("takes the run's cost and time from the run row, which counts every attempt once", () => {
+      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3)];
+      const state = deriveState({ ...run, status: "succeeded", costUsd: 0.16, durationMs: 14_000 }, healed);
+      expect(state.costUsd).toBe(0.16);
       expect(state.durationMs).toBe(14_000);
+    });
+
+    it("falls back to the last attempt's figures for a run row that has none", () => {
+      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3)];
+      const state = deriveState({ ...run, status: "succeeded", costUsd: null, durationMs: null }, healed);
+      expect(state.costUsd).toBe(0.16);
+      expect(state.durationMs).toBe(4_000);
+    });
+
+    it("takes the turns and the error from the last attempt, not the first", () => {
+      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3, true)];
+      const state = deriveState({ ...run, status: "failed" }, healed);
       expect(state.turn).toBe(3);
       expect(state.error).toBe("ran out of turns");
     });

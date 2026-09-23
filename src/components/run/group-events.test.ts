@@ -68,7 +68,12 @@ describe("groupEvents - fixing what the check found", () => {
   });
 
   it("marks an attempt done once the agent finished it, and running until then", () => {
-    expect(groupEvents([plan(["done"]), heal(1), call("Write")]).at(-1)!.status).toBe("running");
-    expect(groupEvents([plan(["done"]), heal(1), call("Write"), { ...finished, seq: ++seq }]).at(-1)!.status).toBe("done");
+    expect(groupEvents([plan(["done"]), heal(1), call("Write")], "running").at(-1)!.status).toBe("running");
+    expect(groupEvents([plan(["done"]), heal(1), call("Write"), { ...finished, seq: ++seq }], "succeeded").at(-1)!.status).toBe("done");
+  });
+
+  // Q148: an attempt the engine recorded and then did not make is not still spinning on a finished run
+  it("marks an attempt of a finished run that was never worked on as skipped", () => {
+    expect(groupEvents([plan(["done"]), { ...finished, seq: ++seq }, heal(2)], "succeeded").at(-1)!.status).toBe("skipped");
   });
 });

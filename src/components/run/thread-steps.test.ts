@@ -76,4 +76,15 @@ describe("threadSteps - fixing what the check found", () => {
   it("says where a stopped run stopped while it was fixing", () => {
     expect(threadSteps(plan(["done"]), "cancelled", [], heals.slice(0, 1))[1]).toMatchObject({ status: "pending", note: "Stopped here" });
   });
+
+  // Q148: the engine stops trying when a fix made no progress; that attempt is recorded but never run
+  it("draws an attempt the engine did not make as skipped, saying why in plain words", () => {
+    const stopped = [heals[0], { ...heals[1], stopped: true }];
+    expect(threadSteps(plan(["done"]), "succeeded", [], stopped)[2]).toEqual({
+      key: "heal-2",
+      title: "Fix what the check found (attempt 2 of 2)",
+      status: "skipped",
+      note: "Stopped trying: the first fix did not get the result any closer to passing",
+    });
+  });
 });

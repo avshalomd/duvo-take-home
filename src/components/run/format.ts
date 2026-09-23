@@ -67,6 +67,10 @@ export function toolKind(name: string): ToolKind {
   return "tool";
 }
 
+export function attemptCost(payload: { total_cost_usd: number; attempt_cost_usd?: number }): number {
+  return payload.total_cost_usd; // written in the next commit
+}
+
 export function formatDuration(ms: number | null): string {
   if (ms === null || ms === undefined) return "-";
   if (ms < 1000) return `${(ms / 1000).toFixed(1)} s`;
