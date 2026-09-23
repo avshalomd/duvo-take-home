@@ -18,6 +18,7 @@ export function Stepper({
   min,
   max,
   prefix,
+  zeroLabel,
   invalid,
   describedBy,
 }: {
@@ -29,11 +30,14 @@ export function Stepper({
   min: number;
   max: number;
   prefix?: string;
+  zeroLabel?: string; // what 0 means in words ("Off"), shown in place of the 0 while the field is not being typed in
   invalid?: boolean;
   describedBy?: string;
 }) {
   const [value, setValue] = useState(defaultValue);
+  const [typing, setTyping] = useState(false);
   const current = Number(value);
+  const saysZero = zeroLabel !== undefined && value.trim() !== "" && current === 0 && !typing;
 
   function nudge(by: number) {
     const base = Number.isFinite(current) && value.trim() !== "" ? current : min; // an empty or odd value starts from the floor
@@ -47,7 +51,7 @@ export function Stepper({
         <Minus />
       </StepButton>
       {/* a fixed slot, the value centred in it: the three steppers of a group line up, and "$5" reads as one value */}
-      <div className={cn("flex w-[4.75rem] items-baseline justify-center rounded-lg focus-within:bg-muted", invalid && "text-crimson")}>
+      <div className={cn("relative flex w-[4.75rem] items-baseline justify-center rounded-lg focus-within:bg-muted", invalid && "text-crimson")}>
         {prefix && <span aria-hidden className="text-slate">{prefix}</span>}
         <input
           id={id}
@@ -57,12 +61,28 @@ export function Stepper({
           step="any" // the buttons keep to the step; a typed 2.50 is the parse's to judge
           value={value}
           onChange={(e) => setValue(e.currentTarget.value)}
+          onFocus={() => setTyping(true)}
+          onBlur={() => setTyping(false)}
           aria-invalid={invalid}
           aria-describedby={describedBy}
+          // a spinbutton, said out loud with its range, so a screen reader hears "Off" too, not "0"
+          role="spinbutton"
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={Number.isFinite(current) ? current : undefined}
+          aria-valuetext={saysZero ? zeroLabel : undefined}
           // as wide as its digits (tabular figures are one ch each), so the prefix sits right against the number
           style={{ width: `${Math.min(Math.max(value.length, 1), 7) + 0.25}ch` }}
-          className="[appearance:textfield] bg-transparent py-1 text-center font-medium tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className={cn(
+            "[appearance:textfield] bg-transparent py-1 text-center font-medium tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+            saysZero && "opacity-0", // still there, still posted and focusable: only the word is drawn over it
+          )}
         />
+        {saysZero && (
+          <span aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center font-medium text-slate">
+            {zeroLabel}
+          </span>
+        )}
       </div>
       <StepButton label={`Raise: ${label}`} onClick={() => nudge(step)} disabled={current >= max}>
         <Plus />
