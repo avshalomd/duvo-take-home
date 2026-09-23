@@ -186,3 +186,19 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q147 | final | connection names under the composer run together ("DeepWiki e2e Settings moved"); a settings e2e leaves a connection and invitations behind | separated names; tests clean up | minor | home + settings | fixed (home a79f939; checked with screenshots and e2e 76/76) |
 | Q148 | engine (live heal) | auto-heal went back and forth: the CSV check demanded quotes, the reviewer held the agent to "without adding any quotes", and each attempt undid the last | a valid file wins over an instruction it cannot satisfy (the report says why), the reviewer never asks for a change that fails a check, and healing stops when an attempt makes no progress | major | eval + engine | fixed (eval 189c7a3: a valid file wins, the reviewer sees the checks - live 20/20; engine 0ae0311: stops when an attempt makes no progress) |
 | Q149 | engine | each attempt's finished event shows the SDK's running total, and the heal prompt repeats the feedback's lead and closing lines | per-attempt cost in Details, one total on the run; no repeated lines | minor | engine + home | fixed (home a79f939; checked with screenshots and e2e 76/76) |
+
+### Round: Handover live (https://handover-gold.vercel.app, 2026-09-23)
+
+The first deploy of v2 was refused (the Hobby plan's 12 functions: the agent's binary in every route made each
+route a function of its own). Runs now execute in `/api/runner/<id>`, the only function with the binary
+(RUNNER=route, 72f6866). Then qa-func walked the live app as the demo account, at 1280 and 390 px, with three runs.
+
+| id | source | observed | expected | severity | owner | status |
+|---|---|---|---|---|---|---|
+| Q150 | qa-func (live) | a correct, titled bar chart failed "no title": the chart tool wraps a long title into two `<tspan>` lines and the check read only up to the first tag; self-heal then looped on the false failure | a wrapped title counts | blocker | main (eval) | re-check (2ebe4f5, a test renders a wrapped title with the real renderer) |
+| Q151 | qa-func (live) | "Make the bars horizontal" could not be done: the chart tool drew only vertical bars | horizontal bars | major | main (outputs) | re-check (88f1083: kind horizontal-bar) |
+| Q152 | qa-func (live) | a chart-only run's Why? said it "may have followed instructions it found on a page"; it read no page | no such warning when nothing outside was read | major | main (eval) | re-check (f1d8203: the question is asked only when the run searched, fetched or used a connection) |
+| Q153 | qa-func (live) | a doubted step read "This step may not have done what it says. May not have done what it says: ..." | the sentence once | minor | main (home) | re-check (ddd6467) |
+| Q154 | qa-func (live) | a fix attempt called set_plan again and the person's steps left the thread | the plan kept, the fix added as a step | minor | main (engine) | re-check (ddd6467: the fix prompt says keep the plan) |
+| Q155 | qa-func (live) | a report opening with a bold "Report:" line under the page's "Report" heading | the word once | minor | main (home) | re-check (ddd6467) |
+| Q156 | qa-func (live) | an unknown invitation link said "This invitation is closed" | "We could not find this invitation" | minor | main (auth) | re-check (ddd6467, e2e) |
