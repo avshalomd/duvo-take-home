@@ -194,8 +194,10 @@ test.describe("a live run", () => {
   test("offers Stop, and pressing it either stops the run or says why it cannot", async ({ page }) => {
     const panel = await openRun(page, runs.live);
     await expect(panel.getByTestId("outcome")).toHaveText(/Working on it/);
+    await expect(panel).not.toContainText(/Stopping|Stopped by you|not available yet/);
     await panel.getByRole("button", { name: /^stop$/i }).click();
-    await expect(panel.getByTestId("outcome").or(panel.getByRole("alert"))).toContainText(/Stopping|Stopped by you|not available yet/);
+    // with the engine in place the run says it is stopping; before, the panel says Stop is not available yet
+    await expect(panel).toContainText(/Stopping|Stopped by you|not available yet/);
   });
 });
 

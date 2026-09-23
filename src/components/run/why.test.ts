@@ -73,6 +73,14 @@ describe("whyLines - the checks", () => {
     expect(whyLines(FAIL_BY_CHECKS, "succeeded")[0].tone).toBe("bad");
   });
 
+  it("lower-cases each label inside the sentence, but not an acronym", () => {
+    const labels: Verdict = {
+      ...PASS_BY_JUDGE,
+      checks: [check("a", "A report was written", true), check("b", "URLs are absolute", true), check("c", "CSV parses", true)],
+    };
+    expect(text(labels, "checks")).toBe("3 checks passed: a report was written, URLs are absolute, CSV parses");
+  });
+
   it("says one check, not one checks", () => {
     const one: Verdict = { ...PASS_BY_JUDGE, checks: [CHECKS[0]] };
     expect(text(one, "checks")).toBe("1 check passed: the CSV parses");
