@@ -8,10 +8,20 @@ export const notes = pgTable("notes", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-import { boolean, index, integer, jsonb, real, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, index, integer, jsonb, real, uniqueIndex } from "drizzle-orm/pg-core";
 
 // Users, sessions and workspaces (Better Auth; its "organization" is our workspace). Generated: `npx @better-auth/cli generate`.
 export * from "./auth-schema";
+
+// Better Auth's rate-limit counts (lib/auth/auth.ts, Q176): one row per client address and path, e.g.
+// "203.0.113.7|/sign-in/email". In the database, not in each function instance's memory, so every instance on Vercel
+// counts the same tries. Better Auth finds it by the export name `rateLimit`; `last_request` is milliseconds since 1970.
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
 
 // One automation: instructions in, a report and files out. Status moves queued -> running -> evaluating -> succeeded | failed,
 // or -> cancelled when the user stops it. v2 columns are nullable or defaulted, so v1 rows stay valid.
