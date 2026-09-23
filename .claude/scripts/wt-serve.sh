@@ -57,7 +57,7 @@ fi
 
 end=$((SECONDS + 60))
 while [ "$SECONDS" -lt "$end" ]; do
-  code=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$url" || true)
+  code=$(curl -sL -o /dev/null -m 15 -w '%{http_code}' "$url" || true)
   [ "$code" = "200" ] && { echo "SERVING $url"; exit 0; }
   if [ -z "$(listeners "$port")" ] && ! { [ -f "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; }; then
     echo "the dev server exited; last lines of $log:"; tail -15 "$log"; exit 1

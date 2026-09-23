@@ -16,8 +16,8 @@ export const createOutputsServer = (dir: string): ReturnType<typeof createSdkMcp
   createSdkMcpServer({
     name: OUTPUTS_SERVER_KEY,
     version: "1.0.0",
-    // Always in the first prompt, never deferred behind tool search: the system prompt does not name these tools,
-    // so the agent only knows it can make a chart if it sees the tool.
+    // Always in the first prompt, never deferred behind tool search: the system prompt names these tools, and a
+    // deferred tool the prompt promises would be one the agent cannot find.
     alwaysLoad: true,
     tools: [makeChartTool(dir), makeSpreadsheetTool(dir)],
   });
