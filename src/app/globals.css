@@ -191,6 +191,19 @@
   font-weight: 600;
 }
 
+/* The thread's running bead (src/components/thread/thread.tsx). */
+@keyframes thread-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --glass: var(--paper);

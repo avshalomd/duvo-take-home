@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Minus, TriangleAlert, X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { MotionConfig, motion } from "motion/react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -45,8 +45,13 @@ export function Thread({
   className?: string;
   label?: string;
 }) {
-  const reduce = useReducedMotion();
   const list = useRef<HTMLOListElement>(null);
+  // The steps already done when the thread first appeared: they are drawn done, with no pop. Only a step that
+  // finishes while the person watches pops, so a page load has no entrance animation (and the server's markup and
+  // the browser's first render agree, whatever the reduced-motion setting).
+  const [doneAtFirstPaint] = useState(
+    () => new Set(steps.filter((s) => s.status === "done").map((s) => s.key)),
+  );
   const nodes = useRef<(HTMLSpanElement | null)[]>([]);
   const [track, setTrack] = useState({ top: 0, height: 0, fill: 0 });
 
@@ -80,60 +85,85 @@ export function Thread({
   const nodeSize = mini ? "size-2.5" : "size-4";
 
   return (
-    <ol ref={list} aria-label={label} data-testid="thread" className={cn("relative", mini ? "space-y-1.5" : "space-y-4", className)}>
-      {/* the track: a quiet hairline groove the whole length of the plan */}
-      <span
-        aria-hidden
-        className={cn("absolute rounded-full bg-hairline", mini ? "left-[9px] w-0.5" : "left-[13px] w-[3px]")}
-        style={{ top: track.top, height: track.height }}
-      />
-      {/* the thread itself: grows from the top with a spring as steps finish */}
-      <motion.span
-        aria-hidden
-        className={cn("absolute origin-top rounded-full", t.fill, mini ? "left-[9px] w-0.5" : "left-[13px] w-[3px]")}
-        style={{ top: track.top, height: track.height || 1 }}
-        initial={false}
-        animate={{ scaleY: track.height ? track.fill / track.height : 0 }}
-        transition={reduce ? { duration: 0.15 } : SPRING}
-      />
-      {steps.map((step, i) => {
-        const current = step.status === "running";
-        return (
-          <li key={step.key} className="relative flex gap-3" aria-current={current ? "step" : undefined}>
-            <span className={cn("flex shrink-0 justify-center", gutter, mini ? "pt-[5px]" : "pt-[3px]")}>
-              <span
-                ref={(el) => {
-                  nodes.current[i] = el;
-                }}
-                className="relative flex items-center justify-center"
-              >
-                <Node status={step.status} tone={t} size={nodeSize} mini={mini} reduce={Boolean(reduce)} />
+    // "user": under reduced motion, motion skips transform animations (the fill and the pop jump to their end)
+    <MotionConfig reducedMotion="user">
+      <ol
+        ref={list}
+        aria-label={label}
+        data-testid="thread"
+        className={cn("relative", mini ? "space-y-1.5" : "space-y-4", className)}
+      >
+        {/* the track: a quiet hairline groove the whole length of the plan */}
+        <span
+          aria-hidden
+          className={cn(
+            "absolute rounded-full bg-hairline",
+            mini ? "left-[9px] w-0.5" : "left-[13px] w-[3px]",
+          )}
+          style={{ top: track.top, height: track.height }}
+        />
+        {/* the thread itself: grows from the top with a spring as steps finish */}
+        <motion.span
+          aria-hidden
+          className={cn(
+            "absolute origin-top rounded-full",
+            t.fill,
+            mini ? "left-[9px] w-0.5" : "left-[13px] w-[3px]",
+          )}
+          style={{ top: track.top, height: track.height || 1 }}
+          initial={false}
+          animate={{ scaleY: track.height ? track.fill / track.height : 0 }}
+          transition={SPRING}
+        />
+        {steps.map((step, i) => {
+          const current = step.status === "running";
+          return (
+            <li key={step.key} className="relative flex gap-3" aria-current={current ? "step" : undefined}>
+              <span className={cn("flex shrink-0 justify-center", gutter, mini ? "pt-[5px]" : "pt-[3px]")}>
+                <span
+                  ref={(el) => {
+                    nodes.current[i] = el;
+                  }}
+                  className="relative flex items-center justify-center"
+                >
+                  <Node
+                    status={step.status}
+                    tone={t}
+                    size={nodeSize}
+                    mini={mini}
+                    pop={!doneAtFirstPaint.has(step.key)}
+                  />
+                </span>
               </span>
-            </span>
-            <div className="min-w-0 flex-1">
-              <p
-                className={cn(
-                  mini ? "text-[13px] leading-5" : "text-[15px] leading-6",
-                  step.status === "pending" && "text-slate",
-                  step.status === "skipped" && "text-slate line-through decoration-hairline",
-                  current && "font-semibold",
-                  step.status === "done" && "font-medium",
-                )}
-              >
-                {step.title}
-              </p>
-              {!mini && step.note && <p className="mt-0.5 max-w-[62ch] text-[13px] leading-5 tracking-[0.01em] text-slate">{step.note}</p>}
-              {!mini && step.flag && (
-                <p className="mt-1 flex max-w-[62ch] items-start gap-1.5 text-[13px] leading-5 text-[color-mix(in_oklab,var(--saffron),var(--graphite)_35%)]">
-                  <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0 text-saffron" />
-                  <span>{step.flag}</span>
+              <div className="min-w-0 flex-1">
+                <p
+                  className={cn(
+                    mini ? "text-[13px] leading-5" : "text-[15px] leading-6",
+                    step.status === "pending" && "text-slate",
+                    step.status === "skipped" && "text-slate line-through decoration-hairline",
+                    current && "font-semibold",
+                    step.status === "done" && "font-medium",
+                  )}
+                >
+                  {step.title}
                 </p>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+                {!mini && step.note && (
+                  <p className="mt-0.5 max-w-[62ch] text-[13px] leading-5 tracking-[0.01em] text-slate">
+                    {step.note}
+                  </p>
+                )}
+                {!mini && step.flag && (
+                  <p className="mt-1 flex max-w-[62ch] items-start gap-1.5 text-[13px] leading-5 text-[color-mix(in_oklab,var(--saffron),var(--graphite)_35%)]">
+                    <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0 text-saffron" />
+                    <span>{step.flag}</span>
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </MotionConfig>
   );
 }
 
@@ -142,23 +172,25 @@ function Node({
   tone,
   size,
   mini,
-  reduce,
+  pop,
 }: {
   status: ThreadStep["status"];
   tone: (typeof TONE)[ThreadTone];
   size: string;
   mini: boolean;
-  reduce: boolean;
+  pop: boolean; // the step finished while the person was watching
 }) {
   if (status === "running") {
     return (
-      <span className={cn("relative flex items-center justify-center rounded-full border-2 border-saffron bg-paper", size)}>
-        {/* the bead breathes slowly (opacity and scale, not a spin): work is happening here, calmly */}
-        <motion.span
-          className="absolute inset-[3px] rounded-full bg-saffron"
-          animate={reduce ? undefined : { opacity: [1, 0.45, 1], scale: [1, 0.8, 1] }}
-          transition={reduce ? undefined : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-        />
+      <span
+        className={cn(
+          "relative flex items-center justify-center rounded-full border-2 border-saffron bg-paper",
+          size,
+        )}
+      >
+        {/* the bead breathes slowly (opacity and scale, not a spin): work is happening here, calmly. CSS, so
+            reduced motion simply switches it off, with nothing for the server and the browser to disagree on */}
+        <span className="absolute inset-[3px] animate-[thread-breathe_1.6s_ease-in-out_infinite] rounded-full bg-saffron motion-reduce:animate-none" />
         <span className="sr-only">In progress</span>
       </span>
     );
@@ -167,9 +199,9 @@ function Node({
     return (
       <motion.span
         // a finished step's node fills with a small pop, the only bounce in the thread: it answers a change
-        initial={reduce ? false : { scale: 0.6 }}
+        initial={pop ? { scale: 0.6 } : false}
         animate={{ scale: 1 }}
-        transition={reduce ? { duration: 0 } : { type: "spring", bounce: 0.35, duration: 0.4 }}
+        transition={{ type: "spring", bounce: 0.35, duration: 0.4 }}
         className={cn("flex items-center justify-center rounded-full border-2", tone.node, size)}
       >
         {!mini && <Check aria-hidden strokeWidth={3.5} className="size-2.5" />}
@@ -179,7 +211,12 @@ function Node({
   }
   if (status === "skipped") {
     return (
-      <span className={cn("flex items-center justify-center rounded-full border-2 border-dashed border-slate/60 bg-paper text-slate", size)}>
+      <span
+        className={cn(
+          "flex items-center justify-center rounded-full border-2 border-dashed border-slate/60 bg-paper text-slate",
+          size,
+        )}
+      >
         {!mini && <Minus aria-hidden strokeWidth={3} className="size-2.5" />}
         <span className="sr-only">Skipped</span>
       </span>

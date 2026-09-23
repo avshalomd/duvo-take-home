@@ -47,6 +47,7 @@ export const Automation = z.object({
   approvedAt: z.string().nullable(),
   schedule: z.string().nullable(), // cron; null = on demand only
   scheduleInput: z.string().nullable(),
+  scheduleTz: z.string().nullable().optional(), // IANA zone, e.g. "Europe/Prague"; cron times are read in it
   nextRunAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -127,7 +128,7 @@ export type UpdateAutomation = (workspaceId: string, id: string, edit: Automatio
 export type ApproveAutomation = (workspaceId: string, id: string) => Promise<Automation>;
 export type DeleteAutomation = (workspaceId: string, id: string) => Promise<void>; // a bad draft needs a way out
 export type SetAutomationStatus = (workspaceId: string, id: string, status: AutomationStatus) => Promise<void>;
-export type SetSchedule = (workspaceId: string, id: string, schedule: string | null, input: string | null) => Promise<void>;
+export type SetSchedule = (workspaceId: string, id: string, schedule: string | null, input: string | null, tz?: string | null) => Promise<void>;
 export type ListTrials = (workspaceId: string, automationId: string) => Promise<Trial[]>;
 export type SetHumanVerdict = (workspaceId: string, input: HumanVerdictInput) => Promise<void>;
 export type StartTrial = (ctx: Ctx, automationId: string, input: string) => Promise<{ id: string }>;
