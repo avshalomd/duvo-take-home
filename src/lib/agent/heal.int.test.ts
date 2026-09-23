@@ -5,7 +5,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs, workspaceSettings } from "@/db/schema";
 import type { Verdict } from "@/contracts/eval";
@@ -44,6 +44,8 @@ vi.mock("@/lib/eval/feedback", () => ({
 const verdict = (v: Verdict["verdict"], reasons: string[] = []): Verdict => ({ verdict: v, checks: [], judgment: null, review: null, reasons, evaluatedAt: "2026-09-23T12:00:00.000Z" });
 const FAIL = verdict("fail", ["The CSV parses: output.csv: row 2 has 4 fields, the header has 3"]);
 const PASS = verdict("pass");
+const FAIL_2 = verdict("fail", ["The reviewer asks: add a source for every row"]);
+const FAIL_3 = verdict("fail", ["The reviewer asks: rank by likes, not by size"]);
 
 const WS = `int-engine-heal-${process.pid}`; // per process: other worktrees run these tests against the same database
 const OFF_WS = `int-engine-heal-off-${process.pid}`;
@@ -53,7 +55,7 @@ async function queuedRun(workspaceId: string, what: string) {
   const [row] = await db.insert(runs).values({ prompt: `[int] ${what}`, status: "queued", model: "test", workspaceId }).returning({ id: runs.id });
   return row.id;
 }
-const healEvents = async (runId: string) => (await db.select().from(runEvents).where(eq(runEvents.runId, runId))).filter((e) => e.kind === "heal");
+const healEvents = async (runId: string) => (await db.select().from(runEvents).where(eq(runEvents.runId, runId)).orderBy(asc(runEvents.seq))).filter((e) => e.kind === "heal"); // in the order they happened
 
 beforeEach(async () => {
   calls.length = 0;
@@ -100,7 +102,7 @@ describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
     expect(stored[0].content).toBe(FIXED);
 
     // Q149: each attempt's own cost beside the SDK's raw running total, for Details
-    const finished = (await db.select().from(runEvents).where(eq(runEvents.runId, id))).filter((e) => e.kind === "finished");
+    const finished = (await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq))).filter((e) => e.kind === "finished");
     const costs = finished.map((e) => e.payload as { total_cost_usd: number; attempt_cost_usd: number });
     expect(costs.map((c) => c.total_cost_usd)).toEqual([0.01, 0.03]);
     expect(costs[0].attempt_cost_usd).toBeCloseTo(0.01, 10);
@@ -128,7 +130,9 @@ describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
   }, 30_000);
 
   it("stops after the workspace's number of attempts and keeps the last failing verdict", async () => {
-    vi.mocked(evaluateRun).mockResolvedValue(FAIL);
+    // each attempt fails differently, with different files: progress, so only the limit stops it (Q148 aside)
+    script.files = [BROKEN, FIXED, `${FIXED}3,c,"third"\n`];
+    vi.mocked(evaluateRun).mockResolvedValueOnce(FAIL).mockResolvedValueOnce(FAIL_2).mockResolvedValue(FAIL_3);
     const id = await queuedRun(WS, "a result that stays broken");
 
     await runAutomation(id);
@@ -142,7 +146,8 @@ describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
 
   // His words: "The run should say pass or fail only if all the auto-heal tries are exhausted."
   it("never shows a failing verdict while attempts remain: the run stays running, the finding lives in the heal event", async () => {
-    vi.mocked(evaluateRun).mockResolvedValue(FAIL);
+    script.files = [BROKEN, FIXED, `${FIXED}3,c,"third"\n`];
+    vi.mocked(evaluateRun).mockResolvedValueOnce(FAIL).mockResolvedValueOnce(FAIL_2).mockResolvedValue(FAIL_3);
     const id = await queuedRun(WS, "a result watched while it heals");
     const seen: { status: string; verdict: unknown; healAttempts: number }[] = [];
     hooks.onAttempt = async (attempt) => {
