@@ -31,7 +31,8 @@ function valuesOf(a: Automation): EditValues {
 }
 
 // The editor. A refused save returns what was typed and the form renders it again (React 19 resets a form after its
-// action). A successful save changes updatedAt, which is the form's key, so it re-mounts on the saved values.
+// action). The form's key is what its defaults come from - the saved row's updatedAt, and the typed values a refused
+// save sent back - so new defaults re-mount it: Base UI's inputs warn when a default changes under them.
 export function AutomationEditor({ automation, connections }: { automation: Automation; connections: ConnectionChoice[] }) {
   const [state, action, pending] = useActionState<EditState, FormData>(saveAutomationAction, {});
   const v = state.values ?? valuesOf(automation);
@@ -44,7 +45,7 @@ export function AutomationEditor({ automation, connections }: { automation: Auto
   ];
 
   return (
-    <form key={automation.updatedAt} action={action} className="space-y-5" aria-label="Edit the automation">
+    <form key={`${automation.updatedAt}:${JSON.stringify(state.values ?? null)}`} action={action} className="space-y-5" aria-label="Edit the automation">
       <input type="hidden" name="id" value={automation.id} />
       <input type="hidden" name="version" value={automation.version} />
 

@@ -19,7 +19,8 @@ export function ScheduleForm({ automationId, inputLabel, schedule, scheduleInput
   const [preset, setPreset] = useState<string>(state.values?.preset ?? presetOf(schedule));
 
   return (
-    <form action={action} className="space-y-3">
+    // keyed by the values a refused save sent back: they become the inputs' defaults, and Base UI warns when a default changes
+    <form key={JSON.stringify(state.values ?? null)} action={action} className="space-y-3">
       <input type="hidden" name="id" value={automationId} />
       <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
         <div className="space-y-1.5">

@@ -18,7 +18,15 @@ export function TryExampleForm({ automationId, inputLabel, inputHint, suggested 
         <span className="ml-1 font-normal text-muted-foreground">({inputLabel})</span>
       </label>
       <div className="flex gap-2">
-        <Input id="example-input" name="input" placeholder={inputHint || inputLabel} defaultValue={state.values?.input ?? suggested} className="h-9" />
+        {/* keyed by its default: Base UI's Input warns when a default changes under it, so a new one re-mounts it */}
+        <Input
+          key={state.values?.input ?? suggested}
+          id="example-input"
+          name="input"
+          placeholder={inputHint || inputLabel}
+          defaultValue={state.values?.input ?? suggested}
+          className="h-9"
+        />
         <Button type="submit" disabled={pending} className="h-9 bg-emerald-700 text-white hover:bg-emerald-800">
           {pending ? <LoaderCircle className="size-4 animate-spin" /> : <FlaskConical className="size-4" />}
           {pending ? "Starting..." : "Run example"}

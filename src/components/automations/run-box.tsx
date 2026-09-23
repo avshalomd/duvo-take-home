@@ -18,7 +18,15 @@ export function RunBox({ automationId, inputLabel, placeholder }: { automationId
         {inputLabel}
       </label>
       <div className="flex gap-2">
-        <Input id={inputId} name="input" placeholder={placeholder || inputLabel} defaultValue={state.values?.input} className="h-8 text-sm" />
+        {/* keyed by its default: Base UI's Input warns when a default changes under it, so a new one re-mounts it */}
+        <Input
+          key={state.values?.input ?? ""}
+          id={inputId}
+          name="input"
+          placeholder={placeholder || inputLabel}
+          defaultValue={state.values?.input}
+          className="h-8 text-sm"
+        />
         <Button type="submit" size="sm" disabled={pending} className="h-8 bg-emerald-700 text-white hover:bg-emerald-800">
           {pending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
           {pending ? "Starting..." : "Run"}
