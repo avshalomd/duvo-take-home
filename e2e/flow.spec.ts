@@ -303,7 +303,7 @@ test.describe("a finished run", () => {
     await why.click();
     const lines = panel.getByTestId("why");
     await expect(lines).toContainText("4 checks passed");
-    await expect(lines).toContainText("The judge was sure the result answers your instructions but not that the plan was finished");
+    await expect(lines).toContainText("The judge was sure the result answers your instructions, but could not tell whether the plan was finished");
     await expect(lines).toContainText("A reviewer read the whole run: finished and usable.");
     await expect(lines).not.toContainText("%");
   });
@@ -466,7 +466,8 @@ test.describe("a run that fixes what the check found", () => {
     await expect(last).toContainText("Fix what the check found (attempt 1 of 2)");
     await expect(last).toHaveAttribute("aria-current", "step");
     await panel.getByRole("button", { name: /why\?/i }).click();
-    await expect(panel.getByTestId("why")).toContainText(`The first result did not pass the check: ${HEAL.reason}`);
+    // HEAL.reason is "At least 8 rows: 3 rows": said in one sentence, lower case, with no chain of colons
+    await expect(panel.getByTestId("why")).toContainText("The first result did not pass the check: at least 8 rows (3 rows)");
   });
 
   test("a fixed run reads like any good run, Why? notes the fix, and Details shows what the agent was told", async ({ page }) => {
