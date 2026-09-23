@@ -177,7 +177,7 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q138 | final | the handover: 1.1 s of nothing after Run, two differently wrapped copies cross-fading, then 5 s of "reading your brief" with no thread | the move starts on the press and lands on a thread with its first bead | major | home | fixing |
 | Q139 | final | the Automations gallery is the most default-looking screen: the command breaks at its hyphen, no press feedback | built around the command token and a mini thread; the command never breaks | minor | automations | fixed (78b53be) |
 | Q140 | final | hovering a rail row squeezes its title to two characters | the title stays readable | minor | home | fixing |
-| Q141 | final | charts are white slabs in dark mode | charts that follow the theme | minor | outputs | fixing |
+| Q141 | final | charts are white slabs in dark mode | charts that follow the theme | minor | outputs | fixed (0b449ee: transparent, a style block with a dark-scheme twin; da4ceec: date axes) |
 | Q142 | final | a chart is labelled "contains 2 payment card numbers" (long decimals pass the card check) | no card warning on decimals or charts | minor | guards | fixed (474d81a: no card inside a decimal; charts skip phone/card/IBAN counts; hand-written .svg/.xlsx refused) |
 | Q143 | final | press feedback missing on rail rows, New run, top-bar links, Why?, gallery tiles; no focus ring on the composer capsule | the same press feedback and a visible focus everywhere | minor | home + automations | fixing |
 | Q144 | final | inline code in the report is monospace; some reports show "Report" twice | no monospace in the glance view; one heading | minor | home | fixing |
