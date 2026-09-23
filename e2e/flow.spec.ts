@@ -454,6 +454,20 @@ test.describe("a run that fixes what the check found", () => {
   });
 });
 
+test.describe("a run whose fixes stopped making progress", () => {
+  // Q148: the engine stops when a fix undoes an earlier one or fails the same way; it records why, and does not count it
+  test("says it stopped trying in plain words, counts only the fixes made, and keeps the engine's reason for Details", async ({ page }) => {
+    const panel = await openRun(page, runs.stuck);
+    await expect(panel.getByTestId("outcome")).toHaveText("Did not pass after 1 attempt to fix it");
+    await panel.getByRole("button", { name: /why\?/i }).click();
+    await expect(panel.getByTestId("why")).toContainText("Stopped trying: the first fix did not get the result any closer to passing");
+    await panel.getByRole("button", { name: /details/i }).click();
+    const timeline = page.getByRole("dialog", { name: /details/i }).getByTestId("timeline");
+    await expect(timeline).toContainText("Stopped trying - attempt 2 of 2");
+    await expect(timeline).toContainText(HEAL.stopped);
+  });
+});
+
 test.describe("a live run", () => {
   test("offers Stop, and pressing it either stops the run or says why it cannot", async ({ page }) => {
     const panel = await openRun(page, runs.live);

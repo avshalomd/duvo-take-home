@@ -4,39 +4,37 @@ import { fixesRun, healsOf, ordinal } from "./heal";
 
 const at = "2026-09-23T10:00:00.000Z";
 let seq = 0;
-const heal = (attempt: number, reasons = ["At least 8 rows: 3 rows"]): RunEvent => ({
-  seq: ++seq, at, kind: "heal", payload: { attempt, max: 2, reasons, feedback: "Add rows." },
-});
-const finished = (): RunEvent => ({
-  seq: ++seq, at, kind: "finished",
-  payload: { subtype: "success", is_error: false, num_turns: 3, duration_ms: 9000, total_cost_usd: 0.02, result: "Done." },
+const heal = (attempt: number, stopped?: string): RunEvent => ({
+  seq: ++seq, at, kind: "heal",
+  payload: { attempt, max: 2, reasons: ["At least 8 rows: 3 rows"], feedback: "Add rows.", ...(stopped ? { stopped } : {}) },
 });
 const stateOf = (events: RunEvent[]) =>
   events.flatMap((e) => (e.kind === "heal" ? [{ attempt: e.payload.attempt, max: e.payload.max, reasons: e.payload.reasons }] : []));
+const UNDID = "The fix undid an earlier one: the files are back to an earlier attempt's, so healing stopped here.";
 
-// Auto-heal: every heal event starts a fix inside the same run - except the one the engine records and then does not
-// run, because the last fix made no progress (Q148). That one is followed by the final verdict, not by an attempt.
+// Auto-heal: every heal event starts a fix inside the same run - except the one the engine records with a reason to
+// stop, because the last fix made no progress (Q148). That one is followed by the final verdict, not by an attempt,
+// and the engine does not count it among the run's attempts.
 describe("healsOf - the attempts to fix the result, and whether the engine stopped trying", () => {
-  it("marks no attempt stopped when each one was followed by the agent's work", () => {
-    const events = [finished(), heal(1), finished()];
-    expect(healsOf(stateOf(events), events, "succeeded").map((h) => h.stopped)).toEqual([false]);
+  it("marks no attempt stopped when the engine gave no reason to stop", () => {
+    const events = [heal(1)];
+    expect(healsOf(stateOf(events), events).map((h) => h.stopped)).toEqual([false]);
   });
 
-  it("marks the last attempt stopped when the run ended without doing it", () => {
-    const events = [finished(), heal(1), finished(), heal(2, ["At least 8 rows: 2 rows"])];
-    const heals = healsOf(stateOf(events), events, "succeeded");
+  it("marks the attempt the engine stopped, with the engine's own words for Details", () => {
+    const events = [heal(1), heal(2, UNDID)];
+    const heals = healsOf(stateOf(events), events);
     expect(heals.map((h) => h.stopped)).toEqual([false, true]);
-    expect(fixesRun(heals)).toBe(1);
+    expect(heals[1].stoppedBecause).toBe(UNDID);
   });
 
-  it("never calls an attempt stopped while the run is still working on it", () => {
-    const events = [finished(), heal(1)];
-    expect(healsOf(stateOf(events), events, "running")[0].stopped).toBe(false);
+  it("counts only the fixes the agent made, as the engine's heal_attempts does", () => {
+    const events = [heal(1), heal(2, UNDID)];
+    expect(fixesRun(healsOf(stateOf(events), events))).toBe(1);
   });
 
-  it("leaves a run the person stopped mid-fix to the thread's own 'Stopped here'", () => {
-    const events = [finished(), heal(1)];
-    expect(healsOf(stateOf(events), events, "cancelled")[0].stopped).toBe(false);
+  it("has no attempts on a run that never needed one", () => {
+    expect(healsOf(undefined, [])).toEqual([]);
   });
 });
 

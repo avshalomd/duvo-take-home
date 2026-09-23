@@ -17,7 +17,7 @@ function client() {
 
 export type HomeRuns = {
   parent: string; followUp: string; live: string; stopped: string; failed: string; legacy: string; audit: string; automation: string;
-  example: string; long: string; healing: string; healed: string; unfixed: string;
+  example: string; long: string; healing: string; healed: string; unfixed: string; stuck: string;
 };
 export const AUTOMATION = { name: `${PREFIX} audit`, command: COMMAND, input: "Acme Ltd" }; // a draft
 export const READY = { name: `${PREFIX} ready check`, command: "e2e-home-ready", hint: "The registered name, e.g. Acme Ltd" };
@@ -35,9 +35,15 @@ export const TITLES = {
   healing: `${PREFIX} healing: list at least eight AI news stories in a CSV`,
   healed: `${PREFIX} healed: list at least eight robotics stories in a CSV`,
   unfixed: `${PREFIX} unfixed: list at least eight space stories in a CSV`,
+  stuck: `${PREFIX} stuck: list at least eight sea stories in a CSV`,
 };
-// Auto-heal: what the check found on the first result, and what the agent was then told
-export const HEAL = { reason: "At least 8 rows: 3 rows", feedback: "output.csv has 3 rows; the brief asks for at least 8. Add stories until there are 8 or more." };
+// Auto-heal: what the check found on the first result, what the agent was then told, and the engine's words when it
+// stops trying (src/lib/agent/heal.ts, noProgress)
+export const HEAL = {
+  reason: "At least 8 rows: 3 rows",
+  feedback: "output.csv has 3 rows; the brief asks for at least 8. Add stories until there are 8 or more.",
+  stopped: "This attempt failed the same way as an earlier one, so healing stopped here.",
+};
 
 const PLAN = (running: number | null) => ({
   intent: "Facts about the Moon",
@@ -206,7 +212,11 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const unfixed = await insert({ prompt: TITLES.unfixed, status: "succeeded", minutesAgo: 13, heals: 2, verdict: FAIL_ROWS, report: "Six space stories.", cost: 0.2 });
   await events(unfixed, [started, { kind: "plan", payload: PLAN(null) }, attempt(0.1, 0.1), heal(1, HEAL.reason), attempt(0.15, 0.05), heal(2, "At least 8 rows: 5 rows"), attempt(0.2, 0.05)]);
 
-  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed };
+  // Q148: the engine stopped trying - the second heal is recorded with its reason and never made, and not counted
+  const stuck = await insert({ prompt: TITLES.stuck, status: "succeeded", minutesAgo: 14, heals: 1, verdict: FAIL_ROWS, report: "Six sea stories.", cost: 0.15 });
+  await events(stuck, [started, { kind: "plan", payload: PLAN(null) }, attempt(0.1, 0.1), heal(1, HEAL.reason), attempt(0.15, 0.05), { kind: "heal", payload: { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"], feedback: HEAL.feedback, stopped: HEAL.stopped } }]);
+
+  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck };
 }
 
 export async function deleteHomeRuns(): Promise<void> {
