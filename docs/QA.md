@@ -204,3 +204,49 @@ route a function of its own). Runs now execute in `/api/runner/<id>`, the only f
 | Q156 | qa-func (live) | an unknown invitation link said "This invitation is closed" | "We could not find this invitation" | minor | main (auth) | fixed (ddd6467, e2e; live, signed in and out) |
 | Q157 | qa-func (live) | on a horizontal bar chart the value labels "80" and "90" nearly touch | labels apart | minor | main (outputs) | fixed (about five ticks on the value axis; next deploy) |
 | Q158 | him (live) | a command's hint that wraps ("/model-scores Comma-separated list of...") runs over the composer's controls | the box grows with the hint | minor | main (home) | fixed (input and hint in one grid cell; e2e at phone width) |
+
+### Round: v2 deep QA (2026-09-23, after the link went to the reviewer)
+
+Production stayed read-only (anonymous GETs only). Two functional agents (runs and automations; accounts, roles and
+tenancy), a UX review of every screen at 1280 and 390 px in light and dark, and two code reviews (security and
+tenancy; the engine) ran against the local app and its own database. Workspace isolation held on every path tried.
+Fixes are made locally, on branches merged into v2; the next deploy is his call.
+
+| id | source | observed | expected | severity | owner | status |
+|---|---|---|---|---|---|---|
+| Q159 | reviewer (engine) | on Vercel a run can outlive its 300 s function (agent 240 s, then step checks and an unbounded evaluation); the killed run stays "running"/"evaluating" for ever, and Stop is never read | every run closes: the evaluation time-boxed, the agent's budget leaves room for it, a dead run closed when it is read or stopped | major | engine | fixing |
+| Q160 | reviewer (engine), qa-ux | after a self-heal the run's report is only the fix note ("What I changed: ...") | the whole task's report, with one line on the fix | major | engine | fixing |
+| Q161 | reviewer (engine) | a run ended by the wall clock, the tripwire or a crash records no cost, so the daily budget never sees it | the cost so far recorded on every way out | major | engine | fixing |
+| Q162 | reviewer (engine) | on a follow-up, Make an automation drafts from the change alone and Run again starts a paid run whose brief is only "Make the bars horizontal" | both use the whole thread's instructions | major | engine | fixing |
+| Q163 | reviewer (engine) | `$&`, `$$` or `$'` in a command's input are read as replacement patterns ("{input}" left in the prompt) | the input as typed | minor | engine | fixing |
+| Q164 | reviewer (engine) | a chart field named "revenue.usd" draws no marks, and the chart check passes it | the field drawn; an empty chart fails | minor | engine | fixing |
+| Q165 | reviewer (engine) | a Stop between a verdict and the next fix attempt lets that attempt run to its end | no attempt starts after Stop | minor | engine | fixing |
+| Q166 | reviewer (engine) | fix attempts never re-check the daily budget | healing stops when the budget is used up | minor | engine | fixing |
+| Q167 | qa-func (admin), reviewer (security) | a plain member can read pending invitation ids (members page, Better Auth's list-invitations), sign up with the invited email and join as admin; anyone knowing an invited email can take the account first | ids only for admins; sign-up needs the invitation from the link | major | auth | fixing |
+| Q168 | reviewer (security) | the private-address check reads the spelling only: `[::]`, `[::7f00:1]`, `100.100.100.200`, NAT64 and DNS names that resolve inside pass (connections, OAuth fetches, WebFetch) | addresses parsed and resolved; any internal one refused | major | connections | fixing |
+| Q169 | qa-func (admin) | an owner or admin cannot remove a member or change a role from the app (only through the auth API) | Remove and a role choice on Members | major | settings | open (a feature, his call) |
+| Q170 | qa-func (admin) | inviting an address again with another role keeps the old role | the new role, or a message | minor | auth | fixing |
+| Q171 | qa-func (admin) | switching to a workspace one is not in is a 500 | refused in plain words | minor | auth | fixing |
+| Q172 | qa-func (admin) | turning off or deleting another workspace's connection by id says nothing went wrong | "This connection was not found" | minor | settings | fixing |
+| Q173 | qa-func (admin) | no frame-ancestors / X-Frame-Options, no nosniff, `x-powered-by` sent: sign-in and Settings can be framed | the headers set | minor | main | fixing |
+| Q174 | reviewer (security) | `?oauth_error=<text>` is shown word for word as the app's own error toast | codes mapped to our sentences | minor | connections | fixing |
+| Q175 | reviewer (security) | no deployment-wide cap on runs in flight: every account can make workspaces, each with its own limits, on one key | a cap across workspaces | minor | engine | fixing |
+| Q176 | qa-func (admin) | sign-in rate limiting is Better Auth's in-memory default, per function instance | a shared store | minor | auth | open |
+| Q177 | qa-func (admin) | `/api/health?deep=1` is anonymous and makes a model call each time | cached or gated | minor | main | open |
+| Q178 | qa-func (admin) | any member can edit, approve, turn off or delete any automation | his call: members may, or admins only | question | automations | open (his call) |
+| Q179 | qa-ux | a chart's preview box is white in dark mode, so the chart's light text is invisible | the box follows the theme | major | home | fixing |
+| Q180 | qa-ux | the report-only automation /compare-concepts fails "a file was written": "Write a short answer" reads as asking for a file | "write" counts only with a file as its object | major | eval | fixing |
+| Q181 | qa-ux | a healed run says "3 of 3 done" above four thread nodes | the count agrees with the thread | minor | home | fixing |
+| Q182 | qa-ux | Details on a healed run: two groups keyed "step-2" (React warning) | unique keys | minor | home | fixing |
+| Q183 | qa-ux | tool names in step notes, the report and the reviewer's quoted reasons ("WebFetch blocked ... no shell/curl tool") | plain words | minor | engine | fixing |
+| Q184 | qa-ux | Why? sentences such as "The judge was sure the result does not answer your instructions but not that the plan was finished"; chained colons | one readable sentence each | minor | home | fixing |
+| Q185 | qa-ux | finished runs show a pending "Planning" and "waiting for the result..."; the failed banner points to Details, which has only a raw error | no pending marks on a finished run; the cause in the banner | minor | home | fixing |
+| Q186 | qa-ux | the steps of a run that did not pass are red circles with check marks | steps that ran look done; only the outcome is red | minor | home | fixing |
+| Q187 | qa-ux | Details: a local read badged "fetch", the machine's absolute path, the report as raw markdown pipes | "read", a path inside the run, no raw markdown | minor | home | fixing |
+| Q188 | qa-ux | the / command list covers the Run button; its output line is raw column names | Run visible; plain words | minor | home | fixing |
+| Q189 | qa-ux | the rail search shows the browser's blue clear button | graphite or none | minor | home | fixing |
+| Q190 | qa-ux | an automation run's rail row repeats the command as a tag and truncates the input | no repeated name | minor | home | fixing |
+| Q191 | qa-ux | the unknown-invitation page signed out offers "Go to your workspace" | "Sign in" | minor | auth | fixing |
+| Q192 | qa-ux | the workspace menu's white popover has no visible edge in light mode | a hairline edge | minor | home | fixing |
+| Q193 | qa-ux | inactive Settings tabs at 4.44:1 | 4.5:1 | minor | settings | fixing |
+| Q194 | qa-ux | the sign-in demo card grows as it plays (layout shifts ~22 px) and never reaches done | fixed height, ends green | minor | auth | fixing |
