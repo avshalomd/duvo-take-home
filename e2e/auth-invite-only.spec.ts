@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DEMO_EMAIL, DEMO_PASSWORD, E2E_PASSWORD, SIGNED_OUT, deleteUsers, e2eEmail, formError, inviteByRow, signInThroughUi } from "./auth-helpers";
+import { DEMO_EMAIL, DEMO_PASSWORD, E2E_PASSWORD, SIGNED_OUT, asNewClient, deleteUsers, e2eEmail, formError, inviteByRow, signInThroughUi } from "./auth-helpers";
 
 // Sign-up by invitation only, as production runs. The same variable starts the server in that mode and turns
 // these tests on (they skip in the default open mode, where auth.spec.ts signs people up freely):
@@ -7,6 +7,7 @@ import { DEMO_EMAIL, DEMO_PASSWORD, E2E_PASSWORD, SIGNED_OUT, deleteUsers, e2eEm
 //   SIGNUP_MODE=invite BASE_URL=http://localhost:3004 npx playwright test e2e/auth-invite-only.spec.ts
 test.skip(process.env.SIGNUP_MODE !== "invite", "run with SIGNUP_MODE=invite, against a server started the same way");
 test.use({ storageState: SIGNED_OUT });
+test.beforeEach(async ({ context }) => context.setExtraHTTPHeaders(asNewClient())); // a client of its own: the sign-in limit
 
 const INVITE_ONLY = "Handover is invite-only. Open your invitation link, or ask someone in a workspace to invite you.";
 const created: string[] = [];
@@ -26,11 +27,11 @@ test("the API refuses a sign-up without an invitation too, and no account is mad
   created.push(email);
   const res = await request.post("/api/auth/sign-up/email", {
     data: { name: "Api Uninvited", email, password: E2E_PASSWORD },
-    headers: { origin: baseURL! },
+    headers: { origin: baseURL!, ...asNewClient() },
   });
   expect(res.status()).toBe(403);
   expect((await res.json()).code).toBe("SIGNUP_INVITE_ONLY");
-  const signIn = await request.post("/api/auth/sign-in/email", { data: { email, password: E2E_PASSWORD }, headers: { origin: baseURL! } });
+  const signIn = await request.post("/api/auth/sign-in/email", { data: { email, password: E2E_PASSWORD }, headers: { origin: baseURL!, ...asNewClient() } });
   expect(signIn.status()).toBe(401);
 });
 
@@ -42,11 +43,11 @@ test("the API refuses an invited email's sign-up that did not come from the invi
   await inviteByRow(DEMO_EMAIL, invitee);
   const res = await request.post("/api/auth/sign-up/email", {
     data: { name: "Mallory", email: invitee, password: E2E_PASSWORD },
-    headers: { origin: baseURL! },
+    headers: { origin: baseURL!, ...asNewClient() },
   });
   expect(res.status()).toBe(403);
   expect((await res.json()).code).toBe("SIGNUP_INVITE_ONLY");
-  const signIn = await request.post("/api/auth/sign-in/email", { data: { email: invitee, password: E2E_PASSWORD }, headers: { origin: baseURL! } });
+  const signIn = await request.post("/api/auth/sign-in/email", { data: { email: invitee, password: E2E_PASSWORD }, headers: { origin: baseURL!, ...asNewClient() } });
   expect(signIn.status()).toBe(401); // no account was made
 });
 

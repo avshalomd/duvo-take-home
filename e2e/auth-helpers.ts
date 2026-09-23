@@ -13,6 +13,16 @@ export const E2E_PASSWORD = "e2e-password-123";
 // A browser with no cookies: these specs are about getting in, so they start signed out.
 export const SIGNED_OUT = { cookies: [], origins: [] };
 
+/**
+ * Sign-in and sign-up allow 3 tries in 10 s per client address (lib/auth/auth.ts), and every test browser comes from
+ * this one machine. A test that signs in or up poses as a client of its own: an address from 198.18.0.0/16 (reserved
+ * for testing) in x-forwarded-for, which the local server takes as the client's (on Vercel the platform sets it). So
+ * the suite stays under the limit, and only the test about the limit reaches it.
+ */
+export function asNewClient(): Record<string, string> {
+  return { "x-forwarded-for": `198.18.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 254) + 1}` };
+}
+
 /** A fresh address per test; the "e2e-" prefix marks it as a test account if a clean-up is ever missed. */
 export function e2eEmail(what: string) {
   return `e2e-${what}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}@example.com`;
@@ -77,7 +87,7 @@ export async function joinByRow(ownerEmail: string, email: string, role: "member
  * the test is about something else. Close the browser's context when done.
  */
 export async function signedInAs(requests: APIRequest, browser: Browser, baseURL: string, name: string, email: string) {
-  const api = await requests.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL } });
+  const api = await requests.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL, ...asNewClient() } });
   try {
     await expect(await api.post("/api/auth/sign-up/email", { data: { name, email, password: E2E_PASSWORD } })).toBeOK();
     const context = await browser.newContext({ storageState: await api.storageState() });
