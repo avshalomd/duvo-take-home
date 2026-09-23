@@ -3,12 +3,13 @@ import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { files as filesTable, runEvents, runs } from "@/db/schema";
 import { AgentLimits, type RunAutomation } from "@/contracts/agent";
 import type { AutomationTemplate } from "@/contracts/automation";
 import type { GuardRecord } from "@/contracts/guard";
+import type { OutputFile } from "@/contracts/outputs";
 import type { Plan, RunEvent } from "@/contracts/run";
 import { getAutomation } from "@/lib/automations/store";
 import { fillTemplate } from "@/lib/automations/template";
@@ -20,18 +21,24 @@ import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
 import { getLimits } from "@/lib/usage/budget";
+import { watchCancel } from "./cancel-watch";
+import { closeAsCancelled, updateUnlessCancelled } from "./close";
 import { statusUpdates } from "./connection-status";
 import { startDeadline } from "./deadline";
+import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
 import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
+import { newlyDone } from "./plan-diff";
 import { createPlanServer } from "./plan-tool";
+import { resumeOptions, sessionIdOf } from "./session";
 import { SYSTEM_PROMPT } from "./system.prompt";
 import { unknownVerdict } from "./unknown-verdict";
 import { removeRunDir } from "./workspace";
 
 export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const NATIVE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]; // everything else is removed below
+const CANCEL_POLL_MS = 2000; // Stop is felt within 2 s, at one tiny read per run every 2 s
 
 /** One working directory per run, gitignored; bypassPermissions lets the agent write anywhere under it.
  *  On Vercel the code directory is read-only, so the run lives under the function's temp dir instead. */
@@ -47,30 +54,42 @@ async function connectionServers(workspaceId: string) {
   return { enabled, servers };
 }
 
-/** The step indexes that turned "done" between two plans: each one gets a per-step check. */
-function newlyDone(before: Plan | null, after: Plan): number[] {
-  return after.steps
-    .filter((s) => s.status === "done" && before?.steps.find((b) => b.index === s.index)?.status !== "done")
-    .map((s) => s.index);
+/** Has the user pressed Stop on this run? The cancel watch asks every 2 s. */
+async function cancelRequested(runId: string): Promise<boolean> {
+  const [row] = await db.select({ at: runs.cancelRequestedAt }).from(runs).where(eq(runs.id, runId));
+  return row?.at != null;
 }
 
 /**
  * The whole loop for one run: spawn the agent, record every message it sends as a run_events row, collect the
- * files it wrote, evaluate the result and close the run. It is the only writer of a run's rows.
+ * files it wrote, evaluate the result and close the run. It is the only writer of a run's rows. Every way out -
+ * success, failure, the wall clock, Stop - closes the run, and "cancelled" is never overwritten once written.
  */
 export const runAutomation: RunAutomation = async (runId) => {
-  const [run] = await db.select().from(runs).where(eq(runs.id, runId));
-  if (!run) throw new Error(`run ${runId} not found`);
+  // Claim the run, queued -> running, in one statement. A run that is no longer queued - stopped while it waited,
+  // or already taken by another worker - is left alone: a cancelled run never starts and no run starts twice.
+  const [run] = await db
+    .update(runs)
+    .set({ status: "running" })
+    .where(and(eq(runs.id, runId), eq(runs.status, "queued")))
+    .returning();
+  if (!run) {
+    console.warn(`run ${runId} is not queued any more; not started`);
+    return;
+  }
   const workspaceId = run.workspaceId ?? "";
 
   // Everything before the first message can fail too (a read-only disk, a bad connection row): a run must never
-  // stay "queued" with no reason, so these steps close the run as failed like the loop below does.
+  // stay "running" with no reason, so these steps close the run as failed like the loop below does.
   const dir = runDir(runId);
   let enabled: Awaited<ReturnType<typeof connectionServers>>["enabled"];
   let servers: Awaited<ReturnType<typeof connectionServers>>["servers"];
   let limits: Awaited<ReturnType<typeof getLimits>>;
   let systemPrompt = SYSTEM_PROMPT;
   let template: AutomationTemplate | null = null;
+  let prompt = run.prompt; // what the agent is sent
+  let instructions = run.prompt; // what the step checks and the evaluator judge the result against
+  let resume: Awaited<ReturnType<typeof resumeOptions>> = null;
   try {
     await mkdir(dir, { recursive: true });
     ({ enabled, servers } = await connectionServers(workspaceId));
@@ -84,10 +103,14 @@ export const runAutomation: RunAutomation = async (runId) => {
         if (addendum) systemPrompt = `${SYSTEM_PROMPT}\n\n${addendum}`;
       }
     }
-    await db.update(runs).set({ status: "running", connectionIds: enabled.map((c) => c.id) }).where(eq(runs.id, runId));
+    if (run.parentRunId) {
+      // "Ask for a change": the parent's files go back into the directory and its conversation is continued.
+      ({ prompt, instructions, resume } = await prepareFollowUp(run, dir));
+    }
+    await db.update(runs).set({ connectionIds: enabled.map((c) => c.id) }).where(eq(runs.id, runId));
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    await db.update(runs).set({ status: "failed", error, finishedAt: new Date() }).where(eq(runs.id, runId));
+    await updateUnlessCancelled(runId, { status: "failed", error, finishedAt: new Date() });
     await removeRunDir(dir); // this branch returns, so the try/finally below never sees it
     return;
   }
@@ -96,6 +119,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   let seq = 1;
   const recorded: RunEvent[] = []; // kept so the closing update reads the plan and the result from the same events
   let plan: Plan | null = null;
+  const checks = new Set<Promise<void>>(); // the per-step checks still waiting on Jev
 
   // One writer, in order: the agent's messages, the guards' decisions and the step checks all arrive here, from
   // different callbacks, and each gets the next seq only when it is written.
@@ -117,7 +141,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         if (e.kind === "plan") {
           const before = plan;
           plan = e.payload;
-          if (limits.stepChecks) for (const i of newlyDone(before, e.payload)) void stepCheck(e.payload, i);
+          if (limits.stepChecks) for (const i of newlyDone(before, e.payload)) track(stepCheck(e.payload, i));
         }
       }
     });
@@ -125,30 +149,56 @@ export const runAutomation: RunAutomation = async (runId) => {
   };
   const now = () => new Date().toISOString();
 
-  // The per-step check runs beside the agent, never in its way: a slow or failed Jev call records nothing.
+  // The per-step check runs beside the agent, never in its way: a slow or failed Jev call records nothing, and
+  // nothing in here may throw - an unhandled rejection would take the whole worker process down with it.
   const stepCheck = async (p: Plan, stepIndex: number) => {
-    const startedAt = recorded.findLastIndex((e) => e.kind === "plan" && e.payload.steps[stepIndex]?.status === "running");
-    const calls = recorded
-      .slice(Math.max(0, startedAt))
-      .flatMap((e) => (e.kind === "tool_call" ? [{ name: e.payload.name, input: e.payload.input }] : []));
-    const check = await checkStep({ prompt: run.prompt, plan: p, stepIndex, calls }).catch(() => null);
-    if (check) await write([{ kind: "check", payload: check, at: now() }]);
+    try {
+      const startedAt = recorded.findLastIndex((e) => e.kind === "plan" && e.payload.steps[stepIndex]?.status === "running");
+      const calls = recorded
+        .slice(Math.max(0, startedAt))
+        .flatMap((e) => (e.kind === "tool_call" ? [{ name: e.payload.name, input: e.payload.input }] : []));
+      const check = await checkStep({ prompt: instructions, plan: p, stepIndex, calls });
+      await write([{ kind: "check", payload: check, at: now() }]);
+    } catch {
+      // no check event: the stepper shows the step without a mark
+    }
+  };
+  const track = (p: Promise<void>) => {
+    checks.add(p);
+    void p.finally(() => checks.delete(p));
+  };
+  // Before the run closes: the checks still in flight land, then every queued write is in.
+  const settle = async () => {
+    await Promise.allSettled([...checks]);
+    await chain;
   };
 
   const recordGuard = async (r: GuardRecord) => {
     await write([{ kind: "guard", payload: r, at: now() }]);
   };
 
-  // The wall clock the SDK does not keep: turns and budget cannot stop a tool that simply hangs.
+  // The wall clock the SDK does not keep: turns and budget cannot stop a tool that simply hangs. Stop aborts the
+  // same controller, so the SDK sees one abort and the catch below tells the two apart.
   const deadline = startDeadline(AgentLimits.wallClockMs);
+  const cancel = watchCancel({ isRequested: () => cancelRequested(runId), controller: deadline.controller, everyMs: CANCEL_POLL_MS });
   const outputs = createOutputsServer(dir);
   const connectionNames = Object.fromEntries(enabled.map((c) => [connectionKey(c.name), c.name]));
+
+  // The files are stored once, whichever way the run ends: a stopped run keeps what the agent wrote so far.
+  let stored: OutputFile[] | null = null;
+  const storeFiles = async (): Promise<OutputFile[]> => {
+    if (stored) return stored;
+    const found = await collectFiles(dir);
+    if (found.length) await db.insert(filesTable).values(found.map((f) => ({ runId, ...f, ...scanOutput(f) })));
+    stored = found;
+    return found;
+  };
 
   // Everything from here to the closing update is inside one try: a failure in the file collection, the evaluator
   // or a database write used to leave the run "running" or "evaluating" for ever with nobody to close it.
   try {
     const q = query({
-      prompt: run.prompt,
+      prompt,
       options: {
         cwd: dir,
         settingSources: [], // never load this repo's or the user's settings into the child (hooks, CLAUDE.md)
@@ -180,38 +230,41 @@ export const runAutomation: RunAutomation = async (runId) => {
         systemPrompt, // a plain string replaces Claude Code's large preset prompt
         mcpServers: { plan: createPlanServer(), ...(outputs ? { [OUTPUTS_SERVER_KEY]: outputs } : {}), ...servers },
         env: { ...process.env }, // env REPLACES the child's environment: without the spread it has no API key
+        ...resume, // a follow-up: { resume, forkSession } when the parent's session is still on this machine
       },
     });
 
-    for await (const message of q) await write(map(message, 0, now()));
-    deadline.clear(); // the stream is done; nothing left to abort
-    await chain; // the step checks still in flight land before the run closes
-
-    const written = await collectFiles(dir);
-    if (written.length) {
-      await db.insert(filesTable).values(written.map((f) => ({ runId, ...f, ...scanOutput(f) })));
+    for await (const message of q) {
+      const sessionId = sessionIdOf(message);
+      if (sessionId) await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up resumes
+      await write(map(message, 0, now()));
     }
+    deadline.clear(); // the stream is done; nothing left to abort
+    await settle();
+    const written = await storeFiles();
 
+    // An abort can end the stream quietly instead of throwing: Stop is then seen here.
+    if (cancel.cancelled()) {
+      await closeAsCancelled(runId);
+      return;
+    }
     const end = recorded.find((e) => e.kind === "finished")?.payload;
     // No result message means the child died mid-stream. That is a failure, not a success with no report.
     if (!end) throw new Error("the agent ended without a result");
     const finalPlan = (recorded.filter((e) => e.kind === "plan").at(-1)?.payload ?? null) as Plan | null;
-    await db
-      .update(runs)
-      .set({
-        status: "evaluating", // visible while the judge runs: the run is done but the verdict is not
-        report: end.result || null,
-        error: end.is_error ? end.result || end.subtype : null, // the provider's words when the SDK sent any
-        numTurns: end.num_turns,
-        durationMs: end.duration_ms,
-        costUsd: end.total_cost_usd,
-      })
-      .where(eq(runs.id, runId));
+    await updateUnlessCancelled(runId, {
+      status: "evaluating", // visible while the judge runs: the run is done but the verdict is not
+      report: end.result || null,
+      error: end.is_error ? end.result || end.subtype : null, // the provider's words when the SDK sent any
+      numTurns: end.num_turns,
+      durationMs: end.duration_ms,
+      costUsd: end.total_cost_usd,
+    });
 
     // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
     // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59).
-    const verdict = await evaluateRun({
-      prompt: run.prompt,
+    const evaluation = evaluateRun({
+      prompt: instructions,
       runStatus: end.is_error ? "failed" : "succeeded",
       report: end.result || null,
       plan: finalPlan,
@@ -222,22 +275,32 @@ export const runAutomation: RunAutomation = async (runId) => {
       toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
       template,
     }).catch(unknownVerdict);
+    // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
+    const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);
+    if (verdict === null || cancel.cancelled()) {
+      await closeAsCancelled(runId); // keeps the report, turns and cost written above; no verdict
+      return;
+    }
 
-    await db
-      .update(runs)
-      .set({ status: end.is_error ? "failed" : "succeeded", verdict, finishedAt: new Date() })
-      .where(eq(runs.id, runId));
+    await updateUnlessCancelled(runId, { status: end.is_error ? "failed" : "succeeded", verdict, finishedAt: new Date() });
   } catch (err) {
+    await settle().catch(() => undefined);
+    if (cancel.cancelled()) {
+      // Stopped by the user: what the agent wrote so far is kept (and scanned like any other file), with no verdict.
+      await storeFiles().catch((e) => console.error(`run ${runId}: files of a stopped run not stored`, e));
+      await closeAsCancelled(runId);
+      return;
+    }
     // An abort reads as a generic "aborted" error, so say which limit ended the run.
     const error = deadline.expired()
       ? `timed out after ${Math.round(AgentLimits.wallClockMs / 1000)} s`
       : err instanceof Error
         ? err.message
         : String(err);
-    await chain.catch(() => undefined);
-    await db.update(runs).set({ status: "failed", error, finishedAt: new Date() }).where(eq(runs.id, runId));
+    await updateUnlessCancelled(runId, { status: "failed", error, finishedAt: new Date() });
   } finally {
     deadline.clear();
+    cancel.stop();
     // The files that matter are rows in the database by now, so the working directory is rubbish either way;
     // on Vercel /tmp survives between invocations and would fill up (QA Q58).
     await removeRunDir(dir);
