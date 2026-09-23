@@ -27,6 +27,7 @@ export const runs = pgTable("runs", {
   sessionId: text("session_id"), // the Agent SDK session, so a follow-up can resume it
   cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }), // Stop sets it; the loop aborts within 2 s
   humanVerdict: text("human_verdict"), // approved | rejected: the person's own judgment of the result
+  humanVerdictBy: text("human_verdict_by"), // the user id of who judged it; null on rows judged before it was stored
   humanNote: text("human_note"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   healAttempts: integer("heal_attempts").notNull().default(0), // how many times this run fixed its own result

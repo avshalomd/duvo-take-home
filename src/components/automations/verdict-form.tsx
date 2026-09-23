@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { setVerdictAction, type ActionState } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { verdictWords } from "@/lib/runs/verdict-words";
 import { cn } from "@/lib/utils";
 import { FIELD, SMALL } from "./surfaces";
 
@@ -14,26 +15,28 @@ type Props = {
   succeeded: boolean; // "looks right" only fits a run that succeeded
   verdict: "approved" | "rejected" | null;
   note: string | null;
+  said: string | null; // the judgment as who made it, worded on the server where the judge's name is known
 };
 
-// The person's own judgment of an example: the automatic check is advice, this is what approval counts. "Looks right"
-// is one press; "Not right" asks what is off first. The parent keys this form by the stored verdict, so a saved
-// answer re-mounts it in its "you said" state.
-export function VerdictForm({ automationId, runId, succeeded, verdict, note }: Props) {
+// A person's judgment of an example: the automatic check is advice, this is what approval counts. "Looks right" is one
+// press; "Not right" asks what is off first. The parent keys this form by the stored verdict and its words, so a saved
+// answer re-mounts it in its judged state. Anyone may change it; the new judgment is then theirs.
+export function VerdictForm({ automationId, runId, succeeded, verdict, note, said }: Props) {
   const [state, action, pending] = useActionState<ActionState, FormData>(setVerdictAction, {});
   const [changing, setChanging] = useState(false);
   const [explaining, setExplaining] = useState(false);
 
-  if (verdict && !changing)
+  if (verdict && !changing) {
+    const words = said ?? verdictWords(verdict, null, ""); // never "You" without knowing it was you
     return (
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px]">
         {verdict === "approved" ? (
           <span className="inline-flex items-center gap-1.5 font-medium text-fern">
-            <Check aria-hidden className="size-4" /> You said it looks right
+            <Check aria-hidden className="size-4" /> {words}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 font-medium text-crimson">
-            <X aria-hidden className="size-4" /> You said it is not right
+            <X aria-hidden className="size-4" /> {words}
           </span>
         )}
         {note && <span className="text-slate">({note})</span>}
@@ -42,6 +45,7 @@ export function VerdictForm({ automationId, runId, succeeded, verdict, note }: P
         </Button>
       </p>
     );
+  }
 
   return (
     <form action={action} className="space-y-3">

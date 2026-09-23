@@ -126,6 +126,7 @@ export const Run = z.object({
   parentRunId: z.string().nullable().optional(),
   cancelRequested: z.boolean().optional(),
   humanVerdict: z.enum(["approved", "rejected"]).nullable().optional(), // the person's own judgment
+  humanVerdictBy: z.string().nullable().optional(), // who judged it (a user id); null on rows from before it was stored
   humanNote: z.string().nullable().optional(),
   healAttempts: z.number().int().optional(), // how many times the run fixed its own result after a failing verdict
 });

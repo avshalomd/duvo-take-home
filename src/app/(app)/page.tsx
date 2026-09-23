@@ -7,7 +7,9 @@ import { RunSheet } from "@/components/run/run-sheet";
 import { RunsRail, type RailRun } from "@/components/run/runs-rail";
 import { RailSheet } from "@/components/run/rail-sheet";
 import { requireSession } from "@/lib/auth/session";
+import { judgeNames, judgeOf } from "@/lib/runs/judges";
 import { getRun, listRuns } from "@/lib/runs/queries";
+import { verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { composerProps, connectionsOf, fileFacts, readyAutomations, titles } from "@/components/run/home-data";
 import { runTag as runTagOf, runTitle as runTitleOf } from "@/components/run/rail";
@@ -26,7 +28,7 @@ export const maxDuration = 300;
 export default async function Home({ searchParams }: PageProps<"/">) {
   const { run } = await searchParams;
   const selectedId = typeof run === "string" ? run : undefined;
-  const { workspaceId } = await requireSession();
+  const { workspaceId, userId } = await requireSession();
 
   return (
     <div className="flex w-full flex-1">
@@ -37,7 +39,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         {/* room for a run that does not exist yet: the sheet the brief moves into at the press of Run (Q138) */}
         <HandoverHost>
           <Suspense fallback={<SheetSkeleton />}>
-            <MainColumn workspaceId={workspaceId} selectedId={selectedId} />
+            <MainColumn workspaceId={workspaceId} userId={userId} selectedId={selectedId} />
           </Suspense>
         </HandoverHost>
       </main>
@@ -72,7 +74,7 @@ async function Rail({ workspaceId, selectedId }: { workspaceId: string; selected
   );
 }
 
-async function MainColumn({ workspaceId, selectedId }: { workspaceId: string; selectedId?: string }) {
+async function MainColumn({ workspaceId, userId, selectedId }: { workspaceId: string; userId: string; selectedId?: string }) {
   const composer = await composerProps(workspaceId);
   if (!selectedId) return <FirstVisit composer={composer} />;
 
@@ -84,6 +86,9 @@ async function MainColumn({ workspaceId, selectedId }: { workspaceId: string; se
   // the parent is read only for a follow-up, and only for its title
   const parent = run.parentRunId ? await getRun(workspaceId, run.parentRunId) : null;
   const connections = (await connectionsOf(workspaceId)).map((c) => ({ name: c.name })); // names only: no url, no token state
+  // the person's mark, as who made it: "You said" only to them (Q178)
+  const judges = await judgeNames([run.humanVerdictBy]);
+  const verdictLine = run.humanVerdict ? verdictWords(run.humanVerdict, judgeOf(run.humanVerdictBy, judges), userId) : null;
 
   return (
     <RunSheet
@@ -92,6 +97,7 @@ async function MainColumn({ workspaceId, selectedId }: { workspaceId: string; se
       title={runTitleOf(run, names)}
       parentTitle={parent ? runTitleOf(parent.run, names) : null}
       automationName={run.automationId ? (names[run.automationId] ?? null) : null}
+      verdictLine={verdictLine}
       facts={await fileFacts(workspaceId, run, data.files)}
       connections={connections}
       composer={composer}

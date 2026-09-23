@@ -186,7 +186,7 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect((await listAutomations(OTHER_WS)).map((x) => x.id)).not.toContain(a.id);
     expect((await listAutomations(WS)).map((x) => x.id)).toContain(a.id);
     const runId = await insertRun();
-    expect((await setHumanVerdict(OTHER_WS, { runId, verdict: "approved" }).catch((e) => e)).message).toMatch(/not found/i);
+    expect((await setHumanVerdict({ ...ctx, workspaceId: OTHER_WS }, { runId, verdict: "approved" }).catch((e) => e)).message).toMatch(/not found/i);
   });
 
   it("refuses to turn on an automation that was never approved, and turns an approved one off", async () => {

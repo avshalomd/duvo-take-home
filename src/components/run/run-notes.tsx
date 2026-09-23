@@ -1,11 +1,22 @@
 import { CornerDownRight, FlaskConical, ThumbsDown, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 import type { Run } from "@/contracts/run";
+import { verdictWords } from "@/lib/runs/verdict-words";
 
 const link = "rounded-sm underline-offset-2 hover:text-graphite hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
 
 // The quiet lines under a run's title: where it came from, and what the person made of it. One line each.
-export function RunNotes({ run, parentTitle, automationName }: { run: Run; parentTitle: string | null; automationName: string | null }) {
+export function RunNotes({
+  run,
+  parentTitle,
+  automationName,
+  verdictLine,
+}: {
+  run: Run;
+  parentTitle: string | null;
+  automationName: string | null;
+  verdictLine: string | null; // "You said it looks right", "Mia said it looks right" or "Marked: looks right"
+}) {
   const notes: React.ReactNode[] = [];
 
   if (run.parentRunId)
@@ -37,7 +48,7 @@ export function RunNotes({ run, parentTitle, automationName }: { run: Run; paren
     notes.push(
       <span key="human">
         <Thumb aria-hidden className={`mr-1.5 inline size-3.5 align-[-2px] ${right ? "text-fern" : "text-crimson"}`} />
-        You marked this: {right ? "looks right" : "not right"}
+        {verdictLine ?? verdictWords(run.humanVerdict, null, "") /* never "You" without knowing it was you */}
         {run.humanNote && <span className="italic"> - &ldquo;{run.humanNote}&rdquo;</span>}
       </span>,
     );

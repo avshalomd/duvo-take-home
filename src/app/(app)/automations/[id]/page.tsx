@@ -23,7 +23,9 @@ import { getAutomation, listTrials } from "@/lib/automations/store";
 import { canApprove } from "@/lib/automations/template";
 import { listConnections } from "@/lib/connections/store";
 import { schedulerRunning } from "@/lib/runner/mode";
+import { judgeNames, judgeOf } from "@/lib/runs/judges";
 import { getRun } from "@/lib/runs/queries";
+import { verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +40,7 @@ const SHOWN_EXAMPLES = 6; // each one is read in full for its plan, files and ve
 export default async function AutomationPage({ params, searchParams }: PageProps<"/automations/[id]">) {
   const { id } = await params;
   const { approved } = await searchParams;
-  const { workspaceId, role } = await requireSession();
+  const { workspaceId, role, userId } = await requireSession();
   const automation = await getAutomation(workspaceId, id);
   // not notFound(): the loading boundary above has already streamed a 200, so a plain message is what the reader gets anyway
   if (!automation) return <Missing />;
@@ -46,7 +48,10 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   const [trials, connections, history] = await Promise.all([listTrials(workspaceId, id), listConnections(workspaceId), automationHistory(workspaceId, id)]);
   const current = trials.filter((t) => t.version === automation.version);
   const older = trials.filter((t) => t.version !== automation.version);
-  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES));
+  // each judgment says who made it: "You said" to them, their name to everyone else (Q178)
+  const names = await judgeNames(trials.map((t) => t.humanVerdictBy));
+  const said = (t: Trial) => (t.humanVerdict ? verdictWords(t.humanVerdict, judgeOf(t.humanVerdictBy, names), userId) : null);
+  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said);
   const approval = canApprove(trials, automation.version);
   const isDraft = automation.status === "draft";
   // Q178: a member drafts, edits, tries and judges; approve, turn off, delete and the schedule read as who does them
@@ -119,7 +124,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
               ))}
             </ul>
           )}
-          {older.length > 0 && <OlderExamples trials={older} />}
+          {older.length > 0 && <OlderExamples trials={older} said={said} />}
           {isDraft && (
             <ApprovalBar
               automationId={automation.id}
@@ -188,7 +193,7 @@ function Schedule({ automation: a, governs }: { automation: Automation; governs:
 }
 
 /** The current version's examples with what their cards show: the plan, the files and the verdict, read once here. */
-async function examplesOf(workspaceId: string, trials: Trial[]): Promise<ExampleView[]> {
+async function examplesOf(workspaceId: string, trials: Trial[], said: (t: Trial) => string | null): Promise<ExampleView[]> {
   const found = await Promise.all(trials.map((t) => getRun(workspaceId, t.runId)));
   return trials.flatMap((t, i) => {
     const data = found[i];
@@ -204,13 +209,14 @@ async function examplesOf(workspaceId: string, trials: Trial[]): Promise<Example
         plan: deriveState(data.run, data.events).plan,
         humanVerdict: t.humanVerdict,
         humanNote: t.humanNote,
+        said: said(t),
       },
     ];
   });
 }
 
 // Examples of an earlier version no longer count toward approval; they stay, folded, as the record.
-function OlderExamples({ trials }: { trials: Trial[] }) {
+function OlderExamples({ trials, said }: { trials: Trial[]; said: (t: Trial) => string | null }) {
   return (
     <details className="rounded-[16px] px-1">
       <summary className="cursor-pointer text-[15px] text-slate">
@@ -225,7 +231,7 @@ function OlderExamples({ trials }: { trials: Trial[] }) {
             <span className="text-slate">
               {" "}
               {outcome(t.status, t.outcome).label.toLowerCase()}
-              {t.humanVerdict === "approved" ? ", you said it looked right" : t.humanVerdict === "rejected" ? ", you said it was not right" : ""}
+              {said(t) && `. ${said(t)}`}
             </span>
           </li>
         ))}

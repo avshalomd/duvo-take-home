@@ -114,9 +114,9 @@ export async function setVerdictAction(_prev: ActionState, formData: FormData): 
     note: field(formData, "note") || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose looks right or not right." };
-  const { workspaceId } = await ctx();
   try {
-    await setHumanVerdict(workspaceId, { runId: parsed.data.runId, verdict: parsed.data.verdict, note: parsed.data.note });
+    // who judged is the session's user, never a field of the form
+    await setHumanVerdict(await ctx(), { runId: parsed.data.runId, verdict: parsed.data.verdict, note: parsed.data.note });
   } catch (e) {
     return { error: readError(e) };
   }

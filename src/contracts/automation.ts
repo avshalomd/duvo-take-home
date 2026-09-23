@@ -86,6 +86,7 @@ export const Trial = z.object({
   status: RunStatus,
   outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown"]).nullable(),
   humanVerdict: z.enum(["approved", "rejected"]).nullable(),
+  humanVerdictBy: z.string().nullable(), // the user id of who judged it; null on rows judged before it was stored
   humanNote: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -130,6 +131,7 @@ export type DeleteAutomation = (workspaceId: string, id: string) => Promise<void
 export type SetAutomationStatus = (workspaceId: string, id: string, status: AutomationStatus) => Promise<void>;
 export type SetSchedule = (workspaceId: string, id: string, schedule: string | null, input: string | null, tz?: string | null) => Promise<void>;
 export type ListTrials = (workspaceId: string, automationId: string) => Promise<Trial[]>;
-export type SetHumanVerdict = (workspaceId: string, input: HumanVerdictInput) => Promise<void>;
+/** Who judged is the session's user, recorded with the verdict so the page can say "You said" only when it was you. */
+export type SetHumanVerdict = (ctx: Ctx, input: HumanVerdictInput) => Promise<void>;
 export type StartTrial = (ctx: Ctx, automationId: string, input: string) => Promise<{ id: string }>;
 export type RunCommand = (ctx: Ctx, parsed: ParsedCommand) => Promise<{ id: string }>;
