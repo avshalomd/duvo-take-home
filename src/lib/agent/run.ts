@@ -21,6 +21,7 @@ import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
 import { getLimits } from "@/lib/usage/budget";
+import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
 import { closeAsCancelled, updateUnlessCancelled } from "./close";
 import { statusUpdates } from "./connection-status";
@@ -92,18 +93,20 @@ export const runAutomation: RunAutomation = async (runId) => {
   let instructions = run.prompt; // what the step checks and the evaluator judge the result against
   let resume: Awaited<ReturnType<typeof resumeOptions>> = null;
   try {
+    if (run.automationId) {
+      // A saved automation's run keeps to its template: the system prompt says so, the evaluator checks it. First,
+      // the template must still be the version the run was started at (and approved, for a command or schedule):
+      // otherwise the run fails here, before the agent starts, with the reason (QA Q82).
+      const automation = await getAutomation(workspaceId, run.automationId);
+      const refusal = automationRunRefusal(run, automation);
+      if (refusal || !automation) throw new Error(refusal ?? AUTOMATION_GONE);
+      template = automation.template;
+      const addendum = fillTemplate(automation, run.input ?? "").systemAddendum;
+      if (addendum) systemPrompt = `${SYSTEM_PROMPT}\n\n${addendum}`;
+    }
     await mkdir(dir, { recursive: true });
     ({ enabled, servers } = await connectionServers(workspaceId));
     limits = await getLimits(workspaceId);
-    if (run.automationId) {
-      // A saved automation's run keeps to its template: the system prompt says so, the evaluator checks it.
-      const automation = await getAutomation(workspaceId, run.automationId);
-      if (automation) {
-        template = automation.template;
-        const addendum = fillTemplate(automation, run.input ?? "").systemAddendum;
-        if (addendum) systemPrompt = `${SYSTEM_PROMPT}\n\n${addendum}`;
-      }
-    }
     if (run.parentRunId) {
       // "Ask for a change": the parent's files go back into the directory and its conversation is continued.
       ({ prompt, instructions, resume } = await prepareFollowUp(run, dir));
