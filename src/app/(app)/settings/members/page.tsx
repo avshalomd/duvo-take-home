@@ -2,7 +2,7 @@ import { InviteForm } from "@/components/settings/invite-form";
 import { MembersList } from "@/components/settings/members-list";
 import { listMembers } from "@/lib/auth/members";
 import { requireSession } from "@/lib/auth/session";
-import { canChangeSettings } from "../roles";
+import { canChangeSettings } from "@/lib/auth/roles";
 
 export default async function MembersPage() {
   const session = await requireSession();

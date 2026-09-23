@@ -2,7 +2,7 @@ import { LimitsForm } from "@/components/settings/limits-form";
 import { UsageCard } from "@/components/settings/usage-card";
 import { requireSession } from "@/lib/auth/session";
 import { getLimits, getUsage } from "@/lib/usage/budget";
-import { canChangeSettings } from "../roles";
+import { canChangeSettings } from "@/lib/auth/roles";
 
 export default async function LimitsPage() {
   const session = await requireSession();

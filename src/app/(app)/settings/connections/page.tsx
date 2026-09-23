@@ -2,7 +2,7 @@ import { ConnectionsList } from "@/components/settings/connections-list";
 import { OAuthToast } from "@/components/settings/oauth-toast";
 import { requireSession } from "@/lib/auth/session";
 import { listConnections } from "@/lib/connections/store";
-import { canChangeSettings } from "../roles";
+import { canChangeSettings } from "@/lib/auth/roles";
 
 // The query only carries a message back from the OAuth callback; anything but a single string is ignored.
 const one = (v: string | string[] | undefined) => (typeof v === "string" && v.length > 0 ? v.slice(0, 200) : undefined);

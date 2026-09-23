@@ -11,7 +11,7 @@ import type { FormState } from "../actions";
 import { parseConnectionForm } from "./connection-form";
 import { inviteError, settingsError } from "./errors";
 import { parseLimitsForm } from "./limits-form";
-import { canChangeSettings } from "./roles";
+import { canChangeSettings } from "@/lib/auth/roles";
 
 // Every action returns its state instead of throwing, and takes the workspace from the session, never from the
 // form: a Server Action is a public endpoint, so its arguments are validated like any other input. The role is
