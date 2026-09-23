@@ -60,6 +60,10 @@ describe("healPrompt", () => {
     expect(healPrompt(feedback)).toMatch(/update_step/);
   });
 
+  it("tells the agent to keep its plan, so the person's steps stay on the thread (production, 2026-09-23)", () => {
+    expect(healPrompt(feedback)).toMatch(/keep your plan.*set_plan/i);
+  });
+
   // Q149: feedbackForAgent already opens with its lead and closes with "report what you changed".
   it("uses the feedback as it is, framed once: no second lead or closing line of its own", () => {
     const real = [
