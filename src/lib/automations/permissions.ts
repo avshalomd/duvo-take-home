@@ -1,4 +1,5 @@
 import type { SessionCtx } from "@/contracts/auth";
+import type { AutomationStatus } from "@/contracts/automation";
 
 // Q178 (his decision): anyone in the workspace drafts an automation, edits it, runs examples and judges them. Only an
 // owner or an admin approves it, turns it off or on, deletes it or sets its schedule. Approval is the human gate that
@@ -22,4 +23,13 @@ export function canGovernAutomations(role: SessionCtx["role"]): boolean {
 /** The sentence a refused action returns, or null when the role may do it. */
 export function refusalFor(role: SessionCtx["role"], act: GovernedAct): string | null {
   return canGovernAutomations(role) ? null : REFUSAL[act];
+}
+
+/**
+ * A draft's command is anyone's to change. Once approved (Ready or Off), people call it by that command, and renaming it
+ * takes it from them with no approval step, so only an owner or an admin may. Null when allowed.
+ */
+export function commandRefusal(role: SessionCtx["role"], status: AutomationStatus): string | null {
+  if (status === "draft" || canGovernAutomations(role)) return null;
+  return "Only an owner or an admin can change the command of an approved automation.";
 }

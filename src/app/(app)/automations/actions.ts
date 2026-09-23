@@ -8,7 +8,7 @@ import { readError } from "@/lib/automations/errors";
 import type { EditValues } from "@/lib/automations/form";
 import { parseEditForm } from "@/lib/automations/form";
 import { draftFromRun } from "@/lib/automations/from-run";
-import { refusalFor } from "@/lib/automations/permissions";
+import { commandRefusal, refusalFor } from "@/lib/automations/permissions";
 import { choiceToCron } from "@/lib/automations/schedule-local";
 import { isTimeZone } from "@/lib/automations/schedule";
 import {
@@ -68,6 +68,12 @@ export async function saveAutomationAction(_prev: EditState, formData: FormData)
   if (!parsed.ok) return { fieldErrors: parsed.fieldErrors, values: parsed.values };
 
   const { workspaceId } = await ctx();
+  // Q178: a member renames a draft's command, not an approved one's: people call it by that name
+  const current = await getAutomation(workspaceId, id.data);
+  if (current && current.command !== parsed.edit.command) {
+    const refused = commandRefusal(await role(), current.status);
+    if (refused) return { error: refused, values: parsed.values };
+  }
   try {
     const saved = await updateAutomation(workspaceId, id.data, parsed.edit);
     refresh(id.data);

@@ -57,6 +57,8 @@ export function AutomationEditor({
 }) {
   const v = state.values ?? valuesOf(automation);
   const err = state.fieldErrors ?? {};
+  // Q178: once approved, people call it by its command; a member edits the rest and reads the command
+  const commandLocked = !approver && automation.status !== "draft";
 
   // the workspace's connections, plus any the template names that Settings no longer has, so none is dropped silently
   const choices: ConnectionChoice[] = [
@@ -73,12 +75,26 @@ export function AutomationEditor({
         <Field id="name" label="Name" error={err.name}>
           <Input {...describedBy("name", err.name)} name="name" defaultValue={v.name} className={FIELD} />
         </Field>
-        <Field id="command" label="Command" hint="What you type on Home after the slash" error={err.command}>
+        <Field
+          id="command"
+          label="Command"
+          hint={commandLocked ? "People call it by this command, so an owner or an admin changes it." : "What you type on Home after the slash"}
+          error={err.command}
+        >
           <div className="flex items-center gap-1.5">
             <span aria-hidden className="text-[17px] text-slate">
               /
             </span>
-            <Input {...describedBy("command", err.command)} name="command" defaultValue={v.command} autoCapitalize="none" spellCheck={false} className={FIELD} />
+            {/* read-only, not disabled: it is still sent, so the save sees the command unchanged */}
+            <Input
+              {...describedBy("command", err.command)}
+              name="command"
+              defaultValue={commandLocked ? automation.command : v.command}
+              readOnly={commandLocked}
+              autoCapitalize="none"
+              spellCheck={false}
+              className={cn(FIELD, commandLocked && "bg-muted text-slate")}
+            />
           </div>
         </Field>
       </div>
