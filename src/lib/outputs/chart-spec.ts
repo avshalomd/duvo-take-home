@@ -66,6 +66,22 @@ function categoryAxis(rows: Row[], field: string, withLegend: boolean) {
   return fits ? { labelAngle: 0 } : { labelAngle: -45, labelAlign: "right" as const, labelBaseline: "middle" as const };
 }
 
+const DAY_MS = 86_400_000;
+const MAX_DATE_STEPS = 4; // at most about five date labels: "Jan 2025" is some 70 px and they must not touch
+
+/**
+ * A date axis labelled by day for spans up to three months, by month up to three years, by year beyond, with ticks
+ * only on those boundaries. The first render put ticks at noon and read "12 PM, 12 PM, 12 PM".
+ */
+function dateAxis(rows: Row[], field: string) {
+  const times = rows.map((r) => Date.parse(String(r[field]))).filter((t) => Number.isFinite(t));
+  const days = (Math.max(...times) - Math.min(...times)) / DAY_MS;
+  const step = (units: number) => Math.max(1, Math.ceil(units / MAX_DATE_STEPS));
+  if (days <= 92) return { format: "%b %-d", tickCount: { interval: "day" as const, step: step(days) } };
+  if (days <= 3 * 366) return { format: "%b %Y", tickCount: { interval: "month" as const, step: step(days / 30.44) } };
+  return { format: "%Y", tickCount: { interval: "year" as const, step: step(days / 365.25) } };
+}
+
 /** A value axis: short numbers when they reach the millions, the digits as they are below that. */
 function valueAxis(rows: Row[], field: string) {
   const largest = Math.max(0, ...rows.map((r) => (typeof r[field] === "number" ? Math.abs(r[field]) : 0)));
@@ -78,7 +94,15 @@ function valueAxis(rows: Row[], field: string) {
  */
 function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area", withLegend: boolean) {
   const holds = fieldKind(rows, field);
-  if (kind !== "bar" && holds === "date") return { field, type: "temporal" as const, title: null };
+  if (kind !== "bar" && holds === "date") {
+    return {
+      field,
+      type: "temporal" as const,
+      title: null,
+      scale: { type: "utc" as const }, // "2026-09-14" is a UTC midnight: in the server's own zone it moved off the day
+      axis: { ...dateAxis(rows, field), labelAngle: 0 },
+    };
+  }
   if (kind !== "bar" && holds === "number") {
     const whole = rows.every((r) => r[field] === null || Number.isInteger(r[field]));
     return {
