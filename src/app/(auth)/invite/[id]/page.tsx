@@ -20,13 +20,21 @@ export default async function InvitePage({ params }: PageProps<"/invite/[id]">) 
   const { id } = await params;
   const [invitation, ctx] = await Promise.all([getInvitation(id), sessionFromHeaders(await headers())]);
   const here = `/invite/${id}`;
+  // A dead link's way on: back to the workspace when signed in; signed out there is none yet, so sign in (UX QA)
+  const wayOn = ctx ? (
+    <Link href="/" className={secondary}>
+      Go to your workspace
+    </Link>
+  ) : (
+    <Link href="/sign-in" className={secondary}>
+      Sign in
+    </Link>
+  );
 
   if (!invitation) {
     return (
       <AuthPanel title="We could not find this invitation" description="Check that the link is complete, or ask the person who invited you to send it again.">
-        <Link href="/" className={secondary}>
-          Go to your workspace
-        </Link>
+        {wayOn}
       </AuthPanel>
     );
   }
@@ -34,9 +42,7 @@ export default async function InvitePage({ params }: PageProps<"/invite/[id]">) 
   if (!invitation.open) {
     return (
       <AuthPanel title="This invitation is closed" description="It has expired or was already used. Ask the person who invited you for a new link.">
-        <Link href="/" className={secondary}>
-          Go to your workspace
-        </Link>
+        {wayOn}
       </AuthPanel>
     );
   }
