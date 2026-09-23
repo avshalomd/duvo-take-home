@@ -68,6 +68,14 @@ describe("matchesSearch - the rail's search box", () => {
     expect(matchesSearch(audit, "/audit acme")).toBe(true);
     expect(matchesSearch(audit, "company")).toBe(true);
   });
+
+  // Q133: an example run is tagged "example", so the command of the automation it tried was nowhere in its text
+  it("matches an example run by the command of the automation it tried", () => {
+    const example = { prompt: "Check Globex: filings ...", title: "Company check: Globex", tag: "example", command: "audit" };
+    expect(matchesSearch(example, "/audit")).toBe(true);
+    expect(matchesSearch(example, "audit globex")).toBe(true);
+    expect(matchesSearch({ ...example, command: null }, "/audit")).toBe(false);
+  });
 });
 
 const NAMES = { "auto-1": "Company audit" };

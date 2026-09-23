@@ -50,3 +50,25 @@ describe("groupEvents - the timeline is read as the plan, not as a flat log", ()
     expect(groups[1].status).toBe("running");
   });
 });
+
+// Auto-heal: Details shows each attempt to fix the result, with what the agent was told, and the work it did then
+describe("groupEvents - fixing what the check found", () => {
+  const heal = (attempt: number): RunEvent => ({
+    seq: ++seq, at, kind: "heal", payload: { attempt, max: 2, reasons: ["At least 8 rows: 3 rows"], feedback: "Add rows until there are 8." },
+  });
+  const finished: RunEvent = {
+    seq: 0, at, kind: "finished",
+    payload: { subtype: "success", is_error: false, num_turns: 3, duration_ms: 9000, total_cost_usd: 0.02, result: "Done." },
+  };
+
+  it("opens a group for each attempt, headed by the attempt, holding the heal event and the work that followed", () => {
+    const groups = groupEvents([plan(["done"]), call("Write"), heal(1), call("Write")]);
+    expect(groups.map((g) => g.title)).toEqual(["step 0", "Fixing what the check found - attempt 1 of 2"]);
+    expect(groups[1].events.map((e) => e.kind)).toEqual(["heal", "tool_call"]);
+  });
+
+  it("marks an attempt done once the agent finished it, and running until then", () => {
+    expect(groupEvents([plan(["done"]), heal(1), call("Write")]).at(-1)!.status).toBe("running");
+    expect(groupEvents([plan(["done"]), heal(1), call("Write"), { ...finished, seq: ++seq }]).at(-1)!.status).toBe("done");
+  });
+});

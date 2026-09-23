@@ -15,7 +15,10 @@ function client() {
   return neon(process.env.DATABASE_URL!);
 }
 
-export type HomeRuns = { parent: string; followUp: string; live: string; stopped: string; failed: string; legacy: string; audit: string; automation: string };
+export type HomeRuns = {
+  parent: string; followUp: string; live: string; stopped: string; failed: string; legacy: string; audit: string; automation: string;
+  example: string; long: string; healing: string; healed: string; unfixed: string;
+};
 export const AUTOMATION = { name: `${PREFIX} audit`, command: COMMAND, input: "Acme Ltd" }; // a draft
 export const READY = { name: `${PREFIX} ready check`, command: "e2e-home-ready", hint: "The registered name, e.g. Acme Ltd" };
 export const TITLES = {
@@ -26,7 +29,15 @@ export const TITLES = {
   failed: `${PREFIX} failed: fetch a page that is not there`,
   legacy: `${PREFIX} legacy: a run checked by the first version`,
   audit: `${PREFIX} audit run: audit Acme Ltd, ownership and filings`, // the filled template: not what the title shows
+  example: `${PREFIX} example run: audit Globex, ownership and filings`,
+  // Q137: a brief long enough to take four lines as a title
+  long: `${PREFIX} long: read the three most recent quarterly reports of every listed European carmaker, compare their margins, their order books and what each says about electric models, then write a two-page summary for the board with a table of the figures and a short list of the risks each company names`,
+  healing: `${PREFIX} healing: list at least eight AI news stories in a CSV`,
+  healed: `${PREFIX} healed: list at least eight robotics stories in a CSV`,
+  unfixed: `${PREFIX} unfixed: list at least eight space stories in a CSV`,
 };
+// Auto-heal: what the check found on the first result, and what the agent was then told
+export const HEAL = { reason: "At least 8 rows: 3 rows", feedback: "output.csv has 3 rows; the brief asks for at least 8. Add stories until there are 8 or more." };
 
 const PLAN = (running: number | null) => ({
   intent: "Facts about the Moon",
@@ -63,20 +74,42 @@ const V2_NOTES = {
   path: ["checks", "judge", "review"],
 };
 
+// A result that still did not pass after every attempt to fix it
+const FAIL_ROWS = {
+  verdict: "fail",
+  checks: [{ id: "rows", label: "At least 8 rows", ok: false, detail: "6 rows" }],
+  judgment: null,
+  review: null,
+  reasons: ["At least 8 rows: 6 rows"],
+  evaluatedAt: new Date().toISOString(),
+  decidedBy: "checks",
+  path: ["checks"],
+};
+
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"><rect width="120" height="60" fill="#15845a"/></svg>';
 const CSV = "name,email\nA,a@x.example\nB,b@x.example\nC,c@x.example\n";
-const REPORT = ["The Moon is 238,855 miles from Earth on average.", "", "| Measure | Value |", "|---|---|", "| Distance | 238,855 miles |", "| Diameter | 2,159 miles |"].join("\n");
+// Q144: agents often open with their own "Report" heading, and quote names as `code`
+const REPORT = [
+  "## Report",
+  "",
+  "The Moon is 238,855 miles from Earth on average; the figures are in `table.xlsx`.",
+  "",
+  "| Measure | Value |",
+  "|---|---|",
+  "| Distance | 238,855 miles |",
+  "| Diameter | 2,159 miles |",
+].join("\n");
 
 export async function createHomeRuns(): Promise<HomeRuns> {
   await deleteHomeRuns(); // a crashed earlier run may have left its rows behind
   const sql = client();
-  const insert = async (row: { prompt: string; status: string; minutesAgo: number; purpose?: string; parent?: string; verdict?: unknown; report?: string; human?: string; error?: string; automation?: string; input?: string }) => {
+  const insert = async (row: { prompt: string; status: string; minutesAgo: number; purpose?: string; parent?: string; verdict?: unknown; report?: string; human?: string; error?: string; automation?: string; input?: string; heals?: number }) => {
     const [r] = await sql.query(
-      `insert into runs (workspace_id, created_by, purpose, parent_run_id, prompt, status, model, report, verdict, human_verdict, error, automation_id, automation_version, input, created_at, finished_at, num_turns, duration_ms, cost_usd)
-       values ($1, 'demo-user', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, now() - make_interval(mins => $14), $15, 4, 42000, 0.12) returning id`,
+      `insert into runs (workspace_id, created_by, purpose, parent_run_id, prompt, status, model, report, verdict, human_verdict, error, automation_id, automation_version, input, created_at, finished_at, num_turns, duration_ms, cost_usd, heal_attempts)
+       values ($1, 'demo-user', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, now() - make_interval(mins => $14), $15, 4, 42000, 0.12, $16) returning id`,
       [WORKSPACE, row.purpose ?? "adhoc", row.parent ?? null, row.prompt, row.status, MODEL, row.report ?? null,
         row.verdict ? JSON.stringify(row.verdict) : null, row.human ?? null, row.error ?? null, row.automation ?? null, row.automation ? 1 : null, row.input ?? null, row.minutesAgo,
-        row.status === "running" ? null : new Date(Date.now() - (row.minutesAgo - 1) * 60_000).toISOString()],
+        row.status === "running" ? null : new Date(Date.now() - (row.minutesAgo - 1) * 60_000).toISOString(), row.heals ?? 0],
     );
     return r.id as string;
   };
@@ -149,7 +182,25 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const live = await insert({ prompt: TITLES.live, status: "running", minutesAgo: 1 });
   await events(live, [started, { kind: "plan", payload: PLAN(1) }]);
 
-  return { parent, followUp, live, stopped, failed, legacy, audit, automation };
+  // an example of the draft automation: the rail tags it "example", and its command must still find it (Q133)
+  const example = await insert({ prompt: TITLES.example, status: "succeeded", minutesAgo: 10, purpose: "trial", automation, input: "Globex", verdict: V1_PASS, report: "Globex is owned by ..." });
+  await events(example, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
+
+  const long = await insert({ prompt: TITLES.long, status: "succeeded", minutesAgo: 11, verdict: V1_PASS, report: "The board summary." });
+  await events(long, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
+
+  // auto-heal, in its three states: fixing now (no verdict yet: it is written once, at the end), fixed, not fixed
+  const heal = (attempt: number, reason: string) => ({ kind: "heal", payload: { attempt, max: 2, reasons: [reason], feedback: HEAL.feedback } });
+  const healing = await insert({ prompt: TITLES.healing, status: "running", minutesAgo: 1, heals: 1 });
+  await events(healing, [started, { kind: "plan", payload: PLAN(null) }, finished(), heal(1, HEAL.reason)]);
+
+  const healed = await insert({ prompt: TITLES.healed, status: "succeeded", minutesAgo: 12, heals: 1, verdict: V1_PASS, report: "Eight robotics stories." });
+  await events(healed, [started, { kind: "plan", payload: PLAN(null) }, finished(), heal(1, HEAL.reason), finished()]);
+
+  const unfixed = await insert({ prompt: TITLES.unfixed, status: "succeeded", minutesAgo: 13, heals: 2, verdict: FAIL_ROWS, report: "Six space stories." });
+  await events(unfixed, [started, { kind: "plan", payload: PLAN(null) }, finished(), heal(1, HEAL.reason), finished(), heal(2, "At least 8 rows: 5 rows"), finished()]);
+
+  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed };
 }
 
 export async function deleteHomeRuns(): Promise<void> {

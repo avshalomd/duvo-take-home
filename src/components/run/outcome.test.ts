@@ -48,6 +48,40 @@ describe("outcome - Stop", () => {
   });
 });
 
+// Auto-heal (his call, 2026-09-23): the run fixes a result the check failed inside the same run, and says pass or
+// fail only once every attempt is used. Until then it is in progress everywhere: no red, no "did not pass".
+describe("outcome - a run fixing what the check found", () => {
+  it("reads as progress while it fixes, naming the attempt when it knows the limit", () => {
+    expect(outcome("running", null, false, { attempts: 1, max: 2 })).toEqual({
+      label: "Checking the result - fixing what the check found (attempt 1 of 2)",
+      tone: "busy",
+    });
+    expect(outcome("evaluating", null, false, { attempts: 2, max: 2 }).tone).toBe("busy");
+    // the rail knows the count from the run row, not the limit
+    expect(outcome("running", null, false, { attempts: 1 }).label).toBe("Checking the result - fixing what the check found");
+  });
+
+  it("says a fixed result the way it says any good result", () => {
+    expect(outcome("succeeded", "pass", false, { attempts: 1 })).toEqual({ label: "Done - looks good", tone: "ok" });
+    expect(outcome("succeeded", "pass_with_notes", false, { attempts: 2 })).toEqual({ label: "Done, with notes", tone: "warn" });
+  });
+
+  it("says how many attempts did not fix a result that still did not pass", () => {
+    expect(outcome("succeeded", "fail", false, { attempts: 2 })).toEqual({ label: "Did not pass after 2 attempts to fix it", tone: "bad" });
+    expect(outcome("succeeded", "fail", false, { attempts: 1 }).label).toBe("Did not pass after 1 attempt to fix it");
+  });
+
+  it("reads a run with no attempts exactly as before", () => {
+    expect(outcome("succeeded", "fail", false, { attempts: 0 })).toEqual(outcome("succeeded", "fail"));
+    expect(outcome("running", null, false, { attempts: 0 })).toEqual(outcome("running", null));
+  });
+
+  it("lets Stop win over fixing", () => {
+    expect(outcome("running", null, true, { attempts: 1, max: 2 }).label).toBe("Stopping...");
+    expect(outcome("cancelled", null, false, { attempts: 1 }).label).toBe("Stopped");
+  });
+});
+
 describe("statusLabel - the status badge in Details", () => {
   it("reads the enum as words, and cancelled as stopped", () => {
     expect(statusLabel("cancelled")).toBe("stopped");

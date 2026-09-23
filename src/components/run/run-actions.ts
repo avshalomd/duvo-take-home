@@ -1,4 +1,10 @@
+import type { Verdict } from "@/contracts/eval";
 import type { Run } from "@/contracts/run";
+
+export function changeSuggestion(verdict: Pick<Verdict, "verdict" | "reasons"> | null): string | null {
+  void verdict; // written in the next commit
+  return null;
+}
 
 // An automation repeats what a run did, so only a run whose result passed is worth saving as one (Q121) - and not a
 // run that already came from an automation (an example, a called or a scheduled one).

@@ -44,6 +44,10 @@ function cells(line: string): Inline[][] {
   return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => parseInline(c.trim()));
 }
 
+export function reportBlocks(text: string): Block[] {
+  return parseMarkdown(text); // the leading heading is dropped in the next commit
+}
+
 export function parseMarkdown(text: string): Block[] {
   const blocks: Block[] = [];
   let paragraph: string[] = [];
