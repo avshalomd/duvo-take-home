@@ -1,5 +1,6 @@
 import { parse } from "csv-parse/sync";
 import type { Check, EvaluateInput } from "@/contracts/eval";
+import { templateChecks } from "./template-checks";
 
 // The half of the evaluator that costs nothing and cannot be talked round: everything that can be decided by
 // reading the instructions and the files. Any failure here ends the evaluation before a model is paid to look at
@@ -9,6 +10,10 @@ const ALLOWED_EXTENSIONS = [".txt", ".md", ".csv"]; // the agent is only allowed
 const DEFAULT_FRESH_DAYS = 30; // "latest" with no window named: a month is the widest reading of "latest news"
 
 export function runChecks(input: EvaluateInput): Check[] {
+  return [...runChecksOnFiles(input), ...templateChecks(input)]; // a run of a saved automation is also held to its template
+}
+
+function runChecksOnFiles(input: EvaluateInput): Check[] {
   const checks: Check[] = [];
   const ok = (id: string, label: string, okay: boolean, detail: string) => checks.push({ id, label, ok: okay, detail });
 

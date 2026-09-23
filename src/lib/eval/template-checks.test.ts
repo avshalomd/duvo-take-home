@@ -72,6 +72,12 @@ describe("template checks", () => {
     expect(got?.ok, got?.detail).toBe(true);
   });
 
+  it("keeps a step the agent shortened, as long as most of its words are there", () => {
+    const t = { ...template, steps: ["Search the web for news about {input} from the last 7 days"] };
+    const got = check(input({ template: t, plan: plan(step("Search for Nvidia news")) }), "template_steps");
+    expect(got?.ok, got?.detail).toBe(true); // search, news of search, web, news, last, days: 2 of 5 words, the 0.4 bar
+  });
+
   it("counts a step skipped with a note as kept: the agent said why it could not be done", () => {
     const skipped = plan(
       step("Search the web for Acme Robotics"),

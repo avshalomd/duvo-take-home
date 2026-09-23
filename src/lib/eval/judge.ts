@@ -10,10 +10,14 @@ const LINE_CHARS = 300;
 const TIMEOUT_MS = 20_000;
 
 export function judgeState(input: EvaluateInput) {
+  const t = input.template;
   return {
     instructions: input.prompt,
     today: input.today,
     plan: input.plan,
+    // A run of a saved automation is judged against what the person approved, not only against the plan the agent
+    // wrote for itself: a run that planned less than the automation asks for could still "follow its own plan".
+    ...(t ? { automation: { intent: t.intent, expectedOutputs: t.expectedOutputs, outputFormat: t.outputFormat, steps: t.steps } } : {}),
     report: input.report ?? "(the run wrote no report)",
     files: input.files.map((f) => ({
       name: f.name,
@@ -31,19 +35,32 @@ export async function judgeRun(input: EvaluateInput): Promise<Judgment> {
         true: "the content is on the subject asked about and in the form asked for; a user would call this done",
         false: "the content is about something else, answers a different question, or is not what was asked for",
       }),
-      // With no plan recorded the same question has to be asked of the run itself, or every planless run would
-      // escalate to the LLM review and nothing could ever come back a plain "pass".
-      followedPlan: input.plan
-        ? noul("The run carried out the plan it set: every step was done, none was silently dropped.", {
-            true: "every step is done or has a note saying why it could not be",
-            false: "steps are still pending or were skipped without saying so",
-          })
-        : noul("The run did the work end to end: nothing important was left half-done or silently dropped.", {
-            true: "the report and the files show the whole task was carried out",
-            false: "part of the task was not done, or the report admits work is missing",
-          }),
+      followedPlan: followedQuestion(input),
     },
     timeoutMs: TIMEOUT_MS,
   });
   return { answeredQuery: answers.answeredQuery.noul, followedPlan: answers.followedPlan.noul };
+}
+
+// The second question reads "followed the automation" for a saved automation's run, "followed its plan" for a
+// free-text run with a plan, and "did the work end to end" when there is neither.
+function followedQuestion(input: EvaluateInput) {
+  if (input.template) {
+    return noul("The run followed the saved automation: it took the automation's steps and produced the outputs the automation promises.", {
+      true: "every step of the automation is done or has a note saying why it could not be, and the promised outputs are there",
+      false: "a step of the automation was dropped or left undone without a note, or the run produced something other than it promises",
+    });
+  }
+  if (input.plan) {
+    return noul("The run carried out the plan it set: every step was done, none was silently dropped.", {
+      true: "every step is done or has a note saying why it could not be",
+      false: "steps are still pending or were skipped without saying so",
+    });
+  }
+  // With no plan recorded the same question has to be asked of the run itself, or every planless run would
+  // escalate to the LLM review and nothing could ever come back a plain "pass".
+  return noul("The run did the work end to end: nothing important was left half-done or silently dropped.", {
+    true: "the report and the files show the whole task was carried out",
+    false: "part of the task was not done, or the report admits work is missing",
+  });
 }
