@@ -161,3 +161,15 @@ Per file: what it does and why it is built that way. Grows at every merge.
   tool calls, not guessed by the model.
 - `src/components/automations/drafting.tsx` - the draft is a Server Action started once the page is on screen, so a
   prefetch or a crawler fetching the URL never spends a model call.
+
+### The v2 look ("the thread", docs/DESIGN-V2.md)
+- `src/app/globals.css` - the palette as named tokens (mist, paper, graphite, slate, saffron, fern, crimson) mapped
+  onto shadcn's names, so every primitive picked the look up at once; `glass` goes through Tailwind's backdrop
+  utilities because a hand-written `backdrop-filter` compiled to the -webkit- form only and never blurred in Chrome.
+- `src/components/thread/thread.tsx` - one animated plan line for the run, the automation examples and sign-in. The
+  fill is a spring on `scaleY` measured from the nodes; steps already done at first paint never pop, so the server's
+  markup and a reduced-motion browser agree; the running bead breathes in CSS so reduced motion switches it off.
+- `src/lib/automations/schedule.ts`, `src/lib/runner/next-run.ts` - a schedule is a cron in its own IANA zone
+  (`schedule_tz`), so 08:00 stays 08:00 across daylight saving; a zone-less row (saved before) reads as UTC.
+- `src/components/run/no-backslash-commands.test.ts` - commands are `/audit` only (his call); the test scans the
+  Home's source for any text that would show a backslash command.
