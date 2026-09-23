@@ -9,7 +9,7 @@ export default function Loading() {
         <Skeleton className="h-11 w-64 rounded-[12px] bg-paper/70" />
         <Skeleton className="h-5 w-80 max-w-full rounded-full bg-paper/70" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2">
         <Skeleton className="h-32 rounded-[16px] bg-paper/70" />
         <Skeleton className="h-32 rounded-[16px] bg-paper/70" />
         <Skeleton className="h-32 rounded-[16px] bg-paper/70" />

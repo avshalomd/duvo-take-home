@@ -345,6 +345,8 @@ v1.1.0. The v1 curated runs are re-seeded into the demo workspace of v2.
   and fixes its result in the same run - at most `auto_heal_attempts` times (a workspace limit, 2 by default, 0 turns
   it off). Only fixable failures heal (bad or missing files, an unfinished task, the reviewer's change); an
   unavailable judge, a stopped run or a run that hit its own limits does not.
+  Healing happens inside the run (the same run, the same agent session; no follow-up is opened for it), and the run
+  shows pass or fail only once, when a check passes or the attempts are exhausted; until then it is in progress.
 - Commands use a front slash only: `/audit Apple Inc.` (familiar to people who use coding agents; the backslash in
   the mail was a slip).
 

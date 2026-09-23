@@ -68,7 +68,10 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
           />
         </InsetGroup>
 
-        <InsetGroup title="While a run works">
+        <InsetGroup
+          title="While a run works"
+          footer="When the check finds a problem, the agent is told what failed and tries again, up to this many times."
+        >
           <SwitchRow
             name="stepChecks"
             label="Check each step as it finishes"
@@ -80,6 +83,18 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
             label="Block servers the plan did not name"
             detail="When off, the run only notes it. When on, the agent is stopped from using them."
             defaultChecked={limits.strictConnections}
+          />
+          {/* the last row, so the group's footer reads as its explanation; 0 tries is the feature switched off */}
+          <StepperRow
+            name="autoHealAttempts"
+            label="Let the agent fix its own result"
+            detail="Tries per run"
+            zeroLabel="Off"
+            step={1}
+            min={0}
+            max={5}
+            defaultValue={String(limits.autoHealAttempts)}
+            error={errors?.autoHealAttempts?.[0]}
           />
         </InsetGroup>
 
@@ -142,6 +157,7 @@ function StepperRow({
   detail?: string;
   error?: string;
   prefix?: string;
+  zeroLabel?: string;
   step: number;
   min: number;
   max: number;

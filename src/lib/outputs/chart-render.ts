@@ -1,4 +1,5 @@
 import type { TopLevelSpec } from "vega-lite";
+import { styleSvg } from "./chart-style";
 import { CHAR_EM } from "./chart-theme";
 
 // vega's text measure: exported at runtime, missing from its type declarations, hence the cast where it is used.
@@ -27,7 +28,7 @@ export async function renderChartSvg(spec: TopLevelSpec): Promise<string> {
   (vega as unknown as { textMetrics: TextMetrics }).textMetrics.width = textWidth;
   const view = new vega.View(vega.parse(compile(spec).spec), { renderer: "none" });
   try {
-    return await view.toSVG();
+    return styleSvg(await view.toSVG()); // the colours for light and dark ride inside the file (Q141)
   } finally {
     view.finalize(); // releases the view's timers and listeners; one view per chart
   }

@@ -57,6 +57,11 @@ test("a finished run becomes a draft automation that can be edited and cannot be
   await page.goto("/automations");
   await expect(page.getByTestId("gallery")).toBeVisible();
   await expect(page.getByTestId("gallery")).not.toContainText("{input}");
+  // Q139: the tile is built around its command, which never breaks, a mini thread of its steps and its state in words
+  const tile = page.getByTestId("automation-tile").filter({ hasText: name });
+  await expect(tile.getByTestId("thread")).toBeVisible();
+  await expect(tile).toContainText("Draft");
+  await expect(tile.getByTestId("tile-command")).toHaveCSS("white-space", "nowrap");
   // commands are shown with the front slash only (his call), never a backslash
   await expect(page.getByTestId("gallery")).toContainText("/");
   await expect(page.getByTestId("gallery")).not.toContainText("\\");

@@ -1,0 +1,896 @@
+{
+  "id": "csv-ragged-row",
+  "why": "His real run (2026-09-23): a good CSV of models in which one unquoted value holds a comma, so row 7 has 8 fields against a header of 7. The report and the spreadsheet are fine. The checks must fail it on parses alone, naming the row; this is the finding the feedback to the agent turns into an instruction (feedback.test.ts).",
+  "source": "scripts/record-run.ts from run 5d487f79-c99c-4476-afc0-73c11870c767 on 2026-09-23; its stored verdict was fail, decided by checks, failed checks: parses",
+  "expected": {
+    "verdict": "fail",
+    "decidedBy": "checks",
+    "failedChecks": [
+      "parses"
+    ]
+  },
+  "recorded": {
+    "judge": null,
+    "review": null,
+    "source": "not reached: the checks decide"
+  },
+  "run": {
+    "id": "5d487f79-c99c-4476-afc0-73c11870c767",
+    "prompt": "top 10 hugging face models for Jev-like local use",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [
+      "2f298f4e-e0bd-4364-ab0e-8b1a65f237ed"
+    ],
+    "report": "## Report\n\n**What \"jev\" turned out to mean:** Not a typo — it's a real, fast-growing model family on the Hub this week (Sept 2026), started by `AlexWortega/openjev`: a small NLI cross-encoder that acts as a zero-shot judge (entailment/contradiction/neutral) to rerank answers, grade against a reference, catch hallucinations, or drive agent decisions. It has spawned many derivatives in just the last few days (Jev-Omni, Open-Jev-2B/9B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision, jevify-gemma4, open-jev-deberta-v3-large...). I read \"jev-like local use\" as: which of these judge/decision models are best suited to run entirely on one machine (small size, and/or already packaged as GGUF/MLX/LoRA).\n\n**What I produced:**\n- `output.csv` — the ranked top 10, with URL, base model/size, format, likes, and why each is good for local use.\n- `top10_jev_models.xlsx` — the same table as a spreadsheet.\n- `report.md` — the reasoning above plus a short summary of the 10 picks and caveats.\n\n**Top 10 (fuller detail in the files):**\n1. AlexWortega/openjev — the original, ships a 0.8B local-friendly checkpoint\n2. com-kotobalabs/open-jev-deberta-v3-large — 434M encoder, CPU-comfortable\n3. Meanblock/JEV-CPU — Qwen3-0.6B, built explicitly for CPU-only use\n4. chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF — quantized for Ollama/LM Studio/Jan-style runners\n5. chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16 — same model, Apple Silicon\n6. mradermacher/jevify-gemma4-e4b-GGUF — GGUF Gemma-4 MoE judge\n7. vagmi/jev-lite — tiny LoRA adapter on Gemma-4-E4B-it\n8. lostargon/Tiny-Jev — smallest named variant\n9. samatv256/mini-Jev — compact variant\n10. ZefanCai/Open-Jev-2B — 2B, one step up in capacity, still single-machine friendly\n\n**Caveat:** Since this trend is only days old, likes/downloads for several 2026-09-18–23 repos are still thin, so ranking weighted explicit local-format signals (GGUF/MLX/LoRA/\"CPU\"/\"tiny\"/\"mini\"/\"lite\") alongside current Hub traction rather than downloads alone. Nothing found on the model pages asked for any action, so nothing beyond this report was carried out from their content.",
+    "error": null,
+    "numTurns": 18,
+    "durationMs": 154251,
+    "costUsd": 0.3204948,
+    "createdAt": "2026-09-23T09:58:02.540Z",
+    "finishedAt": "2026-09-23T10:00:39.461Z",
+    "workspaceId": "b39d54e1-7edb-4fec-9caf-7e5b8f99deee",
+    "purpose": "adhoc",
+    "automationId": null,
+    "automationVersion": null,
+    "input": null
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-23T09:58:04.537Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "Read",
+          "WebFetch",
+          "WebSearch",
+          "Write",
+          "mcp__hugging_face__hf_fs",
+          "mcp__hugging_face__hf_whoami",
+          "mcp__hugging_face__hub_repo_details",
+          "mcp__hugging_face__hub_repo_search",
+          "mcp__outputs__make_chart",
+          "mcp__outputs__make_spreadsheet",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": [
+          {
+            "name": "hugging_face",
+            "status": "connected"
+          },
+          {
+            "name": "plan",
+            "status": "connected"
+          },
+          {
+            "name": "outputs",
+            "status": "connected"
+          }
+        ],
+        "cwd": "/Users/avshalom/projects/duvo-take-home/runs/5d487f79-c99c-4476-afc0-73c11870c767",
+        "turn": 0
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-23T09:58:19.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "pending"
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "pending"
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "pending"
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-23T09:58:22.841Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "done",
+            "note": "Read \"Jev-like\" as a likely typo for \"Jan-like\" — i.e., local-first LLM apps such as Jan.ai/LM Studio/Ollama; so the ask is for open-weight models that run well fully offline on a single machine (laptop/desktop GPU or CPU), typically via GGUF quantization."
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "pending"
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "pending"
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-23T09:58:23.211Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 0,
+        "onTrack": 0.8,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-23T09:58:23.349Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "done",
+            "note": "Read \"Jev-like\" as a likely typo for \"Jan-like\" — i.e., local-first LLM apps such as Jan.ai/LM Studio/Ollama; so the ask is for open-weight models that run well fully offline on a single machine (laptop/desktop GPU or CPU), typically via GGUF quantization."
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "running"
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "pending"
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-23T09:58:24.020Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_0198HRiDE7n1C3CSBD4mzdSs",
+        "name": "mcp__hugging_face__hf_fs",
+        "input": {
+          "operations": [
+            {
+              "cmd": "ls",
+              "args": [
+                "hf://models/trending",
+                "--limit",
+                "30"
+              ]
+            },
+            {
+              "cmd": "search",
+              "args": [
+                "hf://models",
+                "GGUF chat",
+                "--sort",
+                "downloads",
+                "--limit",
+                "20"
+              ]
+            }
+          ]
+        },
+        "turn": 6
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-23T09:58:24.194Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_0198HRiDE7n1C3CSBD4mzdSs",
+        "is_error": false,
+        "preview": "{\"results\":[{\"index\":0,\"status\":\"error\",\"error\":{\"code\":\"HF_FS_INVALID_ARGUMENT\",\"message\":\"EINVAL: limit must be between 1 and 20 for this command\",\"recovery\":\"Correct the URI or flags using the operation grammar and route-specific option guidance.\",\"retryable\":false}},{\"index\":1,\"status\":\"success\"",
+        "turn": 6
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-23T09:58:29.085Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_01DpkVJquufPXduj8Lr1b9R1",
+        "name": "mcp__hugging_face__hf_fs",
+        "input": {
+          "operations": [
+            {
+              "cmd": "ls",
+              "args": [
+                "hf://models/trending",
+                "--limit",
+                "20"
+              ]
+            },
+            {
+              "cmd": "search",
+              "args": [
+                "hf://models/bartowski",
+                "GGUF",
+                "--sort",
+                "trendingScore",
+                "--limit",
+                "20"
+              ]
+            },
+            {
+              "cmd": "search",
+              "args": [
+                "hf://models/unsloth",
+                "GGUF",
+                "--sort",
+                "trendingScore",
+                "--limit",
+                "20"
+              ]
+            }
+          ]
+        },
+        "turn": 8
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-23T09:58:29.244Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_01DpkVJquufPXduj8Lr1b9R1",
+        "is_error": false,
+        "preview": "{\"results\":[{\"index\":0,\"status\":\"success\",\"result\":{\"uri\":\"hf://models/trending\",\"op\":\"ls\",\"entries\":[{\"type\":\"repo\",\"path\":\"convaiinnovations/laya\",\"uri\":\"hf://models/convaiinnovations/laya\",\"repo_type\":\"model\",\"private\":false,\"gated\":false,\"likes\":2805,\"downloads\":0,\"task\":\"text-classification\",\"u",
+        "turn": 8
+      }
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-23T09:58:33.632Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_019rbT8iPwyjVqwVEvKezjwd",
+        "name": "mcp__hugging_face__hub_repo_details",
+        "input": {
+          "repo_ids": [
+            "AlexWortega/openjev"
+          ],
+          "operations": [
+            "overview"
+          ]
+        },
+        "turn": 10
+      }
+    },
+    {
+      "seq": 11,
+      "at": "2026-09-23T09:58:33.837Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_019rbT8iPwyjVqwVEvKezjwd",
+        "is_error": false,
+        "preview": "**Type: Model**\n\n# AlexWortega/openjev\n\n## Overview\n- **Author:** AlexWortega\n- **Task:** text-classification\n- **Library:** transformers\n- **Likes:** 495\n- **Updated:** 21 Sep, 2026\n\n## Technical Details\n- **Model Class:** AutoModel\n\n## Tags\n`transformers` `safetensors` `nli` `cross-encoder` `qwen3",
+        "turn": 10
+      }
+    },
+    {
+      "seq": 12,
+      "at": "2026-09-23T09:58:34.115Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_019HU5cryYFbt5JTEUgGsirv",
+        "name": "mcp__hugging_face__hf_fs",
+        "input": {
+          "operations": [
+            {
+              "cmd": "cat",
+              "args": [
+                "hf://models/AlexWortega/openjev/README.md"
+              ]
+            }
+          ]
+        },
+        "turn": 11
+      }
+    },
+    {
+      "seq": 13,
+      "at": "2026-09-23T09:58:34.414Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_019HU5cryYFbt5JTEUgGsirv",
+        "is_error": false,
+        "preview": "{\"results\":[{\"index\":0,\"status\":\"success\",\"result\":{\"uri\":\"hf://models/AlexWortega/openjev/README.md\",\"op\":\"cat\",\"path\":\"README.md\",\"content\":\"---\\nlicense: mit\\nbase_model: Qwen/Qwen3.5-4B\\npipeline_tag: text-classification\\nlibrary_name: transformers\\ntags:\\n- nli\\n- cross-encoder\\n- qwen3.5\\n- re",
+        "turn": 11
+      }
+    },
+    {
+      "seq": 14,
+      "at": "2026-09-23T09:58:45.371Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_01UmR5a8wt68JKsR3pL6VB8a",
+        "name": "mcp__hugging_face__hf_fs",
+        "input": {
+          "operations": [
+            {
+              "cmd": "search",
+              "args": [
+                "hf://models",
+                "jev",
+                "--sort",
+                "trendingScore",
+                "--limit",
+                "20"
+              ]
+            },
+            {
+              "cmd": "search",
+              "args": [
+                "hf://models",
+                "NLI cross-encoder reranker",
+                "--sort",
+                "downloads",
+                "--limit",
+                "20"
+              ]
+            },
+            {
+              "cmd": "search",
+              "args": [
+                "hf://models/dleemiller",
+                "nli",
+                "--limit",
+                "10"
+              ]
+            }
+          ]
+        },
+        "turn": 13
+      }
+    },
+    {
+      "seq": 15,
+      "at": "2026-09-23T09:58:45.509Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_01UmR5a8wt68JKsR3pL6VB8a",
+        "is_error": false,
+        "preview": "{\"results\":[{\"index\":0,\"status\":\"success\",\"result\":{\"uri\":\"hf://models\",\"op\":\"search\",\"entries\":[{\"type\":\"repo\",\"path\":\"akhilaaa3/Jev-Omni\",\"uri\":\"hf://models/akhilaaa3/Jev-Omni\",\"repo_type\":\"model\",\"private\":false,\"gated\":false,\"likes\":104,\"downloads\":0,\"task\":\"text-classification\",\"updated_at\":\"20",
+        "turn": 13
+      }
+    },
+    {
+      "seq": 16,
+      "at": "2026-09-23T09:59:16.043Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "done",
+            "note": "Read \"Jev-like\" as a likely typo for \"Jan-like\" — i.e., local-first LLM apps such as Jan.ai/LM Studio/Ollama; so the ask is for open-weight models that run well fully offline on a single machine (laptop/desktop GPU or CPU), typically via GGUF quantization."
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "done",
+            "note": "Discovered \"jev\" is a live, named model family on the Hub right now: AlexWortega/openjev (a Qwen3.5-based NLI cross-encoder used as a zero-shot judge/reranker/game-decision model), which has spawned many derivatives (Jev-Omni, Open-Jev-9B/2B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision-GGUF/MLX, open-jev-deberta-v3-large, jevify-gemma4 variants). Re-read \"Jev-like local use\" as: small/quantized variants of this jev (NLI-judge/decision) family suited to running on a single machine."
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "pending"
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 17,
+      "at": "2026-09-23T09:59:16.338Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "done",
+            "note": "Read \"Jev-like\" as a likely typo for \"Jan-like\" — i.e., local-first LLM apps such as Jan.ai/LM Studio/Ollama; so the ask is for open-weight models that run well fully offline on a single machine (laptop/desktop GPU or CPU), typically via GGUF quantization."
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "done",
+            "note": "Discovered \"jev\" is a live, named model family on the Hub right now: AlexWortega/openjev (a Qwen3.5-based NLI cross-encoder used as a zero-shot judge/reranker/game-decision model), which has spawned many derivatives (Jev-Omni, Open-Jev-9B/2B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision-GGUF/MLX, open-jev-deberta-v3-large, jevify-gemma4 variants). Re-read \"Jev-like local use\" as: small/quantized variants of this jev (NLI-judge/decision) family suited to running on a single machine."
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "running"
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 18,
+      "at": "2026-09-23T09:59:16.408Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 1,
+        "onTrack": 0.62,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 19,
+      "at": "2026-09-23T09:59:21.198Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_015y68Cg2SvWtJZPbcBQcxb9",
+        "name": "mcp__hugging_face__hub_repo_details",
+        "input": {
+          "repo_ids": [
+            "Meanblock/JEV-CPU",
+            "vagmi/jev-lite",
+            "com-kotobalabs/open-jev-deberta-v3-large",
+            "chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF",
+            "mradermacher/jevify-gemma4-e4b-GGUF"
+          ],
+          "operations": [
+            "overview"
+          ]
+        },
+        "turn": 18
+      }
+    },
+    {
+      "seq": 20,
+      "at": "2026-09-23T09:59:21.451Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_015y68Cg2SvWtJZPbcBQcxb9",
+        "is_error": false,
+        "preview": "**Type: Model**\n\n# Meanblock/JEV-CPU\n\n## Overview\n- **Author:** Meanblock\n- **Task:** zero-shot-classification\n- **Library:** transformers\n- **Likes:** 38\n- **Updated:** 19 Sep, 2026\n\n## Technical Details\n- **Model Class:** AutoModel\n\n## Tags\n`transformers` `semantic-if` `decision` `semif` `cpu` `ze",
+        "turn": 18
+      }
+    },
+    {
+      "seq": 21,
+      "at": "2026-09-23T09:59:36.749Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "done",
+            "note": "Read \"Jev-like\" as a likely typo for \"Jan-like\" — i.e., local-first LLM apps such as Jan.ai/LM Studio/Ollama; so the ask is for open-weight models that run well fully offline on a single machine (laptop/desktop GPU or CPU), typically via GGUF quantization."
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "done",
+            "note": "Discovered \"jev\" is a live, named model family on the Hub right now: AlexWortega/openjev (a Qwen3.5-based NLI cross-encoder used as a zero-shot judge/reranker/game-decision model), which has spawned many derivatives (Jev-Omni, Open-Jev-9B/2B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision-GGUF/MLX, open-jev-deberta-v3-large, jevify-gemma4 variants). Re-read \"Jev-like local use\" as: small/quantized variants of this jev (NLI-judge/decision) family suited to running on a single machine."
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "done",
+            "note": "Ranked 10 jev-family models by local-run friendliness (small params, GGUF/MLX/LoRA formats, CPU-targeted) and Hub credibility (likes/downloads), spanning 0.6B-4B and covering safetensors, GGUF, MLX and LoRA adapter formats."
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 22,
+      "at": "2026-09-23T09:59:37.106Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 2,
+        "onTrack": 0.15,
+        "note": "May not have done what it says: Ranked 10 jev-family models by local-run friendliness (small params, GGUF/MLX/LoRA formats, CPU-targeted) and Hub credibility (likes/downloads), spanning 0.6B-4B and covering safetensors, GGUF, MLX and LoRA adapter formats."
+      }
+    },
+    {
+      "seq": 23,
+      "at": "2026-09-23T09:59:37.179Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "done",
+            "note": "Read \"Jev-like\" as a likely typo for \"Jan-like\" — i.e., local-first LLM apps such as Jan.ai/LM Studio/Ollama; so the ask is for open-weight models that run well fully offline on a single machine (laptop/desktop GPU or CPU), typically via GGUF quantization."
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "done",
+            "note": "Discovered \"jev\" is a live, named model family on the Hub right now: AlexWortega/openjev (a Qwen3.5-based NLI cross-encoder used as a zero-shot judge/reranker/game-decision model), which has spawned many derivatives (Jev-Omni, Open-Jev-9B/2B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision-GGUF/MLX, open-jev-deberta-v3-large, jevify-gemma4 variants). Re-read \"Jev-like local use\" as: small/quantized variants of this jev (NLI-judge/decision) family suited to running on a single machine."
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "done",
+            "note": "Ranked 10 jev-family models by local-run friendliness (small params, GGUF/MLX/LoRA formats, CPU-targeted) and Hub credibility (likes/downloads), spanning 0.6B-4B and covering safetensors, GGUF, MLX and LoRA adapter formats."
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 24,
+      "at": "2026-09-23T09:59:49.663Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_01AtVdVbYSicJX3MtSFD8Cvz",
+        "name": "mcp__outputs__make_spreadsheet",
+        "input": {
+          "file": "top10_jev_models.xlsx",
+          "sheets": [
+            {
+              "name": "Top 10 Jev-like local models",
+              "rows": [
+                [
+                  1,
+                  "AlexWortega/openjev",
+                  "https://huggingface.co/AlexWortega/openjev",
+                  "Qwen3.5, 0.8B / 4B / 35B-A3B checkpoints",
+                  "safetensors (transformers)",
+                  495,
+                  "The original 'jev' model: an NLI cross-encoder (entailment/contradiction/neutral) used as a zero-shot judge, reranker, hallucination detector and game-decision engine. Ships a 0.8B, 4k-context checkpoint made specifically to run the public demo locally; MIT licensed."
+                ],
+                [
+                  2,
+                  "com-kotobalabs/open-jev-deberta-v3-large",
+                  "https://huggingface.co/com-kotobalabs/open-jev-deberta-v3-large",
+                  "DeBERTa-v3-large, 434M params",
+                  "safetensors (transformers)",
+                  61,
+                  "Compact 434M encoder cross-encoder trained as a calibrated 'typed decision' judge. Small enough for CPU or a modest GPU, has several community demo Spaces, apache-2.0 licensed."
+                ],
+                [
+                  3,
+                  "Meanblock/JEV-CPU",
+                  "https://huggingface.co/Meanblock/JEV-CPU",
+                  "Qwen3-0.6B finetune",
+                  "safetensors (transformers)",
+                  38,
+                  "Explicitly built and named for CPU-only local inference; smallest base model in the family, ideal where there is no GPU."
+                ],
+                [
+                  4,
+                  "chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF",
+                  "https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF",
+                  "Qwen3.5-2B",
+                  "GGUF (quantized)",
+                  8,
+                  "Pre-quantized GGUF build of a jev-style decision/classification model, drop-in for llama.cpp-based local runners (Ollama, LM Studio, Jan)."
+                ],
+                [
+                  5,
+                  "chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16",
+                  "https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16",
+                  "Qwen3.5-2B",
+                  "MLX bf16",
+                  2,
+                  "Same 2B jev-style decision model exported to MLX, for fast local inference on Apple Silicon Macs."
+                ],
+                [
+                  6,
+                  "mradermacher/jevify-gemma4-e4b-GGUF",
+                  "https://huggingface.co/mradermacher/jevify-gemma4-e4b-GGUF",
+                  "Gemma-4 E4B (MoE, LoRA-merged)",
+                  "GGUF (quantized)",
+                  2,
+                  "GGUF-quantized version of a Gemma-4-based jev/'jevify' judge model; MoE base keeps active compute low while running fully offline via llama.cpp-style runners."
+                ],
+                [
+                  7,
+                  "vagmi/jev-lite",
+                  "https://huggingface.co/vagmi/jev-lite",
+                  "Gemma-4-E4B-it + LoRA/QLoRA adapter",
+                  "safetensors, PEFT LoRA adapter",
+                  5,
+                  "Ships only a LoRA/QLoRA adapter (tiny download) layered on an efficient Gemma-4 MoE base, so local storage and load time stay minimal while keeping jev-style calibrated decisions."
+                ],
+                [
+                  8,
+                  "lostargon/Tiny-Jev",
+                  "https://huggingface.co/lostargon/Tiny-Jev",
+                  "Small text-classification checkpoint",
+                  "safetensors (transformers)",
+                  4,
+                  "Explicitly the smallest-footprint entry in the jev family; positioned for lightweight local or edge use."
+                ],
+                [
+                  9,
+                  "samatv256/mini-Jev",
+                  "https://huggingface.co/samatv256/mini-Jev",
+                  "Small text-classification checkpoint",
+                  "safetensors (transformers)",
+                  11,
+                  "Compact 'mini' jev variant with modest download size, aimed at running comfortably on a single local machine."
+                ],
+                [
+                  10,
+                  "ZefanCai/Open-Jev-2B",
+                  "https://huggingface.co/ZefanCai/Open-Jev-2B",
+                  "2B parameter jev variant",
+                  "safetensors (transformers)",
+                  10,
+                  "Open 2B-parameter jev-style model, small enough to run on a single consumer GPU or a strong CPU box, one step up from the 0.6B/mini variants when more capacity is needed."
+                ]
+              ],
+              "columns": [
+                "Rank",
+                "Model",
+                "URL",
+                "Base / Size",
+                "Format",
+                "Likes",
+                "Why good for local, jev-style use"
+              ]
+            }
+          ]
+        },
+        "turn": 22
+      }
+    },
+    {
+      "seq": 25,
+      "at": "2026-09-23T09:59:49.700Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_01AtVdVbYSicJX3MtSFD8Cvz",
+        "is_error": false,
+        "preview": "Wrote top10_jev_models.xlsx (1 sheet, 10 rows)",
+        "turn": 22
+      }
+    },
+    {
+      "seq": 26,
+      "at": "2026-09-23T10:00:11.525Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_01LZo63sLgS9z4fhfqbbPoqH",
+        "name": "Write",
+        "input": {
+          "content": "rank,model,url,base_or_size,format,likes,why_good_for_local_jev_use\n1,AlexWortega/openjev,https://huggingface.co/AlexWortega/openjev,\"Qwen3.5, 0.8B / 4B / 35B-A3B checkpoints\",safetensors (transformers),495,\"The original 'jev' model: an NLI cross-encoder (entailment/contradiction/neutral) used as a zero-shot judge, reranker, hallucination detector and game-decision engine. Ships a 0.8B, 4k-context checkpoint made specifically to run the public demo locally; MIT licensed.\"\n2,com-kotobalabs/open-jev-deberta-v3-large,https://huggingface.co/com-kotobalabs/open-jev-deberta-v3-large,\"DeBERTa-v3-large, 434M params\",safetensors (transformers),61,\"Compact 434M encoder cross-encoder trained as a calibrated 'typed decision' judge. Small enough for CPU or a modest GPU, has several community demo Spaces, apache-2.0 licensed.\"\n3,Meanblock/JEV-CPU,https://huggingface.co/Meanblock/JEV-CPU,Qwen3-0.6B finetune,safetensors (transformers),38,\"Explicitly built and named for CPU-only local inference; smallest base model in the family, ideal where there is no GPU.\"\n4,chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF,https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF,Qwen3.5-2B,GGUF (quantized),8,\"Pre-quantized GGUF build of a jev-style decision/classification model, drop-in for llama.cpp-based local runners (Ollama, LM Studio, Jan).\"\n5,chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16,https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16,Qwen3.5-2B,MLX bf16,2,\"Same 2B jev-style decision model exported to MLX, for fast local inference on Apple Silicon Macs.\"\n6,mradermacher/jevify-gemma4-e4b-GGUF,https://huggingface.co/mradermacher/jevify-gemma4-e4b-GGUF,Gemma-4 E4B (MoE, LoRA-merged),GGUF (quantized),2,\"GGUF-quantized version of a Gemma-4-based jev/'jevify' judge model; MoE base keeps active compute low while running fully offline via llama.cpp-style runners.\"\n7,vagmi/jev-lite,https://huggingface.co/vagmi/jev-lite,Gemma-4-E4B-it + LoRA/QLoRA adapter,\"safetensors, PEFT LoRA adapter\",5,\"Ships only a LoRA/QLoRA adapter (tiny download) layered on an efficient Gemma-4 MoE base, so local storage and load time stay minimal while keeping jev-style calibrated decisions.\"\n8,lostargon/Tiny-Jev,https://huggingface.co/lostargon/Tiny-Jev,Small text-classification checkpoint,safetensors (transformers),4,\"Explicitly the smallest-footprint entry in the jev family; positioned for lightweight local or edge use.\"\n9,samatv256/mini-Jev,https://huggingface.co/samatv256/mini-Jev,Small text-classification checkpoint,safetensors (transformers),11,\"Compact 'mini' jev variant with modest download size, aimed at running comfortably on a single local machine.\"\n10,ZefanCai/Open-Jev-2B,https://huggingface.co/ZefanCai/Open-Jev-2B,2B parameter jev variant,safetensors (transformers),10,\"Open 2B-parameter jev-style model, small enough to run on a single consumer GPU or a strong CPU box, one step up from the 0.6B/mini variants when more capacity is needed.\"\n",
+          "file_path": "/Users/avshalom/projects/duvo-take-home/runs/5d487f79-c99c-4476-afc0-73c11870c767/output.csv"
+        },
+        "turn": 24
+      }
+    },
+    {
+      "seq": 27,
+      "at": "2026-09-23T10:00:11.562Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_01LZo63sLgS9z4fhfqbbPoqH",
+        "is_error": false,
+        "preview": "File created successfully at: /Users/avshalom/projects/duvo-take-home/runs/5d487f79-c99c-4476-afc0-73c11870c767/output.csv (file state is current in your context — no need to Read it back)",
+        "turn": 24
+      }
+    },
+    {
+      "seq": 28,
+      "at": "2026-09-23T10:00:23.981Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_01A9fH1KBrpoZeVREV9vc7nq",
+        "name": "Write",
+        "input": {
+          "content": "# Top 10 Hugging Face models for jev-like local use\n\n## Reading the request\n\"Jev\" is not a typo here — it is a real, fast-moving model family on the Hugging Face Hub this week\n(Sept 2026), started by **AlexWortega/openjev**: a small NLI cross-encoder that turns any base model into\na zero-shot judge (entailment / contradiction / neutral). Instead of training a separate model per task, a\n\"jev\" model reads a premise and a hypothesis and its entailment score is used directly to rerank answers,\ngrade them against a reference, detect hallucinations, or drive an agent's next move (the README shows it\nplaying Doom and crafting tools in Minecraft this way). The name has since spawned many derivatives\n(Jev-Omni, Open-Jev-2B/9B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision, jevify-gemma4,\nopen-jev-deberta-v3-large, etc.).\n\n\"For jev-like local use\" is read as: **which of these jev-style judge/decision models are best suited to run\nentirely on one machine** (laptop CPU, single consumer GPU, or Apple Silicon) rather than on a server — i.e.\nsmall parameter counts, and/or already packaged as GGUF, MLX, or a lightweight LoRA adapter.\n\n## The top 10\nSee `output.csv` (and `top10_jev_models.xlsx`) for the full table with links. In short:\n\n1. **AlexWortega/openjev** — the original; ships a 0.8B checkpoint built for local, CPU-friendly demo use.\n2. **com-kotobalabs/open-jev-deberta-v3-large** — 434M DeBERTa-v3 encoder, comfortable on CPU.\n3. **Meanblock/JEV-CPU** — Qwen3-0.6B, explicitly built for CPU-only inference.\n4. **chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF** — 2B, pre-quantized for llama.cpp-style local runners (Ollama/LM Studio/Jan).\n5. **chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16** — same 2B model in MLX, for Apple Silicon.\n6. **mradermacher/jevify-gemma4-e4b-GGUF** — GGUF-quantized Gemma-4 MoE jev/judge model.\n7. **vagmi/jev-lite** — a tiny LoRA/QLoRA adapter on Gemma-4-E4B-it, minimal download and load time.\n8. **lostargon/Tiny-Jev** — smallest-footprint named variant.\n9. **samatv256/mini-Jev** — compact \"mini\" variant.\n10. **ZefanCai/Open-Jev-2B** — 2B open variant, a step up in capacity while staying single-GPU/CPU friendly.\n\n## Notes and limits\n- Popularity signals (likes/downloads) for several of this week's new \"jev\" repos are still very low or\n  not yet indexed, since the trend is only days old (all created 2026-09-18 to 2026-09-23); rankings favor\n  models that both state an explicit local-use format (GGUF/MLX/LoRA/\"CPU\"/\"tiny\"/\"mini\"/\"lite\") and have\n  the most Hub traction so far.\n- None of the pages read during this research asked for any action beyond what's reported here; nothing\n  from third-party model cards was treated as an instruction.\n",
+          "file_path": "/Users/avshalom/projects/duvo-take-home/runs/5d487f79-c99c-4476-afc0-73c11870c767/report.md"
+        },
+        "turn": 25
+      }
+    },
+    {
+      "seq": 29,
+      "at": "2026-09-23T10:00:24.019Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_01A9fH1KBrpoZeVREV9vc7nq",
+        "is_error": false,
+        "preview": "File created successfully at: /Users/avshalom/projects/duvo-take-home/runs/5d487f79-c99c-4476-afc0-73c11870c767/report.md (file state is current in your context — no need to Read it back)",
+        "turn": 25
+      }
+    },
+    {
+      "seq": 30,
+      "at": "2026-09-23T10:00:26.702Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Find and present the top 10 Hugging Face models best suited for local use in an app like Jan.ai (a local, privacy-first LLM runner similar to LM Studio/Ollama) — i.e., open-weight, efficient, quantized-friendly chat/coding models that run well on a single machine.",
+        "expectedOutputs": [
+          "output.csv with rank,model,url,size,format,why_good_for_local_use",
+          "a short report.md summarizing the picks and how the ambiguous term 'Jev-like' was interpreted"
+        ],
+        "sources": [
+          "hugging_face"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Clarify the likely meaning of the request and pick a reading",
+            "status": "done",
+            "note": "Read \"Jev-like\" as a likely typo for \"Jan-like\" — i.e., local-first LLM apps such as Jan.ai/LM Studio/Ollama; so the ask is for open-weight models that run well fully offline on a single machine (laptop/desktop GPU or CPU), typically via GGUF quantization."
+          },
+          {
+            "index": 1,
+            "title": "Look up currently trending and popular local-friendly models on Hugging Face",
+            "status": "done",
+            "note": "Discovered \"jev\" is a live, named model family on the Hub right now: AlexWortega/openjev (a Qwen3.5-based NLI cross-encoder used as a zero-shot judge/reranker/game-decision model), which has spawned many derivatives (Jev-Omni, Open-Jev-9B/2B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision-GGUF/MLX, open-jev-deberta-v3-large, jevify-gemma4 variants). Re-read \"Jev-like local use\" as: small/quantized variants of this jev (NLI-judge/decision) family suited to running on a single machine."
+          },
+          {
+            "index": 2,
+            "title": "Shortlist and rank the 10 best models for running locally",
+            "status": "done",
+            "note": "Ranked 10 jev-family models by local-run friendliness (small params, GGUF/MLX/LoRA formats, CPU-targeted) and Hub credibility (likes/downloads), spanning 0.6B-4B and covering safetensors, GGUF, MLX and LoRA adapter formats."
+          },
+          {
+            "index": 3,
+            "title": "Write the results to a table and a short explanatory report",
+            "status": "done",
+            "note": "Wrote output.csv, top10_jev_models.xlsx and report.md with the ranked list and the interpretation of \"jev\"."
+          }
+        ]
+      }
+    },
+    {
+      "seq": 31,
+      "at": "2026-09-23T10:00:27.049Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 3,
+        "onTrack": 0.91,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 32,
+      "at": "2026-09-23T10:00:38.736Z",
+      "kind": "text",
+      "payload": {
+        "text": "## Report\n\n**What \"jev\" turned out to mean:** Not a typo — it's a real, fast-growing model family on the Hub this week (Sept 2026), started by `AlexWortega/openjev`: a small NLI cross-encoder that acts as a zero-shot judge (entailment/contradiction/neutral) to rerank answers, grade against a reference, catch hallucinations, or drive agent decisions. It has spawned many derivatives in just the last few days (Jev-Omni, Open-Jev-2B/9B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision, jevify-gemma4, open-jev-deberta-v3-large...). I read \"jev-like local use\" as: which of these judge/decision models are best suited to run entirely on one machine (small size, and/or already packaged as GGUF/MLX/LoRA).\n\n**What I produced:**\n- `output.csv` — the ranked top 10, with URL, base model/size, format, likes, and why each is good for local use.\n- `top10_jev_models.xlsx` — the same table as a spreadsheet.\n- `report.md` — the reasoning above plus a short summary of the 10 picks and caveats.\n\n**Top 10 (fuller detail in the files):**\n1. AlexWortega/openjev — the original, ships a 0.8B local-friendly checkpoint\n2. com-kotobalabs/open-jev-deberta-v3-large — 434M encoder, CPU-comfortable\n3. Meanblock/JEV-CPU — Qwen3-0.6B, built explicitly for CPU-only use\n4. chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF — quantized for Ollama/LM Studio/Jan-style runners\n5. chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16 — same model, Apple Silicon\n6. mradermacher/jevify-gemma4-e4b-GGUF — GGUF Gemma-4 MoE judge\n7. vagmi/jev-lite — tiny LoRA adapter on Gemma-4-E4B-it\n8. lostargon/Tiny-Jev — smallest named variant\n9. samatv256/mini-Jev — compact variant\n10. ZefanCai/Open-Jev-2B — 2B, one step up in capacity, still single-machine friendly\n\n**Caveat:** Since this trend is only days old, likes/downloads for several 2026-09-18–23 repos are still thin, so ranking weighted explicit local-format signals (GGUF/MLX/LoRA/\"CPU\"/\"tiny\"/\"mini\"/\"lite\") alongside current Hub traction rather than downloads alone. Nothing found on the model pages asked for any action, so nothing beyond this report was carried out from their content.",
+        "turn": 27
+      }
+    },
+    {
+      "seq": 33,
+      "at": "2026-09-23T10:00:38.771Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 18,
+        "duration_ms": 154251,
+        "total_cost_usd": 0.3204948,
+        "result": "## Report\n\n**What \"jev\" turned out to mean:** Not a typo — it's a real, fast-growing model family on the Hub this week (Sept 2026), started by `AlexWortega/openjev`: a small NLI cross-encoder that acts as a zero-shot judge (entailment/contradiction/neutral) to rerank answers, grade against a reference, catch hallucinations, or drive agent decisions. It has spawned many derivatives in just the last few days (Jev-Omni, Open-Jev-2B/9B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision, jevify-gemma4, open-jev-deberta-v3-large...). I read \"jev-like local use\" as: which of these judge/decision models are best suited to run entirely on one machine (small size, and/or already packaged as GGUF/MLX/LoRA).\n\n**What I produced:**\n- `output.csv` — the ranked top 10, with URL, base model/size, format, likes, and why each is good for local use.\n- `top10_jev_models.xlsx` — the same table as a spreadsheet.\n- `report.md` — the reasoning above plus a short summary of the 10 picks and caveats.\n\n**Top 10 (fuller detail in the files):**\n1. AlexWortega/openjev — the original, ships a 0.8B local-friendly checkpoint\n2. com-kotobalabs/open-jev-deberta-v3-large — 434M encoder, CPU-comfortable\n3. Meanblock/JEV-CPU — Qwen3-0.6B, built explicitly for CPU-only use\n4. chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF — quantized for Ollama/LM Studio/Jan-style runners\n5. chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16 — same model, Apple Silicon\n6. mradermacher/jevify-gemma4-e4b-GGUF — GGUF Gemma-4 MoE judge\n7. vagmi/jev-lite — tiny LoRA adapter on Gemma-4-E4B-it\n8. lostargon/Tiny-Jev — smallest named variant\n9. samatv256/mini-Jev — compact variant\n10. ZefanCai/Open-Jev-2B — 2B, one step up in capacity, still single-machine friendly\n\n**Caveat:** Since this trend is only days old, likes/downloads for several 2026-09-18–23 repos are still thin, so ranking weighted explicit local-format signals (GGUF/MLX/LoRA/\"CPU\"/\"tiny\"/\"mini\"/\"lite\") alongside current Hub traction rather than downloads alone. Nothing found on the model pages asked for any action, so nothing beyond this report was carried out from their content.",
+        "turn": 27
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "output.csv",
+      "content": "rank,model,url,base_or_size,format,likes,why_good_for_local_jev_use\n1,AlexWortega/openjev,https://huggingface.co/AlexWortega/openjev,\"Qwen3.5, 0.8B / 4B / 35B-A3B checkpoints\",safetensors (transformers),495,\"The original 'jev' model: an NLI cross-encoder (entailment/contradiction/neutral) used as a zero-shot judge, reranker, hallucination detector and game-decision engine. Ships a 0.8B, 4k-context checkpoint made specifically to run the public demo locally; MIT licensed.\"\n2,com-kotobalabs/open-jev-deberta-v3-large,https://huggingface.co/com-kotobalabs/open-jev-deberta-v3-large,\"DeBERTa-v3-large, 434M params\",safetensors (transformers),61,\"Compact 434M encoder cross-encoder trained as a calibrated 'typed decision' judge. Small enough for CPU or a modest GPU, has several community demo Spaces, apache-2.0 licensed.\"\n3,Meanblock/JEV-CPU,https://huggingface.co/Meanblock/JEV-CPU,Qwen3-0.6B finetune,safetensors (transformers),38,\"Explicitly built and named for CPU-only local inference; smallest base model in the family, ideal where there is no GPU.\"\n4,chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF,https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF,Qwen3.5-2B,GGUF (quantized),8,\"Pre-quantized GGUF build of a jev-style decision/classification model, drop-in for llama.cpp-based local runners (Ollama, LM Studio, Jan).\"\n5,chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16,https://huggingface.co/chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16,Qwen3.5-2B,MLX bf16,2,\"Same 2B jev-style decision model exported to MLX, for fast local inference on Apple Silicon Macs.\"\n6,mradermacher/jevify-gemma4-e4b-GGUF,https://huggingface.co/mradermacher/jevify-gemma4-e4b-GGUF,Gemma-4 E4B (MoE, LoRA-merged),GGUF (quantized),2,\"GGUF-quantized version of a Gemma-4-based jev/'jevify' judge model; MoE base keeps active compute low while running fully offline via llama.cpp-style runners.\"\n7,vagmi/jev-lite,https://huggingface.co/vagmi/jev-lite,Gemma-4-E4B-it + LoRA/QLoRA adapter,\"safetensors, PEFT LoRA adapter\",5,\"Ships only a LoRA/QLoRA adapter (tiny download) layered on an efficient Gemma-4 MoE base, so local storage and load time stay minimal while keeping jev-style calibrated decisions.\"\n8,lostargon/Tiny-Jev,https://huggingface.co/lostargon/Tiny-Jev,Small text-classification checkpoint,safetensors (transformers),4,\"Explicitly the smallest-footprint entry in the jev family; positioned for lightweight local or edge use.\"\n9,samatv256/mini-Jev,https://huggingface.co/samatv256/mini-Jev,Small text-classification checkpoint,safetensors (transformers),11,\"Compact 'mini' jev variant with modest download size, aimed at running comfortably on a single local machine.\"\n10,ZefanCai/Open-Jev-2B,https://huggingface.co/ZefanCai/Open-Jev-2B,2B parameter jev variant,safetensors (transformers),10,\"Open 2B-parameter jev-style model, small enough to run on a single consumer GPU or a strong CPU box, one step up from the 0.6B/mini variants when more capacity is needed.\"\n"
+    },
+    {
+      "name": "report.md",
+      "content": "# Top 10 Hugging Face models for jev-like local use\n\n## Reading the request\n\"Jev\" is not a typo here — it is a real, fast-moving model family on the Hugging Face Hub this week\n(Sept 2026), started by **AlexWortega/openjev**: a small NLI cross-encoder that turns any base model into\na zero-shot judge (entailment / contradiction / neutral). Instead of training a separate model per task, a\n\"jev\" model reads a premise and a hypothesis and its entailment score is used directly to rerank answers,\ngrade them against a reference, detect hallucinations, or drive an agent's next move (the README shows it\nplaying Doom and crafting tools in Minecraft this way). The name has since spawned many derivatives\n(Jev-Omni, Open-Jev-2B/9B, JEV-CPU, jev-lite, Tiny-Jev, mini-Jev, Jev-Style-Qwen3.5-2B-Decision, jevify-gemma4,\nopen-jev-deberta-v3-large, etc.).\n\n\"For jev-like local use\" is read as: **which of these jev-style judge/decision models are best suited to run\nentirely on one machine** (laptop CPU, single consumer GPU, or Apple Silicon) rather than on a server — i.e.\nsmall parameter counts, and/or already packaged as GGUF, MLX, or a lightweight LoRA adapter.\n\n## The top 10\nSee `output.csv` (and `top10_jev_models.xlsx`) for the full table with links. In short:\n\n1. **AlexWortega/openjev** — the original; ships a 0.8B checkpoint built for local, CPU-friendly demo use.\n2. **com-kotobalabs/open-jev-deberta-v3-large** — 434M DeBERTa-v3 encoder, comfortable on CPU.\n3. **Meanblock/JEV-CPU** — Qwen3-0.6B, explicitly built for CPU-only inference.\n4. **chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-GGUF** — 2B, pre-quantized for llama.cpp-style local runners (Ollama/LM Studio/Jan).\n5. **chaoliangUNSW/Jev-Style-Qwen3.5-2B-Decision-MLX-bf16** — same 2B model in MLX, for Apple Silicon.\n6. **mradermacher/jevify-gemma4-e4b-GGUF** — GGUF-quantized Gemma-4 MoE jev/judge model.\n7. **vagmi/jev-lite** — a tiny LoRA/QLoRA adapter on Gemma-4-E4B-it, minimal download and load time.\n8. **lostargon/Tiny-Jev** — smallest-footprint named variant.\n9. **samatv256/mini-Jev** — compact \"mini\" variant.\n10. **ZefanCai/Open-Jev-2B** — 2B open variant, a step up in capacity while staying single-GPU/CPU friendly.\n\n## Notes and limits\n- Popularity signals (likes/downloads) for several of this week's new \"jev\" repos are still very low or\n  not yet indexed, since the trend is only days old (all created 2026-09-18 to 2026-09-23); rankings favor\n  models that both state an explicit local-use format (GGUF/MLX/LoRA/\"CPU\"/\"tiny\"/\"mini\"/\"lite\") and have\n  the most Hub traction so far.\n- None of the pages read during this research asked for any action beyond what's reported here; nothing\n  from third-party model cards was treated as an instruction.\n"
+    },
+    {
+      "name": "top10_jev_models.xlsx",
+      "content": "UEsDBAoAAAAIAHhPN12R28AJWQEAAPAEAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbK2UTW7CMBCF9z1F5C1KDF1UVUXCorTLFqn0ANN4Qiwc2/KYv9t3EiiqKiCqYBMrmTfve57EGU+2jUnWGEg7m4tRNhQJ2tIpbRe5+Jy/po8ioQhWgXEWc7FDEpPibjzfeaSEmy3loo7RP0lJZY0NUOY8Wq5ULjQQ+TYspIdyCQuU98PhgyydjWhjGlsPUYynWMHKxORly4/3QQIaEsnzXtiycgHeG11C5LpcW/WHkh4IGXd2Gqq1pwELhDxJaCvnAYe+d55M0AqTGYT4Bg2r5NbIjQvLL+eW2WWTEyldVekSlStXDbdk5AOCohoxNibr1qwBbQf9/E5MsltGNw5y9O/JEfl94/56fYTOpgdIcWeQbj32zrSPXENA9REDH4ybB/jtfeGTXV9J5f5pgA1Tzm2UpbPgPPERDfj/Xf6cwbY79WyEIerLoz0S2frqsWI7K4XqBFt2P6ziG1BLAwQKAAAAAAB4TzddAAAAAAAAAAAAAAAABgAAAF9yZWxzL1BLAwQKAAAACAB4Tzdd8p9J2ukAAABLAgAACwAAAF9yZWxzLy5yZWxzrZLBTsMwDEDvfEXk+5puSAihpbsgpN0mND7AJG4btY2jxIPu74mQQAyNaQeOceznZ8vrzTyN6o1S9hwMLKsaFAXLzofOwMv+aXEPKgsGhyMHMnCkDJvmZv1MI0qpyb2PWRVIyAZ6kfigdbY9TZgrjhTKT8tpQinP1OmIdsCO9Kqu73T6yYDmhKm2zkDauiWo/THSNWxuW2/pke1hoiBnWvzKKGRMHYmBedTvnIZX5qEqUNDnXVbXu/w9p55I0KGgtpxoEVOpTuLLWr91HNtdCefPjEtCt/+5HJqFgiN3WQlj/DLSJzfQfABQSwMECgAAAAAAeE83XQAAAAAAAAAAAAAAAAMAAAB4bC9QSwMECgAAAAAAeE83XQAAAAAAAAAAAAAAAAkAAAB4bC9fcmVscy9QSwMECgAAAAgAeE83XYQksVbpAAAAuQIAABoAAAB4bC9fcmVscy93b3JrYm9vay54bWwucmVsc62SwWrDMBBE7/0KsfdadlpKKZFzKYFcW/cDhLS2TGxJaDdt/fdVG0gcCKEHn8Ss2JnHSOvN9ziIT0zUB6+gKkoQ6E2wve8UfDTb+2cQxNpbPQSPCiYk2NR36zccNOcdcn0kkU08KXDM8UVKMg5HTUWI6PNNG9KoOcvUyajNXncoV2X5JNPcA+oLT7GzCtLOViCaKeJ/vEPb9gZfgzmM6PlKhCSehswvGp06ZAVHXWQfkNfjV0vGc97Fc/qfPA6rWwwPi1bgdEL7zik/8LyJ+fgWzOOSMF8h7ckh8hnkNPpFzcepGXnx4+ofUEsDBAoAAAAAAHhPN10AAAAAAAAAAAAAAAAOAAAAeGwvd29ya3NoZWV0cy9QSwMECgAAAAgAeE83XZDT52UKBAAAtg8AABgAAAB4bC93b3Jrc2hlZXRzL3NoZWV0MS54bWyVV9uOozgQfd+vQLxPEwiXECUZDSHJjjQrjXYu++wmJrEaMLKdpHu+fo0hLC48bOclwT5Vx3WqfF19fC0L64oZJ7Ra2+7TzLZwldEjqU5r+8f3/YeFbXGBqiMqaIXX9hvm9sfNH6sbZS/8jLGwJEHF1/ZZiHrpODw74xLxJ1rjSiI5ZSUSsslODq8ZRkflVBaON5uFTolIZbcMS/YeDprnJMMpzS4lrkRLwnCBhAyfn0nN72xl9h66ErGXS/0ho2UtKZ5JQcSbIrWtMlt+PlWUoedCyn51fZTduVVjRF+SjFFOc/Ek6bpAx5pjJ3Yk02Z1JFJBk3WL4Xxtf3KXB9e1nc1KGf8k+MYH31aT72dKX5rG5+PankmKGlXYevtWy6hl6WxL0PoLzsUWF4Uk9GwLZYJc8VfUFO6ZCkHLBlcFFbIrZ/QXrtSYuMBZk0OrhsYSdfowht/38PYqn1+ZdcQ5uhTib3r7E5PTuYkpsC16EQWp8Bd8xYWEmsi1vi0tVJ9K6vL4lmKeydKu7SBoxs5owdWvVZJKqSzRq/q/kaM4r205P7MLl9H+07bdzqu19zp7r7cP/EmHeecw7x3C2aSD3zn4vYPvTToEnUPQO8ynHcLOIXyn5qizj/5HgtPmVhUxRQJtVozeLKaSy+U8kIvaXUoSrnpa/7bYqmNUsNmTF8hZmTUUn9y7nwS47L1uZivn2gzaWSRjC1e32I4tPN0iHVvMdYvd2MLXLfZji0C3OIwtwt7CkTnrE+fpiZvOkGfSnHiDUSKQjyG2AJkYYjHIwRBzQRn2bRh+DEVrTq5Z7/wRvXNTBZP5cBgAbjUQVDbVQFDU3XxKchtJCFJ/0HwCs2L/EcW+aUYm/nCYECjWQFD/VAPBBNj5U4q7SIDPQfOJzYqDRxQHphWWBMMVDELbaiAoSaqBYHbsNBBkeR+YVslBc/HNgsNHBIemDSMJh8MAcKuBoP5pOCVYA8Hk2Iem5XXQXBZmwdEjgiOw/7WCo+EwYPvZDsE5KH+qgaD8u2iqwpFRsMbnmQUvHhG8MG3FyWI4DIhsq4FgMaQaCObGTgNBkvcL4+GkuURmwfEjgmPTykni4TAA3GogKH86BH1Q/l08tWvFpt3koPH95mByZ48odmemYzNpSP4bCZ5NOgoPJx2FqjV0JLsLx4Xnk875m93LdR9S7hpDSFztwgR3MB2FW5iORlC6OyndHM9B54T7mDO4wtbohP9C7EQqbhXy/dIIlmlg7YNEfctnkvqSh0H7zrm3zvKphlnTkleBnFJxbzgt7zcsLrVFGZGJVC/OtV1TJhgi8k11lv2/qASKtCbNIyD24zDyYskrn9eCZAaAy07czFZZ2ZyI77S/nrfN/h2lruv9k3vzL1BLAwQKAAAACAB4Tzddygk8YpIFAABRDgAAFAAAAHhsL3NoYXJlZFN0cmluZ3MueG1stVfbUttIEH3fr+jywxbUeizCJZsNlxQmQIWChGDYbO3bWGrJE0szimYEOF+/p2UZHBsISWpfZDSXVvfp092HnTe3RU7XXHnj7G7nRW+tQ2xjlxib7XauLo/Uqw75oG2ic2d5tzNh33mz99uO94Fw1frdziiE8nUU+XjEhfY9V7LFTuqqQge8Vlnky4p14kfMocij9bW1l1Ghje1Q7Gobdjtbf3aotuZLzQfThc2/Ons73uzthL0Lbcc7UdjbieR9unbmEs4XF68uTheX+tozRTQwX3lx66hxb3H11IzZLy5+Gk0ocy4hhES5i3Xepc98rXyY5Ey1X7K9n/PtJ1cFznQkaODw4hHBzAO0UZ1lgDrVMfdiFz3j5scbthu9rS6t9V71EdymPDa2+mp/o09IQTwunbFhKQqvUw5svas8rYRKWy8ZQuJXF09ejphcZeCXzul3XTq/DT+mf1Ah0L8mben96TuKK+e9agjDFa2wDdrkBX6i2Fl8JDFxALEiyzXe8lVBKyHtSdNXrpzyIxfoc51k3KWK4dSYqy6NdJ7XMT4vdymB23EA9CAhZbpglXBshK9gKpzkHg1GphSbAkmXNsdKvs63YQ4PKnTC5EtcTQ1SmE8oOKpqSwHhlvUwNzE+VbhphvPJNp29uySsAjNOeosgxa5QYxfcUOd66JtkKSFFwkOuglbXGyrXVbbEjUcS/7Pm3nL/8OLyfh/Rb2yeUakrXSxR4MAVpY7D9Mgsad+mEFkCom2KgIMZVjrgfZr9MCnx9wz+lhFN+pCDAqjBqquzUVMpB+dXJFlrKINucXx+Jan15Bn9BtRCzAWqPkymuA/gG/suafyOWK331h5H/4y1HSJR4+jk8G+FLz0T5u/ea6pLrfVe9ikFEKG2S5Af3pbwywQwaFibPDS8tOBlMgtbOYvNhkdkbMoV0OVt8oKQIDGUttQUErYb/qW6MPmkSyZh3LkZ4Yqs42k8WSfYLTNwpF1utM2u3g8+RScgy0AakmobhFrvq7dtptTx8dXRc5n4i2bvzy3uyGla+VJrG9CQk6W+c16xutul5rQAnJBLwaL7jjvjXxTn2vumnJtG0SDapaRypQKuTbfOdaF7cVkqwTxpc4Kqtyxt8EOz36XTMxqEOjGuSyfarv4S1Gen/6hh+uLl/wD3Y6axTg+tD0BKWu8/AF3LPr4tZdgk0gphpNtglmpQdIG8hCv7ZQkLAwPy4+1Mx34JpwIdnzFXUb9VhK+adKIyLgq9qXhz+CMs/AlLx7KtNukQE3HlzB0ire5iX2HEZQ+QTSzMsa1VQFOqtZZazuDr0d0UhB/zbW+KI0aFO5xW9ZhZJhGm3jVLgyvrwADzBjVtgJ4wD1FSWssAcmmao8nQtdFzTJ1mquXoEsTXOiuMIKJyE547XZ6+NAsXwCkT6I8Gt+ijPEknugxcPSEmunR+eHRJT52ejuemKeoHjEOOGIsh4G5s7nSySrmegHaJkA46g1NUuIGmmOXlDu0u+XZcQ6K6SiMf0ovFCAUD7kO4Tqgw1hRNV5UMSIIkA/c1MTflZuWxDHvuYKvK0HQu4as6ebai+/7F6eAUuaIWGtq9enliBsn4mE0WlToXykrkDvCqJrPxgmDbEbNNIK8R6+24yk02CjcszxZKLLJQG1JtCQYPkobr9S3od6D6AzB8/+JMnEzLS07NCg3OX+sKPTLQjQmjmZ6Y8YU8KhiywcgE1uGuxlB9CDDooVQamIRzNsu5jVJai2jHRTf+5VTbA22iDyLBpB8vD7JHYnzOVXTjRpux8H4ussVzYgKtW31zuCVsO+f8vOBqtex8nOjSvkb3E/EwFWI+VA7AiDAbutsuTkuJcEl1SWnlioYron2aJM1c86JHZGJUUivIkSg2kSXMyTfSLML/hHv/AVBLAwQKAAAAAAB4TzddAAAAAAAAAAAAAAAACQAAAHhsL3RoZW1lL1BLAwQKAAAACAB4Tzdddpsw3yEGAAAZHwAAEwAAAHhsL3RoZW1lL3RoZW1lMS54bWztWU1v2zYYvu9XELq38pdSJ6hTxI7dbm3aIHE79EhLtMSGEgWSTuLb0B4HDBjWDbsM2G2HYVuBFtil+zXZOmwd0L+wV9aHKZtqnCbdUCA5OCL1PO8X3/claV+/cRwydEiEpDzqWPWrNQuRyOUejfyOdX84uNK2kFQ48jDjEelYUyKtG5sfXccbKiAhQUCP5AbuWIFS8YZtSxemsbzKYxLBuzEXIVYwFL7tCXwEYkNmN2q1NTvENLJQhEOQem88pi5Bw0SktYly6X0GH5GSsxmXiX13plPnpGjvoD77L6eyxwQ6xKxjgS6PHw3JsbIQw1LBi45Vm/1ZNqDtOY2pKrpGHcz+cmpO8Q4aKVX4o4JbH7TWr23PtTQyLQZov9/v9etzqSkEuy74XV+GtwbtereQrMPSZ4OGXs2ptRYoupbmMmW92+0662VKU6O0lint2lprq1GmtDSKY/Clu9XrrZUpjkZZW6YMrq2vtRYoKSxgNDpYJiSrPV+0OWjM2S0zow2MdpEhGs7WUjCTEanKjAzxIy4GgEiXHisaITWNyRi7gOzhcCQonmnBGwRrr7I5Vy7PJQqRdAWNVcf6JMZQPnPMm5c/vXn5HL15+ezk8YuTx7+ePHly8vgXE/MWjnyd+fqHL//57jP09/PvXz/9uoIgdcIfP3/++29fVSCVjnz1zbM/Xzx79e0Xf/341ITfEnik44c0JBLdJUdoj4fgn0kFGYkzUoYBpiUKDgBqQvZVUELenWJmBHZJOYYPBLQLI/Lm5FHJ3v1ATBQ1IW8HYQm5wznrcmH26XaiTvdpEvkV+sVEB+5hfGhU31tY5f4khtymRqG9gJRM3WWw8NgnEVEoeccPCDHxHlJaiu8OdQWXfKzQQ4q6mJoDM6QjZWbdoiEs0NRoI6x6KUI7D1CXM6OCbXJYhkKFYGYUSlgpmjfxROHQbDUOmQ69g1VgNHR/KtxS4KWCRfcJ46jvESmNpHtiWjL5NoY2Zc6AHTYNy1Ch6IERegdzrkO3+UEvwGFstptGgQ7+WB5AxmK0y5XZDl6umWQMC4Kj6pV/QIk6Y7Hfp35gTpbkzUQYa4Twco1O2RiTKN8Eyr08pNFbOzuj0NovO/tCZ9+C7c5YUYv9vBL4gXbxbTyJdglUymUTv2zil038bRX+Plq31qxt/cieSgqrD/Bjyti+mjJyR6adXoKb3gBm09GMV9wa4gAec6VlpC/wbIAEV59SFewHOAZd9VSNL3P5vkQxl3BlsaoVpFdjCv7PJp3iMgt4rHa4l843S7fcQlI69GVJXTMRsrrK5rXzq6yn2JV11p0Knc5pOm09wFBbCCdfa9TXGqkFkEWYES9ZjExIvljve+XqNX3pAuwR07zma735/uLrnNGWi4t7zRB321B7LFoYoqOOte40HAu5OO5YYziGwWMYg0yZNCjM/KhjuSrzdYXaXfR+vSLp6jWn2vmynlhItY1lkBJn74oveiLNkYbTSoJyUZ4Yu9CqtjTb9f/dFntpwcl4TFxVNaWN87d8oojYD7wjNGITsYfBg1aaeh6VsG008oGA9G9lWVku87yAFr9OyisLszjAWUG09ZRICemgsCMd6kbaVT68s0/NC/XJufQp3/ldOBM3vdmzCwcFgVGSwh2LCxVwaF1xQN2BgLNFqhHsQ1A6iWmIJV+rJzaTQ63dpVKy7ugHao/6SFBokSoQhOyqzOPT5NUbpV03F5W3prnVMs4eRuSQsGFS6GtJMCwU5O0nj0qKXFpI21iEI3/wARyTWu+8j83Vtc62pbb03UPbVNbPb8lqu7umtFHhfsN5y062vI3HcPVByQfsAFS4TDsnD/keZAYqjhIIcvVKOyvWYnIEtrd1PxNh/+2xq12VCRd+etXi36yK/6lKzxN/xxB+59To24aatrWLUjpc/nGOjx6BBdtwCZuwbErGMMyedkXq/oh70/yZybSXZIEpNggW7ZExot5xseQLUc5+9ZofGfYyPUkoCm5zFW7G0Damgt9YhV9wNvOLacGf3TyNMpimP2VkGTBvtfPYsejcUVzJk4oomvN89SiutILvFEV1fGoU89jZxvwkx0rgXv6LHqS6rSX35r9QSwMECgAAAAgAeE83XQTrG66QAgAAYAYAAA0AAAB4bC9zdHlsZXMueG1spVXfb5swEH7fX2H5nRpoYEkEVEtTpErdNKmZtFcHTGLVP5BxOrJp//vOQAJRt3XqXmL7u7vvvjufSXLTSoGemWm4VikOrnyMmCp0ydUuxV82uTfHqLFUlVRoxVJ8ZA2+yd4ljT0K9rhnzCJgUE2K99bWS0KaYs8kba50zRRYKm0ktXA0O9LUhtGycUFSkND3YyIpV7hnWMriX0gkNU+H2iu0rKnlWy64PXZcGMlieb9T2tCtAKVtMKMFaoPYhKcMHfQiieSF0Y2u7BWQEl1VvGAvtS7IgtBiZALatzEFEfHDvvAsqbSyDSr0QdkUO51O4fJJ6W8qdya4ksErSwottEEWUjEHE8Cp5OKInqlwwQB0QlgPSA6t6MDvPRB0MYqeHG6p4FvDHUj6DP3vdgS6pQEDF2IisweyBG7AMqNyOKBhvznWoE7BrPS8nd8r3jtDj0EYTQK6BfJutSlhNk+ZXS96KEsEqywEGL7bu9XqmjijtdD5LCk53WlFhaM8RQwboC2YEI9ugL9WF9xthdRB5tLelymGl+CqP21B0LDtafqD45+y9dwT2vBNtKitzvx/ig5ej0a0rsXRDdIwMGRQN2nBRQPOKHJjkuJP7uGJCeH2wIXl6jfFA2fZjnV3Vute4mUW4ChZRQ/Cbs7GFI/7j6zkBxmevT7zZ20Hr3H/4G49iF0O1tqHxnYrOhie4h93q/eL9V0eenN/Nfdm1yzyFtFq7UWz29V6nS/80L/9Ofkk/McHYXjFQLJsBHiZodhB/OOIpXhy6OV3/QPZU+2LMPY/RIHv5dd+4M1iOvfm8XXk5VEQruPZ6i7Ko4n26I2fIJ8EwSg+WloumeCKXcrfTFG4JDj+pQhyugky/jdkvwBQSwMECgAAAAAAeE83XQAAAAAAAAAAAAAAAAkAAABkb2NQcm9wcy9QSwMECgAAAAgAeE83XXKkLnGRAQAAOQMAABAAAABkb2NQcm9wcy9hcHAueG1snVNBbtswELz3FQTvNqW0CAqDYlA4LYKiQQ1YSc5bamURpkiC3Ah2X1/KhhW56am32d3BcDhcyrtDb9mAMRnvKl4uC87Qad8Yt6v4U/1t8ZmzROAasN5hxY+Y+J36IDfRB4xkMLGs4FLFO6KwEiLpDntIyzx2edL62APlMu6Eb1uj8d7r1x4diZuiuBV4IHQNNoswCfKz4mqg/xVtvB79pef6GLKekl9CsEYD5UuqR6OjT74l9vWg0UoxH8ostEX9Gg0dVSHFvJRbDRbXWVi1YBNK8daQDwhjZhswMSk50GpATT6yZH7n1G44+wUJRzsVHyAacMTPtHNxwjYkiurFx33qEClJMTVPcM6dY/NJlSdCBtdEMRnJ+Npibchi+tluINI/HJdzxycPfOax9oGVBfuOw8KaPTLrcxKs9w3a964v5/914tr3AVyOVUzoERzscORO6Idx+/QUan8PhJfcr5ty20HEJj/V9C5TQz7kC0Q78tcduB02F877wbglz+efoMrbZfGxKE7LcelJ8bb06g9QSwMECgAAAAgAeE83XZ8/qzRfAQAA4wIAABEAAABkb2NQcm9wcy9jb3JlLnhtbJ1Sy27CMBC89ysi34NDaFGJQpDailORKpWqVW+uvQSXxLbspSF/X+dBAJVTbzs7s+N9OF0cyiL4AeukVnMyHkUkAMW1kCqfk7f1MrwngUOmBCu0gjmpwZFFdpNyk3Bt4cVqAxYluMAbKZdwMydbRJNQ6vgWSuZGXqE8udG2ZOihzalhfMdyoHEUTWkJyARDRhvD0AyOpLcUfLA0e1u0BoJTKKAEhY6OR2N60iLY0l0taJkzZSmxNnBVeiQH9cHJQVhV1aiatFLf/5h+rJ5f21FDqZpVcSBZKnjCLTDUNntTO6UrldKzXMOjxAKyNt2HPnL7r2/g2KUH4GMBjltp0N+pIy8S/hw7qCtthfPsBWouxRBybeuOOiEPCuZw5c+9kSAe6lOvf6m03203A4jA7yTpNnhk3iePT+slyeIonobRLIwn62iW3M2S29ln0/NF/cmw7B/5t+PRoJ/v4l9mv1BLAwQKAAAACAB4Tzdd/dpOPmYBAACHAgAADwAAAHhsL3dvcmtib29rLnhtbI2SO2/DIBCA9/4KxJ7YJH1GsSNVbaV0qDqk3QmcE2TgEOC0+fc9O3WlKksW3vfdd8By9e0sO0BMBn3FxbTkDLxCbfyu4h+bl8k9ZylLr6VFDxU/QuKr+mr5hbHdIraM4n2q+D7nsCiKpPbgZJpiAE87DUYnM03jrkghgtRpD5CdLWZleVs4aTw/ERbxEgY2jVHwhKpz4PMJEsHKTPZpb0IaaU5dgnMytl2YKHSBEFtjTT4OUM6cWqx3HqPcWqr6W9yMZBqeoZ1RERM2eUqoX8mzekVZCHEquV42xsLn6daZDOFNuj6L5czKlJ+1yaArTjktfsG/hdiFx85YmjzMyzkv6r+XeI9MQyM7mzdkNdLpTW+vSyE4o5QZ4ns0B6mOtNzHDnbpt2dDu9b9HvOD0QYDEyV7hcPEmhZIR0nLHGqwafgXmQ4dTDJ0S+S2MBQc1/q6ZxcjnEIUyfXdAL8T5exuODGq1z9QSwECFAAKAAAACAB4TzddkdvACVkBAADwBAAAEwAAAAAAAAAAAAAAAAAAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUAAoAAAAAAHhPN10AAAAAAAAAAAAAAAAGAAAAAAAAAAAAEAAAAIoBAABfcmVscy9QSwECFAAKAAAACAB4Tzdd8p9J2ukAAABLAgAACwAAAAAAAAAAAAAAAACuAQAAX3JlbHMvLnJlbHNQSwECFAAKAAAAAAB4TzddAAAAAAAAAAAAAAAAAwAAAAAAAAAAABAAAADAAgAAeGwvUEsBAhQACgAAAAAAeE83XQAAAAAAAAAAAAAAAAkAAAAAAAAAAAAQAAAA4QIAAHhsL19yZWxzL1BLAQIUAAoAAAAIAHhPN12EJLFW6QAAALkCAAAaAAAAAAAAAAAAAAAAAAgDAAB4bC9fcmVscy93b3JrYm9vay54bWwucmVsc1BLAQIUAAoAAAAAAHhPN10AAAAAAAAAAAAAAAAOAAAAAAAAAAAAEAAAACkEAAB4bC93b3Jrc2hlZXRzL1BLAQIUAAoAAAAIAHhPN12Q0+dlCgQAALYPAAAYAAAAAAAAAAAAAAAAAFUEAAB4bC93b3Jrc2hlZXRzL3NoZWV0MS54bWxQSwECFAAKAAAACAB4Tzddygk8YpIFAABRDgAAFAAAAAAAAAAAAAAAAACVCAAAeGwvc2hhcmVkU3RyaW5ncy54bWxQSwECFAAKAAAAAAB4TzddAAAAAAAAAAAAAAAACQAAAAAAAAAAABAAAABZDgAAeGwvdGhlbWUvUEsBAhQACgAAAAgAeE83XXabMN8hBgAAGR8AABMAAAAAAAAAAAAAAAAAgA4AAHhsL3RoZW1lL3RoZW1lMS54bWxQSwECFAAKAAAACAB4TzddBOsbrpACAABgBgAADQAAAAAAAAAAAAAAAADSFAAAeGwvc3R5bGVzLnhtbFBLAQIUAAoAAAAAAHhPN10AAAAAAAAAAAAAAAAJAAAAAAAAAAAAEAAAAI0XAABkb2NQcm9wcy9QSwECFAAKAAAACAB4TzddcqQucZEBAAA5AwAAEAAAAAAAAAAAAAAAAAC0FwAAZG9jUHJvcHMvYXBwLnhtbFBLAQIUAAoAAAAIAHhPN12fP6s0XwEAAOMCAAARAAAAAAAAAAAAAAAAAHMZAABkb2NQcm9wcy9jb3JlLnhtbFBLAQIUAAoAAAAIAHhPN1392k4+ZgEAAIcCAAAPAAAAAAAAAAAAAAAAAAEbAAB4bC93b3JrYm9vay54bWxQSwUGAAAAABAAEADGAwAAlBwAAAAA"
+    }
+  ],
+  "template": null
+}

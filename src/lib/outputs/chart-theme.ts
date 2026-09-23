@@ -1,7 +1,7 @@
 /**
- * The look of every chart, from the app's design (docs/DESIGN-V2.md): graphite text on paper, hairline grid lines,
- * the system font, saffron as the first colour. Sized for the smallest place a chart is shown: a tile on a 390 px
- * phone, about 320 px wide, where the SVG is scaled down to fit.
+ * The look of every chart, from the app's design (docs/DESIGN-V2.md): graphite text, hairline grid lines, the system
+ * font, saffron as the first colour, on a transparent ground. Sized for the smallest place a chart is shown: a tile
+ * on a 390 px phone, about 320 px wide, where the SVG is scaled down to fit.
  */
 
 // The whole SVG, axes, legend and padding included (autosize "fit"). 320 / 420 = 0.76 is the smallest tile's scale.
@@ -17,18 +17,29 @@ export const CHAR_EM = 0.6;
 const PADDING = 20;
 export const INNER_WIDTH = CHART_WIDTH - 2 * PADDING;
 
-const GRAPHITE = "#17202B";
-const SLATE = "#5B6878";
-const SAFFRON = "#E89A0C";
-const FERN = "#15845A";
-const CRIMSON = "#C62F43";
+// The design's tokens, light and dark. The SVG is drawn in the light ones; its style block (chart-style.ts) switches
+// every one of them to its dark value when the viewer's scheme is dark.
+export const TOKENS = {
+  graphite: { light: "#17202B", dark: "#E6EBF2" },
+  slate: { light: "#5B6878", dark: "#98A4B3" },
+  saffron: { light: "#E89A0C", dark: "#F5B437" },
+  fern: { light: "#15845A", dark: "#3CC489" },
+  crimson: { light: "#C62F43", dark: "#F0697A" },
+  paper: { light: "#FFFFFF", dark: "#151C26" },
+} as const;
+const GRAPHITE = TOKENS.graphite.light;
+const SLATE = TOKENS.slate.light;
+const SAFFRON = TOKENS.saffron.light;
 
 export const ACCENT = SAFFRON; // a single series is saffron, the app's colour for what the agent made
-// The design's five, then lighter tints of the first three, so a sixth pie slice never repeats a colour.
-const PALETTE = [SAFFRON, FERN, GRAPHITE, SLATE, CRIMSON, "#F4C56A", "#7CC4A2", "#8A95A3"];
+// The design's five series colours in order; the style block maps each to its dark twin.
+export const SERIES = [TOKENS.saffron, TOKENS.fern, TOKENS.graphite, TOKENS.slate, TOKENS.crimson];
+// After the five, lighter tints of the first three, so a sixth pie slice never repeats a colour (readable in both).
+const PALETTE = [...SERIES.map((t) => t.light), "#F4C56A", "#7CC4A2", "#8A95A3"];
 
 export const THEME = {
-  background: "#FFFFFF", // paper
+  // the tile's own colour, light or dark, shows through (Q141); vega's SVG writer draws no rectangle for "transparent"
+  background: "transparent",
   padding: PADDING,
   font: 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
   view: { stroke: null }, // no box around the plot
@@ -66,5 +77,5 @@ export const THEME = {
   bar: { cornerRadiusEnd: 4 },
   line: { strokeWidth: 2.5 },
   point: { size: 70, opacity: 0.9 }, // Vega-Lite's default 0.7 left saffron points pale on paper
-  arc: { stroke: "#FFFFFF", strokeWidth: 2 }, // a thin paper seam between slices
+  arc: { stroke: TOKENS.paper.light, strokeWidth: 2 }, // a thin paper seam between slices
 } as const;
