@@ -37,7 +37,7 @@ test("a finished run becomes a draft automation that can be edited and cannot be
 
   // edit inline: the brief keeps its placeholder in the editor, a new name is saved and survives a reload
   await page.getByRole("button", { name: "Edit" }).click();
-  await expect(page.getByLabel("Instructions")).toHaveValue(/\{input\}/);
+  await expect(page.getByLabel("The brief")).toHaveValue(/\{input\}/);
   const name = `[e2e] Agent or workflow ${Date.now()}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Save changes" }).click();

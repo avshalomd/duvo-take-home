@@ -8,7 +8,7 @@ import { readError } from "@/lib/automations/errors";
 import type { EditValues } from "@/lib/automations/form";
 import { parseEditForm } from "@/lib/automations/form";
 import { draftFromRun } from "@/lib/automations/from-run";
-import { SCHEDULE_PRESETS } from "@/lib/automations/schedule-presets";
+import { toUtcCron } from "@/lib/automations/schedule-local";
 import {
   approveAutomation,
   deleteAutomation,
@@ -116,12 +116,13 @@ export async function approveAction(_prev: ActionState, formData: FormData): Pro
   if (!id.success) return { error: "That automation no longer exists." };
   const { workspaceId } = await ctx();
   try {
-    const a = await approveAutomation(workspaceId, id.data);
-    refresh(id.data);
-    return { ok: true, message: `Approved. Call it from Home with \\${a.command} and an input.` };
+    await approveAutomation(workspaceId, id.data);
   } catch (e) {
     return { error: readError(e) };
   }
+  refresh(id.data);
+  // the page turns into the ready page; ?approved=1 asks it for the small confirmation of this press
+  redirect(`/automations/${id.data}?approved=1`);
 }
 
 export async function setStatusAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -140,18 +141,21 @@ export async function setStatusAction(_prev: ActionState, formData: FormData): P
 
 const Schedule = z.object({
   id: Id,
-  preset: z.enum(["none", "custom", ...SCHEDULE_PRESETS.map((p) => p.id)]),
+  preset: z.enum(["none", "weekdays", "mondays", "daily", "custom"]),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time of day"),
+  offset: z.coerce.number().int().min(-840).max(840), // the browser's offset from UTC in minutes: the widest zones are 14 h out
   cron: z.string().trim().max(100),
   input: z.string().trim().max(2000),
 });
 
+/** The schedule as chosen in the viewer's time (Q107), stored as the UTC cron the scheduler reads. */
 export async function setScheduleAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const values = { preset: field(formData, "preset"), cron: field(formData, "cron"), input: field(formData, "input") };
-  const parsed = Schedule.safeParse({ id: field(formData, "id"), ...values });
-  if (!parsed.success) return { error: "Choose when it should run.", values };
-  const { id, preset, cron, input } = parsed.data;
+  const values = { preset: field(formData, "preset"), time: field(formData, "time") || "08:00", cron: field(formData, "cron"), input: field(formData, "input") };
+  const parsed = Schedule.safeParse({ id: field(formData, "id"), offset: field(formData, "offset"), ...values });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose when it should run.", values };
+  const { id, preset, time, offset, cron, input } = parsed.data;
 
-  const chosen = preset === "none" ? null : preset === "custom" ? cron : SCHEDULE_PRESETS.find((p) => p.id === preset)!.cron;
+  const chosen = preset === "none" ? null : preset === "custom" ? cron : toUtcCron({ repeat: preset, time }, offset);
   if (chosen === "") return { error: "Write the custom schedule as a cron expression, e.g. 0 8 * * 1-5.", values };
   if (chosen && !input) return { error: "Say which input the scheduled runs get.", values };
 
@@ -165,7 +169,7 @@ export async function setScheduleAction(_prev: ActionState, formData: FormData):
   return { ok: true, message: chosen ? "Schedule saved." : "Schedule removed." };
 }
 
-/** "Run" on a card or on the automation's page: the same path as typing \command input on Home. */
+/** "Run" on the automation's page: the same path as typing \command input on Home. */
 export async function runNowAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const id = Id.safeParse(field(formData, "id"));
   if (!id.success) return { error: "That automation no longer exists." };

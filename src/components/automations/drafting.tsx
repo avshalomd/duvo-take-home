@@ -1,16 +1,21 @@
 "use client";
 
-import { LoaderCircle, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { draftFromRunAction } from "@/app/(app)/automations/actions";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { LINK, SHEET } from "./surfaces";
 
 // The drafting page's body. The draft is a Server Action started once the page is on screen - not a render side
-// effect - so a prefetch or a crawler fetching the URL never spends a model call.
+// effect - so a prefetch or a crawler fetching the URL never spends a model call. A reload lands on the same draft:
+// the server reuses a draft of this run made moments ago (Q119).
 export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
   const router = useRouter();
+  const reduce = useReducedMotion();
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const started = useRef<number | null>(null);
@@ -26,16 +31,15 @@ export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
 
   if (error)
     return (
-      <section role="alert" className="space-y-4 rounded-xl border bg-background p-6">
-        <div className="flex items-start gap-3">
-          <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-600" />
-          <div className="space-y-1">
-            <h1 className="text-base font-medium">The draft could not be made</h1>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </div>
+      <section role="alert" className={cn(SHEET, "space-y-5 p-6 sm:p-10")}>
+        <TriangleAlert aria-hidden className="size-6 text-crimson" />
+        <div className="space-y-2">
+          <h1 className="display text-[28px] text-graphite">The draft could not be made</h1>
+          <p className="text-slate">{error}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-4">
           <Button
+            className="h-10 px-5 text-[15px]"
             onClick={() => {
               setError(null);
               setAttempt((n) => n + 1);
@@ -43,7 +47,7 @@ export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
           >
             Try again
           </Button>
-          <Link href="/automations" className={buttonVariants({ variant: "outline" })}>
+          <Link href="/automations" className={LINK}>
             Back to automations
           </Link>
         </div>
@@ -51,16 +55,20 @@ export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
     );
 
   return (
-    <section aria-live="polite" aria-busy="true" className="space-y-4 rounded-xl border bg-background p-6">
-      <div className="flex items-center gap-3">
-        <LoaderCircle className="size-5 animate-spin text-emerald-700" />
-        <h1 className="text-base font-medium">Drafting an automation from this run...</h1>
+    <section aria-live="polite" aria-busy="true" className={cn(SHEET, "space-y-5 p-6 sm:p-10")}>
+      <span className="relative flex size-5 items-center justify-center rounded-full border-2 border-saffron">
+        {/* the thread's bead: work is happening, calmly (it stops breathing under reduced motion) */}
+        <motion.span
+          className="absolute inset-[3px] rounded-full bg-saffron"
+          animate={reduce ? undefined : { opacity: [1, 0.45, 1], scale: [1, 0.8, 1] }}
+          transition={reduce ? undefined : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </span>
+      <div className="space-y-2">
+        <h1 className="display text-[28px] text-graphite sm:text-[36px]">Writing a first draft</h1>
+        <p className="text-slate">It reads what the run was asked, its plan and its files. This takes about half a minute.</p>
       </div>
-      <p className="text-sm text-muted-foreground">
-        It reads what the run was asked, its plan and its files, and writes a first version for you to check and try. This takes
-        about half a minute.
-      </p>
-      <blockquote className="border-l-2 pl-3 text-sm text-muted-foreground italic">{prompt}</blockquote>
+      <blockquote className="max-w-[66ch] border-l-2 border-hairline pl-4 text-[15px] leading-6 text-graphite/80">{prompt}</blockquote>
     </section>
   );
 }
