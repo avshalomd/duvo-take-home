@@ -1,4 +1,5 @@
 import type { RunView } from "./types";
+import { fixesRun, healsOf } from "./heal";
 import { IntentSection } from "./intent-section";
 import { isTerminal } from "./poll";
 import { StateSection } from "./state-section";
@@ -9,6 +10,7 @@ import { VerdictSection } from "./verdict-section";
 // "what exactly did it do", which is the question you only ask when something looks wrong. Monospace lives here only.
 export function RunDetails({ view, storedOutcome, connections }: { view: RunView; storedOutcome: string | null; connections: { name: string }[] }) {
   const { run, state, events, verdict } = view;
+  const heals = healsOf(state.heals, events);
 
   return (
     <div data-testid="run-details">
@@ -46,11 +48,12 @@ export function RunDetails({ view, storedOutcome, connections }: { view: RunView
         <dd className="font-mono">{run.model}</dd>
         <dt>Turns</dt>
         <dd className="tabular-nums">{run.numTurns ?? "-"}</dd>
-        {state.heals && state.heals.length > 0 && (
+        {heals.length > 0 && (
           <>
             <dt>Fix attempts</dt>
+            {/* the fixes the agent made, as the engine counts them: a stopped attempt was never made (Q148) */}
             <dd className="tabular-nums">
-              {state.heals.length} of {state.heals.at(-1)!.max}
+              {fixesRun(heals)} of {heals.at(-1)!.max}
             </dd>
           </>
         )}

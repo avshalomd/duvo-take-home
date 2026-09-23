@@ -20,11 +20,12 @@ export function groupEvents(events: RunEvent[], runStatus = "running"): EventGro
 
   for (const event of events) {
     if (event.kind === "heal") {
-      const { attempt, max } = event.payload;
-      // under way until the agent's result for it arrives. On a run that ended without one: a succeeded run's engine
-      // stopped trying (Q148), so it never ran; a stopped or broken run ended in the middle of it
-      const status = LIVE.includes(runStatus) ? "running" : runStatus === "succeeded" ? "skipped" : "pending";
-      heal = { key: `heal-${attempt}`, title: `Fixing what the check found - attempt ${attempt} of ${max}`, status, events: [event] };
+      const { attempt, max, stopped } = event.payload;
+      // the engine stopped trying instead (Q148): it never ran. Otherwise under way until the agent's result for it
+      // arrives; a run that ended without one was stopped or broke in the middle of it
+      const status = stopped ? "skipped" : LIVE.includes(runStatus) ? "running" : "pending";
+      const title = `${stopped ? "Stopped trying" : "Fixing what the check found"} - attempt ${attempt} of ${max}`;
+      heal = { key: `heal-${attempt}`, title, status, events: [event] };
       current = heal;
       groups.push(heal);
       continue;

@@ -62,7 +62,7 @@ export function RunPanel({
   // Details then all say the same thing, whatever shape the verdict was stored in (Q91)
   const headline = verdict?.verdict ?? run.outcome ?? null;
   // auto-heal's attempts, the last one marked if the engine stopped trying instead of making it (Q148)
-  const heals = healsOf(state.heals, events, run.status);
+  const heals = healsOf(state.heals, events);
   const result = outcome(run.status, headline, run.cancelRequested, { attempts: fixesRun(heals), max: heals.at(-1)?.max });
   const why = whyLines(verdict, run.status, run.outcome, heals);
   const progress = planProgress(state.plan);

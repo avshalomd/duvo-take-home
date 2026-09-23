@@ -106,8 +106,15 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
         return (
           <div key={event.seq} className="space-y-1 rounded-[10px] bg-saffron-wash/60 px-2.5 py-2 text-[12px]">
             <p className="text-slate">The check found: {event.payload.reasons.join("; ") || "no reasons given"}</p>
-            <p className="text-slate">The agent was told:</p>
-            <pre className="font-mono text-[11px] whitespace-pre-wrap text-graphite">{event.payload.feedback}</pre>
+            {event.payload.stopped ? (
+              // the engine's own reason for not trying again (Q148); the feedback was never sent
+              <p className="text-graphite">{event.payload.stopped}</p>
+            ) : (
+              <>
+                <p className="text-slate">The agent was told:</p>
+                <pre className="font-mono text-[11px] whitespace-pre-wrap text-graphite">{event.payload.feedback}</pre>
+              </>
+            )}
           </div>
         );
       case "started":
