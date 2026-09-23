@@ -97,7 +97,7 @@ describe("carryOverPrompt: the earlier run's plan and its check (his words: the 
   });
 
   it("asks the agent to fix what the check found and to check the files itself before it finishes", () => {
-    expect(carryOverPrompt(hisParent, "fix the table")).toMatch(/fix what it found.*check the files yourself/is);
+    expect(carryOverPrompt(hisParent, "fix the table")).toMatch(/fix what it found[\s\S]*check the files yourself/i);
   });
 
   it("says the check passed it with notes, and carries the notes, for a pass with notes", () => {
