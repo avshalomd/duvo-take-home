@@ -205,3 +205,17 @@ Per file: what it does and why it is built that way. Grows at every merge.
   workspace's own limits: every account can make workspaces, and they all spend one key (Q175).
 - `next.config.ts` headers - no framing (`X-Frame-Options`, `frame-ancestors 'none'`), `nosniff`, a referrer policy
   and no `X-Powered-By` on every route (Q173).
+
+### Roles and limits (his decisions after the deep QA: Q169, Q176-Q178)
+- `src/lib/auth/member-rules.ts` - who may change whose role or remove whom, as plain functions the page and the
+  actions both ask: an admin never acts on an owner or makes one, the last owner stays, nobody changes themselves
+  here. The actions then call Better Auth's own `removeMember` / `updateMemberRole`, so its rules apply as well.
+- `src/lib/automations/permissions.ts` - approving, switching, deleting, scheduling and renaming a Ready command are
+  for owners and admins; drafting, editing, examples and judging are for everyone. Approval is the human gate that
+  lets written instructions reach the agent, so whoever approves answers for the workspace.
+- `runs.human_verdict_by` and `src/lib/runs/verdict-words.ts` - a judgment records who made it (from the session),
+  so "You said it looks right" is only ever said to that person; older rows read "Marked: looks right".
+- `src/lib/auth/auth.ts` rate limit - counted in the `rate_limit` table, not in one function instance's memory, and
+  on in every environment: 3 sign-in or sign-up tries per 10 s per client address and path.
+- `src/app/api/health/cache.ts` - the deep check's model answer is kept 60 s per instance, so the open health route
+  cannot be used to make paid calls; the database is asked every time.
