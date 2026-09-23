@@ -1,49 +1,35 @@
 import type { TopLevelSpec } from "vega-lite";
 import type { z } from "zod";
 import type { ChartInput } from "@/contracts/outputs";
+import { CHART_HEIGHT, CHART_WIDTH, TEXT_PX, THEME } from "./chart-theme";
 import { asNumber } from "./numbers";
+
+export { ACCENT, CHART_HEIGHT, CHART_WIDTH } from "./chart-theme";
 
 /** make_chart's arguments without the file name: everything the picture depends on. */
 export type ChartArgs = Omit<z.infer<z.ZodObject<typeof ChartInput>>, "file">;
 type Row = ChartArgs["data"][number];
 
-export const CHART_WIDTH = 640;
-export const CHART_HEIGHT = 360;
-
-// One accent for a single series; the companions only appear when a series splits the data into groups.
-export const ACCENT = "#2563eb";
-const PALETTE = [ACCENT, "#f59e0b", "#10b981", "#8b5cf6", "#f43f5e", "#64748b", "#0891b2", "#ea580c"];
-
-// A calm, readable default: white background, no frame, grey text, light grid lines, the title on top at the left.
-const THEME = {
-  background: "#ffffff",
-  padding: 16,
-  font: "Helvetica, Arial, sans-serif",
-  view: { stroke: null },
-  title: { anchor: "start", fontSize: 16, fontWeight: 600, color: "#111827", offset: 16 },
-  axis: {
-    labelFontSize: 12,
-    labelColor: "#4b5563",
-    labelLimit: 160,
-    titleFontSize: 12,
-    titleFontWeight: 500,
-    titleColor: "#374151",
-    gridColor: "#eceef1",
-    domainColor: "#d1d5db",
-    tickColor: "#d1d5db",
-  },
-  axisX: { grid: false },
-  legend: { labelFontSize: 12, labelColor: "#4b5563", titleFontSize: 12, titleColor: "#374151" },
-  range: { category: PALETTE },
-  mark: { color: ACCENT },
-  bar: { cornerRadiusEnd: 3 },
-  line: { strokeWidth: 2 },
-  point: { size: 60 },
-} as const;
-
 const ROW_ORDER = "__row"; // a computed field: the double underscore keeps it clear of the agent's own field names
 
-const ISO_DATE =/^\d{4}-\d{2}(-\d{2})?([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+const ISO_DATE = /^\d{4}-\d{2}(-\d{2})?([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+// What the category labels have to share: the chart minus its padding and the value axis on the left.
+const PLOT_WIDTH = CHART_WIDTH - 2 * THEME.padding - 70;
+const CHAR_PX = TEXT_PX * 0.5; // an average character of the system font; a rough estimate is enough to decide
+
+// Values in the millions shortened on the axis: 84,700,000 is ten characters where 85M is three.
+const SHORT_NUMBER =
+  "abs(datum.value) >= 1e9 ? format(datum.value / 1e9, '~g') + 'B'" +
+  " : abs(datum.value) >= 1e6 ? format(datum.value / 1e6, '~g') + 'M'" +
+  " : abs(datum.value) >= 1e3 ? format(datum.value / 1e3, '~g') + 'k'" +
+  " : format(datum.value, '~g')";
+
+/** A field name as an axis or legend title: population_millions reads "Population millions". */
+function words(field: string): string {
+  const spaced = field.replace(/[_-]+/g, " ").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 
 /** What a field holds, read from its values: numbers, ISO dates or text. Nulls do not count either way. */
 function fieldKind(rows: Row[], field: string): "number" | "date" | "text" {
@@ -53,32 +39,48 @@ function fieldKind(rows: Row[], field: string): "number" | "date" | "text" {
   return "text";
 }
 
-/** The x encoding of a line, area or scatter chart, chosen from what x holds. */
-function continuousX(rows: Row[], field: string) {
-  const kind = fieldKind(rows, field);
-  if (kind === "date") return { field, type: "temporal" as const };
-  if (kind === "number") {
+/**
+ * Level labels while the longest one fits its share of the width; otherwise slanted at 45 degrees and anchored at
+ * their end, so each label runs down-left from its own tick and cannot touch its neighbour.
+ */
+function categoryAxis(rows: Row[], field: string) {
+  const labels = [...new Set(rows.map((r) => String(r[field] ?? "")))];
+  const longest = Math.max(...labels.map((l) => l.length));
+  const fits = longest * CHAR_PX <= (PLOT_WIDTH / labels.length) * 0.9; // 10% air between neighbours
+  return fits ? { labelAngle: 0 } : { labelAngle: -45, labelAlign: "right" as const, labelBaseline: "middle" as const };
+}
+
+/** A value axis: short numbers when they reach the millions, the digits as they are below that. */
+function valueAxis(rows: Row[], field: string) {
+  const largest = Math.max(0, ...rows.map((r) => (typeof r[field] === "number" ? Math.abs(r[field]) : 0)));
+  return largest >= 1e6 ? { labelExpr: SHORT_NUMBER } : undefined;
+}
+
+/**
+ * The x encoding of a bar, line or area chart. It has no axis title: the labels (countries, months, years) say what
+ * they are and the chart's title says the rest, and a title under slanted labels is what landed on top of them (Q98).
+ */
+function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area") {
+  const holds = fieldKind(rows, field);
+  if (kind !== "bar" && holds === "date") return { field, type: "temporal" as const, title: null };
+  if (kind !== "bar" && holds === "number") {
     const whole = rows.every((r) => r[field] === null || Number.isInteger(r[field]));
     return {
       field,
       type: "quantitative" as const,
+      title: null,
       scale: { zero: false }, // an x axis of years must not start at year 0
       // whole numbers are usually years or counts: "2024", not "2,024", and no tick at 2023.5
-      ...(whole ? { axis: { format: "d", tickMinStep: 1 } } : {}),
+      ...(whole ? { axis: { format: "d", tickMinStep: 1, labelAngle: 0 } } : { axis: { labelAngle: 0 } }),
     };
   }
-  return { field, type: "ordinal" as const, sort: null }; // text on x ("Jan", "Q1"): keep the order the agent gave
-}
-
-/** A bar chart's category axis: the agent's order, and slanted labels only when they would collide. */
-function categoryX(rows: Row[], field: string) {
-  const labels = rows.map((r) => String(r[field] ?? ""));
-  const crowded = labels.length > 12 || labels.some((l) => l.length > 10);
   return {
     field,
-    type: fieldKind(rows, field) === "number" ? ("ordinal" as const) : ("nominal" as const), // years as bars are categories
+    // text is a category; numbers on a bar chart (years) are categories too, and ordinal keeps them in order
+    type: kind === "bar" && holds !== "number" ? ("nominal" as const) : ("ordinal" as const),
     sort: null, // the agent's order: the five largest stay largest-first
-    axis: { labelAngle: crowded ? -40 : 0 },
+    title: null,
+    axis: categoryAxis(rows, field),
   };
 }
 
@@ -90,7 +92,7 @@ function requireField(rows: Row[], field: string) {
 
 /**
  * A Vega-Lite spec for one chart, as plain data: the chart kind picks the mark and the encodings, the values decide
- * the axis types. Pure, so every choice here is tested without rendering anything.
+ * the axis types and labels. Pure, so every choice here is tested without rendering anything.
  */
 export function buildChartSpec(args: ChartArgs): TopLevelSpec {
   const { kind, x, y, series, title } = args;
@@ -107,9 +109,16 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
     throw new Error(`The field "${y}" holds no numbers, so there is nothing to draw. Send the values as numbers.`);
   }
 
-  const yEnc = { field: y, type: "quantitative" as const };
-  const color = series ? { color: { field: series, type: "nominal" as const } } : {};
-  const base = { title: { text: title }, data: { values }, config: THEME, width: 640, height: 360 };
+  const yEnc = { field: y, type: "quantitative" as const, title: words(y), axis: valueAxis(values, y) };
+  const color = series ? { color: { field: series, type: "nominal" as const, title: words(series) } } : {};
+  const base = {
+    title: { text: title },
+    data: { values },
+    config: THEME,
+    width: CHART_WIDTH,
+    height: CHART_HEIGHT,
+    autosize: { type: "fit" as const, contains: "padding" as const }, // the SVG is exactly this size, whatever the axes need
+  };
 
   switch (kind) {
     case "bar":
@@ -117,29 +126,32 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
         ...base,
         mark: { type: "bar" },
         // grouped, not stacked: with a series each value is read on its own against the axis
-        encoding: { x: categoryX(values, x), y: yEnc, ...color, ...(series ? { xOffset: { field: series } } : {}) },
+        encoding: { x: xEncoding(values, x, kind), y: yEnc, ...color, ...(series ? { xOffset: { field: series } } : {}) },
       } as TopLevelSpec;
     case "line":
-      return { ...base, mark: { type: "line", point: true }, encoding: { x: continuousX(values, x), y: yEnc, ...color } } as TopLevelSpec;
+      return { ...base, mark: { type: "line", point: true }, encoding: { x: xEncoding(values, x, kind), y: yEnc, ...color } } as TopLevelSpec;
     case "area":
-      return { ...base, mark: { type: "area", opacity: 0.85 }, encoding: { x: continuousX(values, x), y: yEnc, ...color } } as TopLevelSpec;
+      return { ...base, mark: { type: "area", opacity: 0.85 }, encoding: { x: xEncoding(values, x, kind), y: yEnc, ...color } } as TopLevelSpec;
     case "scatter":
       return {
         ...base,
         mark: { type: "point", filled: true },
-        encoding: { x: { field: x, type: "quantitative", scale: { zero: false } }, y: { ...yEnc, scale: { zero: false } }, ...color },
+        encoding: {
+          // x is a quantity here, so it keeps its title, under level labels (titlePadding from the theme)
+          x: { field: x, type: "quantitative", title: words(x), scale: { zero: false }, axis: { labelAngle: 0, titlePadding: 12, ...valueAxis(values, x) } },
+          y: { ...yEnc, scale: { zero: false } },
+          ...color,
+        },
       } as TopLevelSpec;
     case "pie":
       return {
         ...base,
-        width: 360, // a pie is round: a square view
-        height: 360,
-        mark: { type: "arc", innerRadius: 70 }, // a ring reads calmer than a solid pie
+        mark: { type: "arc", innerRadius: 60 }, // a ring reads calmer than a solid pie
         // Vega-Lite stacks slices by the colour field's name; the row number keeps them in the agent's order instead
         transform: [{ window: [{ op: "row_number", as: ROW_ORDER }] }],
         encoding: {
           theta: { field: y, type: "quantitative", stack: true },
-          color: { field: x, type: "nominal", sort: null }, // the legend in the same order
+          color: { field: x, type: "nominal", sort: null, title: words(x) }, // the legend in the same order
           order: { field: ROW_ORDER, type: "quantitative" },
         },
       } as TopLevelSpec;
