@@ -27,6 +27,13 @@ describe("buildChartSpec", () => {
     expect(s.encoding.color).toBeUndefined(); // one series: every bar in the accent colour
   });
 
+  it("draws horizontal bars: the categories down the side in the data's order, the values along the bottom", () => {
+    const s = spec({ title: "Population", kind: "horizontal-bar", data: countries, x: "country", y: "population" });
+    expect(s.mark.type).toBe("bar");
+    expect(s.encoding.y).toMatchObject({ field: "country", type: "nominal", sort: null });
+    expect(s.encoding.x).toMatchObject({ field: "population", type: "quantitative" });
+  });
+
   it("groups the bars side by side when a series splits them", () => {
     const data = [
       { year: "2023", country: "DE", gdp: 4.1 },

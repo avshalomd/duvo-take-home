@@ -22,7 +22,7 @@ describe("renderChartSvg", () => {
   });
 
   it("renders every kind without a browser", async () => {
-    for (const kind of ["bar", "line", "area", "pie", "scatter"] as const) {
+    for (const kind of ["bar", "horizontal-bar", "line", "area", "pie", "scatter"] as const) {
       const data = [
         { a: 1, b: 2 },
         { a: 2, b: 5 },

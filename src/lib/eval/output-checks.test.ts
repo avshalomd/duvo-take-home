@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { EvaluateInput } from "@/contracts/eval";
+import { renderChartSvg } from "@/lib/outputs/chart-render";
+import { buildChartSpec } from "@/lib/outputs/chart-spec";
 import { runChecks } from "./checks";
 
 // Q124: a chart (.svg) and a spreadsheet (.xlsx) from the output tools get a check of their own, like a CSV does,
@@ -21,6 +23,17 @@ describe("the chart check", () => {
     expect(got?.detail).toMatch(/^fruit\.svg: /);
     expect(got?.detail).toMatch(/Fruit Counts/);
     expect(got?.detail).toMatch(/3 marks/);
+  });
+
+  it("passes a chart whose long title the chart tool wrapped onto two lines, and reads the whole title", async () => {
+    // Production, 2026-09-23: the title drawn as two <tspan> lines read as "no title", and self-heal looped on it.
+    const title = "Population of the 5 Largest EU Countries (millions)";
+    const data = [{ country: "Germany", population: 83.4 }, { country: "France", population: 68.4 }];
+    const svg = await renderChartSvg(buildChartSpec({ title, kind: "bar", data, x: "country", y: "population" }));
+    expect(svg).toContain("<tspan"); // the case under test: the title really is wrapped
+    const got = check([{ name: "eu.svg", content: svg }], "chart");
+    expect(got?.ok, got?.detail).toBe(true);
+    expect(got?.detail).toContain(`title "${title}"`);
   });
 
   it("fails a chart cut off part-way and names the element left open", () => {

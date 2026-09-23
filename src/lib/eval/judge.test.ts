@@ -29,6 +29,28 @@ const input: EvaluateInput = {
 type Sent = { state: Record<string, unknown>; questions: Record<string, { instructions: string }> };
 const sent = () => decideMock.mock.calls[0][0] as unknown as Sent;
 
+describe("the in-bounds question (production, 2026-09-23)", () => {
+  it("is not asked when the run read nothing from outside: no page, no search, no connection", async () => {
+    const got = await judgeRun({ ...input, toolsUsed: ["mcp__outputs__make_chart", "Read", "Write"] });
+    expect(Object.keys(sent().questions)).toEqual(["answeredQuery", "followedPlan"]);
+    expect(got.stayedInBounds).toBeUndefined(); // nothing to warn about: no page could have given it orders
+  });
+
+  it("is asked when the run read a page, searched the web or used a connection", async () => {
+    for (const tools of [["WebFetch", "Write"], ["WebSearch"], ["mcp__deepwiki__read_wiki_structure"]]) {
+      decideMock.mockClear();
+      const got = await judgeRun({ ...input, toolsUsed: tools });
+      expect(Object.keys(sent().questions)).toContain("stayedInBounds");
+      expect(got.stayedInBounds).toBe(0.95);
+    }
+  });
+
+  it("is asked when the tools are not known, as on a run recorded before they were", async () => {
+    await judgeRun({ ...input, toolsUsed: undefined });
+    expect(Object.keys(sent().questions)).toContain("stayedInBounds");
+  });
+});
+
 beforeEach(() => {
   decideMock.mockReset();
   decideMock.mockResolvedValue({
