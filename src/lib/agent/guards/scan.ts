@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { ScanOutput } from "@/contracts/guard";
 import type { FileFlag } from "@/contracts/run";
 import { findCredentials } from "./credentials";
@@ -11,12 +12,14 @@ import { countCards, countEmails, countIbans, countPhones } from "./personal-dat
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-// One line per kind, in the order the file card lists them.
-const PERSONAL: { kind: FileFlag["kind"]; count: (text: string) => number; one: string; many: string }[] = [
-  { kind: "email", count: countEmails, one: "email address", many: "email addresses" },
-  { kind: "phone", count: countPhones, one: "phone number", many: "phone numbers" },
-  { kind: "card", count: countCards, one: "payment card number", many: "payment card numbers" },
-  { kind: "iban", count: countIbans, one: "IBAN", many: "IBANs" },
+// One line per kind, in the order the file card lists them. `inCharts`: whether the kind is counted in an .svg.
+// A chart's numbers are data points (Q142: its decimals passed as card numbers), so the number-shaped kinds skip it;
+// an email address in a chart is a label someone typed, and still counts.
+const PERSONAL: { kind: FileFlag["kind"]; count: (text: string) => number; one: string; many: string; inCharts: boolean }[] = [
+  { kind: "email", count: countEmails, one: "email address", many: "email addresses", inCharts: true },
+  { kind: "phone", count: countPhones, one: "phone number", many: "phone numbers", inCharts: false },
+  { kind: "card", count: countCards, one: "payment card number", many: "payment card numbers", inCharts: false },
+  { kind: "iban", count: countIbans, one: "IBAN", many: "IBANs", inCharts: false },
 ];
 
 export const scanOutput: ScanOutput = (file) => {
@@ -35,7 +38,9 @@ export const scanOutput: ScanOutput = (file) => {
       detail: credentials.length === 1 ? where : `${credentials.length} credentials, the first ${where}`,
     });
   }
+  const isChart = path.extname(file.name).toLowerCase() === ".svg"; // only make_chart makes one: the write guard refuses a Write of it
   for (const p of PERSONAL) {
+    if (isChart && !p.inCharts) continue;
     const n = p.count(file.content);
     if (n > 0) flags.push({ kind: p.kind, count: n, detail: plural(n, p.one, p.many) });
   }

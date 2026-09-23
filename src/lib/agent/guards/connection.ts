@@ -11,7 +11,8 @@ const OWN_SERVERS = new Set([PLAN_SERVER_KEY, OUTPUTS_SERVER_KEY]);
  * The connection guard, on every mcp__<key>__<tool> call. The plan's `sources` is the agent's own statement of what
  * it will use, made before it acts; a connection it did not name is either a change of mind or a page talking it
  * into something, and the person should see which connection was used outside the plan. Flagged by default; a
- * workspace set to strict blocks it instead.
+ * workspace set to strict blocks it instead. A server that is not one of the workspace's connections at all (nor
+ * our own plan or outputs server) is always blocked.
  */
 
 /** "mcp__github_read_only__search" -> "github_read_only". A key never holds "__": connectionKey() collapses every run of punctuation to one "_". */
@@ -37,7 +38,9 @@ export function connectionCheck(
     const key = serverKey(tool);
     if (!key || OWN_SERVERS.has(key)) return allowed("not a connection");
     const name = ctx.connectionNames[key];
-    if (!name) return allowed("not a connection"); // only the workspace's connections are this guard's business
+    // Q134: a server nobody added to this workspace - the developer's own claude.ai connectors reached a run once.
+    // The engine no longer offers them; this is the second belt, so it blocks whatever the plan or the setting says.
+    if (!name) return { decision: "blocked", reason: `${key}: this tool source was not added to the workspace.`, target: key };
 
     const plan = ctx.plan(); // read at call time: the plan arrives after the hooks are built
     if (!plan) {
