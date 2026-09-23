@@ -31,17 +31,24 @@ export function filterAutomations<T extends { command: string; name: string }>(l
   return [...byCommand, ...byName];
 }
 
+const CHOSEN = /^\s*[\\/]([a-z][a-z0-9-]*)\s+$/i; // a command, then whitespace, and nothing typed after it yet
+
+/** What to type after a chosen command - the automation's input hint - until the input is typed (Q93). */
 export function commandHint(text: string, ready: { command: string; hint: string }[]): string | null {
-  void text; void ready;
-  return null;
+  const m = CHOSEN.exec(text);
+  if (!m) return null;
+  return ready.find((a) => a.command === m[1].toLowerCase())?.hint || null;
 }
 
-export function emptyListLine(counts: { ready: number; notReady: number; query: string }): string {
-  void counts;
-  return "";
+/** What the command list says when it has nothing to offer: none made, none ready (Q117), or none matching. */
+export function emptyListLine({ ready, notReady, query }: { ready: number; notReady: number; query: string }): string {
+  if (ready > 0) return `No ready automation starts with \\${query}`;
+  if (notReady === 1) return "Your automation is not ready yet - approve or turn it on in Automations";
+  if (notReady > 1) return `None of your ${notReady} automations is ready yet - approve or turn one on in Automations`;
+  return "No saved automations yet - make one from a finished run";
 }
 
+/** An automation's output line with its input named: "about {input}" reads "about the topic" (Q118). */
 export function describeOutput(text: string, inputLabel: string): string {
-  void inputLabel;
-  return text;
+  return text.replaceAll("{input}", `the ${inputLabel.toLowerCase()}`);
 }

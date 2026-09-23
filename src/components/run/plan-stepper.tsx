@@ -1,7 +1,7 @@
 import { CircleCheck, CircleDashed, CircleMinus, CircleStop, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { Plan, PlanStep, RunState } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { barTone, planProgress } from "./plan-progress";
+import { planProgress } from "./plan-progress";
 
 // Below this, the per-step check thinks the step did not do what its title says (a probability from the checker).
 const OFF_TRACK = 0.5;
@@ -33,7 +33,7 @@ export function PlanStepper({
   const running = terminal ? undefined : plan.steps.find((s) => s.status === "running");
   // a run whose every step was skipped is settled but not successful: a full emerald bar would say the opposite
   const anyDone = plan.steps.some((s) => s.status === "done");
-  const bar = { pass: "bg-emerald-600", warn: "bg-amber-500", neutral: "bg-zinc-400 dark:bg-zinc-500" }[barTone(verdict, anyDone)];
+  const bar = anyDone && verdict === "pass" ? "bg-fern" : "bg-slate"; // replaced by the thread in the redesign
   // a run that ended with a step still "running" stopped in the middle of it: say so instead of spinning for ever
   const stoppedMidway = runStatus === "cancelled" || runStatus === "failed";
 

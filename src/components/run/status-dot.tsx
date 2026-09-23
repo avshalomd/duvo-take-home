@@ -1,36 +1,19 @@
 import { cn } from "@/lib/utils";
 
-// One dot, one meaning, everywhere in the app: emerald worked, amber is working, red failed, zinc has not run.
-export type Tone = "ok" | "idle" | "warn" | "bad" | "busy";
+// One mark, one meaning, everywhere in the app (docs/DESIGN-V2.md colours). Shape carries meaning as well as colour,
+// so the marks can be told apart without colour (Q105): a filled dot is a settled fact - done, working, went wrong -
+// and a ring is "not a result": not checked, not started, or a result that did not pass.
+export type Tone = "ok" | "idle" | "warn" | "bad" | "broken" | "busy";
 
 const toneClass: Record<Tone, string> = {
-  ok: "bg-emerald-500",
-  idle: "bg-zinc-400",
-  warn: "bg-amber-500",
-  bad: "bg-red-500",
-  busy: "bg-amber-500",
-};
-
-export const statusTone: Record<string, Tone> = {
-  succeeded: "ok",
-  pass: "ok",
-  pass_with_notes: "warn",
-  running: "busy",
-  evaluating: "busy",
-  queued: "idle",
-  failed: "bad",
-  fail: "bad",
-  unknown: "idle",
+  ok: "bg-fern",
+  warn: "bg-saffron",
+  busy: "bg-saffron animate-pulse", // the live mark breathes (opacity, not a spin); reduced motion stops it
+  broken: "bg-crimson",
+  bad: "border-[1.5px] border-crimson",
+  idle: "border-[1.5px] border-slate",
 };
 
 export function StatusDot({ tone, className }: { tone: Tone; className?: string }) {
-  return (
-    <span className={cn("relative flex h-2 w-2 shrink-0", className)} aria-hidden>
-      {/* only a live run pulses, so movement on the screen always means work in progress */}
-      {tone === "busy" && (
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-70" />
-      )}
-      <span className={cn("relative inline-flex h-2 w-2 rounded-full", toneClass[tone])} />
-    </span>
-  );
+  return <span aria-hidden className={cn("inline-flex size-2 shrink-0 rounded-full", toneClass[tone], className)} />;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Plan } from "@/contracts/run";
-import { barTone, planProgress } from "./plan-progress";
+import { planProgress } from "./plan-progress";
 
 const plan = (statuses: Plan["steps"][number]["status"][]): Plan => ({
   intent: "",
@@ -33,26 +33,5 @@ describe("planProgress", () => {
 
   it("reaches 100% when every step is done", () => {
     expect(planProgress(plan(["done", "done"]))?.percent).toBe(100);
-  });
-});
-
-// Q67: a full emerald bar over a red outcome told two different stories about the same run.
-describe("barTone", () => {
-  it("is emerald only when the judge passed the result", () => {
-    expect(barTone("pass", true)).toBe("pass");
-  });
-
-  it("is amber when the result passed with notes", () => {
-    expect(barTone("pass_with_notes", true)).toBe("warn");
-  });
-
-  it("stays neutral when the result failed, was not checked, or is not judged yet", () => {
-    expect(barTone("fail", true)).toBe("neutral");
-    expect(barTone("unknown", true)).toBe("neutral");
-    expect(barTone(null, true)).toBe("neutral");
-  });
-
-  it("stays neutral while nothing is done, whatever the verdict says", () => {
-    expect(barTone("pass", false)).toBe("neutral");
   });
 });

@@ -32,6 +32,11 @@ function summarize(input: unknown): string {
 // The SDK's own tool lookup, run before the agent does anything: it is the harness searching, not the agent working.
 const HOST_TOOLS = ["ToolSearch"];
 
+// Our own MCP servers, given to every run (the keys a connection may not take, RESERVED_KEYS in contracts/connection):
+// they are the app's tools, not one of the person's connections. Named here because this file also runs in the browser.
+const OUTPUTS_SERVER = "outputs";
+const BUILT_IN_SERVERS = ["plan", OUTPUTS_SERVER];
+
 /** The highest turn stamped on any event, or null for a run recorded before the mapper stamped them. */
 function maxTurn(events: RunEvent[]): number | null {
   const turns = events.map((e) => (e.payload as { turn?: unknown }).turn).filter((t): t is number => typeof t === "number");
@@ -51,11 +56,13 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
   const toolsUsed: string[] = [];
   for (const c of calls) if (!toolsUsed.includes(c.name)) toolsUsed.push(c.name);
 
+  // The agent writes text files with Write (a path) and makes charts and spreadsheets with the outputs tools (a
+  // file name): both are files the run made (Q103, Q123).
   const files: string[] = [];
   for (const c of calls) {
-    if (c.name !== "Write") continue;
-    const path = (c.input as { file_path?: unknown } | null)?.file_path;
-    const name = typeof path === "string" ? basename(path) : null;
+    const input = c.input as { file_path?: unknown; file?: unknown } | null;
+    const raw = c.name === "Write" ? input?.file_path : c.name.startsWith(`mcp__${OUTPUTS_SERVER}__`) ? input?.file : null;
+    const name = typeof raw === "string" ? basename(raw) : null;
     if (name && !files.includes(name)) files.push(name);
   }
 
@@ -88,7 +95,7 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
     lastTool: last ? { name: last.name, summary: summarize(last.input), viaConnection: connectionOf(last.name) } : null,
     toolsUsed,
     connections: (started?.mcp_servers ?? [])
-      .filter((s) => s.name !== "plan") // the plan tool is ours, not one of the user's connections
+      .filter((s) => !BUILT_IN_SERVERS.includes(s.name)) // the plan and outputs tools are ours, not the person's connections
       .map((s) => ({ name: s.name, status: s.status, used: calls.some((c) => c.name.startsWith(`mcp__${s.name}__`)) })),
     files,
     costUsd: finished ? finished.total_cost_usd : null,

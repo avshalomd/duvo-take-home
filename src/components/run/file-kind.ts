@@ -1,6 +1,7 @@
 import type { FileFlag } from "@/contracts/run";
 
-// How a produced file is shown: a chart is previewed, a spreadsheet gets its own card, the rest are documents.
+// How a produced file is shown, and the words on its tile. Pure, so every sentence is tested without a DOM.
+
 export type FileKind = "chart" | "spreadsheet" | "document";
 
 export function fileKind(name: string): FileKind {
@@ -15,30 +16,63 @@ export function flagLine(flags: FileFlag[] | undefined): string | null {
   // a credential quarantines the file, and the quarantine warning says so: it is not repeated here
   const personal = (flags ?? []).filter((f) => f.kind !== "credential").map((f) => f.detail);
   if (personal.length === 0) return null;
-  const list = personal.length === 1 ? personal[0] : `${personal.slice(0, -1).join(", ")} and ${personal[personal.length - 1]}`;
-  return `Contains ${list}`;
+  return `Contains ${listOf(personal)}`;
 }
 
+/** A size a person reads: bytes under a kilobyte, so a small file never shows as "0.0 KB" (Q99). */
 export function formatBytes(bytes: number): string {
-  return String(bytes);
+  if (bytes < 1024) return `${bytes} ${bytes === 1 ? "byte" : "bytes"}`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** What the empty file area says, by the state of the run: files are collected when a run ends (Q100, Q122). */
 export function noFilesLine(status: string, hasReport: boolean): string {
-  void status; void hasReport;
-  return "";
+  if (status === "queued" || status === "running" || status === "evaluating") return "Files appear here when the run finishes.";
+  if (status === "failed") return "The run ended before it saved any files.";
+  if (status === "cancelled") return "The run was stopped before it saved any files.";
+  return hasReport ? "No files: the answer is in the report below." : "This run made no files.";
 }
 
-export function csvLine(summary: { rows: number; columns: string[] }): string {
-  void summary;
-  return "";
+const SHOWN_COLUMNS = 3;
+
+/** "12 rows with title, source, url and 2 more columns": a CSV tile's facts. */
+export function csvLine({ rows, columns }: { rows: number; columns: string[] }): string {
+  if (rows === 0) return `No rows, only the ${listOf(columns)} ${columns.length === 1 ? "column" : "columns"}`;
+  const count = `${rows} ${rows === 1 ? "row" : "rows"}`;
+  if (columns.length <= SHOWN_COLUMNS) return `${count} with ${listOf(columns)}`;
+  const more = columns.length - SHOWN_COLUMNS;
+  return `${count} with ${columns.slice(0, SHOWN_COLUMNS).join(", ")} and ${more} more ${more === 1 ? "column" : "columns"}`;
 }
 
-export function sheetsOf(events: { kind: string; payload: unknown }[], file: string): { name: string; rows: number }[] {
-  void events; void file;
-  return [];
+export type Sheet = { name: string; rows: number };
+
+type EventLike = { kind: string; payload: unknown };
+
+/**
+ * A spreadsheet's sheets, read from the spreadsheet tool's call that made the file (the latest one, if the agent
+ * made it twice). The call carries the sheets as data, so the tile needs no workbook parser.
+ */
+export function sheetsOf(events: EventLike[], file: string): Sheet[] {
+  let sheets: Sheet[] = [];
+  for (const e of events) {
+    if (e.kind !== "tool_call") continue;
+    const p = e.payload as { name?: string; input?: { file?: unknown; sheets?: unknown } };
+    if (!p.name?.endsWith("__make_spreadsheet") || p.input?.file !== file || !Array.isArray(p.input.sheets)) continue;
+    sheets = p.input.sheets.map((s: { name?: unknown; rows?: unknown }) => ({ name: String(s.name ?? ""), rows: Array.isArray(s.rows) ? s.rows.length : 0 }));
+  }
+  return sheets;
 }
 
-export function sheetsLine(sheets: { name: string; rows: number }[]): string | null {
-  void sheets;
-  return null;
+/** "Sheets Summary (2 rows) and Data (1 row)", or "One sheet, Sheet1, with 40 rows". */
+export function sheetsLine(sheets: Sheet[]): string | null {
+  if (sheets.length === 0) return null;
+  const rows = (n: number) => `${n} ${n === 1 ? "row" : "rows"}`;
+  if (sheets.length === 1) return `One sheet, ${sheets[0].name}, with ${rows(sheets[0].rows)}`;
+  return `Sheets ${listOf(sheets.map((s) => `${s.name} (${rows(s.rows)})`))}`;
+}
+
+/** "a", "a and b", "a, b and c". */
+function listOf(items: string[]): string {
+  return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
