@@ -158,6 +158,23 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect(renamed).toMatchObject({ command: "int-renamed", status: "active" });
   });
 
+  // Review R2: an edit of the instructions sends a Ready one back to draft, and "a draft" was all the write asked for
+  it("keeps an approved automation's command an owner's or an admin's to change after an edit sends it back to draft", async () => {
+    const LOCKED = "Only an owner or an admin can change the command of an approved automation.";
+    const a = await createAutomationDraft(ctx, draftWith("int-two-saves"), null);
+    await approvedTrial(a.id, 1);
+    await approveAutomation(WS, a.id);
+
+    const edited = await updateAutomation(WS, a.id, editOf({ ...a, template: { ...a.template, instructions: "[int] Audit {input} in four lines." } }), { mayRenameApproved: false });
+    expect(edited).toMatchObject({ status: "draft", version: 2 });
+    const refused = await updateAutomation(WS, a.id, editOf({ ...edited, command: "int-two-saves-m" }), { mayRenameApproved: false }).catch((e) => e);
+    expect(refused).toBeInstanceOf(AutomationError);
+    expect(refused.message).toBe(LOCKED);
+    expect((await getAutomation(WS, a.id))?.command).toBe(a.command);
+
+    expect((await updateAutomation(WS, a.id, editOf({ ...edited, command: "int-two-saves-a" }), { mayRenameApproved: true })).command).toBe("int-two-saves-a");
+  });
+
   it("renames a draft's command for anyone, and saves the rest of an approved automation's edit when the command stays", async () => {
     const draft = await createAutomationDraft(ctx, draftWith("int-rename-draft"), null);
     expect((await updateAutomation(WS, draft.id, editOf({ ...draft, command: "int-renamed-draft" }), { mayRenameApproved: false })).command).toBe("int-renamed-draft");

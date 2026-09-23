@@ -9,7 +9,8 @@ const session = vi.hoisted(() => ({ role: "member" as SessionCtx["role"] }));
 const store = vi.hoisted(() => ({
   approveAutomation: vi.fn(async () => ({})),
   deleteAutomation: vi.fn(async () => {}),
-  getAutomation: vi.fn(async () => ({ command: "audit", status: "draft" })),
+  getAutomation: vi.fn(async () => ({ command: "audit", status: "draft", version: 1 })),
+  listTrials: vi.fn(async (): Promise<{ version: number; humanVerdict: string | null }[]> => []),
   runCommand: vi.fn(async () => ({ id: "run-1" })),
   setAutomationStatus: vi.fn(async () => {}),
   setHumanVerdict: vi.fn(async () => {}),
@@ -138,6 +139,15 @@ describe("a member", () => {
     store.updateAutomation.mockRejectedValueOnce(new AutomationError(LOCKED));
     const out = await saveAutomationAction({}, form({ ...edit, command: "audit-2" }));
     expect(out).toMatchObject({ error: LOCKED, values: { command: "audit-2" } });
+  });
+
+  // Review R2: an edit of a Ready one's instructions sends it back to draft; its command stays theirs to leave alone
+  it("is refused renaming the command of a draft that was approved before, and nothing is written", async () => {
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft", version: 2 });
+    store.listTrials.mockResolvedValueOnce([{ version: 1, humanVerdict: "approved" }]);
+    const out = await saveAutomationAction({}, form({ ...edit, command: "audit-2" }));
+    expect(out.error).toBe(LOCKED);
+    expect(store.updateAutomation).not.toHaveBeenCalled();
   });
 
   it.each(["active", "disabled"] as const)("is refused renaming an approved automation's command (%s), and nothing is written", async (status) => {

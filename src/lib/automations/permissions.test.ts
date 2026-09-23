@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canGovernAutomations, commandRefusal, refusalFor, type GovernedAct } from "./permissions";
+import { canGovernAutomations, commandRefusal, hasBeenApproved, refusalFor, type GovernedAct } from "./permissions";
 
 // Q178 (his decision): anyone in the workspace drafts, edits, tries and judges an automation; only an owner or an
 // admin approves it, turns it off or on, deletes it or sets its schedule.
@@ -28,15 +28,34 @@ describe("who governs a workspace's automations", () => {
   });
 });
 
-// People call an approved automation by its command, so renaming it takes it from them without an approval step.
-describe("who may change an automation's command", () => {
-  it("anyone, while it is a draft", () => {
-    for (const role of ["owner", "admin", "member"] as const) expect(commandRefusal(role, "draft")).toBeNull();
+// Review R2: any edit of what the agent is told sends a Ready automation back to draft, so "a draft" alone let a
+// member rename an approved command in two saves. Approval leaves one trace once that edit has cleared it: an example
+// of an earlier version marked looks right, which approving needed.
+describe("whether an automation has been approved, for its command", () => {
+  it.each(["active", "disabled"] as const)("is so while it is approved (%s)", (status) => {
+    expect(hasBeenApproved(status, 1, [])).toBe(true);
   });
 
-  it.each(["active", "disabled"] as const)("only an owner or an admin once it is approved (%s)", (status) => {
-    expect(commandRefusal("owner", status)).toBeNull();
-    expect(commandRefusal("admin", status)).toBeNull();
-    expect(commandRefusal("member", status)).toBe("Only an owner or an admin can change the command of an approved automation.");
+  it("stays so once an edit has sent it back to draft: an example of an earlier version looked right", () => {
+    expect(hasBeenApproved("draft", 2, [{ version: 1, humanVerdict: "approved" }])).toBe(true);
+  });
+
+  it("is not so for a draft whose examples looking right are of this version, or whose earlier ones did not look right", () => {
+    expect(hasBeenApproved("draft", 1, [{ version: 1, humanVerdict: "approved" }])).toBe(false);
+    expect(hasBeenApproved("draft", 2, [{ version: 1, humanVerdict: "rejected" }, { version: 1, humanVerdict: null }])).toBe(false);
+    expect(hasBeenApproved("draft", 1, [])).toBe(false);
+  });
+});
+
+// People call an approved automation by its command, so renaming it takes it from them without an approval step.
+describe("who may change an automation's command", () => {
+  it("anyone, while it has never been approved", () => {
+    for (const role of ["owner", "admin", "member"] as const) expect(commandRefusal(role, false)).toBeNull();
+  });
+
+  it("only an owner or an admin once it has been approved, whatever its status now", () => {
+    expect(commandRefusal("owner", true)).toBeNull();
+    expect(commandRefusal("admin", true)).toBeNull();
+    expect(commandRefusal("member", true)).toBe("Only an owner or an admin can change the command of an approved automation.");
   });
 });
