@@ -89,6 +89,36 @@ test("a refused server keeps the sign-in choice and everything typed, the token 
   await expect(page.getByTestId("connections")).not.toContainText("e2e Settings refused"); // nothing was created
 });
 
+test("a server that signs in with the service offers Sign in, linking to the OAuth start", async ({ page }) => {
+  await open(page, "/settings/connections");
+  await page.getByRole("button", { name: /add a server/i }).click();
+  const add = page.getByRole("dialog");
+  await add.getByLabel("Name").fill("e2e Settings oauth");
+  await add.getByLabel("Address").fill("https://example.com/oauth-mcp");
+  await add.getByLabel("Sign in with the service").check();
+  await expect(add.getByLabel("Token", { exact: true })).toHaveCount(0); // no token to paste for this kind
+  await add.getByRole("button", { name: "Add" }).click();
+  await expect(add).toBeHidden();
+
+  const row = page.getByTestId("connections").getByRole("listitem").filter({ hasText: "e2e Settings oauth" });
+  await expect(row).toContainText("needs you to sign in");
+  await expect(row.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", /^\/api\/connections\/oauth\/start\?id=[0-9a-f-]{36}$/);
+
+  await row.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(row).toHaveCount(0);
+});
+
+test("coming back from the service's sign-in shows what happened once, then drops it from the address", async ({ page }) => {
+  await open(page, "/settings/connections?signed_in=DeepWiki");
+  await expect(page.getByText("Signed in to DeepWiki. Runs can use it now.")).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/connections$/);
+
+  await open(page, "/settings/connections?oauth_error=The%20sign-in%20was%20cancelled");
+  await expect(page.getByText("The sign-in was cancelled")).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/connections$/);
+});
+
 test("a changed limit is saved and shown again after a reload", async ({ page }) => {
   await open(page, "/settings/limits");
   await expect(page.getByRole("link", { name: "Limits" })).toHaveAttribute("aria-current", "page");
