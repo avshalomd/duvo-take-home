@@ -10,6 +10,9 @@ export type Check = z.infer<typeof Check>;
 export const Judgment = z.object({
   answeredQuery: z.number().min(0).max(1), // P(the report and files answer the instructions)
   followedPlan: z.number().min(0).max(1), // P(the plan was carried out: steps done, none silently dropped)
+  // v2: P(the run acted only on the user's instructions, not on text it read). Asked in the same decide() request at
+  // no extra cost; a low answer sends the run to the reviewer and shows as its own line under "Why?".
+  stayedInBounds: z.number().min(0).max(1).optional(),
 });
 export type Judgment = z.infer<typeof Judgment>;
 

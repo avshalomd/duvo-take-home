@@ -20,7 +20,8 @@
     "format": "prettier --write .",
     "test:int": "dotenv -e .env.local -- env VITEST_INT=1 vitest run",
     "sql": "dotenv -e .env.local -- tsx scripts/sql.ts",
-    "worker": "dotenv -e .env.local -- tsx --conditions=react-server scripts/worker.ts"
+    "worker": "dotenv -e .env.local -- tsx --conditions=react-server scripts/worker.ts",
+    "record-run": "dotenv -e .env.local -- tsx scripts/record-run.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.57",

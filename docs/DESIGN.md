@@ -115,7 +115,7 @@ token), `ListConnections`, `SetConnectionEnabled`, `AddConnection`, `ListEnabled
   (`src/lib/eval/review.prompt.ts`, the instructions, plan, report and files in; taskFinished, responseSuitable,
   changeNeeded out): finished and suitable -> pass_with_notes, finished but not suitable -> fail with
   changeNeeded, not finished -> fail; judge unavailable -> unknown with the checks
-  listed and a Re-evaluate button. Eval `src/lib/eval/evaluate.eval.test.ts` over `fixtures/llm-cases.json`
+  listed and a Re-evaluate button. Eval `src/lib/eval/suite.eval.test.ts` over `fixtures/llm-cases.json`
   (skipped unless `EVAL=1`), writing `docs/EVAL.md`; pass bar 8 of 10 verdicts as expected.
 
 ## Look

@@ -24,7 +24,7 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/eval/judge.ts` - Jev through `decide()`: two `noul()` questions, answeredQuery and followedPlan, answered in one request as probabilities.
 - `src/lib/eval/review.ts`, `review.prompt.ts` - tier two, `extract()` with the Review schema; runs only when Jev says the plan was not followed or is not confident.
 - `src/lib/eval/evaluate.ts` - the cascade. `evaluate(input, { judge, review })` takes its two model calls as arguments so the verdict logic is tested without a network; `evaluateRun` binds the real ones. `unknown` is returned when a judge fails, never `fail`: a broken judge must not mark good work bad.
-- `src/lib/eval/evaluate.eval.test.ts` - the evaluator over `fixtures/llm-cases.json` (EVAL=1), writing `docs/EVAL.md`. 9/10 at merge.
+- `src/lib/eval/suite.eval.test.ts` - the evaluator over `fixtures/llm-cases.json` (EVAL=1), writing `docs/EVAL.md`. 9/10 at merge.
 
 ## P1 - engine
 
