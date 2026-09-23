@@ -115,7 +115,7 @@ test.describe("a finished run", () => {
     await expect(why).toHaveAttribute("aria-expanded", "false");
     await why.click();
     const lines = panel.getByTestId("why");
-    await expect(lines).toContainText("3 checks passed");
+    await expect(lines).toContainText("4 checks passed");
     await expect(lines).toContainText("The judge was sure the result answers your instructions but not that the plan was finished");
     await expect(lines).toContainText("A reviewer read the whole run: finished and usable.");
     await expect(lines).not.toContainText("%");
@@ -124,7 +124,7 @@ test.describe("a finished run", () => {
   test("Why? works on a verdict recorded before v2", async ({ page }) => {
     const panel = await openRun(page, runs.parent);
     await panel.getByRole("button", { name: /why\?/i }).click();
-    await expect(panel.getByTestId("why")).toContainText("3 checks passed");
+    await expect(panel.getByTestId("why")).toContainText("4 checks passed");
     await expect(panel.getByTestId("why")).toContainText("The judge was sure the result answers your instructions and that the plan was finished");
   });
 
@@ -167,6 +167,11 @@ test.describe("a finished run", () => {
   });
 
   test("Details opens as a drawer with the timeline, the state and the raw verdict, and closes on Escape", async ({ page }) => {
+    // React warns in the console when two list items share a key: two "content" checks once did (one per file)
+    const keyWarnings: string[] = [];
+    page.on("console", (m) => {
+      if (/same key/i.test(m.text())) keyWarnings.push(m.text());
+    });
     const panel = await openRun(page, runs.followUp);
     await expect(page.getByTestId("timeline")).toBeHidden();
     const opener = panel.getByRole("button", { name: /details/i });
@@ -180,6 +185,7 @@ test.describe("a finished run", () => {
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
     await expect(opener).toBeFocused();
+    expect(keyWarnings).toEqual([]);
   });
 
   test("a stopped run reads 'Stopped by you' and shows where the plan stopped", async ({ page }) => {

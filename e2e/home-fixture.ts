@@ -32,10 +32,12 @@ const PLAN = (running: number | null) => ({
   })),
 });
 
+// The evaluator writes one "content" check per file, so two files mean two checks with the same id.
 const CHECKS = [
   { id: "report", label: "A report was written", ok: true, detail: "412 characters" },
   { id: "file_expected", label: "A file was written", ok: true, detail: "chart.svg, contacts.csv" },
   { id: "content", label: "The file has content", ok: true, detail: "96 characters" },
+  { id: "content", label: "The file has content", ok: true, detail: "54 characters" },
 ];
 
 // A v1 verdict: no path, no decidedBy. The Why? block has to work them out.
