@@ -17,12 +17,17 @@ const BROKEN = 'rank,model,why\n1,a,"fine"\n2,b,small, fast\n';
 const FIXED = 'rank,model,why\n1,a,"fine"\n2,b,"small, fast"\n';
 const calls: { prompt: string; resume?: string }[] = [];
 const hooks: { onAttempt?: (attempt: number) => Promise<void> } = {}; // lets a test look at the run while it heals
-const script: { files: string[] } = { files: [BROKEN, FIXED] }; // what output.csv holds after each attempt
+// How an attempt ends: its result message, no result at all (the child died mid-stream), or working until aborted.
+type Ending = "result" | "no-result" | "hang";
+const script: { files: string[]; endings: Ending[] } = { files: [BROKEN, FIXED], endings: [] }; // per attempt; "result" when unset
+// What the tests turn: the agent's time budget (to let the wall clock run out) and the SDK's totals for an attempt that
+// sent no result (its transcript's cost-state, which a fake session does not have).
+const knobs = vi.hoisted(() => ({ budgetMs: null as number | null, sdkTotals: null as { costUsd: number; durationMs: number | null } | null }));
 
 vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@anthropic-ai/claude-agent-sdk")>()),
   getSessionInfo: vi.fn(async (id: string) => ({ sessionId: id })), // the session is "on this machine", so a heal resumes it
-  query: vi.fn(({ prompt, options }: { prompt: string; options: { cwd: string; resume?: string } }) => {
+  query: vi.fn(({ prompt, options }: { prompt: string; options: { cwd: string; resume?: string; abortController: AbortController } }) => {
     const attempt = calls.length;
     calls.push({ prompt, resume: options.resume });
     return (async function* fakeAgent() {
@@ -30,10 +35,20 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
       await hooks.onAttempt?.(attempt);
       await writeFile(path.join(options.cwd, "output.csv"), script.files[attempt] ?? FIXED);
       yield { type: "assistant", message: { content: [{ type: "text", text: `Attempt ${attempt + 1}: wrote output.csv.` }] } };
+      const ending = script.endings[attempt] ?? "result";
+      if (ending === "hang") await new Promise((_, reject) => options.abortController.signal.addEventListener("abort", () => reject(new Error("aborted"))));
       // the SDK's total for a resumed session continues from the saved one: 0.01, then 0.03 (0.02 of its own)
-      yield { type: "result", subtype: "success", is_error: false, num_turns: 2, duration_ms: 1000, total_cost_usd: 0.01 * (2 * attempt + 1), result: "Wrote output.csv." };
+      if (ending === "result") yield { type: "result", subtype: "success", is_error: false, num_turns: 2, duration_ms: 1000, total_cost_usd: 0.01 * (2 * attempt + 1), result: "Wrote output.csv." };
     })();
   }),
+}));
+vi.mock("./heal", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./heal")>();
+  return { ...real, runBudgetMs: (mode: "inline" | "queue" | "route") => knobs.budgetMs ?? real.runBudgetMs(mode) };
+});
+vi.mock("./stopped-cost", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./stopped-cost")>()),
+  readSdkTotals: vi.fn(async () => knobs.sdkTotals),
 }));
 vi.mock("@/lib/eval/evaluate", () => ({ evaluateRun: vi.fn() }));
 vi.mock("@/lib/eval/feedback", () => ({
@@ -61,6 +76,9 @@ beforeEach(async () => {
   calls.length = 0;
   hooks.onAttempt = undefined;
   script.files = [BROKEN, FIXED];
+  script.endings = [];
+  knobs.budgetMs = null;
+  knobs.sdkTotals = null;
   await db.insert(workspaceSettings).values({ workspaceId: THREE_WS, autoHealAttempts: 3 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 3 } });
   vi.mocked(evaluateRun).mockReset();
   await db.insert(workspaceSettings).values({ workspaceId: WS, autoHealAttempts: 2 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 2 } });
@@ -177,5 +195,60 @@ describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
     expect(run.healAttempts).toBe(0);
     expect((run.verdict as Verdict).verdict).toBe("fail");
     expect(await healEvents(id)).toHaveLength(0);
+  }, 30_000);
+});
+
+// A run ended by the wall clock, the tripwire or a child that died mid-stream was closed with no cost, duration or
+// turns, so the day's budget never saw what it spent. It records them the way a stopped run does (Q129).
+describe.skipIf(!process.env.DATABASE_URL)("what a failed run spent", () => {
+  const runRow = async (id: string) => (await db.select().from(runs).where(eq(runs.id, id)))[0];
+
+  it("records an attempt that ended without a result at the SDK's own totals", async () => {
+    script.endings = ["no-result"];
+    knobs.sdkTotals = { costUsd: 0.04, durationMs: 1500 };
+    const id = await queuedRun(WS, "a child that dies mid-stream");
+
+    await runAutomation(id);
+
+    const run = await runRow(id);
+    expect(run.status).toBe("failed");
+    expect(run.error).toBe("the agent ended without a result");
+    expect(run.costUsd).toBeCloseTo(0.04, 10);
+    expect(run.durationMs).toBe(1500);
+    expect(run.numTurns).toBe(1);
+  }, 30_000);
+
+  it("records a run the wall clock cut off with what it spent, and says it timed out", async () => {
+    script.endings = ["hang"];
+    knobs.budgetMs = 300;
+    knobs.sdkTotals = { costUsd: 0.02, durationMs: null };
+    const id = await queuedRun(WS, "a tool that never answers");
+
+    await runAutomation(id);
+
+    const run = await runRow(id);
+    expect(run.status).toBe("failed");
+    expect(run.error).toMatch(/^timed out after \d+ s$/);
+    expect(run.costUsd).toBeCloseTo(0.02, 10);
+    expect(run.durationMs).toBeGreaterThan(0); // no duration from the SDK: the time from the attempt's start
+    expect(run.numTurns).toBe(1);
+  }, 30_000);
+
+  it("adds a fix attempt that died to what the attempts before it cost, and keeps the last verdict", async () => {
+    script.endings = ["result", "no-result"];
+    vi.mocked(evaluateRun).mockResolvedValueOnce(FAIL);
+    knobs.sdkTotals = { costUsd: 0.05, durationMs: 800 }; // the resumed session's running total: 0.04 of its own
+    const id = await queuedRun(WS, "a fix attempt that dies");
+
+    await runAutomation(id);
+
+    const run = await runRow(id);
+    expect(calls).toHaveLength(2);
+    expect(run.status).toBe("failed");
+    expect(run.costUsd).toBeCloseTo(0.05, 10); // 0.01 for the first attempt, 0.04 for the fix
+    expect(run.durationMs).toBe(1800);
+    expect(run.numTurns).toBe(3);
+    expect(run.healAttempts).toBe(1);
+    expect((run.verdict as Verdict).verdict).toBe("fail");
   }, 30_000);
 });

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RunEvent } from "@/contracts/run";
-import { costStateOf, ownCost, readSdkTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
+import { costStateOf, ownCost, readSdkTotals, runTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
 
 // The shape the CLI wrote for a run stopped mid-way on 2026-09-23 (cancel check db56bab3): its own total, written as
 // it shut down after the abort - $0.0529 on claude-sonnet-5 plus $0.0459 on the web-search helper model.
@@ -50,6 +50,28 @@ describe("readSdkTotals (Q129)", () => {
   it("answers null when the transcript cannot be read at all (a session on another machine)", async () => {
     const load = vi.fn().mockRejectedValue(new Error("session not found"));
     expect(await readSdkTotals("s", { load, waitMs: 0 })).toBeNull();
+  });
+});
+
+// A run closed before its last attempt finished - stopped, cut off by the wall clock, tripped, or a child that died -
+// records every attempt: a failed run closed with no cost left it out of the day's budget.
+describe("runTotals", () => {
+  const spent = { usd: 0.25, ms: 1000, turns: 2 }; // the attempts whose result is in
+
+  it("is the finished attempts' sum when no attempt is left unfinished", () => {
+    expect(runTotals(spent, null)).toEqual({ costUsd: 0.25, durationMs: 1000, numTurns: 2 });
+  });
+
+  it("adds the unfinished attempt's own cost, time and turns to the finished ones", () => {
+    expect(runTotals(spent, { costUsd: 0.5, durationMs: 500, numTurns: 1 })).toEqual({ costUsd: 0.75, durationMs: 1500, numTurns: 3 });
+  });
+
+  it("keeps the finished attempts' cost when the unfinished one's is not known", () => {
+    expect(runTotals(spent, { costUsd: null, durationMs: 500, numTurns: 1 })).toEqual({ costUsd: 0.25, durationMs: 1500, numTurns: 3 });
+  });
+
+  it("records no cost rather than $0 when no attempt's cost is known", () => {
+    expect(runTotals({ usd: 0, ms: 0, turns: 0 }, { costUsd: null, durationMs: 500, numTurns: 1 }).costUsd).toBeNull();
   });
 });
 
