@@ -24,11 +24,21 @@ vi.mock("@/lib/connections/store", () => ({
     message = "That address points at a private or local network, which a connection cannot reach";
   },
 }));
-vi.mock("@/lib/auth/members", () => ({ inviteMember: vi.fn(), listMembers: vi.fn(async () => []) }));
+const members = vi.hoisted(() => ({ removeFromWorkspace: vi.fn(async () => {}), changeMemberRole: vi.fn(async () => {}) }));
+vi.mock("@/lib/auth/members", () => ({ inviteMember: vi.fn(), listMembers: vi.fn(async () => []), ...members }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ cookie: "better-auth.session_token=t" }) }));
 vi.mock("@/lib/usage/budget", () => ({ updateLimits: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { addConnectionAction, deleteConnectionAction, setConnectionEnabledAction, updateConnectionAction } from "./actions";
+import { MemberChangeError } from "@/lib/auth/member-rules";
+import {
+  addConnectionAction,
+  changeMemberRoleAction,
+  deleteConnectionAction,
+  removeMemberAction,
+  setConnectionEnabledAction,
+  updateConnectionAction,
+} from "./actions";
 
 const ID = "3b368c9a-231d-4fb5-874c-add3059f9c41";
 function form(fields: Record<string, string>): FormData {
@@ -107,5 +117,56 @@ describe("toggling or deleting a connection that is not this workspace's", () =>
     const { ConnectionNotFoundError } = await import("@/lib/connections/store");
     (what === "delete" ? store.deleteConnection : store.setConnectionEnabled).mockRejectedValueOnce(new ConnectionNotFoundError());
     expect(await writes[what]()).toEqual({ error: "That connection could not be found. It may have been deleted - reload the page." });
+  });
+});
+
+// Q169: removing someone and changing a role. The rules themselves are lib/auth/member-rules.ts's (and its tests');
+// here, what the actions do before and after: the member id and the role are checked like any other input, and the
+// workspace is the session's, never one the browser names.
+describe("removing someone and changing a role", () => {
+  const MEMBER = "mem_3b368c9a";
+  const NOT_FOUND = "That person could not be found in this workspace. Reload the page to see who is in it.";
+
+  it("refuse a plain member before anything is looked up", async () => {
+    session.role = "member";
+    expect(await removeMemberAction(MEMBER)).toEqual({ error: "Only an owner or an admin can remove people from this workspace." });
+    expect(await changeMemberRoleAction(MEMBER, "admin")).toEqual({ error: "Only an owner or an admin can change someone's role." });
+    for (const fn of Object.values(members)) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("pass the session's workspace and the asker's headers on, with the member id as it came", async () => {
+    session.role = "admin";
+    expect(await removeMemberAction(MEMBER)).toEqual({});
+    expect(await changeMemberRoleAction(MEMBER, "admin")).toEqual({});
+    const ctx = expect.objectContaining({ userId: "u1", workspaceId: "ws-a", role: "admin" });
+    expect(members.removeFromWorkspace).toHaveBeenCalledWith(expect.any(Headers), ctx, MEMBER);
+    expect(members.changeMemberRole).toHaveBeenCalledWith(expect.any(Headers), ctx, MEMBER, "admin");
+  });
+
+  it("refuse a role the app does not have", async () => {
+    session.role = "owner";
+    expect(await changeMemberRoleAction(MEMBER, "superuser")).toEqual({ error: "Choose Member, Admin or Owner." });
+    expect(members.changeMemberRole).not.toHaveBeenCalled();
+  });
+
+  // "@" would make Better Auth look the member up by email instead of by id
+  it.each(["", "x".repeat(101), "someone@example.com", "id with spaces"])("answer an id that cannot be a member's as not found (%j)", async (id) => {
+    session.role = "owner";
+    expect(await removeMemberAction(id)).toEqual({ error: NOT_FOUND });
+    expect(await changeMemberRoleAction(id, "admin")).toEqual({ error: NOT_FOUND });
+    for (const fn of Object.values(members)) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("say a refusal of the rules in its own words", async () => {
+    session.role = "admin";
+    members.removeFromWorkspace.mockRejectedValueOnce(new MemberChangeError("Only an owner can remove an owner."));
+    expect(await removeMemberAction(MEMBER)).toEqual({ error: "Only an owner can remove an owner." });
+  });
+
+  it("answer anything unexpected with one safe sentence, never the error's own text", async () => {
+    session.role = "owner";
+    vi.spyOn(console, "error").mockImplementation(() => {}); // readable() logs it for us
+    members.changeMemberRole.mockRejectedValueOnce(new Error("connect ECONNREFUSED db.internal:5432"));
+    expect(await changeMemberRoleAction(MEMBER, "member")).toEqual({ error: "Something went wrong on our side - try again" });
   });
 });
