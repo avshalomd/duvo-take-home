@@ -1,5 +1,7 @@
 import "server-only";
 
+export class SecretError extends Error {}
+
 /**
  * Connection secrets at rest: AES-256-GCM under CONNECTION_KEY (32 bytes, base64). The settings package builds it;
  * the OAuth package stores its tokens through it.

@@ -9,3 +9,18 @@ export function connectionStatus(lastStatus: string | null): { label: string; to
     return { label: "needs a token before a run can use it", tone: "warn" };
   return { label: lastStatus, tone: "bad" }; // a failure keeps the server's own words: the reason is the useful part
 }
+
+export function connectionState(_c: {
+  authType?: "none" | "bearer" | "oauth";
+  hasToken: boolean;
+  signedIn?: boolean;
+  lastStatus: string | null;
+}): { label: string; tone: ConnectionTone } {
+  throw new Error("not implemented yet");
+}
+export function toolCount(_n: number): string {
+  throw new Error("not implemented yet");
+}
+export function toolWords(_name: string): string {
+  throw new Error("not implemented yet");
+}
