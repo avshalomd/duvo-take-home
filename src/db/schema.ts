@@ -104,6 +104,7 @@ export const automations = pgTable("automations", {
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   schedule: text("schedule"), // cron, e.g. "0 8 * * 1"; null when it only runs on demand
   scheduleInput: text("schedule_input"),
+  scheduleTz: text("schedule_tz"), // the IANA time zone the schedule was set in, so 08:00 stays 08:00 across DST
   nextRunAt: timestamp("next_run_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

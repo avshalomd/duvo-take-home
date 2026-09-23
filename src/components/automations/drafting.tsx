@@ -57,11 +57,12 @@ export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
   return (
     <section aria-live="polite" aria-busy="true" className={cn(SHEET, "space-y-5 p-6 sm:p-10")}>
       <span className="relative flex size-5 items-center justify-center rounded-full border-2 border-saffron">
-        {/* the thread's bead: work is happening, calmly (it stops breathing under reduced motion) */}
+        {/* the thread's bead: work is happening, calmly. Under reduced motion it stops breathing: only the transition
+            changes, so the server's HTML and a reduced-motion browser's first render stay the same */}
         <motion.span
           className="absolute inset-[3px] rounded-full bg-saffron"
-          animate={reduce ? undefined : { opacity: [1, 0.45, 1], scale: [1, 0.8, 1] }}
-          transition={reduce ? undefined : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          animate={{ opacity: [1, 0.45, 1], scale: [1, 0.8, 1] }}
+          transition={reduce ? { duration: 0 } : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
         />
       </span>
       <div className="space-y-2">

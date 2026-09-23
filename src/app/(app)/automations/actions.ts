@@ -8,7 +8,8 @@ import { readError } from "@/lib/automations/errors";
 import type { EditValues } from "@/lib/automations/form";
 import { parseEditForm } from "@/lib/automations/form";
 import { draftFromRun } from "@/lib/automations/from-run";
-import { toUtcCron } from "@/lib/automations/schedule-local";
+import { choiceToCron } from "@/lib/automations/schedule-local";
+import { isTimeZone } from "@/lib/automations/schedule";
 import {
   approveAutomation,
   deleteAutomation,
@@ -143,25 +144,25 @@ const Schedule = z.object({
   id: Id,
   preset: z.enum(["none", "weekdays", "mondays", "daily", "custom"]),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time of day"),
-  offset: z.coerce.number().int().min(-840).max(840), // the browser's offset from UTC in minutes: the widest zones are 14 h out
+  tz: z.string().refine(isTimeZone, "Your browser sent a time zone we do not know. Reload the page and try again."), // the browser's IANA zone
   cron: z.string().trim().max(100),
   input: z.string().trim().max(2000),
 });
 
-/** The schedule as chosen in the viewer's time (Q107), stored as the UTC cron the scheduler reads. */
+/** The schedule as chosen, in the viewer's own time and zone (Q107): the cron keeps the local time, the zone goes beside it. */
 export async function setScheduleAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = { preset: field(formData, "preset"), time: field(formData, "time") || "08:00", cron: field(formData, "cron"), input: field(formData, "input") };
-  const parsed = Schedule.safeParse({ id: field(formData, "id"), offset: field(formData, "offset"), ...values });
+  const parsed = Schedule.safeParse({ id: field(formData, "id"), tz: field(formData, "tz"), ...values });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose when it should run.", values };
-  const { id, preset, time, offset, cron, input } = parsed.data;
+  const { id, preset, time, tz, cron, input } = parsed.data;
 
-  const chosen = preset === "none" ? null : preset === "custom" ? cron : toUtcCron({ repeat: preset, time }, offset);
+  const chosen = preset === "none" ? null : preset === "custom" ? cron : choiceToCron({ repeat: preset, time });
   if (chosen === "") return { error: "Write the custom schedule as a cron expression, e.g. 0 8 * * 1-5.", values };
   if (chosen && !input) return { error: "Say which input the scheduled runs get.", values };
 
   const { workspaceId } = await ctx();
   try {
-    await setSchedule(workspaceId, id, chosen, chosen ? input : null);
+    await setSchedule(workspaceId, id, chosen, chosen ? input : null, chosen ? tz : null);
   } catch (e) {
     return { error: readError(e), values };
   }

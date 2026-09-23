@@ -12,7 +12,7 @@ import { RunForm } from "@/components/automations/run-form";
 import { ScheduleForm } from "@/components/automations/schedule-form";
 import { StatePill } from "@/components/automations/state-pill";
 import { StatusToggle } from "@/components/automations/status-toggle";
-import { LINK, SECTION, SHEET, SMALL } from "@/components/automations/surfaces";
+import { LINK, SECTION, SHEET } from "@/components/automations/surfaces";
 import { TryExampleForm } from "@/components/automations/try-example-form";
 import { outcome } from "@/components/run/outcome";
 import { requireSession } from "@/lib/auth/session";
@@ -88,8 +88,8 @@ export default async function AutomationPage({ params, searchParams }: PageProps
           </article>
 
           {!isDraft && (
-            <article aria-label="The automation" className={cn(SHEET, "space-y-6 p-6 sm:p-10")}>
-              <p className={SMALL}>Changing what the agent is told sends it back to testing: it needs a new example and your approval again.</p>
+            // what an edit does is said where it matters: under the editor, and in the save's own message
+            <article aria-label="The automation" className={cn(SHEET, "p-6 sm:p-10")}>
               <AutomationDocument automation={automation} connections={connections} footer={deleteButton} />
             </article>
           )}
@@ -139,11 +139,8 @@ function Header({ automation: a }: { automation: Automation }) {
       <h1 className="display text-[32px] break-words text-graphite sm:text-[40px]">{a.name}</h1>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <StatePill status={a.status} />
-        {a.status === "draft" ? (
-          <p className={SMALL}>Check it on an example, then approve it to use it.</p>
-        ) : (
-          <StatusToggle automationId={a.id} command={a.command} active={a.status === "active"} />
-        )}
+        {/* a draft's next step is said once, on the approval bar; a ready one gets its switch here (Q106) */}
+        {a.status !== "draft" && <StatusToggle automationId={a.id} command={a.command} active={a.status === "active"} />}
       </div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-[17px]">
@@ -173,6 +170,7 @@ function Schedule({ automation: a }: { automation: Automation }) {
       inputExample={a.inputExample}
       schedule={a.schedule}
       scheduleInput={a.scheduleInput}
+      scheduleTz={a.scheduleTz ?? null}
       nextRunAt={a.status === "active" ? a.nextRunAt : null} // an automation that is off has no next run
     />
   );

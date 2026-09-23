@@ -30,9 +30,10 @@ export const tickSchedules: TickSchedules = async (now) => {
   const started: string[] = [];
   for (const a of candidates) {
     try {
-      const action = scheduleAction({ schedule: a.schedule ?? "", nextRunAt: a.nextRunAt }, now);
+      // read in the zone it was set in (schedule_tz), so 08:00 stays 08:00 across daylight saving; null is UTC
+      const action = scheduleAction({ schedule: a.schedule ?? "", nextRunAt: a.nextRunAt, tz: a.scheduleTz }, now);
       if (!action.next) {
-        console.warn(`automation ${a.id}: schedule "${a.schedule}" is not a valid cron expression; not fired`);
+        console.warn(`automation ${a.id}: schedule "${a.schedule}" in zone ${a.scheduleTz ?? "UTC"} cannot be read; not fired`);
         continue;
       }
       // Move next_run_at first, and only while it is still what this tick saw (due, or unset): if another tick moved it
