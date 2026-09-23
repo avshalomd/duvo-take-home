@@ -16,6 +16,11 @@ describe("runnerMode", () => {
     expect(runnerMode()).toBe("queue");
   });
 
+  it("is route with RUNNER=route: each run gets a function of its own through /api/runner", () => {
+    vi.stubEnv("RUNNER", "route");
+    expect(runnerMode()).toBe("route");
+  });
+
   it("treats any other value as inline rather than guessing", () => {
     vi.stubEnv("RUNNER", "worker");
     expect(runnerMode()).toBe("inline");
