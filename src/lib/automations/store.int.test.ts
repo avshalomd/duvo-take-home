@@ -5,6 +5,7 @@ import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { automations, runs } from "@/db/schema";
 import type { AutomationDraft, AutomationEdit } from "@/contracts/automation";
+import { AutomationError } from "./errors";
 import {
   approveAutomation,
   createAutomationDraft,
@@ -219,6 +220,19 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     await createAutomationDraft(ctx, draftWith("int-notyet"), null);
     const err = await runCommand(ctx, { command: "int-notyet", input: "Apple" }).catch((e) => e);
     expect(err.message).toMatch(/not approved yet/i);
+  });
+
+  // Q197: "/news-digest" with 3,900 characters after it answered 500 on the API and "Keep the instructions under 4000
+  // characters" on Home, because the filled brief was over 4000. The input has a limit of its own, in its own words.
+  it("runCommand refuses an input over 2000 characters in plain words, and starts nothing", async () => {
+    const a = await createAutomationDraft(ctx, draftWith("int-long"), null);
+    await approvedTrial(a.id, 1);
+    await approveAutomation(WS, a.id);
+    const before = (await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length;
+    const err = await runCommand(ctx, { command: "int-long", input: "x".repeat(2001) }).catch((e) => e);
+    expect(err).toBeInstanceOf(AutomationError);
+    expect(err.message).toBe("Keep the company name under 2000 characters.");
+    expect((await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length).toBe(before);
   });
 
   it("runCommand refuses when a connection the automation needs is not on, and says which", async () => {
