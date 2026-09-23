@@ -3,12 +3,12 @@
 import { Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { setConnectionEnabledAction } from "@/app/actions";
+import { setConnectionEnabledAction } from "@/app/(app)/settings/actions";
 import { Switch } from "@/components/ui/switch";
 import type { Connection } from "@/contracts/connection";
 import { AddConnectionDialog } from "./add-connection-form";
 import { connectionStatus } from "./connection-label";
-import { StatusDot } from "./status-dot";
+import { StatusDot } from "@/components/run/status-dot";
 
 // The switches decide which MCP servers the next run is given, so the state shown must be the server's.
 export function ConnectionsList({ connections }: { connections: Connection[] }) {

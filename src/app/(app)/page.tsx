@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { AppHeader } from "@/components/automations/app-header";
-import { ConnectionsList } from "@/components/automations/connections-list";
-import { InstructionsForm } from "@/components/automations/instructions-form";
-import { PanelSkeleton } from "@/components/automations/panel-skeleton";
-import { RunPanel } from "@/components/automations/run-panel";
-import { RunsList } from "@/components/automations/runs-list";
-import type { RunView } from "@/components/automations/types";
+import { InstructionsForm } from "@/components/run/instructions-form";
+import { PanelSkeleton } from "@/components/run/panel-skeleton";
+import { RunPanel } from "@/components/run/run-panel";
+import { RunsList } from "@/components/run/runs-list";
+import type { RunView } from "@/components/run/types";
 import type { Connection } from "@/contracts/connection";
+import { requireSession } from "@/lib/auth/session";
 import { listConnections } from "@/lib/connections/store";
 import { getRun, listRuns } from "@/lib/runs/queries";
 import { deriveState } from "@/lib/runs/state";
@@ -19,10 +18,10 @@ export const maxDuration = 300;
 // One page: the left column starts a run, the right shows the run named by ?run=<id>.
 export default async function Home({ searchParams }: PageProps<"/">) {
   const { run: requested } = await searchParams;
-  const [runs, connections] = await Promise.all([listRuns(), listConnections()]);
+  const { workspaceId } = await requireSession();
+  const [runs, connections] = await Promise.all([listRuns(workspaceId), listConnections(workspaceId)]);
 
   const selectedId = typeof requested === "string" ? requested : runs[0]?.id;
-  const live = runs.filter((r) => r.status === "running" || r.status === "queued" || r.status === "evaluating").length;
 
   return (
     <>
@@ -35,12 +34,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           Skip to the run
         </a>
       )}
-      <AppHeader liveCount={live} />
       {/* one column under 900px, and there the panel comes first: after pressing Run, the run is what you want to see */}
       <main className="mx-auto grid w-full max-w-[100rem] flex-1 grid-cols-1 gap-4 px-4 py-4 min-[900px]:grid-cols-[21rem_minmax(0,1fr)] min-[900px]:gap-5">
         <div className="min-w-0 space-y-4">
           <InstructionsForm />
-          <ConnectionsList connections={connections} />
           <RunsList runs={runs} selectedId={selectedId} />
         </div>
 
@@ -48,7 +45,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           {/* only the panel waits for its run: the rest of the page is already on screen, and the key makes
               switching runs fall back to a panel-shaped skeleton instead of a blank column (Q66) */}
           <Suspense key={selectedId ?? "none"} fallback={<PanelSkeleton />}>
-            <RunColumn selectedId={selectedId} connections={connections} />
+            <RunColumn workspaceId={workspaceId} selectedId={selectedId} connections={connections} />
           </Suspense>
         </div>
       </main>
@@ -56,8 +53,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   );
 }
 
-async function RunColumn({ selectedId, connections }: { selectedId?: string; connections: Connection[] }) {
-  const data = selectedId ? await getRun(selectedId) : null;
+async function RunColumn({ workspaceId, selectedId, connections }: { workspaceId: string; selectedId?: string; connections: Connection[] }) {
+  const data = selectedId ? await getRun(workspaceId, selectedId) : null;
   // deriveState is pure, so the panel's state card is computed on every render rather than stored and stale
   const view: RunView | null = data ? { ...data, state: deriveState(data.run, data.events) } : null;
 

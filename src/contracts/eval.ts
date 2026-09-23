@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Plan } from "./run";
+import { AutomationTemplate } from "./automation";
 
 // The evaluator's output: the seam between the decision model and the code that marks a run done.
 export const Check = z.object({ id: z.string(), label: z.string(), ok: z.boolean(), detail: z.string() });
@@ -29,8 +30,21 @@ export const Verdict = z.object({
   review: Review.nullable(), // null when Jev was confident the plan was followed: no escalation
   reasons: z.array(z.string()), // one line per failed check or low-confidence answer, shown on the run
   evaluatedAt: z.string(),
+  // v2, "Why?": which tier produced the verdict and which tiers ran, in order. Optional: v1 verdicts lack them.
+  decidedBy: z.enum(["checks", "judge", "review", "nobody"]).optional(), // nobody = unknown, the judge was unavailable
+  path: z.array(z.enum(["checks", "judge", "review"])).optional(),
 });
 export type Verdict = z.infer<typeof Verdict>;
+
+// The per-step check (v2): after a step is marked done, Jev reads its title, its note and the calls made during it.
+export const StepCheck = z.object({ stepIndex: z.number().int().min(0), onTrack: z.number().min(0).max(1), note: z.string() });
+export type StepCheck = z.infer<typeof StepCheck>;
+export type CheckStep = (input: {
+  prompt: string;
+  plan: Plan;
+  stepIndex: number;
+  calls: { name: string; input: unknown; preview?: string }[]; // the tool calls made while the step was running
+}) => Promise<StepCheck>;
 
 export const EvaluateInput = z.object({
   prompt: z.string(),
@@ -40,6 +54,7 @@ export const EvaluateInput = z.object({
   files: z.array(z.object({ name: z.string(), content: z.string() })),
   today: z.string(), // ISO date, so "last 7 days" checks are testable
   toolsUsed: z.array(z.string()).optional(), // tool names the run called: "a connection claimed but never used" is one line of code, not a judge call
+  template: AutomationTemplate.nullable().optional(), // v2: a run of a saved automation is also checked against its template
 });
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
 export type EvaluateRun = (input: EvaluateInput) => Promise<Verdict>;

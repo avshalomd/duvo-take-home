@@ -10,6 +10,10 @@ export const Connection = z.object({
   hasToken: z.boolean(),
   enabled: z.boolean(),
   lastStatus: z.string().nullable(), // from the last run's init message: "connected" or the failure text
+  // v2, optional so v1 fixtures still parse
+  authType: z.enum(["none", "bearer", "oauth"]).optional(),
+  signedIn: z.boolean().optional(), // oauth only: a token is stored and not expired beyond refresh
+  tools: z.array(z.string()).optional(), // tool names seen in the last run's init message
 });
 export type Connection = z.infer<typeof Connection>;
 
@@ -26,12 +30,32 @@ export const NewConnection = z.object({
   url: publicHttpUrl,
   transport: Transport.default("http"),
   token: z.string().trim().optional(), // sent as Authorization: Bearer <token>
+  authType: z.enum(["none", "bearer", "oauth"]).optional(), // oauth: signed in through the server's own sign-in page
 });
 export type NewConnection = z.infer<typeof NewConnection>;
 
-export type ListConnections = () => Promise<Connection[]>;
-export type SetConnectionEnabled = (id: string, enabled: boolean) => Promise<void>;
-export type AddConnection = (input: NewConnection) => Promise<Connection>;
-// The server-side view, with the token, only for building the agent's mcpServers option.
-export type ConnectionSecret = Connection & { token: string | null };
-export type ListEnabledConnectionsWithSecrets = () => Promise<ConnectionSecret[]>;
+// Editing keeps the token unless a new one is typed; clearToken removes it.
+export const ConnectionEdit = NewConnection.extend({ clearToken: z.boolean().optional() });
+export type ConnectionEdit = z.infer<typeof ConnectionEdit>;
+
+// Every function takes the workspace id first (from the session, never from the client).
+export type ListConnections = (workspaceId: string) => Promise<Connection[]>;
+export type SetConnectionEnabled = (workspaceId: string, id: string, enabled: boolean) => Promise<void>;
+export type AddConnection = (workspaceId: string, input: NewConnection) => Promise<Connection>;
+export type UpdateConnection = (workspaceId: string, id: string, input: ConnectionEdit) => Promise<Connection>;
+export type DeleteConnection = (workspaceId: string, id: string) => Promise<void>;
+// The server-side view, with the decrypted token and the OAuth state, only for building the agent's mcpServers.
+export type ConnectionSecret = Connection & { token: string | null; oauth: unknown };
+export type ListEnabledConnectionsWithSecrets = (workspaceId: string) => Promise<ConnectionSecret[]>;
+/** After a run's init message: the status and the tool names each connection answered with. */
+export type RecordConnectionSeen = (id: string, seen: { lastStatus: string; tools?: string[] }) => Promise<void>;
+/** The OAuth module stores its state (client registration, encrypted tokens, expiry) through this. */
+export type SetConnectionOAuth = (workspaceId: string, id: string, oauth: unknown) => Promise<void>;
+
+// OAuth (MCP authorization: protected-resource discovery, dynamic client registration, PKCE).
+/** Starts the sign-in: returns the server's authorization URL the browser is sent to. */
+export type StartOAuth = (workspaceId: string, connectionId: string, redirectUri: string) => Promise<{ authorizeUrl: string }>;
+/** The callback: exchanges the code, stores the tokens encrypted, returns the connection id. */
+export type CompleteOAuth = (params: { code: string; state: string; redirectUri: string }) => Promise<{ workspaceId: string; connectionId: string }>;
+/** The headers the agent's MCP client sends: a bearer token, or a fresh OAuth access token (refreshed if expired). */
+export type AuthHeaders = (c: ConnectionSecret) => Promise<Record<string, string> | undefined>;

@@ -3,7 +3,7 @@ import type { ConnectionSecret } from "@/contracts/connection";
 import { statusUpdates } from "./connection-status";
 
 const conn = (id: string, name: string): ConnectionSecret => ({
-  id, name, url: "https://example.test/mcp", transport: "http", hasToken: false, enabled: true, lastStatus: null, token: null,
+  id, name, url: "https://example.test/mcp", transport: "http", hasToken: false, enabled: true, lastStatus: null, token: null, oauth: null,
 });
 
 describe("statusUpdates", () => {

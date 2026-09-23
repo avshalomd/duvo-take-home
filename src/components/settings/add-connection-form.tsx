@@ -3,7 +3,7 @@
 import { LoaderCircle } from "lucide-react";
 import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { addConnectionAction } from "@/app/actions";
+import { addConnectionAction } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

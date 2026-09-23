@@ -23,6 +23,15 @@ function toRun(row: RunRow): Run {
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
     outcome: outcomeOf(row.verdict),
+    workspaceId: row.workspaceId,
+    purpose: (row.purpose ?? "adhoc") as Run["purpose"],
+    automationId: row.automationId,
+    automationVersion: row.automationVersion,
+    input: row.input,
+    parentRunId: row.parentRunId,
+    cancelRequested: row.cancelRequestedAt != null,
+    humanVerdict: row.humanVerdict === "approved" || row.humanVerdict === "rejected" ? row.humanVerdict : null,
+    humanNote: row.humanNote,
   };
 }
 
@@ -32,14 +41,16 @@ function outcomeOf(verdict: unknown): Run["outcome"] {
   return v === "pass" || v === "pass_with_notes" || v === "fail" || v === "unknown" ? v : null;
 }
 
-export const listRuns: ListRuns = async () => {
-  const rows = await db.select().from(runs).orderBy(desc(runs.createdAt)).limit(50);
+// Tenancy: every read filters on the workspace from the session. A run of another workspace reads as "not found",
+// never as "forbidden", so its existence does not leak either.
+export const listRuns: ListRuns = async (workspaceId) => {
+  const rows = await db.select().from(runs).where(eq(runs.workspaceId, workspaceId)).orderBy(desc(runs.createdAt)).limit(100);
   return rows.map(toRun);
 };
 
-export const getRun: GetRun = async (id) => {
+export const getRun: GetRun = async (workspaceId, id) => {
   if (!isUuid(id)) return null; // a non-uuid id would make Postgres throw, not return nothing
-  const [row] = await db.select().from(runs).where(eq(runs.id, id));
+  const [row] = await db.select().from(runs).where(and(eq(runs.id, id), eq(runs.workspaceId, workspaceId)));
   if (!row) return null;
   const eventRows = await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq));
   const fileRows = await db.select().from(files).where(eq(files.runId, id)).orderBy(asc(files.name));
@@ -54,13 +65,17 @@ export const getRun: GetRun = async (id) => {
   return {
     run: toRun(row),
     events,
-    files: fileRows.map((f) => ({ name: f.name, mime: f.mime, bytes: f.bytes })),
+    files: fileRows.map((f) => ({ name: f.name, mime: f.mime, bytes: f.bytes, encoding: f.encoding === "base64" ? "base64" : "utf8", flags: f.flags ?? [], quarantined: f.quarantined })),
     verdict: verdict.success ? verdict.data : null,
   };
 };
 
-export const getFile: GetFile = async (runId, name) => {
+export const getFile: GetFile = async (workspaceId, runId, name) => {
   if (!isUuid(runId)) return null;
+  const [owner] = await db.select({ id: runs.id }).from(runs).where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
+  if (!owner) return null;
   const [row] = await db.select().from(files).where(and(eq(files.runId, runId), eq(files.name, name)));
-  return row ? { meta: { name: row.name, mime: row.mime, bytes: row.bytes }, content: row.content } : null;
+  if (!row) return null;
+  const encoding = row.encoding === "base64" ? "base64" : "utf8";
+  return { meta: { name: row.name, mime: row.mime, bytes: row.bytes, encoding, flags: row.flags ?? [], quarantined: row.quarantined }, content: row.content };
 };

@@ -4,7 +4,7 @@ import { LoaderCircle, Play } from "lucide-react";
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
-import { startRunAction } from "@/app/actions";
+import { startRunAction } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";

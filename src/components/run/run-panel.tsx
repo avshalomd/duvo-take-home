@@ -2,7 +2,7 @@
 
 import { ChevronDown, RotateCw, Scale } from "lucide-react";
 import { useActionState, useState } from "react";
-import { reevaluateAction, startRunAction } from "@/app/actions";
+import { reevaluateAction, startRunAction } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Elapsed } from "./elapsed";

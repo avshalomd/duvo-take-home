@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { Verdict } from "./eval"; // type-only: no runtime cycle with eval.ts, which imports Plan from here
 
 // A run is one automation: one set of instructions in, a trace of events, a report and files out.
-export const RunStatus = z.enum(["queued", "running", "evaluating", "succeeded", "failed"]);
+export const RunStatus = z.enum(["queued", "running", "evaluating", "succeeded", "failed", "cancelled"]); // cancelled: the user pressed Stop
+
+// Why the run exists: typed free text, an automation's example while it is being tested, a saved automation called
+// by its command, a schedule, or a follow-up ("ask for a change") on an earlier run.
+export const RunPurpose = z.enum(["adhoc", "trial", "automation", "schedule", "followup"]);
+export type RunPurpose = z.infer<typeof RunPurpose>;
 export type RunStatus = z.infer<typeof RunStatus>;
 
 // The agent's own plan, kept up to date through the plan tool. The key state of a run is read from here.
@@ -45,6 +50,20 @@ export const RunEvent = z.discriminatedUnion("kind", [
     preview: z.string(), // first ~300 chars of the result; the full text stays in the agent, not in our table
   }) }),
   z.object({ ...Base, kind: z.literal("plan"), payload: Plan }), // the whole plan after every plan-tool call: the last one is the current state
+  // v2: a guard's decision on a tool call (blocked and flagged ones are shown; allowed ones only in Details)
+  z.object({ ...Base, kind: z.literal("guard"), payload: z.looseObject({
+    guard: z.enum(["path", "url", "write", "connection"]),
+    tool: z.string(),
+    decision: z.enum(["allowed", "blocked", "flagged", "unchecked"]), // unchecked: the decision model was unavailable, so it was let through
+    reason: z.string(),
+    target: z.string().optional(), // the path, host or connection the call was about
+  }) }),
+  // v2: the per-step check - Jev's reading of whether a finished step did what its title says
+  z.object({ ...Base, kind: z.literal("check"), payload: z.looseObject({
+    stepIndex: z.number().int().min(0),
+    onTrack: z.number().min(0).max(1),
+    note: z.string(),
+  }) }),
   z.object({ ...Base, kind: z.literal("finished"), payload: z.looseObject({
     subtype: z.string(), // success | error_max_turns | error_max_budget_usd | error_during_execution
     is_error: z.boolean(),
@@ -57,7 +76,22 @@ export const RunEvent = z.discriminatedUnion("kind", [
 export type RunEvent = z.infer<typeof RunEvent>;
 export type RunEventKind = RunEvent["kind"];
 
-export const FileMeta = z.object({ name: z.string(), mime: z.string(), bytes: z.number().int() });
+// What the output scan found in a file: credentials quarantine it; personal data is only counted and shown.
+export const FileFlag = z.object({
+  kind: z.enum(["credential", "email", "phone", "card", "iban"]),
+  count: z.number().int().min(1),
+  detail: z.string(), // "3 email addresses", "an API key on line 4"
+});
+export type FileFlag = z.infer<typeof FileFlag>;
+
+export const FileMeta = z.object({
+  name: z.string(),
+  mime: z.string(),
+  bytes: z.number().int(),
+  encoding: z.enum(["utf8", "base64"]).optional(), // base64 for a binary output (.xlsx); absent means utf8
+  flags: z.array(FileFlag).optional(),
+  quarantined: z.boolean().optional(),
+});
 export type FileMeta = z.infer<typeof FileMeta>;
 
 export const Run = z.object({
@@ -75,6 +109,16 @@ export const Run = z.object({
   finishedAt: z.string().nullable(),
   // The verdict's headline, so a run row can say "Done, with notes" like the panel; the full Verdict is on GetRun.
   outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown"]).nullable().optional(),
+  // v2, optional so v1 rows and fixtures still parse
+  workspaceId: z.string().nullable().optional(),
+  purpose: RunPurpose.optional(),
+  automationId: z.string().nullable().optional(),
+  automationVersion: z.number().int().nullable().optional(),
+  input: z.string().nullable().optional(), // the text after the command
+  parentRunId: z.string().nullable().optional(),
+  cancelRequested: z.boolean().optional(),
+  humanVerdict: z.enum(["approved", "rejected"]).nullable().optional(), // the person's own judgment
+  humanNote: z.string().nullable().optional(),
 });
 export type Run = z.infer<typeof Run>;
 
@@ -93,10 +137,14 @@ export const RunState = z.object({
   costUsd: z.number().nullable(),
   durationMs: z.number().nullable(),
   error: z.string().nullable(),
+  // v2: the per-step checks by step index (the latest per step), and the guard decisions that were not "allowed"
+  stepChecks: z.array(z.object({ stepIndex: z.number().int(), onTrack: z.number(), note: z.string() })).optional(),
+  guards: z.array(z.object({ guard: z.string(), decision: z.string(), reason: z.string(), target: z.string().optional() })).optional(),
 });
 export type RunState = z.infer<typeof RunState>;
 
 export type DeriveState = (run: Run, events: RunEvent[]) => RunState;
-export type ListRuns = () => Promise<Run[]>;
-export type GetRun = (id: string) => Promise<{ run: Run; events: RunEvent[]; files: FileMeta[]; verdict: Verdict | null } | null>;
-export type GetFile = (runId: string, name: string) => Promise<{ meta: FileMeta; content: string } | null>;
+// Every read takes the workspace id first. It comes from the session on the server, never from the client.
+export type ListRuns = (workspaceId: string) => Promise<Run[]>;
+export type GetRun = (workspaceId: string, id: string) => Promise<{ run: Run; events: RunEvent[]; files: FileMeta[]; verdict: Verdict | null } | null>;
+export type GetFile = (workspaceId: string, runId: string, name: string) => Promise<{ meta: FileMeta; content: string } | null>;

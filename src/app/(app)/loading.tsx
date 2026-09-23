@@ -1,4 +1,4 @@
-import { PanelSkeleton } from "@/components/automations/panel-skeleton";
+import { PanelSkeleton } from "@/components/run/panel-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // The page reads the database before it renders; this is what the user sees while it does. It copies the real

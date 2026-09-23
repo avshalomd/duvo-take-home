@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { StartRunInput } from "@/contracts/agent";
-import { NewConnection } from "@/contracts/connection";
-import { addConnection, setConnectionEnabled } from "@/lib/connections/store";
+import { requireSession } from "@/lib/auth/session";
 import { reevaluateRun } from "@/lib/eval/reevaluate";
 import { getRun } from "@/lib/runs/queries";
 import { startRun } from "@/lib/runs/start";
@@ -24,9 +23,10 @@ export async function startRunAction(_prev: FormState, formData: FormData): Prom
   const parsed = StartRunInput.safeParse(values);
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
 
+  const session = await requireSession();
   let id: string;
   try {
-    ({ id } = await startRun(parsed.data));
+    ({ id } = await startRun({ workspaceId: session.workspaceId, userId: session.userId }, { prompt: parsed.data.prompt }));
   } catch (e) {
     return { error: readable(e), values }; // keeps what was typed, so the instructions are not lost
   }
@@ -39,7 +39,8 @@ export async function reevaluateAction(_prev: FormState, formData: FormData): Pr
   const runId = z.uuid().safeParse(String(formData.get("runId") ?? ""));
   if (!runId.success) return { error: "No run selected" };
 
-  const data = await getRun(runId.data);
+  const { workspaceId } = await requireSession();
+  const data = await getRun(workspaceId, runId.data); // the workspace check: another workspace's run reads as missing
   if (!data) return { error: "That run no longer exists" };
   // judging a run that is still working would evaluate half a result and overwrite it a minute later
   if (data.run.status !== "succeeded" && data.run.status !== "failed")
@@ -49,38 +50,6 @@ export async function reevaluateAction(_prev: FormState, formData: FormData): Pr
     await reevaluateRun(runId.data);
   } catch (e) {
     return { error: readable(e) };
-  }
-  revalidatePath("/");
-  return {};
-}
-
-export async function setConnectionEnabledAction(id: string, enabled: boolean): Promise<FormState> {
-  const input = z.object({ id: z.uuid(), enabled: z.boolean() }).safeParse({ id, enabled });
-  if (!input.success) return { error: "That connection could not be found" }; // a Server Action is a public endpoint: its arguments are validated too
-
-  try {
-    await setConnectionEnabled(input.data.id, input.data.enabled);
-  } catch (e) {
-    return { error: readable(e) };
-  }
-  revalidatePath("/");
-  return {};
-}
-
-export async function addConnectionAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const values = {
-    name: String(formData.get("name") ?? ""),
-    url: String(formData.get("url") ?? ""),
-    transport: String(formData.get("transport") ?? "http"),
-    token: String(formData.get("token") ?? ""),
-  };
-  const parsed = NewConnection.safeParse({ ...values, token: values.token || undefined });
-  if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
-
-  try {
-    await addConnection(parsed.data);
-  } catch (e) {
-    return { error: readable(e), values };
   }
   revalidatePath("/");
   return {};
