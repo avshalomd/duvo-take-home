@@ -134,7 +134,7 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q95 | qa-ux | example runs show the full prompt in the rail; "Example for an automation being tested" names no automation and stays after approval | the input as the title; "Example for <name>" linking to it | minor | home | redesign |
 | Q96 | qa-ux | tool names in plan step titles ("... using make_chart") | step titles in plain words | minor | guards (system prompt) | fixed (560f6be: plain step titles, never a tool or file name) |
 | Q97 | qa-ux | markdown tables in the report render as raw pipes | rendered tables | minor | home | redesign |
-| Q98 | qa-ux | chart labels about 5 px, the x-axis title overlapping a tick label, a tiny pie legend | readable at 390 px | minor | outputs | fixing |
+| Q98 | qa-ux | chart labels about 5 px, the x-axis title overlapping a tick label, a tiny pie legend | readable at 390 px | minor | outputs | fixed (dcae48a, 0a93a8c: 420x280, 15 px labels, slanted when crowded, the v2 palette) |
 | Q99 | qa-ux | "0.0 KB" for a small file | bytes under 1 KB | minor | home | redesign |
 | Q100 | qa-ux | "No files yet - this run writes its answer in the report below" on finished and failed runs, even with no report | wording per state | minor | home | redesign |
 | Q101 | qa-ux | a failed run says "You can run the same instructions again" but offers only an unlabelled icon | a labelled "Run again" | minor | home | redesign |
@@ -161,7 +161,7 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q122 | qa-func | mid-run, after a file was written, "No files yet - this run writes its answer in the report below" | "files appear when it finishes" while live | minor | home | fixing |
 | Q123 | qa-func | Details > State lists only the Write tool's files, not the chart and spreadsheet (same as Q103) | every file | minor | home (state.ts) | fixing |
 | Q124 | qa-func | .svg and .xlsx outputs get no content check, and "The file has content" names no file | a check per output kind, naming the file | minor | eval | fixed (5a93093: chart and spreadsheet checks, every check names its file; suite 18/18) |
-| Q125 | qa-func | .xlsx served with "; charset=utf-8" | no charset on a binary type | minor | outputs | fixing |
+| Q125 | qa-func | .xlsx served with "; charset=utf-8" | no charset on a binary type | minor | outputs | fixed (07469f9) |
 | Q126 | qa-func | two connections whose names map to the same key are both accepted; one silently replaces the other in a run | the second name refused as taken | minor | settings | fixing |
 | Q127 | qa-func | every url-guard block reads "A web page tried to make the agent send your data elsewhere", also for a private address or a site blocked in Settings | wording by cause | minor | home (guard-notice) | fixing |
 | Q128 | qa-func | a run the model refused shows one text event; the refused action (turns 1-2) is not in the timeline | the refusal visible in the timeline | minor | engine (map-message) | fixing |
