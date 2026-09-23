@@ -9,11 +9,11 @@
   },
   "recorded": {
     "judge": {
-      "answeredQuery": 0.92,
+      "answeredQuery": 0.9,
       "followedPlan": 0.91
     },
     "review": null,
-    "source": "hand-set when the case was written; replaced by live answers with RECORD=1 when the live run agrees"
+    "source": "live 2026-09-23"
   },
   "run": {
     "id": "case_connection_digest",
