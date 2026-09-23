@@ -35,7 +35,7 @@ test.describe("the frame", () => {
     // Q113: the mark is a glyph with the product's name as its label, not the word beside the Automations page
     const mark = header.getByRole("link", { name: "Automations home" });
     await expect(mark).toBeVisible();
-    await expect(mark).toHaveText("");
+    await expect(mark.getByText("Automations", { exact: true })).toBeHidden(); // the tile shows, its word does not
   });
 
   test("with no run open, Home asks one question, with the composer under it", async ({ page }) => {
@@ -151,7 +151,8 @@ test.describe("the composer", () => {
     await page.goto("/");
     await composer(page).fill(`/${AUTOMATION.command} Acme Ltd`);
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    await expect(page.getByRole("alert")).toContainText("is not approved yet");
+    // filtered: Next's route announcer is an alert too
+    await expect(page.getByRole("alert").filter({ hasText: "is not approved yet" })).toBeVisible();
   });
 
   test("the connections that are on are named under the box, with a way to Settings", async ({ page }) => {
@@ -256,7 +257,7 @@ test.describe("a finished run", () => {
     const details = page.getByRole("dialog", { name: /details/i });
     await expect(details.getByTestId("timeline")).toBeVisible();
     await expect(details.getByTestId("state-card")).toContainText(/turn \d+ of \d+/);
-    await expect(details.getByTestId("state-card")).toContainText("chart.svg, contacts.csv, table.xlsx"); // Q103: the tools' files too
+    await expect(details.getByTestId("state-card")).toContainText("contacts.csv, chart.svg, table.xlsx"); // Q103: the tools' files too, in the order made
     await expect(details.getByTestId("state-card")).not.toContainText("outputs"); // Q103: the built-in tools are not a connection
     await expect(details.getByTestId("verdict")).toContainText("%"); // the probabilities live here
     await expect(details).toContainText(runs.followUp); // the id, for a bug report

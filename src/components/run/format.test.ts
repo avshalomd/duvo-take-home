@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectionName, formatCost, formatDuration, humanizeTools, toolKind, toolLine } from "./format";
+import { connectionName, formatCost, formatDuration, humanizeTools, toolKind, toolLabel, toolLine } from "./format";
 
 const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
 
@@ -23,6 +23,13 @@ describe("toolLine - one line per tool call, readable without opening the payloa
 
   it("falls back to the server key when no connection matches it", () => {
     expect(toolLine("mcp__linear__list_issues", {}, connections)).toBe("linear: list_issues");
+  });
+
+  // Q103: "outputs: make_chart" read as a connection called outputs
+  it("names the app's own tools as built in, never behind a server prefix", () => {
+    expect(toolLabel("mcp__outputs__make_chart", connections)).toBe("make_chart (built in)");
+    expect(toolLabel("mcp__plan__update_step", connections)).toBe("update_step (built in)");
+    expect(humanizeTools("used mcp__outputs__make_spreadsheet", connections)).toBe("used make_spreadsheet (built in)");
   });
 
   it("shows a fetch by its url", () => {
