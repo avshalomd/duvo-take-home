@@ -120,3 +120,43 @@ describe("evaluate", () => {
     expect(Number.isNaN(Date.parse(verdict.evaluatedAt))).toBe(false);
   });
 });
+
+// v2, "Why?": every verdict says which tier produced it and which tiers ran, so the run page can explain itself in
+// one line per tier without re-deriving the cascade from the probabilities.
+describe("evaluate: which tier decided and which tiers ran", () => {
+  const why = (v: { decidedBy?: string; path?: string[] }) => ({ decidedBy: v.decidedBy, path: v.path });
+
+  it("says the checks decided when a failed check ended it, and that nothing else ran", async () => {
+    const verdict = await evaluate({ ...input, files: [{ name: "output.csv", content: "title,source\n" }] }, deps(judgment(0.99, 0.99)));
+    expect(why(verdict)).toEqual({ decidedBy: "checks", path: ["checks"] });
+  });
+
+  it("says the judge decided a confident pass, after the checks", async () => {
+    expect(why(await evaluate(input, deps(judgment(0.97, 0.95))))).toEqual({ decidedBy: "judge", path: ["checks", "judge"] });
+  });
+
+  it("says the judge decided a confident fail, with no review", async () => {
+    expect(why(await evaluate(input, deps(judgment(0.02, 0.9))))).toEqual({ decidedBy: "judge", path: ["checks", "judge"] });
+  });
+
+  it("says the review decided when the judge was unsure, and that all three tiers ran", async () => {
+    expect(why(await evaluate(input, deps(judgment(0.96, 0.5), review())))).toEqual({ decidedBy: "review", path: ["checks", "judge", "review"] });
+  });
+
+  it("says the review decided a fail it found unfinished", async () => {
+    const verdict = await evaluate(input, deps(judgment(0.96, 0.03), review({ taskFinished: false })));
+    expect(verdict.verdict).toBe("fail");
+    expect(why(verdict)).toEqual({ decidedBy: "review", path: ["checks", "judge", "review"] });
+  });
+
+  it("says nobody decided when the judge was unavailable, and keeps the judge on the path because it was tried", async () => {
+    const verdict = await evaluate(input, deps(new LlmError("The decision model failed: HTTP 429", "unavailable")));
+    expect(verdict.verdict).toBe("unknown");
+    expect(why(verdict)).toEqual({ decidedBy: "nobody", path: ["checks", "judge"] });
+  });
+
+  it("says nobody decided when the review was unavailable", async () => {
+    const verdict = await evaluate(input, deps(judgment(0.96, 0.5), new LlmError("The model took too long (30 s). Retry.", "timeout")));
+    expect(why(verdict)).toEqual({ decidedBy: "nobody", path: ["checks", "judge", "review"] });
+  });
+});

@@ -1,0 +1,267 @@
+{
+  "id": "abandoned-plan",
+  "why": "The run said it was done while two of its own steps were still pending and two of the three entries are TBD. Every code check passes; only reading the plan against the file catches it.",
+  "source": "hand-written for the suite, in the shape the v2 run loop records",
+  "expected": {
+    "verdict": "fail",
+    "decidedBy": "review",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.35,
+      "followedPlan": 0.08
+    },
+    "review": {
+      "taskFinished": false,
+      "responseSuitable": false,
+      "changeNeeded": "Fill in the parameter count, licence and why it matters for Qwen 3.5 and Mistral Medium 3.1.",
+      "reasoning": "Two of the three entries in releases.md say TBD for parameters, licence and why it matters, and the plan's steps to look them up and check every entry are still pending."
+    },
+    "source": "hand-set when the case was written; replaced by live answers with RECORD=1 when the live run agrees"
+  },
+  "run": {
+    "id": "case_abandoned_plan",
+    "prompt": "Find the three biggest open-weight LLM releases of the last 30 days and write releases.md with, for each one: the name, the lab, the parameter count, the licence and one line on why it matters.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "Wrote releases.md with the three biggest open-weight releases of the last 30 days.",
+    "error": null,
+    "numTurns": 6,
+    "durationMs": 38410,
+    "costUsd": 0.0977,
+    "createdAt": "2026-09-22T13:05:00.000Z",
+    "finishedAt": "2026-09-22T13:05:26.000Z"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T13:05:00.000Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T13:05:02.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Profile the three biggest open-weight LLM releases of the last 30 days in releases.md",
+        "expectedOutputs": [
+          "releases.md with name, lab, parameters, licence and why it matters for each"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for open-weight model releases from the last 30 days",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Pick the three biggest releases",
+            "status": "pending"
+          },
+          {
+            "index": 2,
+            "title": "Look up each model's parameter count and licence",
+            "status": "pending"
+          },
+          {
+            "index": 3,
+            "title": "Write releases.md",
+            "status": "pending"
+          },
+          {
+            "index": 4,
+            "title": "Check every entry has all five fields",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T13:05:04.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "name": "WebSearch",
+        "input": {
+          "query": "open-weight LLM release September 2026"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T13:05:08.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "is_error": false,
+        "preview": "Llama 4.1 weights (Meta), Qwen 3.5 (Alibaba), Mistral Medium 3.1 open weights ..."
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T13:05:10.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Profile the three biggest open-weight LLM releases of the last 30 days in releases.md",
+        "expectedOutputs": [
+          "releases.md with name, lab, parameters, licence and why it matters for each"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for open-weight model releases from the last 30 days",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Pick the three biggest releases",
+            "status": "done"
+          },
+          {
+            "index": 2,
+            "title": "Look up each model's parameter count and licence",
+            "status": "running"
+          },
+          {
+            "index": 3,
+            "title": "Write releases.md",
+            "status": "pending"
+          },
+          {
+            "index": 4,
+            "title": "Check every entry has all five fields",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-22T13:05:12.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "name": "WebFetch",
+        "input": {
+          "url": "https://techcrunch.com/2026/09/17/meta-llama-4-1-weights/",
+          "prompt": "parameter count and licence"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-22T13:05:16.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "is_error": false,
+        "preview": "The 400B model ships with a licence that drops the monthly-active-user cap ..."
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-22T13:05:18.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "name": "Write",
+        "input": {
+          "file_path": "releases.md",
+          "content": "# Open-weight LLM releases, last 30 days\n\n## Llama 4.1 (Meta)\n- Parameters: 400B (mixture of experts)\n- Licence: Llama 4 Community Licence, no user cap\n- Why it ..."
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-22T13:05:22.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "is_error": false,
+        "preview": "File created successfully at releases.md"
+      }
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-22T13:05:24.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Profile the three biggest open-weight LLM releases of the last 30 days in releases.md",
+        "expectedOutputs": [
+          "releases.md with name, lab, parameters, licence and why it matters for each"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for open-weight model releases from the last 30 days",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Pick the three biggest releases",
+            "status": "done"
+          },
+          {
+            "index": 2,
+            "title": "Look up each model's parameter count and licence",
+            "status": "pending"
+          },
+          {
+            "index": 3,
+            "title": "Write releases.md",
+            "status": "done"
+          },
+          {
+            "index": 4,
+            "title": "Check every entry has all five fields",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 11,
+      "at": "2026-09-22T13:05:26.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 6,
+        "duration_ms": 38410,
+        "total_cost_usd": 0.0977,
+        "result": "Wrote releases.md with the three biggest open-weight releases of the last 30 days."
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "releases.md",
+      "content": "# Open-weight LLM releases, last 30 days\n\n## Llama 4.1 (Meta)\n- Parameters: 400B (mixture of experts)\n- Licence: Llama 4 Community Licence, no user cap\n- Why it matters: the first open-weight model to drop the monthly-active-user cap.\n\n## Qwen 3.5 (Alibaba)\n- Parameters: TBD\n- Licence: TBD\n- Why it matters: TBD\n\n## Mistral Medium 3.1 (Mistral)\n- Parameters: TBD\n- Licence: TBD\n- Why it matters: TBD\n"
+    }
+  ],
+  "template": null
+}

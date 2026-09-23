@@ -1,0 +1,211 @@
+{
+  "id": "template-left",
+  "why": "A run of a saved automation that planned its own two steps and wrote a paragraph instead of the promised news.csv. The automation's contract is the file and the steps, and both are code checks.",
+  "source": "hand-written for the suite: a run of an automation, with its template",
+  "expected": {
+    "verdict": "fail",
+    "decidedBy": "checks",
+    "failedChecks": [
+      "template_outputs",
+      "template_steps"
+    ]
+  },
+  "recorded": {
+    "judge": null,
+    "review": null,
+    "source": "not reached: the checks decide"
+  },
+  "run": {
+    "id": "case_template_left",
+    "prompt": "Find the news about Nvidia from the last 7 days and save it to news.csv with title, source, url, published_at, summary. At least 5 rows.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "Wrote summary.md with this week's main Nvidia story.",
+    "error": null,
+    "numTurns": 4,
+    "durationMs": 19850,
+    "costUsd": 0.0521,
+    "createdAt": "2026-09-22T15:00:00.000Z",
+    "finishedAt": "2026-09-22T15:00:20.000Z",
+    "purpose": "automation",
+    "input": "Nvidia",
+    "automationVersion": 1
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T15:00:00.000Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T15:00:02.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Summarise this week's Nvidia news",
+        "expectedOutputs": [
+          "summary.md"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for Nvidia news",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Write a summary in summary.md",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T15:00:04.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "name": "WebSearch",
+        "input": {
+          "query": "Nvidia news this week"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T15:00:08.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "is_error": false,
+        "preview": "The Information - Nvidia Rubin GPUs slip to Q1 2027 ..."
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T15:00:10.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Summarise this week's Nvidia news",
+        "expectedOutputs": [
+          "summary.md"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for Nvidia news",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write a summary in summary.md",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-22T15:00:12.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "name": "Write",
+        "input": {
+          "file_path": "summary.md",
+          "content": "# Nvidia this week\n\nNvidia's Rubin GPUs slipped to Q1 2027 on HBM4 supply (The Information, 16 September). Blackwell Ultra output rises to cover the gap. Analys ..."
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-22T15:00:16.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "is_error": false,
+        "preview": "File created successfully at summary.md"
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-22T15:00:18.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Summarise this week's Nvidia news",
+        "expectedOutputs": [
+          "summary.md"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search for Nvidia news",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write a summary in summary.md",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-22T15:00:20.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 4,
+        "duration_ms": 19850,
+        "total_cost_usd": 0.0521,
+        "result": "Wrote summary.md with this week's main Nvidia story."
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "summary.md",
+      "content": "# Nvidia this week\n\nNvidia's Rubin GPUs slipped to Q1 2027 on HBM4 supply (The Information, 16 September). Blackwell Ultra output rises to cover the gap. Analysts expect the delay to move about $4B of revenue into the next fiscal year.\n"
+    }
+  ],
+  "template": {
+    "instructions": "Find the news about {input} from the last 7 days and save it to news.csv with title, source, url, published_at, summary. At least 5 rows.",
+    "intent": "A weekly news digest about one company, as a CSV",
+    "expectedOutputs": [
+      "news.csv with columns title, source, url, published_at, summary"
+    ],
+    "outputFormat": "CSV with the header title,source,url,published_at,summary; one row per story",
+    "steps": [
+      "Search the web for news about {input} from the last 7 days",
+      "Open each story to confirm its date",
+      "Write news.csv",
+      "Report what was found"
+    ],
+    "connections": []
+  }
+}

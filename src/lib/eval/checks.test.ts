@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AgentLimits } from "@/contracts/agent";
 import type { EvaluateInput } from "@/contracts/eval";
 import { runChecks } from "./checks";
 
@@ -119,6 +120,31 @@ describe("runChecks", () => {
   it("asks for no file when the instructions only ask a question", () => {
     const checks = runChecks(input({ prompt: "What did Anthropic announce this week?", files: [], report: "They shipped X." }));
     expect(check(checks, "file_expected")).toBeUndefined();
+    expect(failedIds(checks)).toEqual([]);
+  });
+
+  it("accepts the chart (.svg) and spreadsheet (.xlsx) files the v2 output tools make", () => {
+    const files = [
+      { name: "prices.svg", content: "<svg xmlns='http://www.w3.org/2000/svg'></svg>" },
+      { name: "prices.xlsx", content: "(application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, 6120 bytes)" },
+    ];
+    const checks = runChecks(input({ prompt: "Chart the prices and export a spreadsheet.", files }));
+    expect(check(checks, "extension")?.ok).toBe(true);
+  });
+
+  it("accepts every file type the run loop collects, so the evaluator and the collector cannot drift apart", () => {
+    const types = [...AgentLimits.fileExtensions, ...AgentLimits.toolFileExtensions];
+    const files = types.map((ext) => ({ name: `out${ext}`, content: ext === ".csv" ? "a,b\n1,2\n" : "x" }));
+    expect(check(runChecks(input({ prompt: "Do it.", files })), "extension")?.ok).toBe(true);
+  });
+
+  it("does not read a chart or a spreadsheet as text: no content, parse or row check on them", () => {
+    const files = [
+      { name: "chart.svg", content: "" },
+      { name: "data.xlsx", content: "(application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, 6120 bytes)" },
+    ];
+    const checks = runChecks(input({ prompt: "Chart the prices.", files }));
+    expect(checks.map((c) => c.id).filter((id) => ["content", "parses", "rows"].includes(id))).toEqual([]);
     expect(failedIds(checks)).toEqual([]);
   });
 
