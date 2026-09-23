@@ -10,6 +10,12 @@ import { answer, failure, issues } from "./result";
 
 const Args = z.object(ChartInput);
 
+// What the agent is shown. The SDK cannot turn the contract's z.record into JSON Schema: tools/list then fails and
+// the agent sees no output tools at all (the first live run). An object with a catchall states the same rule - any
+// field name, each value a cell - and converts cleanly. The contract's own schema still validates every call below.
+const Row = z.object({}).catchall(ChartInput.data.element.valueType);
+const Advertised = { ...ChartInput, data: z.array(Row).min(1).max(1000) };
+
 /**
  * make_chart: the agent passes the data, our code draws it. Validates the arguments itself (the tests and any
  * future caller need not go through the SDK), writes <file> into the run directory and answers in one line.
@@ -37,6 +43,6 @@ export const makeChartTool = (dir: string) =>
       "kind: bar, line, area, pie or scatter. data: one object per point, values as numbers. " +
       "x names the field for the horizontal axis (the slice label, for a pie), y the field for the value, " +
       "series (optional) a field that splits the data into coloured groups. The order of data is kept.",
-    ChartInput,
+    Advertised,
     (args) => makeChart(dir, args),
   );
