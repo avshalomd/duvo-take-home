@@ -62,7 +62,7 @@ describe("groupEvents - fixing what the check found", () => {
   };
 
   it("opens a group for each attempt, headed by the attempt, holding the heal event and the work that followed", () => {
-    const groups = groupEvents([plan(["done"]), call("Write"), heal(1), call("Write")]);
+    const groups = groupEvents([plan(["running"]), call("Write"), heal(1), call("Write")]);
     expect(groups.map((g) => g.title)).toEqual(["step 0", "Fixing what the check found - attempt 1 of 2"]);
     expect(groups[1].events.map((e) => e.kind)).toEqual(["heal", "tool_call"]);
   });

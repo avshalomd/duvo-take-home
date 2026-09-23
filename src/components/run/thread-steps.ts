@@ -1,18 +1,31 @@
 import type { Plan, RunState } from "@/contracts/run";
+import { stoppedLine, type Heal } from "./heal";
 
 // The run's plan as the thread draws it (src/components/thread/thread.tsx). The thread knows nothing about runs, so
-// this is where a step's check becomes a flag and a finished run's last "running" step stops being worked on.
+// this is where a step's check becomes a flag, a finished run's last "running" step stops being worked on, a new
+// run shows its first bead before the plan exists, and auto-heal's attempts carry the thread on past the plan.
 
-export type PlanThreadStep = { key: number; title: string; status: "pending" | "running" | "done" | "skipped"; note?: string; flag?: string };
+export type PlanThreadStep = {
+  key: number | string;
+  title: string;
+  status: "pending" | "running" | "done" | "skipped";
+  note?: string;
+  flag?: string;
+};
 
 // Below this, the per-step check thinks the step did not do what its title says (a probability from the checker).
 const OFF_TRACK = 0.5;
 
-export function threadSteps(plan: Plan, runStatus: string, stepChecks: RunState["stepChecks"]): PlanThreadStep[] {
+// Q138: the agent's first seconds go into reading the brief and writing the plan; the thread shows that as its
+// first step, so a new run opens on work under way instead of a line of text.
+const READING: PlanThreadStep = { key: "reading", title: "Reading your brief", status: "running" };
+
+export function threadSteps(plan: Plan | null, runStatus: string, stepChecks: RunState["stepChecks"], heals: Heal[] = []): PlanThreadStep[] {
   const live = runStatus === "queued" || runStatus === "running" || runStatus === "evaluating";
   const stoppedMidway = runStatus === "cancelled" || runStatus === "failed";
+  if (!plan) return live && heals.length === 0 ? [READING] : [];
 
-  return plan.steps.map((step) => {
+  const steps = plan.steps.map((step): PlanThreadStep => {
     const out: PlanThreadStep = { key: step.index, title: step.title, status: step.status };
     if (step.note) out.note = step.note;
 
@@ -27,4 +40,17 @@ export function threadSteps(plan: Plan, runStatus: string, stepChecks: RunState[
     if (step.status === "done" && check && check.onTrack < OFF_TRACK) out.flag = `This step may not have done what it says. ${check.note}`;
     return out;
   });
+
+  // Auto-heal: each attempt to fix the result is one more step on the same thread. Only the latest can be under way;
+  // what the check found is under Why?, not here, because the run has not said pass or fail yet (his call).
+  const fixes = heals.map((heal, i): PlanThreadStep => {
+    const title = `Fix what the check found (attempt ${heal.attempt} of ${heal.max})`;
+    const key = `heal-${heal.attempt}`;
+    if (heal.stopped) return { key, title, status: "skipped", note: stoppedLine(heal) };
+    if (i < heals.length - 1) return { key, title, status: "done" };
+    if (live) return { key, title, status: "running" };
+    if (stoppedMidway) return { key, title, status: "pending", note: "Stopped here" };
+    return { key, title, status: "done" };
+  });
+  return [...steps, ...fixes];
 }

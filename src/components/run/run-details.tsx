@@ -14,7 +14,7 @@ export function RunDetails({ view, storedOutcome, connections }: { view: RunView
     <div data-testid="run-details">
       <IntentSection prompt={run.prompt} plan={state.plan} finished={isTerminal(run.status)} />
       <StateSection state={state} connections={connections} />
-      <TimelineSection events={events} connections={connections} />
+      <TimelineSection events={events} connections={connections} runStatus={run.status} />
       <VerdictSection verdict={verdict} storedOutcome={storedOutcome} connections={connections} runStatus={run.status} />
       <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 border-t border-hairline px-6 py-4 text-[12px] text-slate">
         <dt>Run id</dt>
@@ -46,6 +46,14 @@ export function RunDetails({ view, storedOutcome, connections }: { view: RunView
         <dd className="font-mono">{run.model}</dd>
         <dt>Turns</dt>
         <dd className="tabular-nums">{run.numTurns ?? "-"}</dd>
+        {state.heals && state.heals.length > 0 && (
+          <>
+            <dt>Fix attempts</dt>
+            <dd className="tabular-nums">
+              {state.heals.length} of {state.heals.at(-1)!.max}
+            </dd>
+          </>
+        )}
         {run.cancelRequested && (
           <>
             <dt>Stop</dt>

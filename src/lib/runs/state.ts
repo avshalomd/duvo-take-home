@@ -49,7 +49,8 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
     .map((e) => e.payload as ToolCall)
     .filter((c) => !HOST_TOOLS.includes(c.name));
   const started = events.find((e) => e.kind === "started")?.payload as Started | undefined;
-  const finished = events.find((e) => e.kind === "finished")?.payload as Finished | undefined;
+  // Auto-heal gives a run one "finished" per attempt: the last one is the result that stands
+  const finished = events.findLast((e) => e.kind === "finished")?.payload as Finished | undefined;
   const plans = events.filter((e) => e.kind === "plan");
   const plan = (plans.length ? plans[plans.length - 1].payload : null) as Plan | null;
 
@@ -98,13 +99,19 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
       .filter((s) => !BUILT_IN_SERVERS.includes(s.name)) // the plan and outputs tools are ours, not the person's connections
       .map((s) => ({ name: s.name, status: s.status, used: calls.some((c) => c.name.startsWith(`mcp__${s.name}__`)) })),
     files,
-    costUsd: finished ? finished.total_cost_usd : null,
-    durationMs: finished ? finished.duration_ms : null,
+    // Once an attempt has finished, the run row is the one total: the engine counts each attempt once. A finished
+    // event carries the SDK's running total of a resumed session, so adding the events up would count the first
+    // attempt twice (Q149). Before any attempt has finished there is nothing to show yet.
+    costUsd: finished ? (run.costUsd ?? finished.total_cost_usd) : null,
+    durationMs: finished ? (run.durationMs ?? finished.duration_ms) : null,
     // The agent's own last words are the most useful error we have; run.error carries a crash before any result.
     // Pressing Stop aborts the agent, which reports an error; it is the person's choice, not a failure to show.
     error: stopped ? null : finished?.is_error ? finished.result || finished.subtype : run.error,
     stepChecks,
     guards,
+    // Auto-heal's attempts, in order, with what the check found each time; what the agent was told stays in the
+    // events, for Details
+    heals: events.flatMap((e) => (e.kind === "heal" ? [{ attempt: e.payload.attempt, max: e.payload.max, reasons: e.payload.reasons }] : [])),
   };
 };
 

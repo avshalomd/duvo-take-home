@@ -437,9 +437,13 @@ test.describe("a run that fixes what the check found", () => {
     await panel.getByRole("button", { name: /why\?/i }).click();
     await expect(panel.getByTestId("why")).toContainText("Fixed after 1 attempt");
     await panel.getByRole("button", { name: /details/i }).click();
-    const timeline = page.getByRole("dialog", { name: /details/i }).getByTestId("timeline");
+    const details = page.getByRole("dialog", { name: /details/i });
+    const timeline = details.getByTestId("timeline");
     await expect(timeline).toContainText("Fixing what the check found - attempt 1 of 2");
     await expect(timeline).toContainText(HEAL.feedback);
+    // Q149: each attempt shows its own cost, and the run one total - never the SDK's running total per attempt
+    await expect(timeline).toContainText("$0.050");
+    await expect(details.getByTestId("state-card")).toContainText("$0.170");
   });
 
   test("a run the fixes did not save says so once, and Ask for a change starts from what did not pass", async ({ page }) => {

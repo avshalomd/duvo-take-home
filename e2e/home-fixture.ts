@@ -103,13 +103,13 @@ const REPORT = [
 export async function createHomeRuns(): Promise<HomeRuns> {
   await deleteHomeRuns(); // a crashed earlier run may have left its rows behind
   const sql = client();
-  const insert = async (row: { prompt: string; status: string; minutesAgo: number; purpose?: string; parent?: string; verdict?: unknown; report?: string; human?: string; error?: string; automation?: string; input?: string; heals?: number }) => {
+  const insert = async (row: { prompt: string; status: string; minutesAgo: number; purpose?: string; parent?: string; verdict?: unknown; report?: string; human?: string; error?: string; automation?: string; input?: string; heals?: number; cost?: number }) => {
     const [r] = await sql.query(
       `insert into runs (workspace_id, created_by, purpose, parent_run_id, prompt, status, model, report, verdict, human_verdict, error, automation_id, automation_version, input, created_at, finished_at, num_turns, duration_ms, cost_usd, heal_attempts)
-       values ($1, 'demo-user', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, now() - make_interval(mins => $14), $15, 4, 42000, 0.12, $16) returning id`,
+       values ($1, 'demo-user', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, now() - make_interval(mins => $14), $15, 4, 42000, $17, $16) returning id`,
       [WORKSPACE, row.purpose ?? "adhoc", row.parent ?? null, row.prompt, row.status, MODEL, row.report ?? null,
         row.verdict ? JSON.stringify(row.verdict) : null, row.human ?? null, row.error ?? null, row.automation ?? null, row.automation ? 1 : null, row.input ?? null, row.minutesAgo,
-        row.status === "running" ? null : new Date(Date.now() - (row.minutesAgo - 1) * 60_000).toISOString(), row.heals ?? 0],
+        row.status === "running" ? null : new Date(Date.now() - (row.minutesAgo - 1) * 60_000).toISOString(), row.heals ?? 0, row.cost ?? 0.12],
     );
     return r.id as string;
   };
@@ -126,6 +126,12 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const finished = (subtype = "success", isError = false) => ({
     kind: "finished",
     payload: { subtype, is_error: isError, num_turns: 4, duration_ms: 42000, total_cost_usd: 0.12, result: "The Moon is 238,855 miles away." },
+  });
+  // an attempt of a healing run: the SDK's total keeps running across the resumed session, the attempt's own cost
+  // is recorded beside it (Q149)
+  const attempt = (total: number, own: number) => ({
+    kind: "finished",
+    payload: { subtype: "success", is_error: false, num_turns: 3, duration_ms: 20000, total_cost_usd: total, attempt_cost_usd: own, result: "Done." },
   });
   const call = (id: string, name: string, input: unknown) => ({ kind: "tool_call", payload: { tool_use_id: id, name, input } });
 
@@ -194,11 +200,11 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const healing = await insert({ prompt: TITLES.healing, status: "running", minutesAgo: 1, heals: 1 });
   await events(healing, [started, { kind: "plan", payload: PLAN(null) }, finished(), heal(1, HEAL.reason)]);
 
-  const healed = await insert({ prompt: TITLES.healed, status: "succeeded", minutesAgo: 12, heals: 1, verdict: V1_PASS, report: "Eight robotics stories." });
-  await events(healed, [started, { kind: "plan", payload: PLAN(null) }, finished(), heal(1, HEAL.reason), finished()]);
+  const healed = await insert({ prompt: TITLES.healed, status: "succeeded", minutesAgo: 12, heals: 1, verdict: V1_PASS, report: "Eight robotics stories.", cost: 0.17 });
+  await events(healed, [started, { kind: "plan", payload: PLAN(null) }, attempt(0.12, 0.12), heal(1, HEAL.reason), attempt(0.17, 0.05)]);
 
-  const unfixed = await insert({ prompt: TITLES.unfixed, status: "succeeded", minutesAgo: 13, heals: 2, verdict: FAIL_ROWS, report: "Six space stories." });
-  await events(unfixed, [started, { kind: "plan", payload: PLAN(null) }, finished(), heal(1, HEAL.reason), finished(), heal(2, "At least 8 rows: 5 rows"), finished()]);
+  const unfixed = await insert({ prompt: TITLES.unfixed, status: "succeeded", minutesAgo: 13, heals: 2, verdict: FAIL_ROWS, report: "Six space stories.", cost: 0.2 });
+  await events(unfixed, [started, { kind: "plan", payload: PLAN(null) }, attempt(0.1, 0.1), heal(1, HEAL.reason), attempt(0.15, 0.05), heal(2, "At least 8 rows: 5 rows"), attempt(0.2, 0.05)]);
 
   return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed };
 }
