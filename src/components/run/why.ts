@@ -20,7 +20,7 @@ const LIVE = ["queued", "running", "evaluating"];
 function healLines(heals: Heal[], verdict: Verdict | null): WhyLine[] {
   const lines = heals.map((heal): WhyLine => {
     if (heal.stopped) return { tier: "heal", tone: "idle", decided: false, text: stoppedLine(heal) };
-    const found = heal.reasons.length ? `: ${heal.reasons.join("; ")}` : "";
+    const found = heal.reasons.length ? `: ${heal.reasons.map(plainReason).join(" and ")}` : "";
     return { tier: "heal", tone: "retry", decided: false, text: `The ${ordinal(heal.attempt)} result did not pass the check${found}` };
   });
   const fixes = fixesRun(heals);
@@ -91,7 +91,7 @@ function checksLine(checks: Check[]): Body {
   const noun = checks.length === 1 ? "check" : "checks";
   if (failed.length === 0)
     return { tone: "ok", text: `${checks.length} ${noun} passed: ${checks.map((c) => lowerFirst(c.label)).join(", ")}` };
-  const what = failed.map((c) => (c.detail ? `${lowerFirst(c.label)} (${c.detail})` : lowerFirst(c.label))).join("; ");
+  const what = failed.map((c) => (c.detail ? `${lowerFirst(c.label)} (${fileInWords(c.detail)})` : lowerFirst(c.label))).join("; ");
   return { tone: "bad", text: `${failed.length} of ${checks.length} ${noun} failed: ${what}` };
 }
 
@@ -104,13 +104,14 @@ function judgeLine(judgment: Judgment | null): Body {
     { p: judgment.followedPlan, yes: "the plan was finished", no: "the plan was not finished" },
   ];
   const sure = answers.filter((a) => a.p >= SURE || a.p <= 1 - SURE).map((a) => (a.p >= SURE ? a.yes : a.no));
-  const unsure = answers.filter((a) => a.p < SURE && a.p > 1 - SURE).map((a) => a.yes);
+  // what the judge could not tell is asked as a question ("whether ..."), so it never reads as a sure no (run ba022140)
+  const unsure = answers.filter((a) => a.p < SURE && a.p > 1 - SURE).map((a) => `whether ${a.yes}`);
   const anyNo = answers.some((a) => a.p <= 1 - SURE);
   const tone = anyNo ? "bad" : unsure.length ? "warn" : "ok";
 
   if (unsure.length === 0) return { tone, text: `The judge was sure ${sure.join(" and that ")}` };
-  if (sure.length === 0) return { tone, text: `The judge was not sure ${unsure.join(", nor that ")}` };
-  return { tone, text: `The judge was sure ${sure[0]} but not that ${unsure[0]}` };
+  if (sure.length === 0) return { tone, text: `The judge could not tell ${unsure.join(", or ")}` };
+  return { tone, text: `The judge was sure ${sure[0]}, but could not tell ${unsure[0]}` };
 }
 
 // stayedInBounds: P(the run acted only on the person's instructions, not on text it read). Absent on older verdicts.
@@ -131,6 +132,32 @@ function reviewLine(review: Review | null): Body {
 function lowerFirst(s: string): string {
   // "The CSV parses" -> "the CSV parses", "A file" -> "a file"; an acronym ("CSV", "URLs": a second capital) stays
   return /^[A-Z][A-Z]/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+// A detail that opens with a file ("countries.csv: row 5 has 6 fields") names the file in words instead: "in
+// countries.csv, row 5 has 6 fields". The checks write their details that way; a sentence should not chain colons.
+function fileInWords(detail: string): string {
+  const m = /^([\w.-]+\.[A-Za-z0-9]{1,5}): (.+)$/.exec(detail);
+  return m ? `in ${m[1]}, ${m[2]}` : detail;
+}
+
+// Words a sentence often opens with, safe to lower-case mid-sentence; anything else (a name, "Spain's field") stays.
+const OPENERS = /^(The|A|An|Only|No|None|Not|It|Its|This|That|These|There|Some|All|Every|One|Each)\b/;
+
+/**
+ * One reason the check gave, as a clause for "The first result did not pass the check: ...". The evaluator writes
+ * "<label>: <detail>" for a check, or a sentence of the judge's or the reviewer's, which may carry a percentage.
+ * Lower case, the file in words, the detail in brackets, and no numbers that belong in Details.
+ */
+function plainReason(reason: string): string {
+  const text = reason
+    .replace(/\s*\([^)]*\d+%[^)]*\)/g, "") // "(85% confident)", "(62%)": the probabilities stay in Details
+    .trim()
+    .replace(/\.+$/, "");
+  const cut = text.indexOf(": ");
+  if (cut < 0) return lowerFirst(text);
+  const detail = fileInWords(text.slice(cut + 2));
+  return `${lowerFirst(text.slice(0, cut))} (${OPENERS.test(detail) ? lowerFirst(detail) : detail})`;
 }
 
 function shorten(text: string): string {
