@@ -39,6 +39,7 @@ export const Automation = z.object({
   description: z.string(),
   inputLabel: z.string(), // "Company name"
   inputHint: z.string(), // "The company's registered name, e.g. Apple Inc."
+  inputExample: z.string(), // the value the source run used ("Acme Ltd"), offered as the first example
   template: AutomationTemplate,
   status: AutomationStatus,
   version: z.number().int(), // bumped by every edit of the template; trials of older versions no longer count
@@ -71,6 +72,7 @@ export const AutomationEdit = z.object({
   description: z.string().trim().max(200).default(""),
   inputLabel: z.string().trim().min(1, "Name the input").max(40),
   inputHint: z.string().trim().max(120).default(""),
+  inputExample: z.string().trim().max(200).default(""),
   template: AutomationTemplate,
 });
 export type AutomationEdit = z.infer<typeof AutomationEdit>;

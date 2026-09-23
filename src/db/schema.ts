@@ -96,6 +96,7 @@ export const automations = pgTable("automations", {
   description: text("description").notNull().default(""),
   inputLabel: text("input_label").notNull().default("Input"), // "Company name"
   inputHint: text("input_hint").notNull().default(""), // "The company's registered name"
+  inputExample: text("input_example").notNull().default(""), // the value the source run used, offered as the first example
   template: jsonb("template").notNull(), // AutomationTemplate: instructions with {input}, outputs, steps, connections
   status: text("status").notNull().default("draft"), // draft | active | disabled
   version: integer("version").notNull().default(1),
