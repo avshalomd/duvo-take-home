@@ -16,7 +16,7 @@ export function readable(e: unknown): string {
   if (e instanceof RunLimitError) return e.message; // "Three runs are already in progress - try again in a minute"
   if (e instanceof CancelError || e instanceof FollowUpError) return e.message; // the engine's refusals: "already finished", "not found"
   if (e instanceof ZodError) return e.issues[0]?.message ?? FALLBACK;
-  // a seam another part of the app has not filled yet throws "not implemented: <name>" (see the // STUB markers)
+  // a seam another part of the app has not filled yet throws "not implemented: <name>" (the stubs' convention)
   if (e instanceof Error && e.message.startsWith("not implemented")) return NOT_YET;
   console.error("action failed", e);
   return FALLBACK;
