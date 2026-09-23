@@ -1,10 +1,11 @@
 import type { ParseCommand } from "@/contracts/automation";
 
-// The prefix, then a name that starts with a letter, then either the end or whitespace and the input. The prefix must
-// open the text: "please run \audit x" is a sentence, and "/usr/bin ..." fails because a "/" follows the name.
-const COMMAND = /^\s*[\\/]([a-z][a-z0-9-]*)(?:\s+([\s\S]*))?$/i;
+// A front slash (his call: the prefix people know from coding agents; a backslash is plain text), then a name that
+// starts with a letter, then either the end or whitespace and the input. The slash must open the text: "please run
+// /audit x" is a sentence, and "/usr/bin ..." fails because a "/" follows the name.
+const COMMAND = /^\s*\/([a-z][a-z0-9-]*)(?:\s+([\s\S]*))?$/i;
 
-/** "\audit Apple Inc." or "/audit Apple Inc." -> { command: "audit", input: "Apple Inc." }; anything else -> null. */
+/** "/audit Apple Inc." -> { command: "audit", input: "Apple Inc." }; anything else, "\audit" included -> null. */
 export const parseCommand: ParseCommand = (text) => {
   const m = COMMAND.exec(text);
   if (!m) return null;

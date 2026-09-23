@@ -164,7 +164,7 @@ export const updateAutomation: UpdateAutomation = async (workspaceId, id, edit) 
       .select({ name: automations.name })
       .from(automations)
       .where(and(eq(automations.workspaceId, workspaceId), eq(automations.command, edit.command), ne(automations.id, id)));
-    if (clash) throw new AutomationError(`\\${edit.command} is already used by "${clash.name}". Pick another command.`);
+    if (clash) throw new AutomationError(`/${edit.command} is already used by "${clash.name}". Pick another command.`);
   }
   const bump = changesThePrompt(current, edit);
   const [row] = await db
@@ -258,7 +258,7 @@ export const setHumanVerdict: SetHumanVerdict = async (workspaceId, input) => {
     .where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
 };
 
-/** "Turn on DeepWiki in Settings to run \audit": a run without a connection its template needs would only fail later. */
+/** "Turn on DeepWiki in Settings to run /audit": a run without a connection its template needs would only fail later. */
 async function refuseMissingConnections(workspaceId: string, a: Automation, what: string) {
   const missing = missingConnections(a.template.connections, await listConnections(workspaceId));
   if (missing.length) throw new AutomationError(`Turn on ${missing.join(" and ")} in Settings to run ${what}`);
@@ -279,19 +279,19 @@ export const startTrial: StartTrial = async (ctx, automationId, rawInput) => {
   });
 };
 
-/** "\audit Apple Inc." from the Home box or the Run box: only an approved, switched-on automation runs. */
+/** "/audit Apple Inc." from the Home box or the Run box: only an approved, switched-on automation runs. */
 export const runCommand: RunCommand = async (ctx, parsed) => {
   const command = parsed.command.toLowerCase();
   const a = await getActiveByCommand(ctx.workspaceId, command);
   if (!a) {
     const any = await getByCommand(ctx.workspaceId, command);
-    if (!any) throw new AutomationError(`There is no automation called \\${command}. The Automations page lists the ones you have.`);
-    if (any.status === "draft") throw new AutomationError(`\\${command} is not approved yet. Open it on the Automations page, try an example and approve it.`);
-    throw new AutomationError(`\\${command} is turned off. Turn it on from its page under Automations.`);
+    if (!any) throw new AutomationError(`There is no automation called /${command}. The Automations page lists the ones you have.`);
+    if (any.status === "draft") throw new AutomationError(`/${command} is not approved yet. Open it on the Automations page, try an example and approve it.`);
+    throw new AutomationError(`/${command} is turned off. Turn it on from its page under Automations.`);
   }
   const input = parsed.input.trim();
-  if (!input) throw new AutomationError(`Add the ${a.inputLabel.toLowerCase()} after the command, e.g. \\${command} ${a.inputExample || "..."}`);
-  await refuseMissingConnections(ctx.workspaceId, a, `\\${command}`);
+  if (!input) throw new AutomationError(`Add the ${a.inputLabel.toLowerCase()} after the command, e.g. /${command} ${a.inputExample || "..."}`);
+  await refuseMissingConnections(ctx.workspaceId, a, `/${command}`);
   return startRun(ctx, {
     prompt: fillTemplate(a, input).prompt,
     purpose: "automation",

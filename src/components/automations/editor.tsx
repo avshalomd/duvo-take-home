@@ -71,10 +71,10 @@ export function AutomationEditor({
         <Field id="name" label="Name" error={err.name}>
           <Input {...describedBy("name", err.name)} name="name" defaultValue={v.name} className={FIELD} />
         </Field>
-        <Field id="command" label="Command" hint="What you type on Home after the backslash" error={err.command}>
+        <Field id="command" label="Command" hint="What you type on Home after the slash" error={err.command}>
           <div className="flex items-center gap-1.5">
             <span aria-hidden className="text-[17px] text-slate">
-              \
+              /
             </span>
             <Input {...describedBy("command", err.command)} name="command" defaultValue={v.command} autoCapitalize="none" spellCheck={false} className={FIELD} />
           </div>

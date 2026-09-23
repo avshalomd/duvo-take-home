@@ -22,8 +22,8 @@ export function StatusToggle({ automationId, command, active }: { automationId: 
       <p className={cn(SMALL, "basis-full sm:basis-auto", state.error && "text-crimson")}>
         {state.error ??
           (active
-            ? `Turning it off stops \\${command} from starting, by hand or on its schedule. Nothing is deleted.`
-            : `\\${command} and its schedule start nothing until you turn it on. Nothing is deleted.`)}
+            ? `Turning it off stops /${command} from starting, by hand or on its schedule. Nothing is deleted.`
+            : `/${command} and its schedule start nothing until you turn it on. Nothing is deleted.`)}
       </p>
     </form>
   );

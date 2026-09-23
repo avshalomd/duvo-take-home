@@ -22,11 +22,11 @@ export function BriefText({ text, inputLabel, className }: { text: string; input
   );
 }
 
-/** A command as people type it, "\audit Apple Inc.", in running text: the system font, set apart as a quiet chip. */
+/** A command as people type it, "/audit Apple Inc.", in running text: the system font, set apart as a quiet chip. */
 export function CommandChip({ command, input, className }: { command: string; input?: string; className?: string }) {
   return (
     <span className={cn("inline-flex items-baseline rounded-full bg-muted px-2 font-semibold whitespace-nowrap text-graphite", className)}>
-      \{command}
+      /{command}
       {input ? <span className="ml-1 font-normal">{input}</span> : null}
     </span>
   );

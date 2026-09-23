@@ -5,6 +5,7 @@ import Link from "next/link";
 import { outcome } from "@/components/run/outcome";
 import { Thread, threadTone, type ThreadStep } from "@/components/thread/thread";
 import { cn } from "@/lib/utils";
+import { DOT } from "./dot";
 import { LINK, SMALL, TILE } from "./surfaces";
 import { useLiveRun, type LiveRun } from "./use-live-run";
 import { VerdictForm } from "./verdict-form";
@@ -17,9 +18,6 @@ export type ExampleView = LiveRun & {
 };
 
 const FINISHED = ["succeeded", "failed", "cancelled"];
-
-// The outcome's glyph colour follows the thread's: saffron while it works, fern when done, crimson when not.
-const GLYPH = { live: "bg-saffron", done: "bg-fern", failed: "bg-crimson", stopped: "bg-slate" } as const;
 
 // One example of the current version: its input, a mini thread of the agent's plan, the outcome in one line, what it
 // made, the way to the full run, and the person's own judgment once it has finished.
@@ -41,7 +39,7 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
       )}
 
       <p data-testid="example-outcome" className="flex items-center gap-2 text-[15px] text-graphite">
-        <span aria-hidden className={cn("size-2 rounded-full", GLYPH[tone])} />
+        <span aria-hidden className={cn("size-2 rounded-full", DOT[o.tone])} />
         {o.label}
       </p>
 

@@ -44,7 +44,7 @@ export function parseEditForm(formData: FormData): ParsedEdit {
 
   const parsed = AutomationEdit.safeParse({
     name: values.name,
-    command: values.command.trim().replace(/^[\\/]+/, ""), // people type the prefix they call it with
+    command: values.command.trim().replace(/^\/+/, ""), // people type the slash they call it with
     description: values.description,
     inputLabel: values.inputLabel,
     inputHint: values.inputHint,

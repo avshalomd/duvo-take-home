@@ -29,7 +29,7 @@ export default async function AutomationsPage() {
           <h2 className="display text-[28px] text-graphite sm:text-[36px]">Which run would you do again?</h2>
           {/* the whole flow in one sentence */}
           <p className="mx-auto mt-4 max-w-[52ch] text-[17px] leading-7 text-slate">
-            Do a run on Home, save it here as an automation, check it on an example, and from then on call it with a backslash, like{" "}
+            Do a run on Home, save it here as an automation, check it on an example, and from then on call it with a slash, like{" "}
             <CommandChip command="audit" input="Apple Inc." />.
           </p>
           <p className="mt-6">
