@@ -28,8 +28,9 @@ export function VerdictSection({
         ) : (
           <>
             <ul className="space-y-1 text-sm">
-              {verdict.checks.map((c) => (
-                <li key={c.id} className="flex gap-2">
+              {verdict.checks.map((c, i) => (
+                // not c.id alone: a check that runs once per file ("content") repeats its id
+                <li key={`${c.id}-${i}`} className="flex gap-2">
                   <span className={c.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
                     {c.ok ? "PASS" : "FAIL"}
                   </span>
@@ -72,8 +73,9 @@ export function VerdictSection({
 
             {reasons.length > 0 && (
               <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                {reasons.map((r) => (
-                  <li key={r}>{humanizeTools(r, connections)}</li>
+                {reasons.map((r, i) => (
+                  // the list never reorders, and two failed per-file checks can read the same
+                  <li key={i}>{humanizeTools(r, connections)}</li>
                 ))}
               </ul>
             )}
