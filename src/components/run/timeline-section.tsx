@@ -9,10 +9,10 @@ import { ToolCard } from "./tool-card";
 
 // the same icons as the plan stepper above, so a step means the same thing in both places
 function GroupIcon({ status }: { status: EventGroup["status"] }) {
-  if (status === "done") return <CircleCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />;
-  if (status === "running") return <LoaderCircle className="size-3.5 animate-spin text-amber-600 dark:text-amber-400" />;
-  if (status === "skipped") return <CircleMinus className="size-3.5 text-muted-foreground" />;
-  return <CircleDashed className="size-3.5 text-muted-foreground/60" />;
+  if (status === "done") return <CircleCheck className="size-3.5 text-fern" />;
+  if (status === "running") return <LoaderCircle className="size-3.5 animate-spin text-saffron" />;
+  if (status === "skipped") return <CircleMinus className="size-3.5 text-slate" />;
+  return <CircleDashed className="size-3.5 text-slate/60" />;
 }
 
 // The agent's trace, grouped under the plan step it belonged to: the evidence behind the verdict, in the shape
@@ -37,11 +37,11 @@ export function TimelineSection({ events, connections }: { events: RunEvent[]; c
 function Group({ group, connections }: { group: EventGroup; connections: { name: string }[] }) {
   return (
     <div>
-      <p className="flex items-center gap-2 text-xs font-medium">
+      <p className="flex items-center gap-2 text-[13px] font-medium">
         <GroupIcon status={group.status} />
-        <span className={group.status === "done" ? "text-muted-foreground" : ""}>{group.title}</span>
+        <span className={group.status === "done" ? "text-slate" : ""}>{group.title}</span>
       </p>
-      <div className="mt-1 space-y-1.5 border-l pl-3">{renderEvents(group.events, connections)}</div>
+      <div className="mt-1 space-y-1.5 border-l border-hairline pl-3">{renderEvents(group.events, connections)}</div>
     </div>
   );
 }
@@ -65,7 +65,7 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
       case "tool_result":
         // shown inside its call's card; only an orphan (its call fell in an earlier step) gets its own line
         return callIds.has(event.payload.tool_use_id) ? null : (
-          <p key={event.seq} className="font-mono text-[11px] text-muted-foreground">
+          <p key={event.seq} className="font-mono text-[11px] text-slate">
             {"-> "}
             {event.payload.preview}
           </p>
@@ -73,7 +73,7 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
       case "text":
         // the agent thinking out loud is context, not an action: a quiet paragraph, never a card
         return (
-          <p key={event.seq} className="text-xs text-muted-foreground italic">
+          <p key={event.seq} className="text-[13px] text-slate italic">
             {event.payload.text}
           </p>
         );
@@ -84,7 +84,7 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
             key={event.seq}
             className={cn(
               "text-[11px]",
-              event.payload.decision === "allowed" ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400",
+              event.payload.decision === "allowed" ? "text-slate" : "text-[color-mix(in_oklab,var(--saffron),var(--graphite)_40%)]",
             )}
           >
             guard {event.payload.guard}: {event.payload.decision} {event.payload.tool}
@@ -95,14 +95,14 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
         return (
           <p
             key={event.seq}
-            className={cn("text-[11px] tabular-nums", event.payload.onTrack < 0.5 ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}
+            className={cn("text-[11px] tabular-nums", event.payload.onTrack < 0.5 ? "text-[color-mix(in_oklab,var(--saffron),var(--graphite)_40%)]" : "text-slate")}
           >
             step check {event.payload.stepIndex + 1}: {Math.round(event.payload.onTrack * 100)}% on track - {event.payload.note}
           </p>
         );
       case "started":
         return (
-          <p key={event.seq} className="flex gap-2 text-[11px] text-muted-foreground">
+          <p key={event.seq} className="flex gap-2 text-[11px] text-slate">
             <LocalTime iso={event.at} />
             started on {event.payload.model}
           </p>
@@ -113,8 +113,8 @@ function renderEvents(events: RunEvent[], connections: { name: string }[]) {
           <p
             key={event.seq}
             className={cn(
-              "text-xs tabular-nums",
-              event.payload.is_error ? "text-red-600 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400",
+              "text-[13px] tabular-nums",
+              event.payload.is_error ? "text-crimson" : "text-fern",
             )}
           >
             finished ({event.payload.subtype}) - {formatDuration(event.payload.duration_ms)},{" "}
