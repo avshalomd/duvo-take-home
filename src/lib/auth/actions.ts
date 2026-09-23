@@ -1,6 +1,7 @@
 "use server";
 
 import { APIError } from "better-auth/api";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -10,6 +11,15 @@ import { listWorkspaces } from "./members";
 import { safeNext, withNext } from "./paths";
 import { requireSession } from "./session";
 import { workspaceSlug } from "./workspace-name";
+
+/**
+ * After the active workspace changed: every page shows another workspace's data now, so the router's cached
+ * pages (and the top bar in the shared layout) are thrown away before Home opens.
+ */
+function openWorkspaceHome(): never {
+  revalidatePath("/", "layout");
+  redirect("/");
+}
 
 // The user menu's and the invitation page's writes. Each reads the session itself (never an id from the client
 // for who is asking); Better Auth checks membership before it switches or accepts anything.
@@ -25,7 +35,7 @@ export async function switchWorkspace(workspaceId: string) {
   await requireSession();
   const id = z.string().min(1).max(100).parse(workspaceId);
   await auth.api.setActiveOrganization({ headers: await headers(), body: { organizationId: id } });
-  redirect("/");
+  openWorkspaceHome();
 }
 
 export type NewWorkspaceState = { error?: string; name?: string };
@@ -42,7 +52,7 @@ export async function createWorkspace(_prev: NewWorkspaceState, form: FormData):
     headers: await headers(),
     body: { name, slug: workspaceSlug(name, crypto.randomUUID().slice(0, 6)) },
   });
-  redirect("/");
+  openWorkspaceHome();
 }
 
 /** Ends the session and opens the sign-in page, which returns to `next` (the invitation page uses it) after. */
@@ -64,5 +74,5 @@ export async function acceptInvitation(invitationId: string): Promise<AcceptStat
     if (code === "INVITATION_NOT_FOUND") return { error: "This invitation has expired or was already used. Ask for a new link." };
     throw e; // anything else is a real failure: the error page, with the stack in the log
   }
-  redirect("/");
+  openWorkspaceHome();
 }
