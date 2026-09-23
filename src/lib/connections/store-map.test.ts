@@ -3,9 +3,11 @@ import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { connections } from "@/db/schema";
 import { encryptSecret } from "./crypto";
-import { oauthSignedIn, readToken, toConnection } from "./store-map";
+import { blob } from "./oauth/fake-store";
+import { readToken, toConnection } from "./store-map";
 
 type Row = typeof connections.$inferSelect;
+const TOKENS = { accessTokenEnc: "v1:sealed-access", refreshTokenEnc: null, expiresAt: null }; // the oauth module seals them; only their presence counts here
 const saved = process.env.CONNECTION_KEY;
 beforeAll(() => {
   process.env.CONNECTION_KEY = randomBytes(32).toString("base64");
@@ -57,10 +59,22 @@ describe("toConnection", () => {
     expect(toConnection(row()).authType).toBe("none");
   });
 
-  it("says signedIn only for an OAuth connection, from its stored state", () => {
-    expect(toConnection(row({ authType: "oauth", oauth: { tokens: "v1:sealed" } })).signedIn).toBe(true);
-    expect(toConnection(row({ authType: "oauth", oauth: null })).signedIn).toBe(false);
+  it("says signedIn only for an OAuth connection, reading its state as the oauth module does", () => {
+    expect(toConnection(row({ authType: "oauth", oauth: blob({ tokens: TOKENS }) })).signedIn).toBe(true);
     expect(toConnection(row({ authType: "bearer", tokenEnc: encryptSecret("x") })).signedIn).toBeUndefined();
+  });
+
+  it("is not signed in before the first sign-in: no state, or a registration without tokens", () => {
+    expect(toConnection(row({ authType: "oauth", oauth: null })).signedIn).toBe(false);
+    expect(toConnection(row({ authType: "oauth", oauth: blob() })).signedIn).toBe(false);
+  });
+
+  it("is not signed in once the service refused a refresh and the person has to sign in again", () => {
+    expect(toConnection(row({ authType: "oauth", oauth: blob({ tokens: TOKENS, needsSignIn: true }) })).signedIn).toBe(false);
+  });
+
+  it("is not signed in when the stored state is not the oauth module's shape", () => {
+    expect(toConnection(row({ authType: "oauth", oauth: { tokens: "something" } })).signedIn).toBe(false);
   });
 
   it("lists the tools the last run saw, and none before any run", () => {
@@ -92,17 +106,5 @@ describe("readToken", () => {
 
   it("names the connection and the fix when its token cannot be read", () => {
     expect(() => readToken(row({ name: "GitHub", tokenEnc: "v1:AAAA:AAAA:AAAA" }))).toThrow(/GitHub.*paste the token again/i);
-  });
-});
-
-describe("oauthSignedIn", () => {
-  it("is true when the OAuth state holds tokens", () => {
-    expect(oauthSignedIn({ clientId: "abc", tokens: { access_token: "x" } })).toBe(true);
-  });
-
-  it("is false before sign-in: no state, a registration only, or not an object", () => {
-    expect(oauthSignedIn(null)).toBe(false);
-    expect(oauthSignedIn({ clientId: "abc" })).toBe(false);
-    expect(oauthSignedIn("tokens")).toBe(false);
   });
 });

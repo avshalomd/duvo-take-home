@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { connections } from "@/db/schema";
 import { authHeaders } from "./oauth";
 import { encryptSecret } from "./crypto";
+import { blob } from "./oauth/fake-store";
 import { listEnabledConnectionsWithSecrets } from "./store";
 
 type Row = typeof connections.$inferSelect;
@@ -64,7 +65,7 @@ describe("listEnabledConnectionsWithSecrets, the agent's view", () => {
   });
 
   it("hands the OAuth state through untouched for the oauth module to read", async () => {
-    const oauth = { clientId: "abc", tokens: "v1:sealed" };
+    const oauth = blob({ tokens: { accessTokenEnc: "v1:sealed", refreshTokenEnc: null, expiresAt: null } });
     state.rows = [row({ authType: "oauth", oauth })];
     const [c] = await listEnabledConnectionsWithSecrets("ws-a");
     expect(c.oauth).toEqual(oauth);

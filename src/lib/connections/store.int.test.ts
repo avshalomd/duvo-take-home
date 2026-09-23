@@ -4,6 +4,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { connections } from "@/db/schema";
+import { blob } from "./oauth/fake-store";
 import {
   addConnection,
   deleteConnection,
@@ -125,11 +126,19 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
       expect(await rawRow(added.id)).toBeUndefined();
     });
 
-    it("setConnectionOAuth stores the sign-in state, and the list then says signed in", async () => {
+    it("setConnectionOAuth stores the sign-in state exactly as given, and the list then says signed in", async () => {
       const added = await addConnection(A, { name: named("oauth"), url: "https://example.com/o", transport: "http", authType: "oauth" });
       expect(added).toMatchObject({ authType: "oauth", signedIn: false });
-      await setConnectionOAuth(A, added.id, { clientId: "abc", tokens: "v1:sealed" });
+      const state = blob({ tokens: { accessTokenEnc: "v1:sealed", refreshTokenEnc: null, expiresAt: null } });
+      await setConnectionOAuth(A, added.id, state);
+      expect((await rawRow(added.id)).oauth).toEqual(state);
       expect((await listConnections(A)).find((c) => c.id === added.id)!.signedIn).toBe(true);
+    });
+
+    it("says the connection needs a sign-in again once the oauth module marks it so", async () => {
+      const added = await addConnection(A, { name: named("oauth again"), url: "https://example.com/o2", transport: "http", authType: "oauth" });
+      await setConnectionOAuth(A, added.id, blob({ tokens: null, needsSignIn: true }));
+      expect((await listConnections(A)).find((c) => c.id === added.id)!.signedIn).toBe(false);
     });
   });
 
@@ -162,7 +171,7 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
 
     it("does not write OAuth state into another workspace's connection", async () => {
       const added = await addConnection(A, { name: named("iso oauth"), url: "https://example.com/io", transport: "http", authType: "oauth" });
-      await setConnectionOAuth(B, added.id, { tokens: "v1:forged" });
+      await setConnectionOAuth(B, added.id, blob({ tokens: { accessTokenEnc: "v1:forged", refreshTokenEnc: null, expiresAt: null } }));
       expect((await rawRow(added.id)).oauth).toBeNull();
     });
   });
