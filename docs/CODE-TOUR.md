@@ -119,6 +119,13 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/runner/jobs.ts`, `recover.ts` - jobs claimed with `FOR UPDATE SKIP LOCKED` inside a real transaction; a
   stale job is requeued while attempts < 2 (its run starts over clean), otherwise its run fails with the reason.
   `closeAbandonedRuns` fails a run left unfinished for 30 minutes with no job (an inline server that restarted).
+- `src/lib/runner/enqueue.ts`, `src/app/api/runner/[id]/route.ts` - RUNNER=route (Vercel): `enqueueRun` posts the
+  run to `/api/runner/<id>` on the app's public address, and that route answers 202 and runs the loop in after().
+  It is the only route `next.config.ts` gives the agent's binary (~240 MB); with the binary in every route, each
+  route was a function of its own and the Hobby plan's 12-function cap refused the deploy. If the runner cannot
+  be reached, `fail-start.ts` closes the run as failed so it never waits forever.
+- `src/lib/runner/token.ts` - the runner's token is an HMAC of the run id under the sign-in secret, with its own
+  label: no new secret to set, and a token seen once starts no other run (the run's own claim stops a replay).
 - `src/lib/agent/session.ts` - a follow-up resumes the parent's SDK session with `forkSession` when it still exists
   (checked with `getSessionInfo`), and always carries a preamble of what the parent did, because on Vercel /tmp is
   per instance and the session is gone.
