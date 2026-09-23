@@ -1,15 +1,13 @@
 import { CronExpressionParser } from "cron-parser";
 import { AutomationError } from "./errors";
+import { SCHEDULE_PRESETS } from "./schedule-presets";
 
 // Schedules are read in UTC: the server's clock on Vercel is UTC, and a fixed zone keeps next_run_at the same whoever
 // computes it (this page or the engine's tick). The labels say "(UTC)" so nobody expects local time.
 const TZ = "UTC";
 const MIN_GAP_MS = 60 * 60_000; // at most once an hour: every run is an agent run that costs money
 
-export const SCHEDULE_PRESETS = [
-  { id: "weekdays", label: "Every weekday at 08:00", cron: "0 8 * * 1-5" },
-  { id: "mondays", label: "Every Monday at 08:00", cron: "0 8 * * 1" },
-] as const;
+export { SCHEDULE_PRESETS };
 
 /** The first time the schedule fires after `from`. Refuses an expression that does not parse or fires too often. */
 export function nextRunAt(cron: string, from: Date): Date {

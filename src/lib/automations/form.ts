@@ -14,7 +14,8 @@ export type EditValues = {
   steps: string; // one per line
   connections: string[];
 };
-export type ParsedEdit = { ok: true; edit: AutomationEdit } | { ok: false; fieldErrors: Record<string, string>; values: EditValues };
+// values come back either way: a save the store refuses (a command already taken) must keep what was typed too
+export type ParsedEdit = { ok: true; edit: AutomationEdit; values: EditValues } | { ok: false; fieldErrors: Record<string, string>; values: EditValues };
 
 const lines = (text: string) =>
   text
@@ -55,7 +56,7 @@ export function parseEditForm(formData: FormData): ParsedEdit {
       connections: values.connections,
     },
   });
-  if (parsed.success) return { ok: true, edit: parsed.data };
+  if (parsed.success) return { ok: true, edit: parsed.data, values };
 
   const fieldErrors: Record<string, string> = {};
   for (const issue of parsed.error.issues) {

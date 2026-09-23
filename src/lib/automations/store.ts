@@ -73,7 +73,15 @@ async function mustGet(workspaceId: string, id: string): Promise<Automation> {
 
 export const listAutomations: ListAutomations = async (workspaceId) => {
   const rows = await db.select().from(automations).where(eq(automations.workspaceId, workspaceId)).orderBy(desc(automations.createdAt));
-  return rows.map(toAutomation);
+  // one row whose template does not parse (written by a script, an older shape) is left out, not the whole page
+  return rows.flatMap((row) => {
+    try {
+      return [toAutomation(row)];
+    } catch (e) {
+      console.error(`automation ${row.id} does not parse`, e);
+      return [];
+    }
+  });
 };
 
 export const getAutomation: GetAutomation = async (workspaceId, id) => {
