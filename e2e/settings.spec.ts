@@ -36,7 +36,7 @@ test("a connection is added with a token, edited, switched off and deleted", asy
   await add.getByLabel("Name").fill(NAME);
   await add.getByLabel("Address").fill("https://example.com/mcp");
   await add.getByLabel("With a token").check();
-  await add.getByLabel("Token").fill(TOKEN);
+  await add.getByLabel("Token", { exact: true }).fill(TOKEN); // exact: "With a token" is a label too
   await add.getByRole("button", { name: "Add" }).click();
   await expect(add).toBeHidden();
 
@@ -48,7 +48,7 @@ test("a connection is added with a token, edited, switched off and deleted", asy
   await row.getByRole("button", { name: "Edit" }).click();
   const edit = page.getByRole("dialog");
   await expect(edit.getByLabel("Name")).toHaveValue(NAME);
-  await expect(edit.getByLabel(/token/i).first()).toHaveValue("");
+  await expect(edit.getByLabel("Token", { exact: true })).toHaveValue(""); // the saved token is never put back in the field
   await edit.getByLabel("Name").fill(RENAMED);
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toBeHidden();
