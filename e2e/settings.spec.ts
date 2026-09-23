@@ -1,9 +1,11 @@
+import { existsSync, readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
 import { neon } from "@neondatabase/serverless";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 // Settings in a browser: a connection added with a token, edited, switched off and deleted; a limit changed and
 // kept. Runs against a dev server on the demo workspace:
-//   npx dotenv -e .env.local -- env BASE_URL=http://localhost:3009 npx playwright test e2e/settings.spec.ts
+//   BASE_URL=http://localhost:3009 npx playwright test e2e/settings.spec.ts
 // A connection name allows letters, digits, spaces, - and _ only, so what it creates is named "e2e Settings ..." (the
 // "[e2e]" prefix would be refused by the form) and deleted by the test itself, with a database sweep as the net.
 const NAME = "e2e Settings server";
@@ -17,10 +19,23 @@ const rowOf = (page: Page, name: string) => page.getByTestId("connections").getB
 const openRow = (row: Locator) => row.getByRole("button", { expanded: false }).click();
 const INVITED = `e2e-invite-${Date.now()}@example.com`;
 
+// Q147: the spec writes to the shared database, so it must always be able to clean up. A plain `npx playwright test`
+// has no DATABASE_URL in its environment, and the sweep used to be skipped then: an "e2e Settings moved" connection
+// was left switched on in the demo workspace. Now the URL is read from .env.local when the shell did not set it (that
+// one variable only), and the spec refuses to start without it rather than leave rows behind.
+function databaseUrl(): string | undefined {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  return existsSync(".env.local") ? parseEnv(readFileSync(".env.local", "utf8")).DATABASE_URL : undefined;
+}
+
+test.beforeAll(() => {
+  if (!databaseUrl()) throw new Error("e2e/settings.spec.ts creates rows and needs DATABASE_URL (or .env.local) to delete them afterwards");
+});
+
+// afterAll runs when a test failed too, so whatever a broken test created is still removed, found by its name.
 test.afterAll(async () => {
-  if (!process.env.DATABASE_URL) return; // the tests delete their own rows; the sweep only runs when the database is reachable
-  const sql = neon(process.env.DATABASE_URL);
-  await sql.query("delete from connections where name like 'e2e Settings%'"); // only this spec's names: other agents share the database
+  const sql = neon(databaseUrl()!);
+  await sql.query("delete from connections where name ilike 'e2e_settings%'"); // this spec's names only, any case or separator ("E2E-settings Twin")
   await sql.query("delete from invitation where email like 'e2e-invite-%@example.com'");
 });
 
