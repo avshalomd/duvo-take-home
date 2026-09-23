@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { WorkspaceSummary } from "@/contracts/auth";
 import { auth } from "./auth";
-import { listWorkspaces } from "./members";
+import { listWorkspaces, revokeInvitation } from "./members";
 import { safeNext, withNext } from "./paths";
 import { requireSession } from "./session";
 import { workspaceSlug } from "./workspace-name";
@@ -24,10 +24,10 @@ function openWorkspaceHome(): never {
 // The user menu's and the invitation page's writes. Each reads the session itself (never an id from the client
 // for who is asking); Better Auth checks membership before it switches or accepts anything.
 
-/** The workspaces for the user menu, loaded when it opens so the top bar needs no extra props. */
-export async function loadWorkspaces(): Promise<{ activeId: string; workspaces: WorkspaceSummary[] }> {
+/** The workspaces (and who is signed in) for the user menu, loaded when it opens so the top bar needs no extra props. */
+export async function loadWorkspaces(): Promise<{ activeId: string; email: string; workspaces: WorkspaceSummary[] }> {
   const ctx = await requireSession();
-  return { activeId: ctx.workspaceId, workspaces: await listWorkspaces(ctx.userId) };
+  return { activeId: ctx.workspaceId, email: ctx.email, workspaces: await listWorkspaces(ctx.userId) };
 }
 
 /** Makes another of the user's workspaces the active one, then opens Home: a run open on screen belongs to the old one. */
@@ -59,6 +59,19 @@ export async function createWorkspace(_prev: NewWorkspaceState, form: FormData):
 export async function signOut(next?: string) {
   await auth.api.signOut({ headers: await headers() }); // nextCookies() clears the cookie on this action's response
   redirect(withNext("/sign-in", safeNext(next)));
+}
+
+/** Revokes a pending invitation of the active workspace; the Members page re-renders without it. */
+export async function revokeInvitationAction(invitationId: string): Promise<{ error?: string }> {
+  const ctx = await requireSession();
+  const id = z.string().min(1).max(100).parse(invitationId);
+  try {
+    await revokeInvitation(ctx, id);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "That invitation could not be revoked." }; // our own plain sentences
+  }
+  revalidatePath("/settings/members");
+  return {};
 }
 
 export type AcceptState = { error?: string };

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AuthCard } from "@/components/auth/auth-card";
+import { authLink } from "@/components/auth/auth-field";
+import { AuthPanel } from "@/components/auth/auth-panel";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import { safeNext, withNext } from "@/lib/auth/paths";
 import { googleConfigured } from "@/lib/auth/providers";
@@ -16,19 +17,19 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
   if (await sessionFromHeaders(await headers())) redirect(target);
 
   return (
-    <AuthCard
+    <AuthPanel
       title="Create an account"
       description="You get a workspace of your own. Nobody else sees what you run in it."
       footer={
-        <span>
+        <>
           Already have an account?{" "}
-          <Link href={withNext("/sign-in", target)} className="font-medium text-foreground underline underline-offset-4">
+          <Link href={withNext("/sign-in", target)} className={authLink}>
             Sign in
           </Link>
-        </span>
+        </>
       }
     >
       <SignUpForm next={target} google={googleConfigured()} email={typeof email === "string" ? email : undefined} />
-    </AuthCard>
+    </AuthPanel>
   );
 }

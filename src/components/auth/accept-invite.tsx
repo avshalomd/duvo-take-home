@@ -10,10 +10,10 @@ export function AcceptInvite({ invitationId, workspaceName }: { invitationId: st
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       <FormError message={error} />
       <Button
-        className="h-9 w-full"
+        className="h-11 w-full text-[15px]"
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
@@ -32,7 +32,7 @@ export function AcceptInvite({ invitationId, workspaceName }: { invitationId: st
 export function SignOutButton({ label, next }: { label: string; next: string }) {
   const [pending, startTransition] = useTransition();
   return (
-    <Button variant="outline" className="h-9 w-full" disabled={pending} onClick={() => startTransition(() => signOut(next))}>
+    <Button variant="outline" className="h-11 w-full text-[15px]" disabled={pending} onClick={() => startTransition(() => signOut(next))}>
       {label}
     </Button>
   );
