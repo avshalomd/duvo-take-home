@@ -240,12 +240,35 @@ describe("deriveState - per-step checks, guards and a stopped run", () => {
       expect(state.durationMs).toBe(4_000);
     });
 
-    it("takes the turns and the error from the last attempt, not the first", () => {
+    it("takes the error from the last attempt, not the first", () => {
       const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3, true)];
       const state = deriveState({ ...run, status: "failed" }, healed);
-      expect(state.turn).toBe(3);
       expect(state.error).toBe("ran out of turns");
     });
+
+    // Q198: a healed run's card said "turn 5 of 25" (its last attempt) while Details' footer said "Turns 17".
+    it("counts a finished run's turns as the run's own total, the number Details' footer shows", () => {
+      const healed = [...events, finished(90, 0.1, 10_000, 5), heal(91, 1, ["x"]), finished(92, 0.16, 4_000, 3)];
+      expect(deriveState({ ...run, status: "succeeded", numTurns: 8 }, healed).turn).toBe(8);
+    });
+  });
+
+  // Q198: run e1c010fb's card said "turn 31 of 25". The SDK's num_turns is not the count its maxTurns cap applies to
+  // (31 on a run capped at 25, and the mapper stamped 40), so the card shows the run's total, as the footer does.
+  it("shows a finished run's own total even past the per-attempt cap, not the turns stamped on its events", () => {
+    const { run, events } = fixture(NEWS);
+    const stamped = events.map((e) => ({ ...e, payload: { ...e.payload, turn: 40 } }) as RunEvent);
+    expect(deriveState({ ...run, numTurns: 31 }, stamped).turn).toBe(31);
+  });
+
+  // Q199: a stopped run's Details showed Duration and Cost "-" though its row stored them (10 s, $0.016): no attempt
+  // finished, so there was no finished event to read them from.
+  it("takes a stopped run's cost and time from the run row, which has them though no attempt finished", () => {
+    const { run, events } = fixture(RUNNING);
+    const state = deriveState({ ...run, status: "cancelled", costUsd: 0.016, durationMs: 10_000, numTurns: 2 }, events);
+    expect(state.costUsd).toBe(0.016);
+    expect(state.durationMs).toBe(10_000);
+    expect(state.turn).toBe(2);
   });
 
   it("says a stopped run is cancelled, with no error and no step still running", () => {
