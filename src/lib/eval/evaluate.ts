@@ -1,4 +1,4 @@
-import type { EvaluateInput, EvaluateRun, Judgment, Review, Verdict } from "@/contracts/eval";
+import type { Check, EvaluateInput, EvaluateRun, Judgment, Review, Verdict } from "@/contracts/eval";
 import { isConfident } from "@/lib/llm/decide";
 import { runChecks } from "./checks";
 import { judgeRun } from "./judge";
@@ -12,7 +12,7 @@ import { reviewRun } from "./review";
 
 export type EvaluateDeps = {
   judge: (input: EvaluateInput) => Promise<Judgment>;
-  review: (input: EvaluateInput) => Promise<Review>;
+  review: (input: EvaluateInput, checks: Check[]) => Promise<Review>; // the checks it passed: rules it must not undo (Q148)
 };
 
 // Jev's probabilities are calibrated, so the bar is set from the labelled runs, not by taste: the clean run comes
@@ -68,7 +68,7 @@ export async function evaluate(input: EvaluateInput, deps: EvaluateDeps): Promis
   const path: Verdict["path"] = ["checks", "judge", "review"];
   let review: Review;
   try {
-    review = await deps.review(input);
+    review = await deps.review(input, checks);
   } catch (e) {
     const reasons = [...unsure, `The reviewer was unavailable: ${message(e)}`];
     return { verdict: "unknown", checks, judgment, review: null, reasons, evaluatedAt: at(), decidedBy: "nobody", path };

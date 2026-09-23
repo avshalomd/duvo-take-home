@@ -13,7 +13,7 @@ const leadFor = (verdict: Verdict) =>
   verdict.verdict === "fail" ? "An automatic check of the result found this to fix:" : "An automatic check of the result noted:";
 const CLOSE = "Fix the files in place, keep what was already right, and report what you changed.";
 const BUDGET = 1200; // characters: long enough for five or six exact findings, short enough to stay the agent's focus
-const ITEM_MAX = 320; // one long finding (a reviewer's essay) cannot crowd out the rest
+const ITEM_MAX = 400; // one long finding (a reviewer's essay) cannot crowd out the rest; the CSV quoting advice is ~370
 const MORE_ROOM = 60; // kept free for the line that counts what did not fit
 
 export const feedbackForAgent: FeedbackForAgent = (verdict) => {
