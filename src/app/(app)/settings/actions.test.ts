@@ -14,7 +14,11 @@ const store = vi.hoisted(() => ({
 vi.mock("@/lib/auth/session", () => ({
   requireSession: async () => ({ userId: "u1", userName: "Sam", email: "sam@example.com", workspaceId: "ws-a", workspaceName: "A", role: session.role }),
 }));
-vi.mock("@/lib/connections/store", () => ({ ...store, ConnectionNotFoundError: class extends Error {} }));
+vi.mock("@/lib/connections/store", () => ({
+  ...store,
+  ConnectionNotFoundError: class extends Error {},
+  ConnectionNameTakenError: class extends Error {},
+}));
 vi.mock("@/lib/auth/members", () => ({ inviteMember: vi.fn(), listMembers: vi.fn(async () => []) }));
 vi.mock("@/lib/usage/budget", () => ({ updateLimits: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -59,6 +63,16 @@ describe("the connection actions for an owner or an admin", () => {
     expect(store.updateConnection).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ url: "https://attacker.example/mcp" }));
     expect(store.deleteConnection).toHaveBeenCalledWith("ws-a", ID);
     expect(store.setConnectionEnabled).toHaveBeenCalledWith("ws-a", ID, false);
+  });
+
+  it.each(["add", "edit"] as const)("show a name another server already has as a problem with the Name field (%s)", async (what) => {
+    session.role = "owner";
+    const { ConnectionNameTakenError } = await import("@/lib/connections/store");
+    const taken = new ConnectionNameTakenError("That name is already used by QA Bearer");
+    (what === "add" ? store.addConnection : store.updateConnection).mockRejectedValueOnce(taken); // only the one this case calls: a queued once would leak into the next test
+    const out = await writes[what]();
+    expect(out.fieldErrors?.name).toEqual(["That name is already used by QA Bearer"]);
+    expect(out.values).toMatchObject({ name: "GitHub" }); // what was typed stays, to be changed
   });
 
   it("lets an owner add a server", async () => {

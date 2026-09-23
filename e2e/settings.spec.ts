@@ -92,6 +92,32 @@ test("a refused server keeps the sign-in choice and everything typed, the token 
   await expect(page.getByTestId("connections")).not.toContainText("e2e Settings refused"); // nothing was created
 });
 
+test("a second server whose name a run could not tell apart is refused, naming the first", async ({ page }) => {
+  await open(page, "/settings/connections");
+  await page.getByRole("button", { name: /add a server/i }).click();
+  const add = page.getByRole("dialog");
+  await add.getByLabel("Name").fill("e2e Settings twin");
+  await add.getByLabel("Address").fill("https://example.com/twin");
+  await add.getByRole("button", { name: "Add" }).click();
+  await expect(add).toBeHidden();
+
+  await page.getByRole("button", { name: /add a server/i }).click();
+  const again = page.getByRole("dialog");
+  await again.getByLabel("Name").fill("E2E-settings Twin"); // the same name to a run: e2e_settings_twin
+  await again.getByLabel("Address").fill("https://example.com/twin2");
+  await again.getByRole("button", { name: "Add" }).click();
+  await expect(again.getByText("That name is already used by e2e Settings twin")).toBeVisible();
+  await expect(again.getByLabel("Name")).toHaveAttribute("aria-invalid", "true");
+  await again.getByRole("button", { name: "Cancel" }).click();
+  await expect(rowOf(page, "E2E-settings Twin")).toHaveCount(0);
+
+  const row = rowOf(page, "e2e Settings twin");
+  await openRow(row);
+  await row.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(row).toHaveCount(0);
+});
+
 test("moving a connection to another server warns that the saved token stays behind, and then asks for a new one", async ({ page }) => {
   await open(page, "/settings/connections");
   await page.getByRole("button", { name: /add a server/i }).click();
