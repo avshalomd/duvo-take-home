@@ -15,7 +15,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
   }),
 }));
 
-const WS = "int-engine-auto";
+const WS = `int-engine-auto-${process.pid}`; // per process: other worktrees run these tests against the same database
 const template = {
   instructions: "[int] Write hello.md with a greeting for {input}",
   intent: "a greeting",

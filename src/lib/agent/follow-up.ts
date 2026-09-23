@@ -5,6 +5,7 @@ import { files, runs } from "@/db/schema";
 import { carryOverPrompt, followUpInstructions } from "./follow-up-prompt";
 import { restoreFiles } from "./restore-files";
 import { resumeOptions } from "./session";
+import { readSdkTotals } from "./stopped-cost";
 
 type RunRow = typeof runs.$inferSelect;
 const MAX_THREAD = 20; // a thread of follow-ups longer than this is cut: the oldest changes are the least relevant
@@ -38,9 +39,14 @@ export async function prepareFollowUp(run: RunRow, dir: string) {
   const restored = await restoreFiles(dir, stored.filter((f) => !f.quarantined));
 
   const parentInstructions = await instructionsOf(parent, workspaceId);
+  const resume = await resumeOptions(parent.sessionId);
+  // A resumed session's SDK total starts from the parent's saved total: that is subtracted, or "Spent today" would
+  // count the parent twice (measured on the 2026-09-23 follow-up). A fresh session starts from nothing.
+  const costBase = resume ? ((await readSdkTotals(resume.resume, { waitMs: 0 }))?.costUsd ?? 0) : 0;
   return {
     prompt: carryOverPrompt({ prompt: parentInstructions, report: parent.report, files: restored }, run.prompt),
     instructions: followUpInstructions(parentInstructions, run.prompt),
-    resume: await resumeOptions(parent.sessionId),
+    resume,
+    costBase,
   };
 }

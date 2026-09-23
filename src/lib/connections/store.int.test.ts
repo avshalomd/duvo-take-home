@@ -27,7 +27,9 @@ afterAll(async () => {
 
 const rawRow = async (id: string) => (await db.select().from(connections).where(eq(connections.id, id)))[0];
 const secretOf = async (ws: string, id: string) => (await listEnabledConnectionsWithSecrets(ws)).find((c) => c.id === id);
-const edit = { name: "int renamed", url: "https://example.com/renamed", transport: "http" as const };
+// Each edit gets a name of its own: two connections of a workspace may not share a name's key (Q126).
+let renames = 0;
+const edited = () => ({ name: `int renamed ${++renames}`, url: "https://example.com/renamed", transport: "http" as const });
 
 describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
   describe("tokens at rest", () => {
@@ -73,14 +75,14 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
   describe("updateConnection", () => {
     it("keeps the saved token when no new one is typed", async () => {
       const added = await addConnection(A, { name: named("keep"), url: "https://example.com/keep", transport: "http", token: "secret-value" });
-      const updated = await updateConnection(A, added.id, { ...edit, authType: "bearer" });
-      expect(updated).toMatchObject({ name: "int renamed", url: "https://example.com/renamed", hasToken: true });
+      const updated = await updateConnection(A, added.id, { ...edited(), authType: "bearer" });
+      expect(updated).toMatchObject({ name: expect.stringMatching(/^int renamed \d+$/), url: "https://example.com/renamed", hasToken: true });
       expect((await secretOf(A, added.id))!.token).toBe("secret-value");
     });
 
     it("replaces the token when a new one is typed, still encrypted", async () => {
       const added = await addConnection(A, { name: named("replace"), url: "https://example.com/r", transport: "http", token: "secret-value" });
-      await updateConnection(A, added.id, { ...edit, authType: "bearer", token: "new-value" });
+      await updateConnection(A, added.id, { ...edited(), authType: "bearer", token: "new-value" });
       const row = await rawRow(added.id);
       expect(row.token).toBeNull();
       expect(row.tokenEnc).not.toContain("new-value");
@@ -89,20 +91,20 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
 
     it("removes the token when clearToken is set", async () => {
       const added = await addConnection(A, { name: named("clear"), url: "https://example.com/c", transport: "http", token: "secret-value" });
-      const updated = await updateConnection(A, added.id, { ...edit, authType: "bearer", clearToken: true });
+      const updated = await updateConnection(A, added.id, { ...edited(), authType: "bearer", clearToken: true });
       expect(updated.hasToken).toBe(false);
       expect((await rawRow(added.id)).tokenEnc).toBeNull();
     });
 
     it("removes the token when the server is switched to no sign-in, so no stale token is ever sent", async () => {
       const added = await addConnection(A, { name: named("to none"), url: "https://example.com/n", transport: "http", token: "secret-value" });
-      const updated = await updateConnection(A, added.id, { ...edit, authType: "none" });
+      const updated = await updateConnection(A, added.id, { ...edited(), authType: "none" });
       expect(updated).toMatchObject({ authType: "none", hasToken: false });
     });
 
     it("refuses an address on a private network and leaves the row as it was", async () => {
       const added = await addConnection(A, { name: named("private"), url: "https://example.com/p", transport: "http" });
-      await expect(updateConnection(A, added.id, { ...edit, url: "http://169.254.169.254/latest" })).rejects.toThrow(/private or local network/);
+      await expect(updateConnection(A, added.id, { ...edited(), url: "http://169.254.169.254/latest" })).rejects.toThrow(/private or local network/);
       expect((await rawRow(added.id)).url).toBe("https://example.com/p");
     });
   });
@@ -114,7 +116,7 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
 
     it("clears the saved token when the host changes, even with the token field left empty", async () => {
       const added = await addConnection(A, { name: named("moved"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
-      const updated = await updateConnection(A, added.id, { ...edit, url: "https://attacker.example/mcp", authType: "bearer" });
+      const updated = await updateConnection(A, added.id, { ...edited(), url: "https://attacker.example/mcp", authType: "bearer" });
       expect(updated.hasToken).toBe(false);
       const row = await rawRow(added.id);
       expect(row.tokenEnc).toBeNull();
@@ -127,39 +129,79 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
         .insert(connections)
         .values({ workspaceId: A, name: named("legacy moved"), url: "https://example.com/legacy", token: "legacy-value" })
         .returning();
-      await updateConnection(A, legacy.id, { ...edit, url: "https://attacker.example/mcp", authType: "bearer" });
+      await updateConnection(A, legacy.id, { ...edited(), url: "https://attacker.example/mcp", authType: "bearer" });
       expect((await rawRow(legacy.id)).token).toBeNull();
     });
 
     it("clears the OAuth sign-in when the host changes, so the new server needs its own sign-in", async () => {
       const added = await addConnection(A, { name: named("oauth moved"), url: "https://example.com/o", transport: "http", authType: "oauth" });
       await setConnectionOAuth(A, added.id, signedIn());
-      const updated = await updateConnection(A, added.id, { ...edit, url: "https://attacker.example/mcp", authType: "oauth" });
+      const updated = await updateConnection(A, added.id, { ...edited(), url: "https://attacker.example/mcp", authType: "oauth" });
       expect(updated.signedIn).toBe(false);
       expect((await rawRow(added.id)).oauth).toBeNull();
     });
 
     it("clears the saved token when https becomes http on the same host", async () => {
       const added = await addConnection(A, { name: named("downgrade"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
-      const updated = await updateConnection(A, added.id, { ...edit, url: "http://example.com/mcp", authType: "bearer" });
+      const updated = await updateConnection(A, added.id, { ...edited(), url: "http://example.com/mcp", authType: "bearer" });
       expect(updated.hasToken).toBe(false);
     });
 
     it("saves a new token pasted along with the new host", async () => {
       const added = await addConnection(A, { name: named("moved new"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
-      await updateConnection(A, added.id, { ...edit, url: "https://other.example/mcp", authType: "bearer", token: "new-value" });
+      await updateConnection(A, added.id, { ...edited(), url: "https://other.example/mcp", authType: "bearer", token: "new-value" });
       expect((await secretOf(A, added.id))!.token).toBe("new-value");
     });
 
     it("keeps the token and the OAuth sign-in when only the path changes on the same host", async () => {
       const bearer = await addConnection(A, { name: named("same host"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
-      await updateConnection(A, bearer.id, { ...edit, url: "https://example.com/v2/mcp", authType: "bearer" });
+      await updateConnection(A, bearer.id, { ...edited(), url: "https://example.com/v2/mcp", authType: "bearer" });
       expect((await secretOf(A, bearer.id))!.token).toBe("secret-value");
 
       const oauth = await addConnection(A, { name: named("same host oauth"), url: "https://example.com/o", transport: "http", authType: "oauth" });
       await setConnectionOAuth(A, oauth.id, signedIn());
-      const updated = await updateConnection(A, oauth.id, { ...edit, url: "https://example.com/o/v2", authType: "oauth" });
+      const updated = await updateConnection(A, oauth.id, { ...edited(), url: "https://example.com/o/v2", authType: "oauth" });
       expect(updated.signedIn).toBe(true);
+    });
+  });
+
+  // Q126: a run registers each server under connectionKey(name), so two names with one key would let one server
+  // silently replace the other. The second name is refused, naming the connection that already has it.
+  describe("names that would collide in a run", () => {
+    it("refuses a second server with the same name", async () => {
+      await addConnection(A, { name: "QA Bearer", url: "https://example.com/qa1", transport: "http" });
+      await expect(addConnection(A, { name: "QA Bearer", url: "https://example.com/qa2", transport: "http" })).rejects.toThrow(
+        "That name is already used by QA Bearer",
+      );
+    });
+
+    it("refuses a name that differs only in case, spaces or punctuation", async () => {
+      await addConnection(A, { name: "QA-Clash", url: "https://example.com/qa3", transport: "http" });
+      await expect(addConnection(A, { name: "qa clash", url: "https://example.com/qa4", transport: "http" })).rejects.toThrow(
+        "That name is already used by QA-Clash",
+      );
+      expect((await listConnections(A)).filter((c) => c.name.toLowerCase().replace(/\W/g, "") === "qaclash")).toHaveLength(1);
+    });
+
+    it("allows the same name in another workspace", async () => {
+      await addConnection(A, { name: "QA Shared", url: "https://example.com/qa5", transport: "http" });
+      await expect(addConnection(B, { name: "QA Shared", url: "https://example.com/qa6", transport: "http" })).resolves.toMatchObject({ name: "QA Shared" });
+    });
+
+    it("refuses to rename a server to a name another one has, and leaves it as it was", async () => {
+      await addConnection(A, { name: "QA Taken", url: "https://example.com/qa7", transport: "http" });
+      const other = await addConnection(A, { name: "QA Other", url: "https://example.com/qa8", transport: "http" });
+      await expect(updateConnection(A, other.id, { name: "QA_Taken", url: "https://example.com/qa8", transport: "http" })).rejects.toThrow(
+        "That name is already used by QA Taken",
+      );
+      expect((await rawRow(other.id)).name).toBe("QA Other");
+    });
+
+    it("lets a server keep its own name when something else is edited", async () => {
+      const own = await addConnection(A, { name: "QA Own", url: "https://example.com/qa9", transport: "http" });
+      await expect(updateConnection(A, own.id, { name: "QA Own", url: "https://example.com/qa9/v2", transport: "http" })).resolves.toMatchObject({
+        name: "QA Own",
+      });
     });
   });
 
@@ -209,7 +251,7 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
 
     it("refuses to update another workspace's connection and leaves it as it was", async () => {
       const added = await addConnection(A, { name: named("iso update"), url: "https://example.com/iu", transport: "http", token: "secret-value" });
-      await expect(updateConnection(B, added.id, { ...edit, authType: "none" })).rejects.toThrow(/could not be found/);
+      await expect(updateConnection(B, added.id, { ...edited(), authType: "none" })).rejects.toThrow(/could not be found/);
       const row = await rawRow(added.id);
       expect(row.name).toBe(named("iso update"));
       expect((await secretOf(A, added.id))!.token).toBe("secret-value");

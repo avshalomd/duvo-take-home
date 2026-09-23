@@ -1,12 +1,13 @@
 import "server-only";
 import { APIError } from "better-auth/api";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gt } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { invitation, member, organization, user } from "@/db/schema";
 import type { InviteMember, ListMembers, ListWorkspaces, Member, SessionCtx } from "@/contracts/auth";
 import { InviteInput } from "@/contracts/auth";
 import { auth } from "./auth";
+import { canChangeSettings } from "./roles";
 import { toRole } from "./session-ctx";
 
 /** Who belongs to the workspace, earliest first, so the owner who made it leads the list. */
@@ -59,7 +60,7 @@ export function inviteLink(invitationId: string): string {
  */
 export async function createInvite(requestHeaders: Headers, ctx: SessionCtx, input: InviteInput): Promise<{ link: string }> {
   const { email, role } = InviteInput.parse(input);
-  if (ctx.role === "member") throw new Error("Only an owner or an admin can invite people to this workspace.");
+  if (!canChangeSettings(ctx.role)) throw new Error("Only an owner or an admin can invite people to this workspace.");
   try {
     const invitation = await auth.api.createInvitation({
       headers: requestHeaders,
@@ -76,3 +77,37 @@ export async function createInvite(requestHeaders: Headers, ctx: SessionCtx, inp
 }
 
 export const inviteMember: InviteMember = async (ctx, input) => createInvite(await headers(), ctx, input);
+
+export type PendingInvitation = { id: string; email: string; role: string; expiresAt: string; link: string };
+
+/**
+ * The workspace's invitations nobody has used yet, newest first, each with its link, so it can be copied again
+ * after a reload (Q109). Accepted, revoked and expired ones are left out: their links no longer work.
+ */
+export async function listInvitations(workspaceId: string): Promise<PendingInvitation[]> {
+  const rows = await db
+    .select({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt })
+    .from(invitation)
+    .where(and(eq(invitation.organizationId, workspaceId), eq(invitation.status, "pending"), gt(invitation.expiresAt, new Date())))
+    .orderBy(desc(invitation.createdAt));
+  return rows.map((r) => ({ ...r, role: toRole(r.role ?? ""), expiresAt: r.expiresAt.toISOString(), link: inviteLink(r.id) }));
+}
+
+/**
+ * Revokes a pending invitation of the active workspace, so its link stops working. Better Auth does the cancel
+ * (and checks the role again); the workspace check is ours, because the plugin accepts any workspace the user
+ * belongs to, and an action only ever touches the one on screen.
+ */
+export async function revokeInvite(requestHeaders: Headers, ctx: SessionCtx, id: string): Promise<void> {
+  if (!canChangeSettings(ctx.role)) throw new Error("Only an owner or an admin can revoke an invitation.");
+  const [row] = await db
+    .select({ id: invitation.id })
+    .from(invitation)
+    .where(and(eq(invitation.id, id), eq(invitation.organizationId, ctx.workspaceId), eq(invitation.status, "pending")));
+  if (!row) throw new Error("That invitation is no longer pending."); // gone, used, or another workspace's: one answer
+  await auth.api.cancelInvitation({ headers: requestHeaders, body: { invitationId: id } });
+}
+
+export async function revokeInvitation(ctx: SessionCtx, id: string): Promise<void> {
+  return revokeInvite(await headers(), ctx, id);
+}

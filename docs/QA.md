@@ -145,10 +145,10 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q106 | qa-ux | the ready automation page: "Turn off" unexplained, two primary buttons, the Run input unlabelled | one primary action, labelled input, Turn off beside the status with a line | minor | automations | redesign |
 | Q107 | qa-ux | schedules offered in UTC only, a raw cron field up front, the scheduled input empty despite an example | local time, cron as an advanced option, the example prefilled | minor | automations | redesign |
 | Q108 | qa-ux | "New from a run" lists runs that did not pass first | good runs first, the others marked | minor | automations | redesign |
-| Q109 | qa-ux | a pending invitation disappears on reload: its link cannot be found again or revoked | a pending list with Copy link and Revoke | minor | auth (lib) + settings (page) | redesign |
-| Q110 | qa-ux | sign-up with a taken email says "Sign in instead." as plain text | a link to sign-in with the email filled in | minor | auth | redesign |
+| Q109 | qa-ux | a pending invitation disappears on reload: its link cannot be found again or revoked | a pending list with Copy link and Revoke | minor | auth (lib) + settings (page) | fixed (auth: listInvitations, revoke, the pending list with Copy link and Revoke on Members) |
+| Q110 | qa-ux | sign-up with a taken email says "Sign in instead." as plain text | a link to sign-in with the email filled in | minor | auth | fixed (auth: a link to sign-in with the email filled in) |
 | Q111 | qa-ux | the main button is green on Home and Automations, near-black elsewhere | one primary style | minor | main | fixed (d4992fa: the ink pill for every primary) |
-| Q112 | qa-ux | Settings repeats its tab name as a card title (Connections, Members) | no repeated heading | minor | settings | redesign |
+| Q112 | qa-ux | Settings repeats its tab name as a card title (Connections, Members) | no repeated heading | minor | settings | fixed (dd6025b: no repeated headings) |
 | Q113 | qa-ux | the product name "Automations" reads as a second nav link; on a phone the workspace name is hidden | a distinct product mark; the workspace named in the phone menu | minor | home + auth | redesign |
 | Q114 | qa-ux | "Stopped by you" also when another member stopped it; a skipped step counts toward "4 of 4" | "Stopped"; "3 of 4 done, 1 skipped" | minor | home | redesign |
 | Q115 | qa-ux | every page logs "Only plain objects can be passed to Client Components ... Set objects are not supported" in dev | no error | minor | home | open |
@@ -162,11 +162,11 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q123 | qa-func | Details > State lists only the Write tool's files, not the chart and spreadsheet (same as Q103) | every file | minor | home (state.ts) | fixing |
 | Q124 | qa-func | .svg and .xlsx outputs get no content check, and "The file has content" names no file | a check per output kind, naming the file | minor | eval | fixed (5a93093: chart and spreadsheet checks, every check names its file; suite 18/18) |
 | Q125 | qa-func | .xlsx served with "; charset=utf-8" | no charset on a binary type | minor | outputs | fixed (07469f9) |
-| Q126 | qa-func | two connections whose names map to the same key are both accepted; one silently replaces the other in a run | the second name refused as taken | minor | settings | fixing |
+| Q126 | qa-func | two connections whose names map to the same key are both accepted; one silently replaces the other in a run | the second name refused as taken | minor | settings | fixed (b27d9cb: refused beside the Name field) |
 | Q127 | qa-func | every url-guard block reads "A web page tried to make the agent send your data elsewhere", also for a private address or a site blocked in Settings | wording by cause | minor | home (guard-notice) | fixing |
-| Q128 | qa-func | a run the model refused shows one text event; the refused action (turns 1-2) is not in the timeline | the refusal visible in the timeline | minor | engine (map-message) | fixing |
-| Q129 | qa-func | a stopped run records no cost or duration, so Limits' "Spent today" leaves it out | the partial cost recorded | minor | engine | fixing |
-| Q130 | qa-func | a stale session cookie on a deep link redirects to /sign-in without ?next= | next kept | minor | auth | fixing |
-| Q131 | qa-func | "Controller is already closed" logged when a client leaves the event stream mid-read | a quiet end | minor | engine | fixing |
-| Q132 | qa-func | POST /api/runs with a non-JSON body answers Zod's wording, and runs `\cmd input` as paid free text where Home refuses it | plain words; the same command rule as Home | minor | engine | fixing |
+| Q128 | qa-func | a run the model refused shows one text event; the refused action (turns 1-2) is not in the timeline | the refusal visible in the timeline | minor | engine (map-message) | fixed (67ec481: every refusal and error shape in sdk.d.ts becomes a plain notice; the QA run itself was deleted, so the exact case is unconfirmed) |
+| Q129 | qa-func | a stopped run records no cost or duration, so Limits' "Spent today" leaves it out | the partial cost recorded | minor | engine | fixed (8ab2600: cost from the result or the SDK's cost-state, else the duration; follow-ups no longer count their parent's cost) |
+| Q130 | qa-func | a stale session cookie on a deep link redirects to /sign-in without ?next= | next kept | minor | auth | fixed (auth: the requested path kept through a stale cookie) |
+| Q131 | qa-func | "Controller is already closed" logged when a client leaves the event stream mid-read | a quiet end | minor | engine | fixed (3c39242) |
+| Q132 | qa-func | POST /api/runs with a non-JSON body answers Zod's wording, and runs `\cmd input` as paid free text where Home refuses it | plain words; the same command rule as Home | minor | engine | fixed (14ca4e4: plain words; parseCommand then runCommand, else startRun) |
 | Q133 | qa-func | the rail search does not match a run's command | a match | minor | home | fixing |

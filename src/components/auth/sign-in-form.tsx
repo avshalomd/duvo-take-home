@@ -3,15 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { friendlyAuthError } from "@/lib/auth/errors";
+import { AuthField } from "./auth-field";
 import { FormError } from "./form-error";
 import { GoogleButton } from "./google-button";
 
 // Email and password. Submitted through onSubmit (not a form action) so a failed try keeps what was typed.
-export function SignInForm({ next, google }: { next: string; google: boolean }) {
+// `email` arrives filled in from sign-up's "Sign in instead" (Q110); the password is then the field to type in.
+export function SignInForm({ next, google, email }: { next: string; google: boolean; email?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -29,24 +29,13 @@ export function SignInForm({ next, google }: { next: string; google: boolean }) 
   }
 
   return (
-    <div className="space-y-4">
-      {google && (
-        <>
-          <GoogleButton next={next} />
-          <p className="text-center text-xs text-muted-foreground">or with your email</p>
-        </>
-      )}
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" required autoFocus />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" autoComplete="current-password" required />
-        </div>
+    <div className="flex flex-col gap-5">
+      {google && <GoogleButton next={next} />}
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <AuthField id="email" label="Email" name="email" type="email" autoComplete="email" required defaultValue={email} autoFocus={!email} />
+        <AuthField id="password" label="Password" name="password" type="password" autoComplete="current-password" required autoFocus={Boolean(email)} />
         <FormError message={error} />
-        <Button type="submit" className="h-9 w-full" disabled={pending}>
+        <Button type="submit" className="mt-1 h-11 w-full text-[15px]" disabled={pending}>
           {pending ? "Signing in..." : "Sign in"}
         </Button>
       </form>
