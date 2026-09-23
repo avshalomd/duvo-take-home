@@ -17,7 +17,7 @@ function client() {
 
 export type HomeRuns = {
   parent: string; followUp: string; live: string; stopped: string; failed: string; legacy: string; audit: string; automation: string;
-  example: string; long: string; healing: string; healed: string; unfixed: string; stuck: string; carried: string;
+  example: string; long: string; healing: string; healed: string; unfixed: string; stuck: string; carried: string; unchecked: string;
 };
 export const AUTOMATION = { name: `${PREFIX} audit`, command: COMMAND, input: "Acme Ltd" }; // a draft
 export const READY = { name: `${PREFIX} ready check`, command: "e2e-home-ready", hint: "The registered name, e.g. Acme Ltd" };
@@ -25,6 +25,7 @@ export const TITLES = {
   parent: `${PREFIX} parent: list three facts about the Moon`,
   followUp: `${PREFIX} follow-up: add the Moon's distance from Earth`,
   carried: `${PREFIX} carried: write the report again, shorter`, // a follow-up of the follow-up that keeps its files
+  unchecked: `${PREFIX} unchecked: sum the fruit counts while the judge is away`, // the model was down when it was judged
   live: `${PREFIX} live: count to three slowly`,
   stopped: `${PREFIX} stopped: summarise the week's AI news`,
   failed: `${PREFIX} failed: fetch a page that is not there`,
@@ -81,6 +82,18 @@ const V2_NOTES = {
   evaluatedAt: new Date().toISOString(),
   decidedBy: "review",
   path: ["checks", "judge", "review"],
+};
+
+// The checks passed and the judge could not be reached (the model was down): nobody looked at the content (Q208)
+const UNKNOWN = {
+  verdict: "unknown",
+  checks: CHECKS,
+  judgment: null,
+  review: null,
+  reasons: ["The judge was unavailable: 503 Service Unavailable"],
+  evaluatedAt: new Date().toISOString(),
+  decidedBy: "nobody",
+  path: ["checks", "judge"],
 };
 
 // A result that still did not pass after every attempt to fix it
@@ -198,6 +211,9 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   await events(carried, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
   await file(carried, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("not a real workbook").toString("base64"), { encoding: "base64" });
 
+  const unchecked = await insert({ prompt: TITLES.unchecked, status: "succeeded", minutesAgo: 15, verdict: UNKNOWN, report: "Ten pieces of fruit." });
+  await events(unchecked, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
+
   const stopped = await insert({ prompt: TITLES.stopped, status: "cancelled", minutesAgo: 2 });
   await events(stopped, [started, { kind: "plan", payload: PLAN(1) }]);
 
@@ -226,7 +242,7 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const stuck = await insert({ prompt: TITLES.stuck, status: "succeeded", minutesAgo: 14, heals: 1, verdict: FAIL_ROWS, report: "Six sea stories.", cost: 0.15 });
   await events(stuck, [started, { kind: "plan", payload: PLAN(null) }, attempt(0.1, 0.1), heal(1, HEAL.reason), attempt(0.15, 0.05), { kind: "heal", payload: { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"], feedback: HEAL.feedback, stopped: HEAL.stopped } }]);
 
-  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck, carried };
+  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck, carried, unchecked };
 }
 
 export async function deleteHomeRuns(): Promise<void> {

@@ -531,6 +531,18 @@ test.describe("a finished run", () => {
     expect(keyWarnings).toEqual([]);
   });
 
+  // Q208: with the model down the result was never checked, and the only way to check it again was inside Details.
+  // Check again is not pressed here: it would call the model
+  test("a result nobody could check says so in words beside the outcome, with Check again there", async ({ page }) => {
+    const panel = await openRun(page, runs.unchecked);
+    await expect(panel.getByTestId("outcome")).toHaveText("Done - not checked");
+    await expect(panel.getByTestId("not-checked")).toContainText("The result was not checked: the checker could not be reached.");
+    await expect(panel.getByTestId("not-checked").getByRole("button", { name: "Check again" })).toBeVisible();
+
+    const checked = await openRun(page, runs.parent); // a run that was checked has nothing to check again here
+    await expect(checked.getByTestId("not-checked")).toHaveCount(0);
+  });
+
   test("a stopped run reads 'Stopped' and the thread shows where it stopped", async ({ page }) => {
     const panel = await openRun(page, runs.stopped);
     await expect(panel.getByTestId("outcome")).toHaveText("Stopped"); // Q114
