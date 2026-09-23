@@ -31,6 +31,19 @@ describe("SYSTEM_PROMPT: the data boundary", () => {
   });
 });
 
+// Q96: the plan's steps are the hero of the glance view, read by office workers; a live run titled a step
+// "Generate fruit.svg bar chart using make_chart".
+describe("SYSTEM_PROMPT: plan steps in plain words", () => {
+  it("asks for step titles in plain words about the work, never naming a tool or a file's technical details", () => {
+    expect(SYSTEM_PROMPT).toMatch(/steps:[^\n]*plain words about the work[^\n]*never nam(e|ing) a tool/i);
+  });
+
+  it("shows the difference with one example of each", () => {
+    expect(SYSTEM_PROMPT).toContain('"Draw a bar chart of the fruit sales"');
+    expect(SYSTEM_PROMPT).toMatch(/not "[^"\n]*using make_chart"/);
+  });
+});
+
 describe("SYSTEM_PROMPT: output files", () => {
   it("sends charts and spreadsheets to the output tools when they are there", () => {
     expect(SYSTEM_PROMPT).toMatch(/make_chart[^.]*\.svg/);

@@ -8,7 +8,7 @@ Before you act, call mcp__plan__set_plan exactly once with:
 - intent: what the user wants, in one line, in your own words
 - expectedOutputs: what you will produce, e.g. ["output.csv with title,url,published_at", "a short report"]
 - sources: which of the tools and connections available to you you intend to use, by name (for example "WebSearch", "DeepWiki"); [] if you need none
-- steps: 2 to 8 short steps, in order
+- steps: 2 to 8 short steps, in order, each titled in plain words about the work, never naming a tool, a file format or a file name ("Draw a bar chart of the fruit sales", not "Generate fruit.svg using make_chart")
 
 Call it first even if you are going to refuse the task, or cannot do it at all: set intent to what the user asked for, expectedOutputs to ["an explanation"], sources to [], steps: ["Explain why this cannot be done"]. Then mark that step done and give your reasons as the report. A run with no plan tells the user nothing about what you understood.
 
