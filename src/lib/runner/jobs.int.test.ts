@@ -1,0 +1,194 @@
+// The queue against the real tables. `npm run test:int`. Runs are "[int] ..." in workspace "int-engine-jobs" and
+// deleted after. Jobs and runs are dated 2000-01-01 and the recovery is called with a `now` in that year, so the
+// oldest-first claim and the time-based recovery only ever touch this file's rows in the shared database.
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { and, eq, inArray } from "drizzle-orm";
+import { db } from "@/db";
+import { files, jobs, runEvents, runs } from "@/db/schema";
+import { enqueueRun } from "./enqueue";
+import { claimJob, finishJob } from "./jobs";
+import { closeAbandonedRuns, recoverStaleJobs } from "./recover";
+
+const WS = "int-engine-jobs";
+const Y2K = Date.parse("2000-01-01T00:00:00Z");
+const t = (minutes: number) => new Date(Y2K + minutes * 60_000);
+const mine = db.select({ id: runs.id }).from(runs).where(eq(runs.workspaceId, WS));
+
+async function makeRun(what: string, fields: Partial<typeof runs.$inferInsert> = {}) {
+  const [row] = await db
+    .insert(runs)
+    .values({ prompt: `[int] ${what}`, status: "queued", model: "test", workspaceId: WS, createdAt: t(0), ...fields })
+    .returning({ id: runs.id });
+  return row.id;
+}
+async function makeJob(runId: string, fields: Partial<typeof jobs.$inferInsert> = {}) {
+  const [row] = await db.insert(jobs).values({ runId, createdAt: t(0), ...fields }).returning({ id: jobs.id });
+  return row.id;
+}
+const jobRow = async (id: string) => (await db.select().from(jobs).where(eq(jobs.id, id)))[0];
+const runRow = async (id: string) => (await db.select().from(runs).where(eq(runs.id, id)))[0];
+
+async function cleanup() {
+  await db.delete(jobs).where(inArray(jobs.runId, mine));
+  await db.delete(runEvents).where(inArray(runEvents.runId, mine));
+  await db.delete(files).where(inArray(files.runId, mine));
+  await db.delete(runs).where(eq(runs.workspaceId, WS));
+}
+
+describe.skipIf(!process.env.DATABASE_URL)("the job queue", () => {
+  // Each test starts with none of this file's jobs queued, so "the oldest queued job" is always one it made.
+  beforeEach(async () => {
+    await db.update(jobs).set({ status: "done" }).where(and(inArray(jobs.runId, mine), eq(jobs.status, "queued")));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  afterAll(cleanup);
+
+  it("claimJob takes the oldest queued job and marks it running, locked by this worker, attempt 1", async () => {
+    const older = await makeJob(await makeRun("claim older"), { createdAt: t(1) });
+    await makeJob(await makeRun("claim newer"), { createdAt: t(2) });
+
+    const claimed = await claimJob("int-worker-1");
+    expect(claimed?.jobId).toBe(older);
+    const row = await jobRow(older);
+    expect(row.status).toBe("running");
+    expect(row.lockedBy).toBe("int-worker-1");
+    expect(row.lockedAt).not.toBeNull();
+    expect(row.attempts).toBe(1);
+  });
+
+  it("claimJob hands back the run id with the job", async () => {
+    const runId = await makeRun("claim run id");
+    await makeJob(runId, { createdAt: t(1) });
+    expect((await claimJob("int-worker-1"))?.runId).toBe(runId);
+  });
+
+  it("never gives the same job to two workers claiming at the same moment", async () => {
+    const a = await makeJob(await makeRun("race a"), { createdAt: t(1) });
+    const b = await makeJob(await makeRun("race b"), { createdAt: t(2) });
+
+    const [one, two] = await Promise.all([claimJob("int-worker-1"), claimJob("int-worker-2")]);
+    expect(one).not.toBeNull();
+    expect(two).not.toBeNull();
+    expect(one!.jobId).not.toBe(two!.jobId);
+    expect([one!.jobId, two!.jobId].sort()).toEqual([a, b].sort());
+  });
+
+  it("does not claim a job that is already running", async () => {
+    const first = await makeJob(await makeRun("claimed once a"), { createdAt: t(1) });
+    const second = await makeJob(await makeRun("claimed once b"), { createdAt: t(2) });
+    expect((await claimJob("int-worker-1"))?.jobId).toBe(first);
+    expect((await claimJob("int-worker-1"))?.jobId).toBe(second);
+  });
+
+  it("finishJob marks a job done or failed", async () => {
+    const done = await makeJob(await makeRun("finish done"), { status: "running" });
+    const failed = await makeJob(await makeRun("finish failed"), { status: "running" });
+    await finishJob(done, "done");
+    await finishJob(failed, "failed");
+    expect((await jobRow(done)).status).toBe("done");
+    expect((await jobRow(failed)).status).toBe("failed");
+  });
+
+  it("enqueueRun with RUNNER=queue inserts a queued job for the run instead of running it here", async () => {
+    vi.stubEnv("RUNNER", "queue");
+    const runId = await makeRun("enqueue");
+    await enqueueRun(runId);
+    const rows = await db.select().from(jobs).where(eq(jobs.runId, runId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("queued");
+    expect(rows[0].attempts).toBe(0);
+  });
+});
+
+describe.skipIf(!process.env.DATABASE_URL)("stale-lock recovery", () => {
+  afterAll(cleanup);
+  const now = t(20); // every lock below is dated from minute 0 to 15 of 2000-01-01
+
+  it("requeues a job whose worker died after one attempt, and starts its run over from a clean slate", async () => {
+    const runId = await makeRun("stale once", { status: "running", error: "half way", sessionId: "s-1" });
+    await db.insert(runEvents).values({ runId, seq: 1, kind: "text", payload: { text: "partial" } });
+    await db.insert(files).values({ runId, name: "partial.csv", mime: "text/csv", bytes: 1, content: "x" });
+    const jobId = await makeJob(runId, { status: "running", lockedBy: "dead-worker", lockedAt: t(5), attempts: 1 });
+
+    const result = await recoverStaleJobs(now);
+    expect(result.requeued).toContain(jobId);
+
+    const job = await jobRow(jobId);
+    expect(job.status).toBe("queued");
+    expect(job.lockedBy).toBeNull();
+    expect(job.lockedAt).toBeNull();
+    const run = await runRow(runId);
+    expect(run.status).toBe("queued");
+    expect(run.error).toBeNull();
+    expect(run.sessionId).toBeNull();
+    expect(await db.select().from(runEvents).where(eq(runEvents.runId, runId))).toHaveLength(0);
+    expect(await db.select().from(files).where(eq(files.runId, runId))).toHaveLength(0);
+  });
+
+  it("closes the run as failed, with the reason, when its job has already been tried twice", async () => {
+    const runId = await makeRun("stale twice", { status: "running" });
+    const jobId = await makeJob(runId, { status: "running", lockedBy: "dead-worker", lockedAt: t(5), attempts: 2 });
+
+    const result = await recoverStaleJobs(now);
+    expect(result.failed).toContain(jobId);
+    expect((await jobRow(jobId)).status).toBe("failed");
+    const run = await runRow(runId);
+    expect(run.status).toBe("failed");
+    expect(run.error).toMatch(/worker stopped/i);
+    expect(run.finishedAt).not.toBeNull();
+  });
+
+  it("closes the run as cancelled when the user had pressed Stop before the worker died", async () => {
+    const runId = await makeRun("stale cancelled", { status: "running", cancelRequestedAt: t(4) });
+    const jobId = await makeJob(runId, { status: "running", lockedBy: "dead-worker", lockedAt: t(5), attempts: 1 });
+
+    await recoverStaleJobs(now);
+    expect((await jobRow(jobId)).status).not.toBe("queued");
+    const run = await runRow(runId);
+    expect(run.status).toBe("cancelled");
+    expect(run.error).toBe("Stopped by you");
+  });
+
+  it("leaves a job locked five minutes ago alone: its worker may still be on it", async () => {
+    const runId = await makeRun("fresh lock", { status: "running" });
+    const jobId = await makeJob(runId, { status: "running", lockedBy: "live-worker", lockedAt: t(15), attempts: 1 });
+
+    await recoverStaleJobs(now);
+    expect((await jobRow(jobId)).status).toBe("running");
+    expect((await runRow(runId)).status).toBe("running");
+  });
+});
+
+describe.skipIf(!process.env.DATABASE_URL)("abandoned runs", () => {
+  afterAll(cleanup);
+  const now = t(45);
+
+  it("closes a run left running for over 30 minutes with no job (the inline server restarted)", async () => {
+    const runId = await makeRun("abandoned", { status: "running", createdAt: t(0) });
+    expect(await closeAbandonedRuns(now)).toContain(runId);
+    const run = await runRow(runId);
+    expect(run.status).toBe("failed");
+    expect(run.error).toMatch(/stopped/i);
+    expect(run.finishedAt).not.toBeNull();
+  });
+
+  it("leaves an old run alone while its job is still queued: the queue may just be long", async () => {
+    const runId = await makeRun("backlog", { status: "queued", createdAt: t(0) });
+    await makeJob(runId, { status: "queued" });
+    expect(await closeAbandonedRuns(now)).not.toContain(runId);
+    expect((await runRow(runId)).status).toBe("queued");
+  });
+
+  it("leaves a run started 20 minutes ago alone", async () => {
+    const runId = await makeRun("recent", { status: "running", createdAt: t(25) });
+    expect(await closeAbandonedRuns(now)).not.toContain(runId);
+  });
+
+  it("never touches a finished run", async () => {
+    const runId = await makeRun("finished long ago", { status: "succeeded", createdAt: t(0) });
+    expect(await closeAbandonedRuns(now)).not.toContain(runId);
+    expect((await runRow(runId)).status).toBe("succeeded");
+  });
+});
