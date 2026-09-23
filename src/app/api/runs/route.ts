@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { StartRunInput } from "@/contracts/agent";
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { parseCommand } from "@/lib/automations/command";
@@ -43,6 +44,8 @@ export async function POST(req: Request) {
   } catch (e) {
     if (e instanceof RunLimitError) return Response.json({ error: e.message }, { status: 429 });
     if (e instanceof AutomationError) return Response.json({ error: e.message }, { status: 400 }); // unknown, unapproved, off, or no input
+    // startRun validates again, whoever called it: a command's filled brief over 4000 characters was an empty 500 (Q197)
+    if (e instanceof ZodError) return Response.json({ error: e.issues[0]?.message ?? BAD_BODY }, { status: 400 });
     throw e; // anything else is a real failure: let it be a 500 with a stack in the logs
   }
 }
