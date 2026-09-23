@@ -100,6 +100,16 @@ test.describe("the frame", () => {
     await expect(rail(page)).toContainText(/no runs match/i);
   });
 
+  // Q201: an unknown address showed Next's bare 404, with no frame and no way back
+  test("an unknown address says so in the app's own look, with a way back to Home", async ({ page }) => {
+    for (const path of ["/nope", "/settings/nope"]) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole("heading", { name: "This page was not found" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Back to Home" })).toHaveAttribute("href", "/");
+    }
+  });
+
   // the field showed the browser's own blue clear "x"; it has a quiet clear button of its own, there only with text
   test("the rail's search clears with its own button, not the browser's", async ({ page }) => {
     await page.goto("/");
