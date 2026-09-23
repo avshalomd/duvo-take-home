@@ -40,8 +40,9 @@ export const makeChartTool = (dir: string) =>
     "make_chart",
     "Draw a chart and save it as an .svg file in your working directory; the user can download it and sees it in the run. " +
       "Use it whenever the user asks for a chart, graph or plot: you cannot draw one any other way. " +
-      "kind: bar, line, area, pie or scatter. data: one object per point, values as numbers. " +
-      "x names the field for the horizontal axis (the slice label, for a pie), y the field for the value, " +
+      "kind: bar, horizontal-bar, line, area, pie or scatter. data: one object per point, values as numbers. " +
+      "x names the field for the categories or the horizontal axis (the slice label, for a pie), y the field for the value; " +
+      "a horizontal-bar chart takes the same fields as bar and draws the categories down the side, which suits long names. " +
       "series (optional) a field that splits the data into coloured groups. The order of data is kept.",
     Advertised,
     (args) => makeChart(dir, args),

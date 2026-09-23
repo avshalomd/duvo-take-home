@@ -6,7 +6,7 @@ const Cell = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 export const ChartInput = {
   file: z.string().regex(/^[\w-]{1,60}\.svg$/, "a file name ending in .svg"),
   title: z.string().max(120),
-  kind: z.enum(["bar", "line", "area", "pie", "scatter"]),
+  kind: z.enum(["bar", "horizontal-bar", "line", "area", "pie", "scatter"]),
   data: z.array(z.record(z.string(), Cell)).min(1).max(1000),
   x: z.string(), // field name for the x axis (or the category, for a pie)
   y: z.string(), // field name for the value

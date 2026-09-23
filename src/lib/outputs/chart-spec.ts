@@ -168,6 +168,16 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
         // grouped, not stacked: with a series each value is read on its own against the axis
         encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color, ...(series ? { xOffset: { field: series } } : {}) },
       } as TopLevelSpec;
+    case "horizontal-bar": {
+      // The same fields as a bar chart, turned: categories down the side (level labels, so no slanting), values along
+      // the bottom. The value axis keeps its title and short numbers; the category axis needs none.
+      const category = { field: x, type: fieldKind(values, x) === "number" ? ("ordinal" as const) : ("nominal" as const), sort: null, title: null };
+      return {
+        ...base,
+        mark: { type: "bar" },
+        encoding: { y: category, x: { ...yEnc, axis: { labelAngle: 0, ...valueAxis(values, y) } }, ...color, ...(series ? { yOffset: { field: series } } : {}) },
+      } as TopLevelSpec;
+    }
     case "line":
       return { ...base, mark: { type: "line", point: true }, encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color } } as TopLevelSpec;
     case "area":
