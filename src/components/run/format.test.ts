@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attemptCost, connectionName, formatCost, formatDuration, humanizeTools, toolKind, toolLabel, toolLine } from "./format";
+import { attemptCost, connectionName, formatCost, formatDuration, humanizeTools, relativeToRun, runFolders, toolKind, toolLabel, toolLine } from "./format";
 
 const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
 
@@ -40,11 +40,15 @@ describe("toolLine - one line per tool call, readable without opening the payloa
 });
 
 describe("toolKind - the timeline is scanned by what the agent was doing", () => {
-  it("sorts the native tools into search, fetch and write", () => {
+  it("sorts the native tools into search, fetch, read and write", () => {
     expect(toolKind("WebSearch")).toBe("search");
     expect(toolKind("WebFetch")).toBe("fetch");
-    expect(toolKind("Read")).toBe("fetch");
     expect(toolKind("Write")).toBe("write");
+  });
+
+  // reading a file in the run's own folder was badged "fetch", as if it had gone to the web
+  it("calls reading a local file read, not fetch", () => {
+    expect(toolKind("Read")).toBe("read");
   });
 
   it("marks anything that went through a connection as a connection call", () => {
@@ -119,5 +123,28 @@ describe("humanizeTools - no mcp__x__y ever reaches the screen", () => {
 
   it("leaves a sentence with no tool ids untouched", () => {
     expect(humanizeTools("the CSV has 10 rows", connections)).toBe("the CSV has 10 rows");
+  });
+});
+
+// Q187: a Write result said "The file /Users/.../runs/<id>/countries.csv has been updated": the machine's path
+describe("relativeToRun - paths in the run's own folder, as the run sees them", () => {
+  const folder = "/Users/someone/projects/app/runs/15f8b99d";
+  const started = (cwd?: unknown) => ({ kind: "started", payload: { cwd } });
+
+  it("finds the run's folder in its started events, once each", () => {
+    expect(runFolders([started(folder), { kind: "text", payload: {} }, started(folder), started(undefined)])).toEqual([folder]);
+  });
+
+  it("writes a path inside the run's folder relative to it", () => {
+    expect(relativeToRun(`The file ${folder}/countries.csv has been updated successfully.`, [folder])).toBe(
+      "The file countries.csv has been updated successfully.",
+    );
+    expect(relativeToRun(`${folder}/out/a.csv and ${folder}/b.csv`, [folder])).toBe("out/a.csv and b.csv");
+  });
+
+  it("leaves other text alone, and the folder itself reads as this folder", () => {
+    expect(relativeToRun("Wrote chart.svg (bar chart, 5 points)", [folder])).toBe("Wrote chart.svg (bar chart, 5 points)");
+    expect(relativeToRun(`ls ${folder}`, [folder])).toBe("ls .");
+    expect(relativeToRun(`${folder}-other/x.csv`, [folder])).toBe(`${folder}-other/x.csv`);
   });
 });

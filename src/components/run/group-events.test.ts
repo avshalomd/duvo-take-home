@@ -79,4 +79,67 @@ describe("groupEvents - fixing what the check found", () => {
     expect(stopped.status).toBe("skipped");
     expect(stopped.title).toBe("Stopped trying - attempt 2 of 2");
   });
+
+  // React warned "two children with the same key step-2": after the fix the agent went back to step 2
+  it("gives a step the agent comes back to after a fix a group of its own, under a key of its own", () => {
+    const events = [
+      plan(["running", "pending", "pending"]),
+      call("WebSearch"),
+      plan(["done", "done", "running"]),
+      call("Write"),
+      plan(["done", "done", "done"]),
+      { ...finished, seq: ++seq },
+      heal(1),
+      plan(["done", "done", "running"]),
+      call("Write"),
+      plan(["done", "done", "done"]),
+      { ...finished, seq: ++seq },
+    ];
+    const groups = groupEvents(events, "succeeded");
+    expect(groups.map((g) => g.title)).toEqual(["step 0", "step 2", "Fixing what the check found - attempt 1 of 2", "step 2"]);
+    expect(new Set(groups.map((g) => g.key)).size).toBe(groups.length);
+    // nothing dropped, nothing doubled: every event that is not a plan is filed exactly once
+    const filed = groups.flatMap((g) => g.events);
+    expect(filed).toHaveLength(events.filter((e) => e.kind !== "plan").length);
+    expect(new Set(filed.map((e) => e.seq)).size).toBe(filed.length);
+    expect(groups.map((g) => g.status)).toEqual(["done", "done", "done", "done"]);
+  });
+});
+
+// A run that is over has nothing left to wait for: no group reads pending or running once it has ended.
+describe("groupEvents - a finished run shows no waiting markers", () => {
+  const finished: RunEvent = {
+    seq: 0, at, kind: "finished",
+    payload: { subtype: "success", is_error: false, num_turns: 3, duration_ms: 9000, total_cost_usd: 0.02, result: "Done." },
+  };
+
+  it("settles Planning once the plan exists, and works on it while a live run has none", () => {
+    expect(groupEvents([text("reading"), plan(["running"]), call("Write")], "running")[0].status).toBe("done");
+    expect(groupEvents([text("reading"), call("WebSearch")], "running")[0].status).toBe("running");
+    expect(groupEvents([text("reading"), call("WebSearch")], "succeeded")[0].status).toBe("done");
+  });
+
+  it("marks where a failed or stopped run stopped, and everything before it as done", () => {
+    const noPlan = groupEvents([text("reading"), call("WebFetch")], "failed");
+    expect(noPlan.map((g) => g.status)).toEqual(["stopped"]);
+    const midway = groupEvents([text("reading"), plan(["running", "pending"]), call("WebFetch"), plan(["done", "running"]), call("Write")], "cancelled");
+    expect(midway.map((g) => g.status)).toEqual(["done", "done", "stopped"]);
+  });
+
+  it("reads a step the agent never marked done as done on a run that succeeded", () => {
+    const groups = groupEvents([plan(["running"]), call("Write"), { ...finished, seq: ++seq }], "succeeded");
+    expect(groups.map((g) => g.status)).toEqual(["done"]);
+  });
+});
+
+describe("groupEvents - the report is on the run's page, not in the timeline", () => {
+  it("leaves out the agent's closing text when it is the report it finished with", () => {
+    const report = "Done. I wrote output.csv:\n\n| a | b |\n|---|---|\n| 1 | 2 |";
+    const end: RunEvent = {
+      seq: 0, at, kind: "finished",
+      payload: { subtype: "success", is_error: false, num_turns: 3, duration_ms: 9000, total_cost_usd: 0.02, result: report },
+    };
+    const groups = groupEvents([plan(["running"]), text("Writing the file now."), call("Write"), text(report), { ...end, seq: ++seq }], "succeeded");
+    expect(groups[0].events.map((e) => e.kind)).toEqual(["text", "tool_call", "finished"]);
+  });
 });
