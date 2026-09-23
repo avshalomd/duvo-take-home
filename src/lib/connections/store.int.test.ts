@@ -107,6 +107,62 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
     });
   });
 
+  // Q80: the saved credentials belong to the server they were given for. Pointing a connection somewhere else with the
+  // token field left empty must not send the old token (or the OAuth access token) to the new address.
+  describe("a new address", () => {
+    const signedIn = () => blob({ tokens: { accessTokenEnc: "v1:sealed", refreshTokenEnc: null, expiresAt: null } });
+
+    it("clears the saved token when the host changes, even with the token field left empty", async () => {
+      const added = await addConnection(A, { name: named("moved"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
+      const updated = await updateConnection(A, added.id, { ...edit, url: "https://attacker.example/mcp", authType: "bearer" });
+      expect(updated.hasToken).toBe(false);
+      const row = await rawRow(added.id);
+      expect(row.tokenEnc).toBeNull();
+      expect(row.token).toBeNull();
+      expect((await secretOf(A, added.id))!.token).toBeNull();
+    });
+
+    it("clears a legacy plain token too when the host changes", async () => {
+      const [legacy] = await db
+        .insert(connections)
+        .values({ workspaceId: A, name: named("legacy moved"), url: "https://example.com/legacy", token: "legacy-value" })
+        .returning();
+      await updateConnection(A, legacy.id, { ...edit, url: "https://attacker.example/mcp", authType: "bearer" });
+      expect((await rawRow(legacy.id)).token).toBeNull();
+    });
+
+    it("clears the OAuth sign-in when the host changes, so the new server needs its own sign-in", async () => {
+      const added = await addConnection(A, { name: named("oauth moved"), url: "https://example.com/o", transport: "http", authType: "oauth" });
+      await setConnectionOAuth(A, added.id, signedIn());
+      const updated = await updateConnection(A, added.id, { ...edit, url: "https://attacker.example/mcp", authType: "oauth" });
+      expect(updated.signedIn).toBe(false);
+      expect((await rawRow(added.id)).oauth).toBeNull();
+    });
+
+    it("clears the saved token when https becomes http on the same host", async () => {
+      const added = await addConnection(A, { name: named("downgrade"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
+      const updated = await updateConnection(A, added.id, { ...edit, url: "http://example.com/mcp", authType: "bearer" });
+      expect(updated.hasToken).toBe(false);
+    });
+
+    it("saves a new token pasted along with the new host", async () => {
+      const added = await addConnection(A, { name: named("moved new"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
+      await updateConnection(A, added.id, { ...edit, url: "https://other.example/mcp", authType: "bearer", token: "new-value" });
+      expect((await secretOf(A, added.id))!.token).toBe("new-value");
+    });
+
+    it("keeps the token and the OAuth sign-in when only the path changes on the same host", async () => {
+      const bearer = await addConnection(A, { name: named("same host"), url: "https://example.com/mcp", transport: "http", token: "secret-value" });
+      await updateConnection(A, bearer.id, { ...edit, url: "https://example.com/v2/mcp", authType: "bearer" });
+      expect((await secretOf(A, bearer.id))!.token).toBe("secret-value");
+
+      const oauth = await addConnection(A, { name: named("same host oauth"), url: "https://example.com/o", transport: "http", authType: "oauth" });
+      await setConnectionOAuth(A, oauth.id, signedIn());
+      const updated = await updateConnection(A, oauth.id, { ...edit, url: "https://example.com/o/v2", authType: "oauth" });
+      expect(updated.signedIn).toBe(true);
+    });
+  });
+
   describe("toggle, delete and OAuth state", () => {
     it("setConnectionEnabled flips a connection off and on again", async () => {
       const added = await addConnection(A, { name: named("toggle"), url: "https://example.com/toggle", transport: "http" });

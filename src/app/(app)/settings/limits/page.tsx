@@ -2,6 +2,7 @@ import { LimitsForm } from "@/components/settings/limits-form";
 import { UsageCard } from "@/components/settings/usage-card";
 import { requireSession } from "@/lib/auth/session";
 import { getLimits, getUsage } from "@/lib/usage/budget";
+import { canChangeSettings } from "../roles";
 
 export default async function LimitsPage() {
   const session = await requireSession();
@@ -11,7 +12,7 @@ export default async function LimitsPage() {
     <div className="space-y-4">
       <UsageCard usage={usage} limits={limits} now={now} />
       {/* a budget is the workspace's money: members see it, owners and admins change it */}
-      <LimitsForm limits={limits} canEdit={session.role !== "member"} />
+      <LimitsForm limits={limits} canEdit={canChangeSettings(session.role)} />
     </div>
   );
 }

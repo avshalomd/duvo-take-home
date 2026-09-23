@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addConnectionAction, updateConnectionAction } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Connection } from "@/contracts/connection";
+import { sameServer } from "@/lib/connections/store-origin";
 import { submitKeepingValues } from "./submit-keeping-values";
 
 type AuthType = "none" | "bearer" | "oauth";
@@ -50,6 +51,17 @@ function ConnectionForm({ connection: current, onDone }: { connection?: Connecti
   const [connection] = useState(current);
   const [state, action, pending] = useActionState(connection ? updateConnectionAction : addConnectionAction, {});
   const [authType, setAuthType] = useState<AuthType>(connection?.authType ?? "none");
+  const [url, setUrl] = useState(connection?.url ?? "");
+  // Q80: the store drops the saved token and sign-in when the address moves to another server; say so before saving.
+  // Only once the typed address parses, so a half-typed one does not flash the warning.
+  const moved = Boolean(connection && URL.canParse(url) && !sameServer(connection.url, url));
+  const movedNote = !moved
+    ? null
+    : authType === "bearer" && connection?.hasToken
+      ? "This is a different server, so the saved token will not be sent to it. Paste a token for the new server."
+      : authType === "oauth" && connection?.signedIn
+        ? "This is a different server, so the sign-in does not carry over. Sign in to the new server after saving."
+        : null;
   const submitted = useRef(false);
   const form = useRef<HTMLFormElement>(null);
 
@@ -87,8 +99,14 @@ function ConnectionForm({ connection: current, onDone }: { connection?: Connecti
         label="Address"
         placeholder="https://mcp.example.com/mcp"
         defaultValue={connection?.url}
+        onChange={(e) => setUrl(e.currentTarget.value)}
         error={state.fieldErrors?.url?.[0]}
       />
+      {movedNote && (
+        <p aria-live="polite" className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          {movedNote}
+        </p>
+      )}
 
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm font-medium">How it signs in</legend>
@@ -119,10 +137,10 @@ function ConnectionForm({ connection: current, onDone }: { connection?: Connecti
             label="Token"
             type="password"
             autoComplete="off"
-            placeholder={connection?.hasToken ? "Leave empty to keep the saved token" : "Paste the token here"}
+            placeholder={connection?.hasToken && !moved ? "Leave empty to keep the saved token" : "Paste the token here"}
             error={state.fieldErrors?.token?.[0]}
           />
-          {connection?.hasToken && (
+          {connection?.hasToken && !moved && (
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" name="clearToken" className="accent-foreground" />
               Remove the saved token
@@ -181,6 +199,7 @@ function Field({
   placeholder?: string;
   defaultValue?: string;
   autoComplete?: string;
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
     <div className="space-y-1">
