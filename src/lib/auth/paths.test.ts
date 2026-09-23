@@ -88,6 +88,10 @@ describe("safeNext", () => {
     expect(safeNext("/auto\tmations")).toBe("/");
   });
 
+  it("answers home, not an error, for an address the URL parser cannot read", () => {
+    expect(safeNext("//[")).toBe("/");
+  });
+
   it("keeps the query and the fragment of a path it accepts", () => {
     expect(safeNext("/automations?tab=mine#top")).toBe("/automations?tab=mine#top");
   });

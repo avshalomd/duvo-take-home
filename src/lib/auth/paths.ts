@@ -30,11 +30,23 @@ export function signInPath(requested: string): string {
   return withNext("/sign-in", requested);
 }
 
+// A placeholder origin to resolve against: whatever `next` says, it is only safe if it stays on this origin.
+const HERE = "http://here.invalid";
+
 /** Where to go after signing in: a path inside this app, never another site and never back to sign-in. */
 export function safeNext(next: string | undefined): string {
   if (!next || !next.startsWith("/")) return "/";
-  if (next.startsWith("//") || next.startsWith("/\\")) return "/"; // a browser reads both as another host
-  const pathname = next.split(/[?#]/)[0];
-  if (PUBLIC_PAGES.includes(pathname)) return "/"; // sign-in -> sign-in would loop
-  return next;
+  // Browsers drop tabs and newlines from a URL and read "\" as "/", so "/\t/evil.example" is "//evil.example" to
+  // them. Rather than list the tricks, refuse control characters and let the URL parser (which applies the same
+  // rules) say where the address really goes.
+  if (/[\u0000-\u001f\u007f]/.test(next)) return "/";
+  let url: URL;
+  try {
+    url = new URL(next, HERE);
+  } catch {
+    return "/"; // "//[" and the like: unreadable, so not a place to send anyone
+  }
+  if (url.origin !== HERE) return "/";
+  if (PUBLIC_PAGES.includes(url.pathname)) return "/"; // sign-in -> sign-in would loop
+  return url.pathname + url.search + url.hash;
 }
