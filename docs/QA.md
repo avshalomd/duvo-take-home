@@ -152,3 +152,21 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q113 | qa-ux | the product name "Automations" reads as a second nav link; on a phone the workspace name is hidden | a distinct product mark; the workspace named in the phone menu | minor | home + auth | redesign |
 | Q114 | qa-ux | "Stopped by you" also when another member stopped it; a skipped step counts toward "4 of 4" | "Stopped"; "3 of 4 done, 1 skipped" | minor | home | redesign |
 | Q115 | qa-ux | every page logs "Only plain objects can be passed to Client Components ... Set objects are not supported" in dev | no error | minor | home | open |
+| Q116 | qa-func | a command to a turned-off or draft automation answers "There is no saved automation called \x" | runCommand's own words ("is turned off", "is not approved yet") | minor | home (actions) | fixing |
+| Q117 | qa-func | with automations that are all off or draft, the `\` list says "No saved automations yet" | "none ready yet" wording | minor | home | fixing |
+| Q118 | qa-func | the `\` list and the automation card show the raw placeholder: "makes facts.md with three facts about {input}" | the input's label in place of `{input}` | minor | home + automations | fixing |
+| Q119 | qa-func | reloading /automations/new?run=<id> while it drafts leaves two drafts | one draft per press | minor | automations | fixing |
+| Q120 | qa-func | "Schedule saved." / "Schedule removed." never show: the form is keyed by updatedAt and remounts on save | the confirmation line shows | minor | automations | fixing |
+| Q121 | qa-func | "Make an automation" is offered on a run whose verdict failed | offered only for a passing result | minor | home | fixing |
+| Q122 | qa-func | mid-run, after a file was written, "No files yet - this run writes its answer in the report below" | "files appear when it finishes" while live | minor | home | fixing |
+| Q123 | qa-func | Details > State lists only the Write tool's files, not the chart and spreadsheet (same as Q103) | every file | minor | home (state.ts) | fixing |
+| Q124 | qa-func | .svg and .xlsx outputs get no content check, and "The file has content" names no file | a check per output kind, naming the file | minor | eval | fixing |
+| Q125 | qa-func | .xlsx served with "; charset=utf-8" | no charset on a binary type | minor | outputs | fixing |
+| Q126 | qa-func | two connections whose names map to the same key are both accepted; one silently replaces the other in a run | the second name refused as taken | minor | settings | fixing |
+| Q127 | qa-func | every url-guard block reads "A web page tried to make the agent send your data elsewhere", also for a private address or a site blocked in Settings | wording by cause | minor | home (guard-notice) | fixing |
+| Q128 | qa-func | a run the model refused shows one text event; the refused action (turns 1-2) is not in the timeline | the refusal visible in the timeline | minor | engine (map-message) | fixing |
+| Q129 | qa-func | a stopped run records no cost or duration, so Limits' "Spent today" leaves it out | the partial cost recorded | minor | engine | fixing |
+| Q130 | qa-func | a stale session cookie on a deep link redirects to /sign-in without ?next= | next kept | minor | auth | fixing |
+| Q131 | qa-func | "Controller is already closed" logged when a client leaves the event stream mid-read | a quiet end | minor | engine | fixing |
+| Q132 | qa-func | POST /api/runs with a non-JSON body answers Zod's wording, and runs `\cmd input` as paid free text where Home refuses it | plain words; the same command rule as Home | minor | engine | fixing |
+| Q133 | qa-func | the rail search does not match a run's command | a match | minor | home | fixing |
