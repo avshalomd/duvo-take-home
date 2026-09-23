@@ -114,3 +114,17 @@ describe("NewConnection", () => {
     ).toBe(false);
   });
 });
+
+describe("v2: shared host rule and reserved names", () => {
+  it("isPrivateHost catches IPv6 private forms and *.localhost as well as the v1 ranges", async () => {
+    const { isPrivateHost } = await import("./connection");
+    for (const h of ["localhost", "127.0.0.1", "10.1.2.3", "[::1]", "[fd00::1]", "[fe80::1]", "[::ffff:7f00:1]", "app.localhost"]) expect(isPrivateHost(h)).toBe(true);
+    for (const h of ["mcp.deepwiki.com", "example.org", "[2001:db8::1]"]) expect(isPrivateHost(h)).toBe(false);
+  });
+  it("a connection cannot take the name of a built-in tool server (plan, outputs)", async () => {
+    const { NewConnection } = await import("./connection");
+    expect(NewConnection.safeParse({ name: "Plan", url: "https://x.example/mcp" }).success).toBe(false);
+    expect(NewConnection.safeParse({ name: " outputs ", url: "https://x.example/mcp" }).success).toBe(false);
+    expect(NewConnection.safeParse({ name: "Planner", url: "https://x.example/mcp" }).success).toBe(true);
+  });
+});

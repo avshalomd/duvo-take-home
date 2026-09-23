@@ -1,0 +1,167 @@
+{
+  "id": "max-turns",
+  "why": "The agent retried a broken search until it ran out of turns and wrote nothing. The checks must end it, quoting the provider's error, without a model call.",
+  "source": "fixtures/runs.json run_01JQ8R2F0C (v1 seed), with plan events",
+  "expected": {
+    "verdict": "fail",
+    "decidedBy": "checks",
+    "failedChecks": [
+      "completed",
+      "file_expected"
+    ]
+  },
+  "recorded": {
+    "judge": null,
+    "review": null,
+    "source": "not reached: the checks decide"
+  },
+  "run": {
+    "id": "case_max_turns",
+    "prompt": "Fetch the latest AI news from the web and save them into a CSV.",
+    "status": "failed",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "Reached the turn limit without producing a file. Web search returned 400 on every attempt.",
+    "error": "Reached the turn limit without producing a file. Web search returned 400 on every attempt.",
+    "numTurns": 12,
+    "durationMs": 151554,
+    "costUsd": 0.447,
+    "createdAt": "2026-09-22T08:52:41.330Z",
+    "finishedAt": "2026-09-22T08:55:12.884Z"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T08:52:41.330Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T08:52:43.330Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Collect the latest AI news into a CSV",
+        "expectedOutputs": [
+          "output.csv"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search the web for the latest AI news",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Write output.csv",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T08:52:45.330Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "name": "WebSearch",
+        "input": {
+          "query": "latest AI news"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T08:52:49.330Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "is_error": true,
+        "preview": "API Error 400: web_search is not enabled for this organization"
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T08:52:51.330Z",
+      "kind": "text",
+      "payload": {
+        "text": "Search is unavailable. I'll try fetching a news page directly instead."
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-22T08:52:53.330Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "name": "WebFetch",
+        "input": {
+          "url": "https://news.ycombinator.com/news",
+          "prompt": "AI stories from the last week"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-22T08:52:57.330Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "is_error": true,
+        "preview": "Request failed: 403 Forbidden"
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-22T08:52:59.330Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "name": "WebSearch",
+        "input": {
+          "query": "AI news this week"
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-22T08:53:03.330Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "is_error": true,
+        "preview": "API Error 400: web_search is not enabled for this organization"
+      }
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-22T08:53:05.330Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "error_max_turns",
+        "is_error": true,
+        "num_turns": 12,
+        "duration_ms": 151554,
+        "total_cost_usd": 0.447,
+        "result": "Reached the turn limit without producing a file. Web search returned 400 on every attempt."
+      }
+    }
+  ],
+  "files": [],
+  "template": null
+}

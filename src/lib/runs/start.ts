@@ -2,7 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { runs } from "@/db/schema";
-import { StartRunInput, type StartRun } from "@/contracts/agent";
+import { FollowUpInput, StartRunInput, type StartRun } from "@/contracts/agent";
 import { AGENT_MODEL } from "@/lib/agent/run";
 import { enqueueRun } from "@/lib/runner/enqueue";
 import { checkBudget } from "@/lib/usage/budget";
@@ -25,7 +25,10 @@ async function callerIp(given?: string | null): Promise<string> {
  * follow-up - so the limits cannot differ between them.
  */
 export const startRun: StartRun = async (ctx, req, ip) => {
-  const { prompt } = StartRunInput.parse({ prompt: req.prompt }); // validated again here: the action is not the only caller
+  // Validated again here: the action is not the only caller. A follow-up's change is checked by its own, shorter
+  // rule ("Fix the dates" is a whole request once the earlier run is the context).
+  const prompt =
+    req.purpose === "followup" ? FollowUpInput.shape.prompt.parse(req.prompt) : StartRunInput.parse({ prompt: req.prompt }).prompt;
 
   // The workspace's own limits (runs and cost per day, runs in flight), then the per-address brake from v1.
   const over = await checkBudget(ctx.workspaceId);

@@ -24,7 +24,7 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/eval/judge.ts` - Jev through `decide()`: two `noul()` questions, answeredQuery and followedPlan, answered in one request as probabilities.
 - `src/lib/eval/review.ts`, `review.prompt.ts` - tier two, `extract()` with the Review schema; runs only when Jev says the plan was not followed or is not confident.
 - `src/lib/eval/evaluate.ts` - the cascade. `evaluate(input, { judge, review })` takes its two model calls as arguments so the verdict logic is tested without a network; `evaluateRun` binds the real ones. `unknown` is returned when a judge fails, never `fail`: a broken judge must not mark good work bad.
-- `src/lib/eval/evaluate.eval.test.ts` - the evaluator over `fixtures/llm-cases.json` (EVAL=1), writing `docs/EVAL.md`. 9/10 at merge.
+- `src/lib/eval/suite.eval.test.ts` - the evaluator over `fixtures/llm-cases.json` (EVAL=1), writing `docs/EVAL.md`. 9/10 at merge.
 
 ## P1 - engine
 
@@ -64,3 +64,74 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/eval/checks.ts` - strict field counts (a ragged row fails `parses` by row number), a `urls` check on the url column, skip counts in the details, and `connectionRequired()` that reads the sentence naming a connection to tell a route from an offer.
 - `src/contracts/connection.ts` - `publicHttpUrl`: http(s) only, no loopback, link-local or private hosts, because the SDK child fetches the URL server-side.
 - `.claude/scripts/qa-env.mjs`, `npm run qa:dev` - the app against the separate QA database, so QA never writes to production again.
+
+## v2 (local, `v2` branch)
+
+### Foundation
+- `src/db/auth-schema.ts` - Better Auth's tables, generated; its `organization` is our workspace, so tenancy is one
+  `workspace_id` column on our own tables and one filter in every query.
+- `src/contracts/automation.ts` - the automation builder's seams: `AutomationDraft` (the LLM's output), `AutomationEdit`
+  (the form), `Trial` (an example with the evaluator's outcome and the person's judgment), `canApprove`.
+- `src/lib/agent/run.ts` - one serialized writer for events: the agent's messages, guard decisions and step checks
+  come from different callbacks and each gets its seq when written, so the trace stays one ordered stream.
+
+### oauth
+- `src/lib/connections/oauth/complete.ts` - the pending state is cleared before the code is exchanged: a state works once.
+- `src/app/api/connections/oauth/redirect.ts` - a cookie ties a sign-in to the browser that started it, so a link
+  someone else sends cannot attach their account to your connection.
+- `src/lib/connections/oauth/headers.ts` - a refused refresh marks the connection as needing sign-in; a server that
+  is down keeps the tokens; a refresh another run already did is reused.
+
+### outputs
+- `src/lib/outputs/tools/make-chart.ts` - the agent draws nothing: it passes data, our code renders the SVG. The tool
+  advertises a catchall object instead of the contract's `z.record`, which the SDK cannot turn into JSON Schema
+  (the tools silently vanished in the first live run).
+- `src/lib/outputs/file-response.ts` - a quarantined file answers 409 until `?confirm=1`; only an SVG is served
+  inline, with a no-script content policy.
+- `src/lib/outputs/chart-render.ts` - vega is loaded on first use: its top-level await broke every `tsx` script.
+
+### guards
+- `src/lib/agent/guards/index.ts` - one PreToolUse hook per tool; its guards run in a fixed order and the first block
+  wins. Only decisions that are not "allowed" are recorded, so the timeline stays quiet.
+- `src/lib/agent/guards/url.ts` - code decides first (private hosts, denied domains); Jev is asked only when a query
+  string is long enough to carry data out (CSV rows in a query scored 0.94, a long search 0.17). Jev down or slow
+  lets the fetch through, recorded as "unchecked": a guard must not stop honest work.
+- `src/lib/agent/guards/scan.ts` - credentials quarantine a file; personal data (emails, phones, Luhn-checked cards,
+  mod-97-checked IBANs) is only counted, because a contact list is often the task.
+- `src/contracts/connection.ts` `isPrivateHost` - one rule for "private or local" shared by the connection form and
+  the url guard, so they cannot drift; `plan` and `outputs` are reserved connection names.
+
+### auth
+- `src/lib/auth/workspaces.ts` `createPersonalWorkspace` - one `db.batch` writes the workspace and its owner and points
+  the sign-up session at them: Better Auth runs the user "after" hook once the session already exists.
+- `src/lib/auth/paths.ts` `needsSignIn` - the proxy leaves `/api/*` to the routes: a 401 JSON is something a fetch or
+  a poll can read, a redirect would hand it the sign-in page's HTML.
+- `src/lib/auth/actions.ts` `openWorkspaceHome` - switching, creating or accepting a workspace revalidates the layout
+  before opening Home, or the top bar keeps naming the old workspace.
+- `src/app/(auth)/invite/[id]` - explains the invitation before asking anyone to sign in, pre-fills the email, and
+  refuses a different signed-in account with "Sign in as ...".
+
+### engine
+- `src/lib/agent/close.ts` `updateUnlessCancelled` - every exit of the run loop writes through it, so a Stop that
+  lands during evaluation is never overwritten by "succeeded".
+- `src/lib/agent/run.ts` - a run is claimed with one `queued -> running` update (a second worker or a retried
+  after() does nothing); the user's MCP servers are spread first and ours last, so no connection can replace them.
+- `src/lib/runner/jobs.ts`, `recover.ts` - jobs claimed with `FOR UPDATE SKIP LOCKED` inside a real transaction; a
+  stale job is requeued while attempts < 2 (its run starts over clean), otherwise its run fails with the reason.
+  `closeAbandonedRuns` fails a run left unfinished for 30 minutes with no job (an inline server that restarted).
+- `src/lib/agent/session.ts` - a follow-up resumes the parent's SDK session with `forkSession` when it still exists
+  (checked with `getSessionInfo`), and always carries a preamble of what the parent did, because on Vercel /tmp is
+  per instance and the session is gone.
+- `src/app/api/runs/[id]/events/route.ts` - Server-Sent Events from the database once a second; ends itself after
+  280 s (under the function limit) and the client reconnects with `?after=<seq>`.
+
+### eval
+- `src/lib/eval/evaluate.ts` - every verdict records `decidedBy` and `path`, which is what "Why?" shows.
+- `src/lib/eval/template-checks.ts` - a run of a saved automation is also checked against its template: a plan step
+  keeps a template step when it holds 40% of its words (filler and `{input}` dropped), a skip with a note counts as
+  kept, and the promised files must exist.
+- `src/lib/eval/step-check.ts` - one `decide()` yes/no per finished step; the note is written by code, not by Jev.
+- `src/lib/eval/suite.test.ts`, `suite.eval.test.ts`, `fixtures/runs/` - the offline test of the evaluator (not a
+  product feature): 18 recorded runs, replayed with recorded judge answers in `npm run check`, live with `EVAL=1`
+  (`docs/EVAL.md`). The live run caught an injected advert passing at 0.80; the judge and review prompts now say that
+  what a run read is data, and it fails.

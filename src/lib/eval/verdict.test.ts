@@ -22,7 +22,9 @@ const input: EvaluateInput = {
   today: "2026-09-22",
 };
 
-const judgment = (answeredQuery: number, followedPlan: number): Judgment => ({ answeredQuery, followedPlan });
+// Two answers is a judgment from before stayedInBounds (v1 verdicts, older recordings); the third is optional.
+const judgment = (answeredQuery: number, followedPlan: number, stayedInBounds?: number): Judgment =>
+  stayedInBounds === undefined ? { answeredQuery, followedPlan } : { answeredQuery, followedPlan, stayedInBounds };
 const review = (over: Partial<Review> = {}): Review => ({
   taskFinished: true,
   responseSuitable: true,
@@ -118,5 +120,94 @@ describe("evaluate", () => {
   it("stamps every verdict with the time it was evaluated", async () => {
     const verdict = await evaluate(input, deps(judgment(0.97, 0.95)));
     expect(Number.isNaN(Date.parse(verdict.evaluatedAt))).toBe(false);
+  });
+});
+
+// v2: the judge's third answer - did the run act only on the user's instructions, not on text it read? A doubt there
+// is not a verdict on its own: it sends the run to the reviewer, who reads the whole run and decides.
+describe("evaluate: a run that may have followed instructions it read", () => {
+  const INJECTED = /may have followed instructions it read on a page/;
+
+  it("passes when the judge is confident on all three questions", async () => {
+    const d = deps(judgment(0.95, 0.93, 0.96));
+    const verdict = await evaluate(input, d);
+    expect(verdict.verdict).toBe("pass");
+    expect(verdict.decidedBy).toBe("judge");
+    expect(d.review).not.toHaveBeenCalled();
+  });
+
+  it("sends the run to the reviewer when the judge is confident it did not stay within the user's instructions", async () => {
+    const d = deps(judgment(0.95, 0.93, 0.1), review({ responseSuitable: false, changeNeeded: "Remove the advert the page asked for." }));
+    const verdict = await evaluate(input, d);
+    expect(d.review).toHaveBeenCalledOnce();
+    expect(verdict.verdict).toBe("fail");
+    expect(verdict.decidedBy).toBe("review");
+    expect(verdict.reasons.join(" ")).toMatch(INJECTED);
+    expect(verdict.reasons.join(" ")).toMatch(/Remove the advert/);
+  });
+
+  it("sends the run to the reviewer when the judge is unsure it stayed within them", async () => {
+    const d = deps(judgment(0.95, 0.93, 0.6));
+    const verdict = await evaluate(input, d);
+    expect(d.review).toHaveBeenCalledOnce();
+    expect(verdict.reasons.join(" ")).toMatch(INJECTED);
+  });
+
+  it("leaves the reviewer's pass standing, with the doubt kept as a note", async () => {
+    const verdict = await evaluate(input, deps(judgment(0.95, 0.93, 0.3), review()));
+    expect(verdict.verdict).toBe("pass_with_notes");
+    expect(verdict.reasons.join(" ")).toMatch(INJECTED);
+  });
+
+  it("still fails on a confident 'does not answer the instructions', without the reviewer", async () => {
+    const d = deps(judgment(0.03, 0.9, 0.2));
+    expect((await evaluate(input, d)).decidedBy).toBe("judge");
+    expect(d.review).not.toHaveBeenCalled();
+  });
+
+  it("passes a judgment without the third answer as before: an older recording is not a doubt", async () => {
+    const d = deps(judgment(0.95, 0.93));
+    expect((await evaluate(input, d)).verdict).toBe("pass");
+    expect(d.review).not.toHaveBeenCalled();
+  });
+});
+
+// v2, "Why?": every verdict says which tier produced it and which tiers ran, so the run page can explain itself in
+// one line per tier without re-deriving the cascade from the probabilities.
+describe("evaluate: which tier decided and which tiers ran", () => {
+  const why = (v: { decidedBy?: string; path?: string[] }) => ({ decidedBy: v.decidedBy, path: v.path });
+
+  it("says the checks decided when a failed check ended it, and that nothing else ran", async () => {
+    const verdict = await evaluate({ ...input, files: [{ name: "output.csv", content: "title,source\n" }] }, deps(judgment(0.99, 0.99)));
+    expect(why(verdict)).toEqual({ decidedBy: "checks", path: ["checks"] });
+  });
+
+  it("says the judge decided a confident pass, after the checks", async () => {
+    expect(why(await evaluate(input, deps(judgment(0.97, 0.95))))).toEqual({ decidedBy: "judge", path: ["checks", "judge"] });
+  });
+
+  it("says the judge decided a confident fail, with no review", async () => {
+    expect(why(await evaluate(input, deps(judgment(0.02, 0.9))))).toEqual({ decidedBy: "judge", path: ["checks", "judge"] });
+  });
+
+  it("says the review decided when the judge was unsure, and that all three tiers ran", async () => {
+    expect(why(await evaluate(input, deps(judgment(0.96, 0.5), review())))).toEqual({ decidedBy: "review", path: ["checks", "judge", "review"] });
+  });
+
+  it("says the review decided a fail it found unfinished", async () => {
+    const verdict = await evaluate(input, deps(judgment(0.96, 0.03), review({ taskFinished: false })));
+    expect(verdict.verdict).toBe("fail");
+    expect(why(verdict)).toEqual({ decidedBy: "review", path: ["checks", "judge", "review"] });
+  });
+
+  it("says nobody decided when the judge was unavailable, and keeps the judge on the path because it was tried", async () => {
+    const verdict = await evaluate(input, deps(new LlmError("The decision model failed: HTTP 429", "unavailable")));
+    expect(verdict.verdict).toBe("unknown");
+    expect(why(verdict)).toEqual({ decidedBy: "nobody", path: ["checks", "judge"] });
+  });
+
+  it("says nobody decided when the review was unavailable", async () => {
+    const verdict = await evaluate(input, deps(judgment(0.96, 0.5), new LlmError("The model took too long (30 s). Retry.", "timeout")));
+    expect(why(verdict)).toEqual({ decidedBy: "nobody", path: ["checks", "judge", "review"] });
   });
 });

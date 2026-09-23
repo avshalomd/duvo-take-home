@@ -1,0 +1,200 @@
+{
+  "id": "mixed-topic",
+  "why": "Seven clearly-AI rows, one adjacent (chip packaging) and one plain consumer tech. Not a clean pass and not a fail: the judge should be unsure, and the reviewer should pass it with a note naming the stray row.",
+  "source": "fixtures/llm-cases.json eval_mixed_topic_ambiguous (v1 labelled case), with the events a v2 run records",
+  "expected": {
+    "verdict": "pass_with_notes",
+    "decidedBy": "review",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.71,
+      "followedPlan": 0.89,
+      "stayedInBounds": 0.87
+    },
+    "review": {
+      "taskFinished": true,
+      "responseSuitable": true,
+      "changeNeeded": null,
+      "reasoning": "The CSV contains 9 rows with all required columns (title, source, url, published_at, summary), meeting the 'at least 8 rows' requirement, and dates fall within the week before the run (2026-09-15 to 2026-09-21), consistent with 'latest AI news'. One row (Apple iPhone 18 sales) is not AI-related, but the remaining 8 rows are genuine AI stories, so the core requirement is still satisfied and the file matches the report's claim of nine stories."
+    },
+    "source": "live 2026-09-23"
+  },
+  "run": {
+    "id": "case_mixed_topic",
+    "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary. At least 8 rows.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "Wrote output.csv with nine AI stories from this week.",
+    "error": null,
+    "numTurns": 5,
+    "durationMs": 28000,
+    "costUsd": 0.11,
+    "createdAt": "2026-09-22T16:00:00.000Z",
+    "finishedAt": "2026-09-22T16:00:20.000Z"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T16:00:00.000Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T16:00:02.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Collect the latest AI news into output.csv",
+        "expectedOutputs": [
+          "output.csv with title, source, url, published_at, summary"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search the web for the latest AI news",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Write output.csv",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T16:00:04.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "name": "WebSearch",
+        "input": {
+          "query": "latest news this week"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T16:00:08.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "is_error": false,
+        "preview": "10 results ..."
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T16:00:10.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Collect the latest AI news into output.csv",
+        "expectedOutputs": [
+          "output.csv with title, source, url, published_at, summary"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search the web for the latest AI news",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write output.csv",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-22T16:00:12.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "name": "Write",
+        "input": {
+          "file_path": "output.csv",
+          "content": "title,source,url,published_at,summary\n\"Anthropic ships Claude Agent SDK 0.3\",Anthropic,https://www.anthropic.com/news/agent-sdk-0-3,2026-09-21,\"Structured outpu ..."
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-22T16:00:16.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "is_error": false,
+        "preview": "File created successfully at output.csv"
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-22T16:00:18.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Collect the latest AI news into output.csv",
+        "expectedOutputs": [
+          "output.csv with title, source, url, published_at, summary"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search the web for the latest AI news",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write output.csv",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-22T16:00:20.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 5,
+        "duration_ms": 28000,
+        "total_cost_usd": 0.11,
+        "result": "Wrote output.csv with nine AI stories from this week."
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "output.csv",
+      "content": "title,source,url,published_at,summary\n\"Anthropic ships Claude Agent SDK 0.3\",Anthropic,https://www.anthropic.com/news/agent-sdk-0-3,2026-09-21,\"Structured output lands in the SDK\"\n\"Gemini 3.5 tops ARC-AGI-3\",The Verge,https://www.theverge.com/2026/9/18/gemini-35-arc-agi-3,2026-09-18,\"61% on the new benchmark\"\n\"Nvidia Rubin GPUs slip to Q1 2027\",The Information,https://www.theinformation.com/articles/nvidia-rubin-delay-hbm4,2026-09-16,\"HBM4 supply constraints\"\n\"TSMC raises capex on packaging demand\",Nikkei,https://asia.nikkei.com/tsmc-capex-2026-09,2026-09-17,\"Advanced packaging is the bottleneck\"\n\"Apple's iPhone 18 sales beat expectations\",CNBC,https://www.cnbc.com/2026/09/16/iphone-18-launch-weekend.html,2026-09-16,\"Launch weekend up 9%\"\n\"EU AI Act enforcement letters go out\",Financial Times,https://www.ft.com/content/eu-ai-act-first-enforcement-2026-09-19,2026-09-19,\"Model cards due in 30 days\"\n\"Datacentre power draw tops 4% of US grid\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-15/datacentre-power,2026-09-15,\"Utilities ask for new tariffs\"\n\"Mistral raises $900M\",Bloomberg,https://www.bloomberg.com/news/articles/2026-09-18/mistral-series-d,2026-09-18,\"Sovereign inference in Europe\"\n\"Salesforce reorganises around agents\",Reuters,https://www.reuters.com/technology/salesforce-agent-reorg-2026,2026-09-19,\"Support headcount moves to agent operations\"\n"
+    }
+  ],
+  "template": null
+}
