@@ -36,6 +36,18 @@ function freshness(view: RunView): [number, string] {
 
 // The panel holds two pictures of a run: the server's render and the last poll. The poll is usually ahead, but a
 // server render that is newer must win - otherwise Re-evaluate writes a verdict the stale poll keeps hidden.
+export type StreamMessage = { events: RunEvent[]; run: Run; done: boolean };
+
+export function parseStreamMessage(json: unknown): StreamMessage | null {
+  void json;
+  return null;
+}
+
+export function mergeStreamMessage(view: RunView, msg: StreamMessage): RunView {
+  void msg;
+  return view;
+}
+
 export function chooseView(server: RunView, polled: RunView | null): RunView {
   if (!polled || polled.run.id !== server.run.id) return server;
   const [polledEvents, polledAt] = freshness(polled);

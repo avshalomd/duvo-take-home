@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { LlmError } from "@/lib/llm/errors";
+import { RunLimitError } from "@/lib/runs/limits";
 import { readable } from "./readable";
 
 // Q60: an action's catch block used to hand the browser any Error.message, which is where a Postgres error puts
@@ -15,6 +16,16 @@ describe("readable", () => {
   it("forwards a validation message, which names the field the user must fix", () => {
     const bad = z.object({ url: z.url("A full http(s) URL") }).safeParse({ url: "nope" });
     expect(readable(bad.error)).toBe("A full http(s) URL");
+  });
+
+  it("forwards a limit's refusal, which says when to try again", () => {
+    expect(readable(new RunLimitError("Three runs are already in progress - try again in a minute"))).toBe(
+      "Three runs are already in progress - try again in a minute",
+    );
+  });
+
+  it("says a part that is still being built is not available yet, instead of 'something went wrong'", () => {
+    expect(readable(new Error("not implemented: cancelRun"))).toBe("That is not available yet - it is still being built");
   });
 
   it("turns a database or unknown error into one fixed sentence, and logs the original", () => {

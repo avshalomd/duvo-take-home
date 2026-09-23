@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseView, isTerminal, parseRunPayload, shouldPoll } from "./poll";
+import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, shouldPoll } from "./poll";
 
 const payload = {
   run: {
@@ -101,5 +101,53 @@ describe("chooseView - which of the two views the panel shows", () => {
 
   it("shows the server's render when nothing has been polled yet", () => {
     expect(chooseView(server, null)).toBe(server);
+  });
+});
+
+describe("isTerminal / shouldPoll - a stopped run has ended too", () => {
+  it("treats cancelled as settled: no more polling, and one refresh of the page", () => {
+    expect(isTerminal("cancelled")).toBe(true);
+    expect(shouldPoll("cancelled")).toBe(false);
+  });
+});
+
+// The events stream (/api/runs/<id>/events) sends {events, run, done} every second; the panel folds each message in.
+describe("parseStreamMessage - a stream message is validated like a poll", () => {
+  it("accepts the stream's shape", () => {
+    const msg = parseStreamMessage({ events: payload.events, run: payload.run, done: false });
+    expect(msg?.run.id).toBe("run_1");
+    expect(msg?.done).toBe(false);
+  });
+
+  it("returns null for anything else, so a changed shape falls back to polling instead of blanking the run", () => {
+    expect(parseStreamMessage({ events: [] })).toBeNull();
+    expect(parseStreamMessage("ping")).toBeNull();
+  });
+});
+
+describe("mergeStreamMessage - folding a stream message into what the panel shows", () => {
+  const server = parseRunPayload(payload)!;
+  const call = (seq: number) => ({ seq, at: "2026-09-22T09:14:10.000Z", kind: "tool_call" as const, payload: { tool_use_id: `t${seq}`, name: "WebFetch", input: { url: "https://x.example" } } });
+
+  it("adds the new events once each, in order, whether the stream sends all events or only the new ones", () => {
+    const all = mergeStreamMessage(server, parseStreamMessage({ events: [...payload.events, call(2)], run: payload.run, done: false })!);
+    expect(all.events.map((e) => e.seq)).toEqual([1, 2]);
+    const onlyNew = mergeStreamMessage(all, parseStreamMessage({ events: [call(4), call(3)], run: payload.run, done: false })!);
+    expect(onlyNew.events.map((e) => e.seq)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("takes the run from the message and derives the state again from the merged events", () => {
+    const check = { seq: 2, at: "2026-09-22T09:14:10.000Z", kind: "check" as const, payload: { stepIndex: 0, onTrack: 0.3, note: "off track" } };
+    const next = mergeStreamMessage(server, parseStreamMessage({ events: [check], run: { ...payload.run, status: "evaluating" }, done: false })!);
+    expect(next.run.status).toBe("evaluating");
+    expect(next.state.status).toBe("evaluating");
+    expect(next.state.stepChecks).toEqual([{ stepIndex: 0, onTrack: 0.3, note: "off track" }]);
+    expect(next.state.toolsUsed).toEqual(["WebSearch"]);
+  });
+
+  it("keeps the files and the verdict, which the stream does not carry", () => {
+    const next = mergeStreamMessage(server, parseStreamMessage({ events: [], run: payload.run, done: false })!);
+    expect(next.files).toEqual(server.files);
+    expect(next.verdict).toBe(server.verdict);
   });
 });
