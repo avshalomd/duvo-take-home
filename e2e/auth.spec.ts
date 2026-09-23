@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DEMO_EMAIL, DEMO_PASSWORD, SIGNED_OUT, deleteUsers, e2eEmail, signInThroughUi, signUpThroughUi } from "./auth-helpers";
+import { DEMO_EMAIL, DEMO_PASSWORD, SIGNED_OUT, deleteUsers, e2eEmail, formError, signInThroughUi, signUpThroughUi } from "./auth-helpers";
 
 // Getting in and out. Local only (it creates accounts):
 // BASE_URL=http://localhost:3004 npx playwright test e2e/auth.spec.ts
@@ -22,13 +22,13 @@ test("signing up with an email that already has an account says so", async ({ pa
   await page.getByLabel("Email").fill(DEMO_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill("another-password");
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("alert")).toHaveText("There is already an account with that email. Sign in instead.");
+  await expect(formError(page)).toHaveText("There is already an account with that email. Sign in instead.");
 });
 
 test("a wrong password shows the error and stays on the sign-in page", async ({ page }) => {
   await page.goto("/sign-in");
   await signInThroughUi(page, DEMO_EMAIL, "not-the-password");
-  await expect(page.getByRole("alert")).toHaveText("That email and password do not match.");
+  await expect(formError(page)).toHaveText("That email and password do not match.");
   await expect(page).toHaveURL(/\/sign-in/);
 });
 

@@ -18,6 +18,9 @@ export function e2eEmail(what: string) {
   return `e2e-${what}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}@example.com`;
 }
 
+// The form's error: role="alert" with text. Next's route announcer is an empty role="alert" on every page.
+export const formError = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
+
 export async function signUpThroughUi(page: Page, name: string, email: string) {
   await page.goto("/sign-up");
   await page.getByLabel("Your name").fill(name);

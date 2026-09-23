@@ -5,7 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { member, organization, session, user } from "@/db/schema";
 import { auth } from "./auth";
-import { createInvite, listMembers, listWorkspaces } from "./members";
+import { createInvite, getInvitation, listMembers, listWorkspaces } from "./members";
 import { sessionFromHeaders } from "./session";
 
 const created: string[] = []; // emails, so afterAll deletes only what this file made
@@ -122,6 +122,27 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
 
     // accepting makes the invited workspace the active one, so the guest lands in it
     expect((await sessionFromHeaders(guest.headers))?.workspaceId).toBe(ownerCtx.workspaceId);
+  });
+
+  it("the invitation page can say who invited whom before anyone signs in, and the link closes once used", async () => {
+    const owner = await signUp("Ivy Inviter", email("inviter"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+    const guestEmail = email("invitee");
+    const { link } = await createInvite(owner.headers, ownerCtx, { email: guestEmail, role: "member" });
+    const invitationId = link.split("/invite/")[1];
+
+    expect(await getInvitation(invitationId)).toEqual({
+      id: invitationId,
+      email: guestEmail,
+      workspaceName: "Ivy's workspace",
+      inviterName: "Ivy Inviter",
+      open: true,
+    });
+
+    const guest = await signUp("Ian Invitee", guestEmail);
+    await auth.api.acceptInvitation({ body: { invitationId }, headers: guest.headers });
+    expect((await getInvitation(invitationId))?.open).toBe(false);
+    expect(await getInvitation("int-no-such-invitation")).toBeNull();
   });
 
   it("inviting the same email twice gives the same link instead of an error", async () => {
