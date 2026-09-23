@@ -118,7 +118,7 @@ describe("feedbackForAgent", () => {
     const review: Review = { taskFinished: false, responseSuitable: false, changeNeeded: "Fill in the TBD entries.", reasoning: "Two entries say TBD." };
     const text = feedbackForAgent(verdictOf([EVERY_CHECK[6][1]()], { review, judgment: { answeredQuery: 0.4, followedPlan: 0.9 } }));
     expect(text.indexOf("at least 2")).toBeLessThan(text.indexOf("Fill in the TBD entries."));
-    expect(text.indexOf("Fill in the TBD entries.")).toBeLessThan(text.indexOf("instructions ask for"));
+    expect(text.indexOf("Fill in the TBD entries.")).toBeLessThan(text.indexOf("check the result against them")); // the judge's own phrase
   });
 
   it("ends by asking for the files fixed in place and a report of the change", () => {
@@ -133,6 +133,13 @@ describe("feedbackForAgent", () => {
     expect(text.length).toBeLessThanOrEqual(1200);
     expect(text).toMatch(/more/); // what did not fit is counted, not silently dropped
     expect(text.endsWith("report what you changed.")).toBe(true);
+  });
+
+  it("calls a pass with notes' findings notes, not faults, when it is carried into 'Ask for a change'", () => {
+    const review: Review = { taskFinished: true, responseSuitable: true, changeNeeded: null, reasoning: "One row is consumer tech, not AI." };
+    const text = feedbackForAgent(verdictOf([], { verdict: "pass_with_notes", review, decidedBy: "review" }));
+    expect(text.startsWith("An automatic check of the result noted:")).toBe(true);
+    expect(feedbackForAgent(verdictOf([EVERY_CHECK[6][1]()])).startsWith("An automatic check of the result found this to fix:")).toBe(true);
   });
 
   it("has nothing to say about a clean pass", () => {

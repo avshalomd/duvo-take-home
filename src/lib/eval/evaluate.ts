@@ -17,7 +17,7 @@ export type EvaluateDeps = {
 
 // Jev's probabilities are calibrated, so the bar is set from the labelled runs, not by taste: the clean run comes
 // back 0.89/0.84 and the genuinely ambiguous one 0.74/0.75, so 0.80 is what separates "call it" from "look again".
-const CONFIDENT = 0.8;
+export const CONFIDENT = 0.8; // exported: the feedback to the agent names a doubt at the same bar (feedback.ts)
 
 export const evaluateRun: EvaluateRun = async (input) => evaluate(input, { judge: judgeRun, review: reviewRun });
 
