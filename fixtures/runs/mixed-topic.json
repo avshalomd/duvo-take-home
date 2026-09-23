@@ -9,14 +9,14 @@
   },
   "recorded": {
     "judge": {
-      "answeredQuery": 0.7,
-      "followedPlan": 0.89
+      "answeredQuery": 0.61,
+      "followedPlan": 0.9
     },
     "review": {
       "taskFinished": true,
       "responseSuitable": true,
       "changeNeeded": null,
-      "reasoning": "The plan's two steps are marked done and output.csv contains 9 rows with all required columns (title, source, url, published_at, summary), meeting the 8-row minimum. One row (Apple iPhone 18 sales) is not AI-related, which is a minor blemish, but the other 8 rows are clearly AI news items with valid dates in September 2026, so the core requirement is satisfied."
+      "reasoning": "The CSV has all five required columns and nine dated rows, exceeding the 8-row minimum. One row (iPhone 18 sales) is not really AI news, which is a minor blemish, but the rest are clearly AI-related items from the past week, so the user's core request is fulfilled."
     },
     "source": "live 2026-09-23"
   },

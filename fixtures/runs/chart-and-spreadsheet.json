@@ -9,11 +9,11 @@
   },
   "recorded": {
     "judge": {
-      "answeredQuery": 0.9,
-      "followedPlan": 0.9
+      "answeredQuery": 0.94,
+      "followedPlan": 0.96
     },
     "review": null,
-    "source": "hand-set: the stored verdict never reached the judge; replaced by live answers with RECORD=1 when the live run agrees"
+    "source": "live 2026-09-23"
   },
   "run": {
     "id": "735759f8-ce7c-4dea-b930-f53155e2683c",
