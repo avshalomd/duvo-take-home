@@ -58,16 +58,20 @@ export function stoppedTotals(args: {
   turns: number;
   costBase?: number;
 }): { costUsd: number | null; durationMs: number; numTurns: number } {
+  const base = args.costBase ?? 0;
   // Stopped during the evaluation: the agent had finished, and its result says exactly what it cost.
-  if (args.end) return { costUsd: args.end.total_cost_usd, durationMs: args.end.duration_ms, numTurns: args.end.num_turns };
+  if (args.end) return { costUsd: ownCost(args.end.total_cost_usd, base), durationMs: args.end.duration_ms, numTurns: args.end.num_turns };
   return {
-    costUsd: args.sdk?.costUsd ?? null, // no number rather than a guess: a token count misses the search helper's cost
+    costUsd: args.sdk ? ownCost(args.sdk.costUsd, base) : null, // no number rather than a guess: a token count misses the search helper's cost
     durationMs: args.sdk?.durationMs ?? args.now - args.startedAt,
     numTurns: args.turns,
   };
 }
 
-/** A run's own share of the SDK's session total. */
+/**
+ * A run's own share of the SDK's session total. A resumed or forked session "continues from the total its transcript
+ * saved", so a follow-up's total carries its parent's again; `base` is that saved total (0 for a fresh session).
+ */
 export function ownCost(sessionTotal: number, base: number): number {
-  throw new Error(`not implemented: ownCost(${sessionTotal}, ${base})`);
+  return Math.max(0, sessionTotal - base); // never negative: the SDK's figure is an estimate, not a ledger
 }
