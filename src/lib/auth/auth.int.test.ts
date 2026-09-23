@@ -316,7 +316,8 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
 
 // Q169: owners and admins remove people and change roles from the Members page. Better Auth does the change with the
 // asker's headers (its own permission rules apply); the app's rules (lib/auth/member-rules.ts) are asked first.
-describe.skipIf(!process.env.DATABASE_URL)("removing people and changing roles", () => {
+// 20 s a test: each builds a workspace of three people through Better Auth (sign-ups, invitations, acceptances)
+describe.skipIf(!process.env.DATABASE_URL)("removing people and changing roles", { timeout: 20_000 }, () => {
   /** An owner's workspace with an admin and a plain member in it, each joined by accepting an invitation. */
   async function team(tag: string) {
     const owner = await signUp("Olga Owner", email(`${tag}-owner`));
