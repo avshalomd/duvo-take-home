@@ -485,6 +485,16 @@ test.describe("a run that fixes what the check found", () => {
     await expect(details.getByTestId("state-card")).toContainText("$0.170");
   });
 
+  // the steps were drawn as red circles with a check mark: "done" and "failed" at once. The steps did run; the
+  // outcome line is where the result's failure is said
+  test("on a run whose result did not pass, the steps that ran look done and only the outcome is red", async ({ page }) => {
+    const panel = await openRun(page, runs.unfixed);
+    await expect(panel.getByTestId("outcome")).toContainText("Did not pass");
+    const done = panel.getByTestId("thread").getByText("Done", { exact: true });
+    await expect(done).toHaveCount(5); // the plan's three steps and the two fixes
+    for (const node of await done.all()) await expect(node.locator("..")).toHaveCSS("background-color", "rgb(21, 132, 90)"); // fern
+  });
+
   test("a run the fixes did not save says so once, and Ask for a change starts from what did not pass", async ({ page }) => {
     const panel = await openRun(page, runs.unfixed);
     await expect(panel.getByTestId("outcome")).toHaveText("Did not pass after 2 attempts to fix it");
