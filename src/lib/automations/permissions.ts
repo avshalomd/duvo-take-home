@@ -25,11 +25,14 @@ export function refusalFor(role: SessionCtx["role"], act: GovernedAct): string |
   return canGovernAutomations(role) ? null : REFUSAL[act];
 }
 
+export const APPROVED_COMMAND_LOCKED = "Only an owner or an admin can change the command of an approved automation.";
+
 /**
  * A draft's command is anyone's to change. Once approved (Ready or Off), people call it by that command, and renaming it
- * takes it from them with no approval step, so only an owner or an admin may. Null when allowed.
+ * takes it from them with no approval step, so only an owner or an admin may. Null when allowed. The store's write
+ * holds the same rule (updateAutomation), since an approval can land between this check and the save.
  */
 export function commandRefusal(role: SessionCtx["role"], status: AutomationStatus): string | null {
   if (status === "draft" || canGovernAutomations(role)) return null;
-  return "Only an owner or an admin can change the command of an approved automation.";
+  return APPROVED_COMMAND_LOCKED;
 }

@@ -8,7 +8,7 @@ import { readError } from "@/lib/automations/errors";
 import type { EditValues } from "@/lib/automations/form";
 import { parseEditForm } from "@/lib/automations/form";
 import { draftFromRun } from "@/lib/automations/from-run";
-import { commandRefusal, refusalFor } from "@/lib/automations/permissions";
+import { canGovernAutomations, commandRefusal, refusalFor } from "@/lib/automations/permissions";
 import { choiceToCron } from "@/lib/automations/schedule-local";
 import { isTimeZone } from "@/lib/automations/schedule";
 import {
@@ -75,7 +75,8 @@ export async function saveAutomationAction(_prev: EditState, formData: FormData)
     if (refused) return { error: refused, values: parsed.values };
   }
   try {
-    const saved = await updateAutomation(workspaceId, id.data, parsed.edit);
+    // the store's write holds the rule again: an approval can land between the check above and this save (review R2)
+    const saved = await updateAutomation(workspaceId, id.data, parsed.edit, { mayRenameApproved: canGovernAutomations(await role()) });
     refresh(id.data);
     const bumped = saved.version !== Number(field(formData, "version")); // the version the form was rendered with
     // a member cannot approve (Q178), so their next step names who does

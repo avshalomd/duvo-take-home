@@ -8,6 +8,7 @@ import {
   HumanVerdictInput,
   type ApproveAutomation,
   type Automation,
+  type AutomationEdit,
   type CreateAutomationDraft,
   type GetActiveByCommand,
   type GetAutomation,
@@ -27,6 +28,7 @@ import { startRun } from "@/lib/runs/start";
 import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName } from "./command";
 import { missingConnections } from "./connections";
 import { AutomationError } from "./errors";
+import { APPROVED_COMMAND_LOCKED } from "./permissions";
 import { outcomeOf } from "./outcome";
 import { nextRunAt } from "./schedule";
 import { canApprove, changesThePrompt, fillTemplate } from "./template";
@@ -157,16 +159,22 @@ export const createAutomationDraft: CreateAutomationDraft = async (ctx, draft, f
 /**
  * Saves the editor. An edit that changes what the agent is told bumps the version and sends the automation back to
  * draft, so its earlier examples stop counting and it needs a new approved one (his rule).
+ *
+ * `mayRenameApproved`: whether the caller may change an approved automation's command (an owner or an admin, Q178).
+ * When they may not and the command changes, the write itself only matches a draft (review R2): an approval landing
+ * between the caller's check and this save then refuses the rename instead of letting it through. Not said: refused.
  */
-export const updateAutomation: UpdateAutomation = async (workspaceId, id, edit) => {
+export const updateAutomation = (async (workspaceId: string, id: string, edit: AutomationEdit, { mayRenameApproved = false } = {}) => {
   const current = await mustGet(workspaceId, id);
-  if (edit.command !== current.command) {
+  const renames = edit.command !== current.command;
+  if (renames) {
     const [clash] = await db
       .select({ name: automations.name })
       .from(automations)
       .where(and(eq(automations.workspaceId, workspaceId), eq(automations.command, edit.command), ne(automations.id, id)));
     if (clash) throw new AutomationError(`/${edit.command} is already used by "${clash.name}". Pick another command.`);
   }
+  const onlyADraft = renames && !mayRenameApproved;
   const bump = changesThePrompt(current, edit);
   const [row] = await db
     .update(automations)
@@ -181,10 +189,15 @@ export const updateAutomation: UpdateAutomation = async (workspaceId, id, edit) 
       ...(bump ? { version: sql`${automations.version} + 1`, status: "draft", approvedAt: null } : {}),
       updatedAt: new Date(),
     })
-    .where(inWorkspace(workspaceId, id))
+    // status as it is before this write: an edit that sends it back to draft does not open the rename
+    .where(and(inWorkspace(workspaceId, id), onlyADraft ? eq(automations.status, "draft") : undefined))
     .returning();
+  if (!row) {
+    await mustGet(workspaceId, id); // deleted meanwhile: say that, not the rename rule
+    throw new AutomationError(APPROVED_COMMAND_LOCKED);
+  }
   return toAutomation(row);
-};
+}) satisfies UpdateAutomation;
 
 export const approveAutomation: ApproveAutomation = async (workspaceId, id) => {
   const a = await mustGet(workspaceId, id);
