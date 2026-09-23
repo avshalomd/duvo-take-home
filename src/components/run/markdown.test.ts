@@ -110,6 +110,11 @@ describe("reportBlocks - the report as it sits under the page's own heading", ()
     expect(reportBlocks("# Report on the Moon\nFar.")[0]).toMatchObject({ kind: "heading" });
   });
 
+  it("drops an opening line that is only a bold Report:, the heading written as a paragraph (production, 2026-09-23)", () => {
+    expect(reportBlocks("**Report:**\n\nI redrew the chart.")).toEqual([{ kind: "paragraph", spans: [{ text: "I redrew the chart." }] }]);
+    expect(reportBlocks("**Report:** I redrew the chart.")[0]).toMatchObject({ kind: "paragraph" }); // a sentence stays
+  });
+
   it("keeps a heading called Report further down", () => {
     expect(reportBlocks("Intro.\n\n## Report\nFar.").map((b) => b.kind)).toEqual(["paragraph", "heading", "paragraph"]);
   });
