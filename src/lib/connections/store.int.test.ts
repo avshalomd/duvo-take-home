@@ -285,16 +285,24 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
       expect((await secretOf(A, added.id))!.token).toBe("secret-value");
     });
 
-    it("does not delete another workspace's connection", async () => {
+    // Security QA: these used to succeed silently, so the page said "done" while nothing had changed.
+    it("does not delete another workspace's connection, and says it was not found", async () => {
       const added = await addConnection(A, { name: named("iso delete"), url: "https://example.com/id", transport: "http" });
-      await deleteConnection(B, added.id);
+      await expect(deleteConnection(B, added.id)).rejects.toThrow(/could not be found/);
       expect(await rawRow(added.id)).toBeDefined();
     });
 
-    it("does not toggle another workspace's connection", async () => {
+    it("does not toggle another workspace's connection, and says it was not found", async () => {
       const added = await addConnection(A, { name: named("iso toggle"), url: "https://example.com/it", transport: "http" });
-      await setConnectionEnabled(B, added.id, false);
+      await expect(setConnectionEnabled(B, added.id, false)).rejects.toThrow(/could not be found/);
       expect((await rawRow(added.id)).enabled).toBe(true);
+    });
+
+    it("says a connection deleted meanwhile was not found, when it is toggled or deleted again", async () => {
+      const added = await addConnection(A, { name: named("gone"), url: "https://example.com/gone", transport: "http" });
+      await deleteConnection(A, added.id);
+      await expect(deleteConnection(A, added.id)).rejects.toThrow(/could not be found/);
+      await expect(setConnectionEnabled(A, added.id, true)).rejects.toThrow(/could not be found/);
     });
 
     it("does not write OAuth state into another workspace's connection", async () => {

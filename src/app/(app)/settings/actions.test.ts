@@ -16,7 +16,9 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/lib/connections/store", () => ({
   ...store,
-  ConnectionNotFoundError: class extends Error {},
+  ConnectionNotFoundError: class extends Error {
+    message = "That connection could not be found. It may have been deleted - reload the page.";
+  },
   ConnectionNameTakenError: class extends Error {},
   PrivateAddressError: class extends Error {
     message = "That address points at a private or local network, which a connection cannot reach";
@@ -95,5 +97,15 @@ describe("a connection address that resolves to a private network", () => {
     const out = await writes[what]();
     expect(out.fieldErrors?.url).toEqual(["That address points at a private or local network, which a connection cannot reach"]);
     expect(out.values).toMatchObject({ url: "https://attacker.example/mcp" });
+  });
+});
+
+// Security QA: another workspace's id (or one deleted meanwhile) used to answer {} while nothing changed.
+describe("toggling or deleting a connection that is not this workspace's", () => {
+  it.each(["delete", "toggle"] as const)("says it was not found instead of reporting success (%s)", async (what) => {
+    session.role = "owner";
+    const { ConnectionNotFoundError } = await import("@/lib/connections/store");
+    (what === "delete" ? store.deleteConnection : store.setConnectionEnabled).mockRejectedValueOnce(new ConnectionNotFoundError());
+    expect(await writes[what]()).toEqual({ error: "That connection could not be found. It may have been deleted - reload the page." });
   });
 });
