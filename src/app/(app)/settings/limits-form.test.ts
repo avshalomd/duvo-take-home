@@ -58,6 +58,25 @@ describe("parseLimitsForm", () => {
     expect(!out.ok && out.fieldErrors.maxInFlight?.[0]).toMatch(/between 1 and 10/);
   });
 
+  it("reads how many times the agent may fix its own result, 0 meaning off", () => {
+    const three = parseLimitsForm(form({ ...valid, autoHealAttempts: "3" }));
+    const off = parseLimitsForm(form({ ...valid, autoHealAttempts: "0" }));
+    expect(three.ok && three.limits.autoHealAttempts).toBe(3);
+    expect(off.ok && off.limits.autoHealAttempts).toBe(0);
+  });
+
+  it("keeps the default of 2 tries when the form has no such row", () => {
+    const out = parseLimitsForm(form({ ...valid, autoHealAttempts: undefined }));
+    expect(out.ok && out.limits.autoHealAttempts).toBe(2);
+  });
+
+  it("refuses more than 5 tries, or a fraction of one, in a sentence", () => {
+    const six = parseLimitsForm(form({ ...valid, autoHealAttempts: "6" }));
+    const half = parseLimitsForm(form({ ...valid, autoHealAttempts: "1.5" }));
+    expect(!six.ok && six.fieldErrors.autoHealAttempts?.[0]).toBe("Give a whole number of tries between 0 and 5.");
+    expect(half.ok).toBe(false);
+  });
+
   it("reads blocked websites one per line, lower-cased, without blank lines or repeats", () => {
     const out = parseLimitsForm(form({ ...valid, deniedDomains: "Example.com\n\n  pastebin.com  \nexample.com\r\n" }));
     expect(out.ok && out.limits.deniedDomains).toEqual(["example.com", "pastebin.com"]);

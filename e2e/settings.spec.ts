@@ -216,6 +216,33 @@ test("a changed limit is saved and shown again after a reload", async ({ page })
   await expect(page.getByLabel("Runs per day", { exact: true })).toHaveValue(before);
 });
 
+test("how often the agent may fix its own result is saved, and 0 reads Off", async ({ page }) => {
+  await open(page, "/settings/limits");
+  const LABEL = "Let the agent fix its own result";
+  const row = page.getByRole("listitem").filter({ hasText: LABEL });
+  const field = page.getByLabel(LABEL, { exact: true });
+  await expect(page.getByText("When the check finds a problem, the agent is told what failed and tries again, up to this many times.")).toBeVisible();
+  const before = await field.inputValue();
+
+  await field.fill("0");
+  await field.blur();
+  await expect(row.getByText("Off", { exact: true })).toBeVisible(); // 0 tries is the switch turned off, said as such
+  await page.getByRole("button", { name: "Save limits" }).click();
+  await expect(page.getByText("Limits saved")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel(LABEL, { exact: true })).toHaveValue("0");
+  await expect(page.getByRole("listitem").filter({ hasText: LABEL }).getByText("Off", { exact: true })).toBeVisible();
+
+  // one press of + turns it back on with one try; then put the shared demo workspace back as it was
+  await page.getByRole("button", { name: `Raise: ${LABEL}` }).click();
+  await expect(page.getByLabel(LABEL, { exact: true })).toHaveValue("1");
+  await page.getByLabel(LABEL, { exact: true }).fill(before);
+  await page.getByRole("button", { name: "Save limits" }).click();
+  await expect(page.getByText("Limits saved").first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel(LABEL, { exact: true })).toHaveValue(before);
+});
+
 test("the members list shows who is in the workspace and their role", async ({ page }) => {
   await open(page, "/settings/members");
   await expect(page.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");

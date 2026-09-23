@@ -53,6 +53,19 @@ describe("renderChartSvg", () => {
     expect(svg).not.toContain("…");
   });
 
+  // Q141: a white slab in a dark tile. The chart is transparent and carries its colours for both schemes.
+  it("renders on a transparent background, with no opaque rectangle behind the chart", async () => {
+    const svg = await renderChartSvg(buildChartSpec({ title: "EU population", kind: "bar", data: countries, x: "country", y: "population" }));
+    expect(svg).not.toMatch(/^<svg[^>]*>(<style>[\s\S]*?<\/style>)?<rect/); // vega draws its background as the first rect
+    expect(svg).not.toContain('fill="#FFFFFF"/>');
+  });
+
+  it("carries a style block with a dark-scheme section, so an <img> of it follows the viewer's scheme", async () => {
+    const svg = await renderChartSvg(buildChartSpec({ title: "EU population", kind: "pie", data: countries, x: "country", y: "population" }));
+    expect(svg).toMatch(/^<svg[^>]*><style>/);
+    expect(svg).toContain("@media (prefers-color-scheme: dark)");
+  });
+
   it("escapes the title, so an ampersand from the agent cannot break the SVG", async () => {
     const svg = await renderChartSvg(buildChartSpec({ title: "Sales & costs", kind: "bar", data: countries, x: "country", y: "population" }));
     expect(svg).toContain("Sales &amp; costs");

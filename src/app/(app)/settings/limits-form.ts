@@ -13,6 +13,7 @@ const SENTENCE: Record<string, string> = {
   dailyRunLimit: "Give a whole number of runs between 1 and 1000.",
   maxInFlight: "Give a whole number between 1 and 10.",
   deniedDomains: "Keep the list to 100 websites or fewer.",
+  autoHealAttempts: "Give a whole number of tries between 0 and 5.",
 };
 
 // A website name: labels of letters, digits and hyphens, joined by dots, ending in a top-level domain.
