@@ -1,5 +1,9 @@
-/** Read at call time, not at import: the worker sets RUNNER=queue for itself before it starts anything. */
-export const runnerMode = (): "inline" | "queue" => (process.env.RUNNER === "queue" ? "queue" : "inline");
+/**
+ * Read at call time, not at import: the worker sets RUNNER=queue for itself before it starts anything.
+ * RUNNER=route is for Vercel: each run goes to /api/runner/<id>, the only function that carries the agent's binary.
+ */
+export const runnerMode = (): "inline" | "queue" | "route" =>
+  process.env.RUNNER === "queue" ? "queue" : process.env.RUNNER === "route" ? "route" : "inline";
 
 /**
  * Can a schedule fire in this deployment? Something must call tickSchedules: the worker (RUNNER=queue) every 30 s,

@@ -9,11 +9,11 @@ import type { Verdict } from "@/contracts/eval";
 export const MIN_HEAL_MS = 60_000; // a shorter attempt would be cut off half way by the wall clock
 
 /**
- * How long a run may spend on the agent, all attempts together. Inline, the run lives inside one function call
- * (300 s on Vercel), so every attempt shares the one wall clock. In the worker there is no function limit, but a
+ * How long a run may spend on the agent, all attempts together. Inline or in the runner route, the run lives inside
+ * one function call (300 s on Vercel), so every attempt shares the one wall clock. In the worker there is no function limit, but a
  * job locked for 10 minutes is taken for dead (recover.ts): 6 minutes leaves room for the evaluations.
  */
-export function runBudgetMs(mode: "inline" | "queue"): number {
+export function runBudgetMs(mode: "inline" | "queue" | "route"): number {
   return mode === "queue" ? 6 * 60_000 : AgentLimits.wallClockMs;
 }
 

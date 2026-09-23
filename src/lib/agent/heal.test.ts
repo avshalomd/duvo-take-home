@@ -8,6 +8,10 @@ describe("runBudgetMs", () => {
     expect(runBudgetMs("inline")).toBe(AgentLimits.wallClockMs);
   });
 
+  it("in the runner route, the same: the run lives inside one function call there too", () => {
+    expect(runBudgetMs("route")).toBe(AgentLimits.wallClockMs);
+  });
+
   it("in the worker, allows more but stays under the 10-minute stale lock, so a healing run is never taken for dead", () => {
     expect(runBudgetMs("queue")).toBe(6 * 60_000);
   });
