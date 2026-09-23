@@ -20,7 +20,7 @@ export function chartCheck(file: File): Check {
   // axes carry the same role, so they are left out: a chart of axes and a title has drawn no data.
   const marks = [...svg.matchAll(/<[^>]*\brole="graphics-symbol"[^>]*>/g)].filter((m) => !/aria-roledescription="(title|axis|legend)"/.test(m[0])).length;
   // Text labels are the axis labels and legends; a title drawn as text is not a label.
-  const labels = [...svg.matchAll(/<text\b[^>]*>([^<]*)<\/text>/g)].filter((m) => m[1].trim()).length - (title.drawn ? 1 : 0);
+  const labels = [...svg.matchAll(TEXT)].filter((m) => textOf(m[1])).length - (title.drawn ? 1 : 0);
   if (!broken && marks + labels <= 0) problems.push("nothing drawn: no mark and no text label");
   return {
     id: "chart",
@@ -55,11 +55,18 @@ function wellFormedProblem(svg: string): string | null {
   return open.length ? `<${open[open.length - 1]}> is never closed` : null;
 }
 
+const TEXT = /<text\b[^>]*>([\s\S]*?)<\/text>/g;
+
+// What a <text> element reads: a long title the chart tool breaks onto two lines is two <tspan>s inside it, and
+// reading only up to the first "<" found nothing there - a correct chart failed as "no title" (production, 2026-09-23).
+const textOf = (inner: string) => inner.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
 /** The standard <title> element, or the title vega draws as a text mark labelled "title". */
 function titleOf(svg: string): { text: string; drawn: boolean } {
   const own = svg.match(/<title\b[^>]*>([^<]*)<\/title>/)?.[1]?.trim();
   if (own) return { text: own, drawn: false };
-  const drawn = svg.match(/aria-roledescription="title"[^>]*>\s*<text\b[^>]*>([^<]*)<\/text>/)?.[1]?.trim();
+  const inner = svg.match(/aria-roledescription="title"[^>]*>\s*<text\b[^>]*>([\s\S]*?)<\/text>/)?.[1];
+  const drawn = inner ? textOf(inner) : "";
   return drawn ? { text: drawn, drawn: true } : { text: "", drawn: false };
 }
 
