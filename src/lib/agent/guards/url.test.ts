@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Plan } from "@/contracts/run";
-import type { AskExfiltration, ExfiltrationState } from "./exfiltration";
-import { isDeniedHost, isPrivateHost, urlCheck } from "./url";
+import type { HostVerdict } from "@/lib/net/address";
+import { JEV_TIMEOUT_MS, type AskExfiltration, type ExfiltrationState } from "./exfiltration";
+import { isDeniedHost, isPrivateHost, urlCheck as check } from "./url";
+
+// No DNS in unit tests: every name is public unless a test says where it leads.
+const allPublic = async (): Promise<HostVerdict> => ({ reach: "public" });
+const urlCheck = (c: Parameters<typeof check>[0], ask?: AskExfiltration, timeoutMs = JEV_TIMEOUT_MS, reach = allPublic) =>
+  check(c, ask, timeoutMs, reach);
 
 // The url guard stands between WebFetch and the network. Permissions are bypassed, so a page the agent reads
 // could tell it to fetch our own network or to carry the task's data out in a query string.
@@ -44,6 +50,12 @@ describe("url guard: private and local addresses", () => {
     "http://[::1]:8080/",
     "http://metadata.google.internal/computeMetadata/v1/",
     "http://2130706433/", // 127.0.0.1 written as one number: the URL parser turns it back into 127.0.0.1
+    // Security QA: spellings the old rule let through
+    "http://[::]:3000/",
+    "http://[::7f00:1]/",
+    "http://100.100.100.200/latest/meta-data/", // Alibaba Cloud's metadata address, in carrier-grade NAT space
+    "http://[64:ff9b::a9fe:a9fe]/", // NAT64 of 169.254.169.254
+    "http://[::ffff:a9fe:a9fe]/", // IPv4-mapped 169.254.169.254
   ])("blocks %s without asking Jev", async (url) => {
     const v = await urlCheck(ctx(), notAsked)("WebFetch", fetchOf(url));
     expect(v.decision).toBe("blocked");
@@ -60,6 +72,21 @@ describe("url guard: private and local addresses", () => {
     expect(isPrivateHost("news.ycombinator.com")).toBe(false);
     const v = await urlCheck(ctx(), notAsked)("WebFetch", fetchOf("https://news.ycombinator.com/item?id=1"));
     expect(v.decision).toBe("allowed");
+  });
+
+  it("blocks a public-looking name that resolves to a private address, without asking Jev", async () => {
+    const rebinds = async (host: string): Promise<HostVerdict> =>
+      host === "rebind.example.com" ? { reach: "internal", address: "169.254.169.254" } : { reach: "public" };
+    const v = await urlCheck(ctx(), notAsked, JEV_TIMEOUT_MS, rebinds)("WebFetch", fetchOf("https://rebind.example.com/latest/meta-data/"));
+    expect(v).toMatchObject({ decision: "blocked", target: "rebind.example.com" });
+    expect(v.reason).toMatch(/leads to a private or local address/i);
+  });
+
+  it("blocks a name whose address could not be looked up, since it was not seen to be public", async () => {
+    const unknown = async (): Promise<HostVerdict> => ({ reach: "unknown" });
+    const v = await urlCheck(ctx(), notAsked, JEV_TIMEOUT_MS, unknown)("WebFetch", fetchOf("https://nowhere.example/"));
+    expect(v).toMatchObject({ decision: "blocked", target: "nowhere.example" });
+    expect(v.reason).toMatch(/could not be found/i);
   });
 
   it("blocks an address that is not a web page, such as file:", async () => {

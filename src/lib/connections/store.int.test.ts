@@ -1,6 +1,6 @@
 // The connections store against the real table. `npm run test:int`. The database is shared with other agents, so
 // everything here lives in two workspaces of its own ("int-settings-a", "int-settings-b") and is deleted afterwards.
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { connections } from "@/db/schema";
@@ -14,6 +14,14 @@ import {
   setConnectionOAuth,
   updateConnection,
 } from "./store";
+
+// One name resolves inside our network, as a rebinding attacker's would; every other name is looked up for real.
+vi.mock("node:dns/promises", async (importOriginal) => {
+  const real = await importOriginal<typeof import("node:dns/promises")>();
+  const lookup = (async (host: string, options: object) =>
+    host === "int-rebind.example.com" ? [{ address: "10.0.0.7", family: 4 }] : real.lookup(host, options as never)) as typeof real.lookup;
+  return { ...real, lookup, default: { ...real, lookup } };
+});
 
 const A = "int-settings-a"; // tenancy: every call names the workspace, as the session would
 const B = "int-settings-b";
@@ -106,6 +114,26 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
       const added = await addConnection(A, { name: named("private"), url: "https://example.com/p", transport: "http" });
       await expect(updateConnection(A, added.id, { ...edited(), url: "http://169.254.169.254/latest" })).rejects.toThrow(/private or local network/);
       expect((await rawRow(added.id)).url).toBe("https://example.com/p");
+    });
+  });
+
+  // Security QA: the contract reads the address as typed; a name is looked up before the row is written.
+  describe("an address whose name resolves to a private network", () => {
+    it("refuses to add it, and saves nothing", async () => {
+      const input = { name: named("rebind add"), url: "https://int-rebind.example.com/mcp", transport: "http" as const };
+      await expect(addConnection(A, input)).rejects.toThrow(/private or local network/);
+      expect((await listConnections(A)).map((c) => c.name)).not.toContain(named("rebind add"));
+    });
+
+    it("refuses to move a connection there, and leaves the row as it was", async () => {
+      const added = await addConnection(A, { name: named("rebind edit"), url: "https://example.com/r", transport: "http" });
+      await expect(updateConnection(A, added.id, { ...edited(), url: "https://int-rebind.example.com/mcp" })).rejects.toThrow(/private or local network/);
+      expect((await rawRow(added.id)).url).toBe("https://example.com/r");
+    });
+
+    it("still saves a name that does not resolve yet: every run looks it up again before using it", async () => {
+      const added = await addConnection(A, { name: named("not yet"), url: "https://int-not-yet.example/mcp", transport: "http" });
+      expect(added.url).toBe("https://int-not-yet.example/mcp");
     });
   });
 
