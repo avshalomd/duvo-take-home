@@ -6,6 +6,7 @@ import { eq, inArray } from "drizzle-orm";
 import type { AutomationTemplate } from "@/contracts/automation";
 import type { EvaluateInput, Verdict } from "@/contracts/eval";
 import { db, schema } from "@/db";
+import { followUpInstructions } from "@/lib/agent/follow-up-prompt";
 import { loadRun, reevaluate, saveVerdict } from "./reevaluate";
 
 const WS = "[int] eval workspace";
@@ -116,6 +117,28 @@ describe.skipIf(!process.env.DATABASE_URL)("reevaluateRun's database path", () =
     const evaluate = vi.fn(async () => verdict);
     await reevaluate(runId, { load: loadRun, evaluate, save: saveVerdict });
     expect(evaluated(evaluate).template).toEqual(template);
+  });
+
+  // Q85: a follow-up's own prompt is only the change ("Add a summary column"). The live run was judged against the
+  // parent's instructions plus the change; Re-evaluate must judge the same brief, or it drops the column, freshness
+  // and file checks and overwrites a good verdict with a worse one.
+  it("judges a follow-up against the thread's instructions and the change, as the live run was judged", async () => {
+    const [parent] = await db.select({ prompt: schema.runs.prompt }).from(schema.runs).where(eq(schema.runs.id, plainRun));
+    const change = "[int] Add a summary column";
+    const followUp = await insertRun({ purpose: "followup", parentRunId: plainRun, prompt: change });
+    const evaluate = vi.fn(async () => verdict);
+    await reevaluate(followUp, { load: loadRun, evaluate, save: saveVerdict });
+    expect(evaluated(evaluate).prompt).toBe(followUpInstructions(parent.prompt, change));
+  });
+
+  it("walks a thread of follow-ups back to the first instructions, each change in order", async () => {
+    const first = await insertRun({ purpose: "followup", parentRunId: plainRun, prompt: "[int] Add a summary column" });
+    const second = await insertRun({ purpose: "followup", parentRunId: first, prompt: "[int] Sort by date" });
+    const evaluate = vi.fn(async () => verdict);
+    await reevaluate(second, { load: loadRun, evaluate, save: saveVerdict });
+    const prompt = evaluated(evaluate).prompt;
+    expect(prompt.startsWith("[int] Find the news about Acme")).toBe(true);
+    expect(prompt.indexOf("Add a summary column")).toBeLessThan(prompt.indexOf("Sort by date"));
   });
 
   it("leaves the template out when the automation was edited after the run: the run followed an older version", async () => {
