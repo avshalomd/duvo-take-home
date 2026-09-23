@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AgentLimits } from "@/contracts/agent";
 import type { EvaluateInput } from "@/contracts/eval";
-import { runChecks } from "./checks";
+import { asksForFile, runChecks } from "./checks";
 
 // The code checks are the half of the evaluator that costs nothing and can never be talked round. Each test names
 // the failure a user would report ("it saved an empty file") rather than the function it happens to call.
@@ -325,5 +325,28 @@ describe("runChecks on a connection the instructions only offer", () => {
     const only = "Write output.csv with area, what_it_does, using only the connected DeepWiki server.";
     const checks = runChecks(input({ prompt: only, files: file, toolsUsed: ["WebFetch", "Write"] }));
     expect(failedIds(checks)).toContain("connection_used");
+  });
+});
+
+// Local run 9c1d8c15: the report-only /compare-concepts ("Write a short, plain-language answer") failed "A file was
+// written: no file was written" though nothing asked for a file. "Write" alone is not a file; its object must be one.
+describe("asksForFile", () => {
+  it("does not read 'write' with no file as its object as a request for a file", () => {
+    expect(asksForFile("Compare the two concepts. Write a short, plain-language answer.")).toBe(false);
+    expect(asksForFile("Research the company and write what you found in the report.")).toBe(false);
+  });
+
+  it("reads a file named or typed, or a verb that can only mean a file, as a request for one", () => {
+    expect(asksForFile("Write the results to a file.")).toBe(true);
+    expect(asksForFile("Write them into news.csv.")).toBe(true);
+    expect(asksForFile("Put the notes in summary.md")).toBe(true);
+    expect(asksForFile("Write a CSV of the prices.")).toBe(true);
+    expect(asksForFile("Save the table.")).toBe(true);
+    expect(asksForFile("Export a spreadsheet of the orders.")).toBe(true);
+  });
+
+  it("fails no 'a file was written' check on a report-only run", () => {
+    const checks = runChecks(input({ prompt: "Compare the two concepts. Write a short, plain-language answer.", report: "Here is the answer." }));
+    expect(check(checks, "file_expected")).toBeUndefined();
   });
 });
