@@ -36,6 +36,20 @@ describe("buildChartSpec", () => {
     expect(s.encoding.x?.axis).toMatchObject({ tickCount: 5 });
   });
 
+  // Vega-Lite reads a dot or brackets in a field name as a path into nested data: "revenue.usd" is usd inside revenue.
+  it("escapes dots and brackets in every field it refers to, and keeps the data's own names as sent", () => {
+    const data = [{ "region.name": "North", "revenue[usd]": 10, "plan.tier": "a" }];
+    const s = spec({ title: "Revenue", kind: "bar", data, x: "region.name", y: "revenue[usd]", series: "plan.tier" });
+    expect(s.encoding.x?.field).toBe("region\\.name");
+    expect(s.encoding.y?.field).toBe("revenue\\[usd\\]");
+    expect(s.encoding.color?.field).toBe("plan\\.tier");
+    expect(s.encoding.xOffset?.field).toBe("plan\\.tier");
+    expect(Object.keys(s.data.values[0])).toEqual(["region.name", "revenue[usd]", "plan.tier"]);
+    const pie = spec({ title: "Revenue", kind: "pie", data, x: "region.name", y: "revenue[usd]" });
+    expect(pie.encoding.theta?.field).toBe("revenue\\[usd\\]");
+    expect(pie.encoding.color?.field).toBe("region\\.name");
+  });
+
   it("groups the bars side by side when a series splits them", () => {
     const data = [
       { year: "2023", country: "DE", gdp: 4.1 },
