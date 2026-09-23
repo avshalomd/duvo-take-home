@@ -43,6 +43,16 @@ describe("renderChartSvg", () => {
     }
   });
 
+  // Without a canvas, vega guesses every character at 0.8 em; the system font runs 0.45-0.6 em (measured in Chromium).
+  // The guess cut "The five largest EU countries" to "The five largest EU c..." and sized the plot for text not there.
+  it("measures text at the system font's width, so a title line that fits the chart is drawn whole", async () => {
+    const svg = await renderChartSvg(
+      buildChartSpec({ title: "The five largest EU countries by population", kind: "bar", data: countries, x: "country", y: "population" }),
+    );
+    expect(svg).toContain(">The five largest EU countries<");
+    expect(svg).not.toContain("…");
+  });
+
   it("escapes the title, so an ampersand from the agent cannot break the SVG", async () => {
     const svg = await renderChartSvg(buildChartSpec({ title: "Sales & costs", kind: "bar", data: countries, x: "country", y: "population" }));
     expect(svg).toContain("Sales &amp; costs");

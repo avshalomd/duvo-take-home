@@ -63,7 +63,7 @@ describe("chart readability in a small tile (Q98)", () => {
     const s = spec({ title: "The five largest EU countries by population", kind: "bar", data: countries, x: "country", y: "population" }) as Loose & {
       title: { text: string | string[] };
     };
-    expect(s.title.text).toEqual(["The five largest EU countries by", "population"]);
+    expect(s.title.text).toEqual(["The five largest EU countries", "by population"]); // 30 characters a line at 21 px
     expect(spec({ title: "Fruit sold this week", kind: "bar", data: countries, x: "country", y: "population" }).title).toEqual({
       text: "Fruit sold this week",
     });
