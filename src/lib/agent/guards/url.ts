@@ -2,17 +2,24 @@ import { isPrivateHost } from "@/contracts/connection";
 import type { GuardContext } from "@/contracts/guard";
 import type { Plan } from "@/contracts/run";
 import { LlmError } from "@/lib/llm/errors";
+import { carriedIn, type Carrier } from "./carried";
 import { askJev, JEV_TIMEOUT_MS, type AskExfiltration, type ExfiltrationState } from "./exfiltration";
 import { allowed, type Verdict } from "./verdict";
 
 /**
  * The url guard, on every WebFetch. Code first: an address that is not a public web page, and a host on the
- * workspace's deny list, are blocked outright. Then, only for an address whose query string and fragment are long
- * enough to carry data out, one question to Jev. Jev being down or slow must not stop the run, so that case is let
- * through and recorded as "unchecked".
+ * workspace's deny list, are blocked outright. Then, only for an address with room to carry data out - a long query
+ * string, an encoded path, an encoded subdomain (carried.ts) - one question to Jev. Jev being down or slow must not
+ * stop the run, so that case is let through and recorded as "unchecked".
  */
 
-export const QUERY_LIMIT = 80; // ?id=, ?q=, ?page= are short; rows of a CSV or a report are not
+// What the agent should do instead, by where the data rode: the denial reason is the only thing it reads.
+const INSTEAD: Record<Carrier, string> = {
+  query: "Fetch the page without the added query text.",
+  path: "Fetch the page without the added text in its path.",
+  host: "Fetch the site's own address, without the added text in front of its name.",
+};
+
 export const BLOCK_AT = 0.8;
 export const FLAG_AT = 0.5;
 const PLAN_LINES = 5; // the first steps say what the task is; the whole plan would only dilute the question
@@ -80,8 +87,8 @@ export function urlCheck(
       return { decision: "blocked", reason: `${host} is blocked in this workspace's settings. Use another source.`, target: host };
     }
 
-    const carried = url.search.slice(1).length + url.hash.slice(1).length; // without the ? and the # themselves
-    if (carried <= QUERY_LIMIT) return allowed("short query");
+    const carrier = carriedIn(url);
+    if (!carrier) return allowed("an ordinary address"); // no room for the task's data: no question, no cost
 
     let p: number;
     try {
@@ -93,7 +100,7 @@ export function urlCheck(
     if (p >= BLOCK_AT) {
       return {
         decision: "blocked",
-        reason: "This address looks like it carries the task's data to another site. Fetch the page without the added query text.",
+        reason: `This address looks like it carries the task's data to another site. ${INSTEAD[carrier]}`,
         target: host,
       };
     }
