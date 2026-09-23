@@ -431,6 +431,38 @@ describe.skipIf(!process.env.DATABASE_URL)("removing people and changing roles",
     expect((refused[0] as PromiseRejectedResult).reason.message).toBe(refusal); // the loser learns why, not Better Auth's code
     expect((await roles()).filter(([, role]) => role === "owner")).toHaveLength(1);
   });
+
+  // Review R2: accepting an invitation does not ask whether its sender may still invite, so an admin's pending
+  // invitations outlived their role: removed, they could rejoin through one sent to another address of theirs.
+  const idOf = (link: string) => link.split("/invite/")[1];
+
+  it("removing an admin closes the invitations they sent, so they cannot rejoin through one, and leaves everyone else's open", async () => {
+    const { owner, ownerCtx, admin, memberIdOf } = await team("inv-remove");
+    const theirOtherAddress = email("inv-remove-other");
+    const sentByAdmin = idOf((await createInvite(admin.headers, admin.ctx, { email: theirOtherAddress, role: "admin" })).link);
+    const sentByOwner = idOf((await createInvite(owner.headers, ownerCtx, { email: email("inv-remove-guest"), role: "member" })).link);
+
+    await removeFromWorkspace(owner.headers, ownerCtx, memberIdOf(admin.userId));
+    expect((await getInvitation(sentByAdmin))?.open).toBe(false);
+    expect((await getInvitation(sentByOwner))?.open).toBe(true);
+
+    const again = await signUp("Adam Again", theirOtherAddress);
+    await expect(auth.api.acceptInvitation({ body: { invitationId: sentByAdmin }, headers: again.headers })).rejects.toThrow();
+    expect((await listWorkspaces(again.userId)).map((w) => w.id)).not.toContain(ownerCtx.workspaceId);
+  });
+
+  it("demoting an admin to member closes the invitations they sent; demoting an owner to admin keeps theirs", async () => {
+    const { owner, ownerCtx, admin, plain, memberIdOf } = await team("inv-demote");
+    const sentByAdmin = idOf((await createInvite(admin.headers, admin.ctx, { email: email("inv-demote-a"), role: "member" })).link);
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(admin.userId), "member");
+    expect((await getInvitation(sentByAdmin))?.open).toBe(false);
+
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(plain.userId), "owner");
+    const secondOwnerCtx = (await sessionFromHeaders(plain.headers))!;
+    const sentBySecondOwner = idOf((await createInvite(plain.headers, secondOwnerCtx, { email: email("inv-demote-b"), role: "member" })).link);
+    await changeMemberRole(owner.headers, ownerCtx, memberIdOf(plain.userId), "admin");
+    expect((await getInvitation(sentBySecondOwner))?.open).toBe(true); // an admin still invites: nothing to close
+  });
 });
 
 // SIGNUP_MODE=invite (production): no account is made without a pending invitation, by the page, the API or Google.
