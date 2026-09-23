@@ -46,15 +46,6 @@ export async function trySwitchWorkspace(workspaceId: string): Promise<SwitchSta
   openWorkspaceHome();
 }
 
-/**
- * The user menu's call. Its transition has no place for a returned message (the menu is another change's to edit),
- * so the refusal is dropped here rather than shown; the menu only lists the user's own workspaces anyway. A menu
- * that shows it calls trySwitchWorkspace and this one can go.
- */
-export async function switchWorkspace(workspaceId: string): Promise<void> {
-  await trySwitchWorkspace(workspaceId);
-}
-
 export type NewWorkspaceState = { error?: string; name?: string };
 
 const NewWorkspace = z.object({ name: z.string().trim().min(1, "Give the workspace a name").max(60, "Keep the name under 60 characters") });

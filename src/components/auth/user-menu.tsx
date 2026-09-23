@@ -4,6 +4,7 @@ import { Menu } from "@base-ui/react/menu";
 import { ChevronDownIcon, LogOut, Plus } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -13,7 +14,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import type { WorkspaceSummary } from "@/contracts/auth";
-import { loadWorkspaces, signOut, switchWorkspace } from "@/lib/auth/actions";
+import { loadWorkspaces, signOut, trySwitchWorkspace } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
 import { NewWorkspaceDialog } from "./new-workspace-dialog";
 
@@ -35,6 +36,13 @@ export function UserMenu({ userName, workspaceName }: { userName: string; worksp
   const [creating, setCreating] = useState(false);
   const [, startTransition] = useTransition();
   const reduce = useReducedMotion();
+
+  // A switch the server refuses (a membership removed while the menu was open) is said in its words, as a toast:
+  // on success the action opens Home instead, and nothing comes back to say
+  async function openWorkspace(id: string) {
+    const result = await trySwitchWorkspace(id);
+    if (result?.error) toast.error(result.error);
+  }
 
   function onOpenChange(next: boolean) {
     setOpen(next);
@@ -94,7 +102,7 @@ export function UserMenu({ userName, workspaceName }: { userName: string; worksp
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="px-2.5 pt-2 pb-1 text-[13px] font-normal text-slate">Your workspaces</DropdownMenuLabel>
                     {loaded ? (
-                      <DropdownMenuRadioGroup value={loaded.activeId} onValueChange={(id: string) => id !== loaded.activeId && startTransition(() => switchWorkspace(id))}>
+                      <DropdownMenuRadioGroup value={loaded.activeId} onValueChange={(id: string) => id !== loaded.activeId && startTransition(() => openWorkspace(id))}>
                         {loaded.workspaces.map((w) => (
                           <DropdownMenuRadioItem key={w.id} value={w.id} className={cn(item, "pr-9")}>
                             <span className="truncate">{w.name}</span>

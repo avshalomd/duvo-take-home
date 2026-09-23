@@ -24,7 +24,7 @@ vi.mock("./members", () => ({
   revokeInvitation: vi.fn(),
 }));
 
-import { switchWorkspace, trySwitchWorkspace } from "./actions";
+import { trySwitchWorkspace } from "./actions";
 
 const NOT_YOURS = "You are not a member of that workspace, so it cannot be opened.";
 
@@ -37,11 +37,6 @@ describe("switching to a workspace the user is not in", () => {
     expect(await trySwitchWorkspace("ws-someone-elses")).toEqual({ error: NOT_YOURS });
     expect(h.setActive).not.toHaveBeenCalled();
     expect(h.redirect).not.toHaveBeenCalled();
-  });
-
-  it("is refused through the menu's call too, with no error page", async () => {
-    await expect(switchWorkspace("ws-someone-elses")).resolves.toBeUndefined();
-    expect(h.setActive).not.toHaveBeenCalled();
   });
 });
 
