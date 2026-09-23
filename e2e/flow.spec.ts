@@ -233,13 +233,15 @@ test.describe("the composer", () => {
     await page.getByRole("button", { name: "Run", exact: true }).click();
     const reason = page.getByText(/say what the agent should do/i);
     await expect(reason).toBeVisible();
-    await expect(composer(page)).toHaveCSS("box-shadow", "none"); // no ring of the box's own
+    // no ring or border of the box's own (a ring is a box-shadow: every layer of it is 0 px wide)
+    expect(await composer(page).evaluate((el) => getComputedStyle(el).boxShadow)).not.toMatch(/\b[1-9]\d*px/);
     await expect(composer(page)).toHaveCSS("border-top-width", "0px");
-    await expect(page.getByTestId("composer-capsule")).toHaveCSS("outline-style", "solid"); // the capsule says it
+    const capsule = page.getByTestId("composer-capsule");
+    await expect(capsule).toHaveAttribute("data-invalid", "true"); // the capsule draws it, in its own rounded shape
     await composer(page).press("End");
     await composer(page).pressSequentially(" now");
     await expect(reason).toHaveCount(0);
-    await expect(page.getByTestId("composer-capsule")).not.toHaveCSS("outline-style", "solid");
+    await expect(capsule).not.toHaveAttribute("data-invalid");
   });
 
   // Q195: a double-click on Run started two identical paid runs half a second apart. The start is never let through

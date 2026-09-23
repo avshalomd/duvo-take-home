@@ -3,7 +3,7 @@
 import { ArrowUp, LoaderCircle, Plug } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useEffect, useRef, useState, useTransition, ViewTransition } from "react";
+import { startTransition, useEffect, useRef, useState, useSyncExternalStore, useTransition, ViewTransition } from "react";
 import { flushSync } from "react-dom";
 import { startRunAction, type FormState } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,12 @@ export function Composer({
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState<string | null>(null); // Escape hides the list until the text changes
   const box = useRef<HTMLTextAreaElement>(null);
+  // Q195: set on the press itself, synchronously. The Run button is only disabled once the start is pending, which
+  // waits for the handover's move (up to SHOWN_WITHIN_MS): a second press or Cmd+Enter in between started a second run
+  const starting = useRef(false);
   const hero = variant === "hero";
+  const shortcut = useShortcutName();
+  const invalid = Boolean(state.error || state.fieldErrors?.prompt);
 
   const query = commandQuery(text);
   const open = query !== null && dismissed !== text;
@@ -69,15 +74,23 @@ export function Composer({
     el.style.height = `${Math.min(el.scrollHeight, 280)}px`;
   }, [text]);
 
-  function pick(command: string) {
-    setText(applyCommand(text, command));
+  // Every change to the text, typed or picked from the list, drops a refusal: it was about the text as it was (Q202)
+  function edit(next: string) {
+    setText(next);
     setActive(0);
+    if (invalid) setState({});
+  }
+
+  function pick(command: string) {
+    edit(applyCommand(text, command));
     box.current?.focus();
   }
 
   // The handover (Q138): the brief moves into the new run's title at the press, and the server is asked afterwards.
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (starting.current) return; // one press, one run: this brief is already on its way
+    starting.current = true;
     const data = new FormData(e.currentTarget);
     // null when the server is going to refuse before any run exists: then nothing moves, the reason just appears
     const title = handover ? handoverTitle(text, automations) : null;
@@ -109,6 +122,7 @@ export function Composer({
         result = { error: UNREACHABLE }; // the request never came back: no run exists
       }
       const id = result.startedId;
+      starting.current = false; // answered, either way: the next press is a new start
       if (!id) {
         handover?.end(); // refused: back to the box, with what was typed and the reason under it
         setState(result);
@@ -154,11 +168,13 @@ export function Composer({
     <form onSubmit={onSubmit} className="w-full">
       <div
         data-testid="composer-capsule"
+        data-invalid={invalid || undefined}
         // the ring is an outline, not a ring utility: a ring is a box-shadow, and the style below sets box-shadow (Q143)
         className={cn(
           // 2 px at 45%: the app's 3 px focus ring reads as a heavy border around something this large. relative z-20:
           // the command list is placed against the capsule, above what follows it on the page
           "glass relative z-20 rounded-[26px] outline-ring/45 focus-within:outline-2",
+          invalid && "outline-2 outline-crimson/60", // refused: the capsule's own outline says so, whether focused or not
           hero ? "px-5 pt-4 pb-3" : "px-4 pt-3 pb-2.5",
         )}
         // glass sets its own box-shadow (the light top edge), which would cancel a shadow utility: the edge, a hairline
@@ -189,10 +205,7 @@ export function Composer({
             rows={hero ? 3 : 1}
             placeholder={hint ? undefined : PLACEHOLDER}
             value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setActive(0);
-            }}
+            onChange={(e) => edit(e.target.value)}
             onKeyDown={onKeyDown}
             onBlur={() => setDismissed(text)} // clicking elsewhere closes the list, as it would a menu
             onFocus={() => setDismissed(null)}
@@ -202,7 +215,9 @@ export function Composer({
             aria-activedescendant={open && options.length ? optionId(options[highlighted].command) : undefined}
             aria-autocomplete="list"
             className={cn(
-              "relative col-start-1 row-start-1 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none placeholder:text-slate focus-visible:ring-0 dark:bg-transparent",
+              // Q203: no ring or border of the box's own when it is refused - a square inside a round capsule; the
+              // capsule draws the refusal instead, in its own shape
+              "relative col-start-1 row-start-1 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none placeholder:text-slate focus-visible:ring-0 aria-invalid:border-0 aria-invalid:ring-0 dark:bg-transparent dark:aria-invalid:ring-0",
               type,
               ghost && "text-transparent caret-transparent", // the brief is leaving: its copy below is what moves
             )}
@@ -235,9 +250,15 @@ export function Composer({
 
         <div className="mt-2.5 flex items-center gap-2">
           <ConnectionChips names={connections} />
-          <div className="ml-auto flex shrink-0 items-center">
-            {/* ⌘/Ctrl+Enter also runs (onKeyDown); its hint was the one accessory taken off the capsule */}
-            <Button type="submit" disabled={pending} className="h-9 px-4 max-[899px]:h-10">
+          <div className="ml-auto flex shrink-0 items-center gap-2.5">
+            {/* Q209: Enter makes a new line, so the key that runs is named beside Run, quietly and in the platform's
+                words; a phone has no such key, so it is not shown there. Screen readers get it from aria-keyshortcuts */}
+            {shortcut && (
+              <span data-testid="run-shortcut" aria-hidden className="text-[12px] tracking-[0.01em] text-slate max-[899px]:hidden">
+                {shortcut.label} Enter
+              </span>
+            )}
+            <Button type="submit" disabled={pending} aria-keyshortcuts={shortcut?.aria} className="h-9 px-4 max-[899px]:h-10">
               {pending ? <LoaderCircle aria-hidden className="animate-spin" /> : <ArrowUp aria-hidden />}
               {pending ? "Starting..." : "Run"}
             </Button>
@@ -276,6 +297,19 @@ export function Composer({
         </div>
       )}
     </form>
+  );
+}
+
+// The run shortcut's key, as the keyboard in front of the person names it: ⌘ on Apple's, Ctrl elsewhere. The server
+// cannot know, so it renders nothing and the browser fills it in (useSyncExternalStore: no hydration mismatch).
+const APPLE = { label: "⌘", aria: "Meta+Enter" };
+const OTHER = { label: "Ctrl", aria: "Control+Enter" };
+const noSubscribe = () => () => {};
+function useShortcutName(): typeof APPLE | null {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? APPLE : OTHER),
+    () => null,
   );
 }
 
