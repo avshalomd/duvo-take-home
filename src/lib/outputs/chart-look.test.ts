@@ -105,6 +105,20 @@ describe("chart readability in a small tile (Q98)", () => {
     expect(Number(s.encoding.x?.axis?.titlePadding)).toBeGreaterThanOrEqual(10);
   });
 
+  // The first dark-mode render labelled five days "12 PM, 12 PM, 12 PM": UTC dates drawn in the server's time zone.
+  it("labels a date axis by day (Sep 14), with one day's ticks, on UTC so the server's time zone cannot shift them", () => {
+    const days = ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"].map((day, i) => ({ day, visitors: 120 + i }));
+    const s = spec({ title: "Visitors", kind: "area", data: days, x: "day", y: "visitors" }) as Loose & { encoding: { x: { scale?: unknown } } };
+    expect(s.encoding.x.scale).toEqual({ type: "utc" });
+    expect(s.encoding.x.axis).toMatchObject({ format: "%b %-d", tickCount: { interval: "day", step: 1 } });
+  });
+
+  it("labels a date axis that spans years by month and year (Jan 2025)", () => {
+    const months = Array.from({ length: 24 }, (_, i) => ({ month: `${2024 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}-01`, sales: i }));
+    const s = spec({ title: "Sales", kind: "line", data: months, x: "month", y: "sales" });
+    expect(s.encoding.x?.axis).toMatchObject({ format: "%b %Y", tickCount: { interval: "month" } });
+  });
+
   it("names the value axis in words: population_millions reads Population millions", () => {
     const s = spec({ title: "P", kind: "bar", data: [{ c: "DE", population_millions: 84.7 }], x: "c", y: "population_millions" });
     expect(s.encoding.y?.title).toBe("Population millions");
