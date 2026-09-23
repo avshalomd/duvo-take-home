@@ -10,6 +10,7 @@ const limits: WorkspaceLimits = {
   stepChecks: true,
   strictConnections: false,
   deniedDomains: [],
+  autoHealAttempts: 2,
 };
 const RESET = "2026-09-24T00:00:00.000Z";
 const usage = (over: Partial<Usage> = {}): Usage => ({ runsToday: 4, costTodayUsd: 0.42, inFlight: 1, resetsAt: RESET, ...over });

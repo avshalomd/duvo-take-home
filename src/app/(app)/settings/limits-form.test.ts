@@ -21,7 +21,7 @@ describe("parseLimitsForm", () => {
     const out = parseLimitsForm(form(valid));
     expect(out).toEqual({
       ok: true,
-      limits: { dailyBudgetUsd: 5, dailyRunLimit: 30, maxInFlight: 3, stepChecks: true, strictConnections: false, deniedDomains: [] },
+      limits: { dailyBudgetUsd: 5, dailyRunLimit: 30, maxInFlight: 3, stepChecks: true, strictConnections: false, deniedDomains: [], autoHealAttempts: 2 },
     });
   });
 
@@ -83,6 +83,7 @@ describe("parseLimitsForm", () => {
       stepChecks: "on",
       strictConnections: "",
       deniedDomains: "example.com",
+      autoHealAttempts: "",
     });
   });
 });

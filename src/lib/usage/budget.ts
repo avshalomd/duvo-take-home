@@ -12,6 +12,7 @@ export const DEFAULT_LIMITS: WorkspaceLimits = {
   stepChecks: true,
   strictConnections: false,
   deniedDomains: [],
+  autoHealAttempts: 2,
 };
 
 const IN_FLIGHT = ["queued", "running", "evaluating"]; // a run holds a slot from the moment it is created until its verdict
@@ -24,6 +25,7 @@ const toLimits = (row: Row): WorkspaceLimits => ({
   stepChecks: row.stepChecks,
   strictConnections: row.strictConnections,
   deniedDomains: row.deniedDomains ?? [],
+  autoHealAttempts: row.autoHealAttempts,
 });
 
 /** The workspace's limits. The first read stores the defaults, so the row the Limits page edits always exists. */

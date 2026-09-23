@@ -28,6 +28,7 @@ export function parseLimitsForm(form: FormData): LimitsFormResult {
     stepChecks: form.get("stepChecks") === "on" ? "on" : "", // a switch that is off posts nothing, like a checkbox
     strictConnections: form.get("strictConnections") === "on" ? "on" : "",
     deniedDomains: text("deniedDomains"),
+    autoHealAttempts: text("autoHealAttempts"),
   };
 
   const fieldErrors: Record<string, string[]> = {};
@@ -48,6 +49,7 @@ export function parseLimitsForm(form: FormData): LimitsFormResult {
     stepChecks: values.stepChecks === "on",
     strictConnections: values.strictConnections === "on",
     deniedDomains: hosts,
+    autoHealAttempts: values.autoHealAttempts === "" ? 2 : values.autoHealAttempts, // a form without the row keeps the default (seam; the settings package adds the row)
   });
   if (!parsed.success)
     for (const issue of parsed.error.issues) {
