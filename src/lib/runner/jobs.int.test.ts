@@ -165,8 +165,8 @@ describe.skipIf(!process.env.DATABASE_URL)("abandoned runs", () => {
   afterAll(cleanup);
   const now = t(45);
 
-  it("closes a run left running for over 30 minutes with no job (the inline server restarted)", async () => {
-    const runId = await makeRun("abandoned", { status: "running", createdAt: t(0) });
+  it("closes a run left running for over 10 minutes with no job (the inline server restarted)", async () => {
+    const runId = await makeRun("abandoned", { status: "running", createdAt: t(30) }); // 15 minutes before now
     expect(await closeAbandonedRuns(now)).toContain(runId);
     const run = await runRow(runId);
     expect(run.status).toBe("failed");
@@ -181,8 +181,8 @@ describe.skipIf(!process.env.DATABASE_URL)("abandoned runs", () => {
     expect((await runRow(runId)).status).toBe("queued");
   });
 
-  it("leaves a run started 20 minutes ago alone", async () => {
-    const runId = await makeRun("recent", { status: "running", createdAt: t(25) });
+  it("leaves a run started 5 minutes ago alone: its wall clock has not run out", async () => {
+    const runId = await makeRun("recent", { status: "running", createdAt: t(40) });
     expect(await closeAbandonedRuns(now)).not.toContain(runId);
   });
 
