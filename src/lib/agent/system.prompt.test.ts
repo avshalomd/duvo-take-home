@@ -38,6 +38,11 @@ describe("SYSTEM_PROMPT: output files", () => {
     expect(SYSTEM_PROMPT).toContain("mcp__outputs__");
   });
 
+  // The outputs package's live run: told only .txt/.md/.csv could be downloaded, the agent wrote chart.txt.
+  it("rules out a text file standing in for a chart or a spreadsheet", () => {
+    expect(SYSTEM_PROMPT).toMatch(/never a text file in (their|its) place/i);
+  });
+
   it("keeps Write for .txt, .md and .csv", () => {
     expect(SYSTEM_PROMPT).toMatch(/Write[^.]*\.txt, \.md (or|and) \.csv/);
   });

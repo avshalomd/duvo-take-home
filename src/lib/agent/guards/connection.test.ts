@@ -75,6 +75,13 @@ describe("connection guard: tools that are not connections", () => {
     expect(guard(null, true)("mcp__outputs__make_chart", {})).toMatchObject({ decision: "allowed" });
   });
 
+  it("leaves the plan and output tools alone even when a connection has the same key", () => {
+    // A connection a user named "Plan" or "Outputs" gets that key too; our own tools must not become its calls.
+    const clash = connectionCheck({ connectionNames: { plan: "Plan", outputs: "Outputs" }, plan: () => null, strictConnections: true });
+    expect(clash("mcp__plan__set_plan", {})).toMatchObject({ decision: "allowed" });
+    expect(clash("mcp__outputs__make_spreadsheet", {})).toMatchObject({ decision: "allowed" });
+  });
+
   it("leaves native tools alone", () => {
     expect(guard(null, true)("WebSearch", {})).toMatchObject({ decision: "allowed" });
   });
