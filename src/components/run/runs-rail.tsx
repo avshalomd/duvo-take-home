@@ -14,9 +14,11 @@ export type RailRun = {
   prompt: string;
   title: string;
   tag: string | null;
+  command: string | null; // the command of the run's automation, for the search: an example is tagged "example" (Q133)
   status: string;
   outcome: string | null;
   stopping: boolean;
+  healAttempts: number; // auto-heal's fixes so far: a run fixing its result still reads as work in progress
   createdAt: string;
 };
 
@@ -37,7 +39,7 @@ export function RunsRail({ runs, selectedId, onPick }: { runs: RailRun[]; select
         <Link
           href="/"
           onClick={onPick}
-          className="flex h-9 items-center gap-2 rounded-full px-3 text-[14px] font-medium transition-colors hover:bg-paper/70 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="flex h-9 items-center gap-2 rounded-full px-3 text-[14px] font-medium transition-[background-color,transform] duration-100 hover:bg-paper/70 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.97]"
         >
           <SquarePen aria-hidden className="size-4 text-slate" />
           New run
@@ -84,26 +86,30 @@ export function RunsRail({ runs, selectedId, onPick }: { runs: RailRun[]; select
 
 function RailRow({ run, selected, onPick }: { run: RailRun; selected: boolean; onPick?: () => void }) {
   // the same function the run's outcome line calls: the rail and the run can never disagree about how it went
-  const result = outcome(run.status, run.outcome, run.stopping);
+  const result = outcome(run.status, run.outcome, run.stopping, { attempts: run.healAttempts });
   return (
     <Link
       href={`/?run=${run.id}`}
       onClick={onPick}
       aria-current={selected ? "true" : undefined}
-      title={run.prompt} // the row truncates the instructions; the tooltip is the rest of them (Q74)
+      // the dot's meaning in words, then the instructions the row truncates (Q74, Q105). In the tooltip, not in the
+      // row: shown in the row on hover, the words squeezed the title to two letters (Q140)
+      title={`${result.label}\n${run.prompt}`}
       className={cn(
-        "group flex items-center gap-2.5 rounded-full px-3 py-1.5 text-[14px] transition-colors max-[899px]:min-h-10",
+        "flex items-center gap-2.5 rounded-full px-3 py-1.5 text-[14px] transition-[background-color,transform] duration-100 active:scale-[0.97] max-[899px]:min-h-10",
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none", // the one focus ring (Q71)
         selected ? "bg-paper font-medium shadow-tile" : "text-graphite/85 hover:bg-paper/50",
       )}
     >
       <StatusDot tone={result.tone} />
-      <span className="min-w-0 flex-1 truncate">{run.title}</span>
-      {/* Q105: the mark's meaning in words - shown in place of the tag on hover and focus, and always read out */}
-      <span aria-hidden className="shrink-0 text-[12px] text-slate">
-        {run.tag && <span className="group-hover:hidden group-focus-visible:hidden">{run.tag}</span>}
-        <span className="hidden group-hover:inline group-focus-visible:inline">{result.label}</span>
+      <span data-testid="rail-title" className="min-w-0 flex-1 truncate">
+        {run.title}
       </span>
+      {run.tag && (
+        <span aria-hidden className="shrink-0 text-[12px] text-slate">
+          {run.tag}
+        </span>
+      )}
       <span className="sr-only">, {result.label}</span>
     </Link>
   );

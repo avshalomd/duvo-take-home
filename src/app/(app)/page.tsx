@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { FirstVisit } from "@/components/run/first-visit";
+import { HandoverHost } from "@/components/run/handover-host";
 import { NotFoundSheet } from "@/components/run/not-found-sheet";
 import { RailFallback, SheetSkeleton } from "@/components/run/panel-skeleton";
 import { RunSheet } from "@/components/run/run-sheet";
@@ -19,10 +20,9 @@ export const maxDuration = 300;
 // ?run=<id>, with the composer floating at the bottom of its sheet.
 //
 // Two Suspense boundaries that stay mounted across navigations. When a run opens, the navigation is a React
-// transition: an already visible boundary keeps showing the old view until the new one is complete, so the new
-// run's title arrives in the same commit that removes the brief from the composer - which is what lets React
-// pair the two and move the words from the box into the title (the handover, docs/DESIGN-V2.md). A route-level
-// loading.tsx would show its skeleton first and split that commit in two, so Home has none.
+// transition: an already visible boundary keeps showing the old view until the new one is complete, so a new run
+// replaces the sheet that stood in for it (HandoverHost) in one commit, with nothing in between. A route-level
+// loading.tsx would show its skeleton first, so Home has none.
 export default async function Home({ searchParams }: PageProps<"/">) {
   const { run } = await searchParams;
   const selectedId = typeof run === "string" ? run : undefined;
@@ -34,9 +34,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <Rail workspaceId={workspaceId} selectedId={selectedId} />
       </Suspense>
       <main className="min-w-0 flex-1 px-3 pt-3 pb-6 min-[900px]:px-8 min-[900px]:pt-6">
-        <Suspense fallback={<SheetSkeleton />}>
-          <MainColumn workspaceId={workspaceId} selectedId={selectedId} />
-        </Suspense>
+        {/* room for a run that does not exist yet: the sheet the brief moves into at the press of Run (Q138) */}
+        <HandoverHost>
+          <Suspense fallback={<SheetSkeleton />}>
+            <MainColumn workspaceId={workspaceId} selectedId={selectedId} />
+          </Suspense>
+        </HandoverHost>
       </main>
     </div>
   );
@@ -50,9 +53,11 @@ async function Rail({ workspaceId, selectedId }: { workspaceId: string; selected
     prompt: r.prompt,
     title: runTitleOf(r, names),
     tag: runTagOf(r, commands),
+    command: r.automationId ? (commands[r.automationId] ?? null) : null,
     status: r.status,
     outcome: r.outcome ?? null,
     stopping: Boolean(r.cancelRequested),
+    healAttempts: r.healAttempts ?? 0,
     createdAt: r.createdAt,
   }));
   return (

@@ -39,12 +39,12 @@ export function TopBar({ userName, workspaceName }: { userName: string; workspac
       />
       <div className="relative flex h-14 items-center gap-2 px-3 min-[900px]:gap-5 min-[900px]:px-5">
         <div id={TOP_BAR_SLOT} className="contents min-[900px]:hidden" />
-        {/* The product's mark, the same tile as on the sign-in page, without its word: the word read as a second
-            link to the Automations page beside the real one (Q113). The name is the link's label instead. */}
+        {/* The product's mark, Handover, the same tile as on the sign-in page, without its word: a word beside the
+            pages read as one more page (Q113). The name is the link's label instead. */}
         <Link
           href="/"
-          aria-label="Automations home"
-          className="shrink-0 rounded-[10px] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&_.display]:hidden"
+          aria-label="Handover home"
+          className="shrink-0 rounded-[10px] transition-transform duration-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.97] [&_.display]:hidden"
         >
           <BrandMark />
         </Link>
@@ -55,7 +55,8 @@ export function TopBar({ userName, workspaceName }: { userName: string; workspac
               href={p.href}
               aria-current={active(p.href) ? "page" : undefined}
               className={cn(
-                "rounded-full px-3 py-1.5 text-[14px] text-slate transition-colors hover:text-graphite max-sm:px-2.5",
+                // active:scale: the same small give under a press as every other control (Q143)
+                "rounded-full px-3 py-1.5 text-[14px] text-slate transition-[color,transform] duration-100 hover:text-graphite active:scale-[0.97] max-sm:px-2.5",
                 "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
                 active(p.href) && "bg-paper font-medium text-graphite shadow-tile",
               )}
