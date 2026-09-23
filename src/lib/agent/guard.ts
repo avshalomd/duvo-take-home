@@ -21,7 +21,7 @@ const allow = (reason: string): Decision => ({
 });
 
 /** The path arguments of the tools we let the agent have: Read/Write/Edit use file_path, Glob/Grep use path. */
-function pathArg(input: unknown): string | null {
+export function pathArg(input: unknown): string | null {
   if (!input || typeof input !== "object") return null;
   const rec = input as Record<string, unknown>;
   for (const key of ["file_path", "path", "notebook_path"]) {

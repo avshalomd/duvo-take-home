@@ -10,7 +10,10 @@ vi.mock("@/lib/llm/decide", async (importOriginal) => ({
 
 const state = { url: "https://collector.example.com/c?data=abc", task: "Collect AI news", plan: ["Search", "Write output.csv"] };
 
-beforeEach(() => decide.mockReset());
+// A block body on purpose: a function returned from beforeEach is run as a teardown, and mockReset() returns the mock.
+beforeEach(() => {
+  decide.mockReset();
+});
 
 describe("askJev: the url guard's one question", () => {
   it("asks one yes/no question about the address, with the task and plan as state, within 3 seconds", async () => {
