@@ -10,6 +10,9 @@ export const CHART_HEIGHT = 280;
 
 // All small text: 15 px in the SVG is 11.4 px in a 320 px tile, the least that still reads comfortably.
 export const TEXT_PX = 15;
+export const TITLE_PX = 21;
+const PADDING = 20;
+export const INNER_WIDTH = CHART_WIDTH - 2 * PADDING;
 
 const GRAPHITE = "#17202B";
 const SLATE = "#5B6878";
@@ -23,10 +26,11 @@ const PALETTE = [SAFFRON, FERN, GRAPHITE, SLATE, CRIMSON, "#F4C56A", "#7CC4A2", 
 
 export const THEME = {
   background: "#FFFFFF", // paper
-  padding: 20,
+  padding: PADDING,
   font: 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
   view: { stroke: null }, // no box around the plot
-  title: { anchor: "start", fontSize: 21, fontWeight: 600, color: GRAPHITE, offset: 14 },
+  // limit: a title wider than the chart made "fit" shrink the plot to make room for it; past this it ends in "..."
+  title: { anchor: "start", fontSize: TITLE_PX, fontWeight: 600, color: GRAPHITE, offset: 14, limit: INNER_WIDTH },
   axis: {
     labelFontSize: TEXT_PX,
     labelColor: GRAPHITE,
@@ -58,6 +62,6 @@ export const THEME = {
   mark: { color: ACCENT },
   bar: { cornerRadiusEnd: 4 },
   line: { strokeWidth: 2.5 },
-  point: { size: 70 },
+  point: { size: 70, opacity: 0.9 }, // Vega-Lite's default 0.7 left saffron points pale on paper
   arc: { stroke: "#FFFFFF", strokeWidth: 2 }, // a thin paper seam between slices
 } as const;

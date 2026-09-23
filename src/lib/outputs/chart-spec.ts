@@ -1,7 +1,7 @@
 import type { TopLevelSpec } from "vega-lite";
 import type { z } from "zod";
 import type { ChartInput } from "@/contracts/outputs";
-import { CHART_HEIGHT, CHART_WIDTH, TEXT_PX, THEME } from "./chart-theme";
+import { CHART_HEIGHT, CHART_WIDTH, INNER_WIDTH, TEXT_PX, THEME, TITLE_PX } from "./chart-theme";
 import { asNumber } from "./numbers";
 
 export { ACCENT, CHART_HEIGHT, CHART_WIDTH } from "./chart-theme";
@@ -24,6 +24,19 @@ const SHORT_NUMBER =
   " : abs(datum.value) >= 1e6 ? format(datum.value / 1e6, '~g') + 'M'" +
   " : abs(datum.value) >= 1e3 ? format(datum.value / 1e3, '~g') + 'k'" +
   " : format(datum.value, '~g')";
+
+// How many title characters fit one line of the inner width, at an average of 0.55 em per character.
+const TITLE_CHARS = Math.floor(INNER_WIDTH / (TITLE_PX * 0.55));
+
+/** The title as it fits: one line, or two broken at a word. What still overflows ends in "..." (THEME.title.limit). */
+function titleLines(title: string): string | string[] {
+  if (title.length <= TITLE_CHARS) return title;
+  const rest = title.split(/\s+/);
+  let first = "";
+  while (rest.length && `${first} ${rest[0]}`.trim().length <= TITLE_CHARS) first = `${first} ${rest.shift()}`.trim();
+  if (!first) return title; // one word longer than the line: nothing to break at
+  return [first, rest.join(" ")];
+}
 
 /** A field name as an axis or legend title: population_millions reads "Population millions". */
 function words(field: string): string {
@@ -112,7 +125,7 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
   const yEnc = { field: y, type: "quantitative" as const, title: words(y), axis: valueAxis(values, y) };
   const color = series ? { color: { field: series, type: "nominal" as const, title: words(series) } } : {};
   const base = {
-    title: { text: title },
+    title: { text: titleLines(title) },
     data: { values },
     config: THEME,
     width: CHART_WIDTH,
