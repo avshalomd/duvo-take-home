@@ -11,6 +11,9 @@ export const CHART_HEIGHT = 280;
 // All small text: 15 px in the SVG is 11.4 px in a 320 px tile, the least that still reads comfortably.
 export const TEXT_PX = 15;
 export const TITLE_PX = 21;
+// The width of an average character, in em. Measured in Chromium, words in the system font run 0.45-0.6 em; the
+// top of that range keeps every estimate on the safe side. The renderer, the title wrap and the label rule share it.
+export const CHAR_EM = 0.6;
 const PADDING = 20;
 export const INNER_WIDTH = CHART_WIDTH - 2 * PADDING;
 

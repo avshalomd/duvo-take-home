@@ -1,7 +1,7 @@
 import type { TopLevelSpec } from "vega-lite";
 import type { z } from "zod";
 import type { ChartInput } from "@/contracts/outputs";
-import { CHART_HEIGHT, CHART_WIDTH, INNER_WIDTH, TEXT_PX, THEME, TITLE_PX } from "./chart-theme";
+import { CHAR_EM, CHART_HEIGHT, CHART_WIDTH, INNER_WIDTH, TEXT_PX, THEME, TITLE_PX } from "./chart-theme";
 import { asNumber } from "./numbers";
 
 export { ACCENT, CHART_HEIGHT, CHART_WIDTH } from "./chart-theme";
@@ -14,9 +14,11 @@ const ROW_ORDER = "__row"; // a computed field: the double underscore keeps it c
 
 const ISO_DATE = /^\d{4}-\d{2}(-\d{2})?([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
 
-// What the category labels have to share: the chart minus its padding and the value axis on the left.
-const PLOT_WIDTH = CHART_WIDTH - 2 * THEME.padding - 70;
-const CHAR_PX = TEXT_PX * 0.5; // an average character of the system font; a rough estimate is enough to decide
+// What the category labels have to share: the chart minus its padding and the value axis (labels and title) on the left.
+const PLOT_WIDTH = CHART_WIDTH - 2 * THEME.padding - 60;
+const LEGEND_WIDTH = 80; // a series legend sits on the right and takes this from the plot
+const LABEL_GAP_PX = 4; // the least space left between two level labels
+const CHAR_PX = TEXT_PX * CHAR_EM;
 
 // Values in the millions shortened on the axis: 84,700,000 is ten characters where 85M is three.
 const SHORT_NUMBER =
@@ -25,8 +27,8 @@ const SHORT_NUMBER =
   " : abs(datum.value) >= 1e3 ? format(datum.value / 1e3, '~g') + 'k'" +
   " : format(datum.value, '~g')";
 
-// How many title characters fit one line of the inner width, at an average of 0.55 em per character.
-const TITLE_CHARS = Math.floor(INNER_WIDTH / (TITLE_PX * 0.55));
+// How many title characters fit one line of the inner width, measured the way the renderer measures them.
+const TITLE_CHARS = Math.floor(INNER_WIDTH / (TITLE_PX * CHAR_EM));
 
 /** The title as it fits: one line, or two broken at a word. What still overflows ends in "..." (THEME.title.limit). */
 function titleLines(title: string): string | string[] {
@@ -53,13 +55,14 @@ function fieldKind(rows: Row[], field: string): "number" | "date" | "text" {
 }
 
 /**
- * Level labels while the longest one fits its share of the width; otherwise slanted at 45 degrees and anchored at
- * their end, so each label runs down-left from its own tick and cannot touch its neighbour.
+ * Level labels while every two neighbours fit side by side: each is centred on its own band, so they touch when half
+ * of one plus half of the other is wider than a band. Otherwise slanted at 45 degrees and anchored at their end, so
+ * each runs down-left from its own tick and cannot reach its neighbour.
  */
-function categoryAxis(rows: Row[], field: string) {
+function categoryAxis(rows: Row[], field: string, withLegend: boolean) {
   const labels = [...new Set(rows.map((r) => String(r[field] ?? "")))];
-  const longest = Math.max(...labels.map((l) => l.length));
-  const fits = longest * CHAR_PX <= (PLOT_WIDTH / labels.length) * 0.9; // 10% air between neighbours
+  const band = (PLOT_WIDTH - (withLegend ? LEGEND_WIDTH : 0)) / labels.length;
+  const fits = labels.every((l, i) => i === 0 || ((labels[i - 1].length + l.length) / 2) * CHAR_PX + LABEL_GAP_PX <= band);
   return fits ? { labelAngle: 0 } : { labelAngle: -45, labelAlign: "right" as const, labelBaseline: "middle" as const };
 }
 
@@ -73,7 +76,7 @@ function valueAxis(rows: Row[], field: string) {
  * The x encoding of a bar, line or area chart. It has no axis title: the labels (countries, months, years) say what
  * they are and the chart's title says the rest, and a title under slanted labels is what landed on top of them (Q98).
  */
-function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area") {
+function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area", withLegend: boolean) {
   const holds = fieldKind(rows, field);
   if (kind !== "bar" && holds === "date") return { field, type: "temporal" as const, title: null };
   if (kind !== "bar" && holds === "number") {
@@ -93,7 +96,7 @@ function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area") {
     type: kind === "bar" && holds !== "number" ? ("nominal" as const) : ("ordinal" as const),
     sort: null, // the agent's order: the five largest stay largest-first
     title: null,
-    axis: categoryAxis(rows, field),
+    axis: categoryAxis(rows, field, withLegend),
   };
 }
 
@@ -139,12 +142,12 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
         ...base,
         mark: { type: "bar" },
         // grouped, not stacked: with a series each value is read on its own against the axis
-        encoding: { x: xEncoding(values, x, kind), y: yEnc, ...color, ...(series ? { xOffset: { field: series } } : {}) },
+        encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color, ...(series ? { xOffset: { field: series } } : {}) },
       } as TopLevelSpec;
     case "line":
-      return { ...base, mark: { type: "line", point: true }, encoding: { x: xEncoding(values, x, kind), y: yEnc, ...color } } as TopLevelSpec;
+      return { ...base, mark: { type: "line", point: true }, encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color } } as TopLevelSpec;
     case "area":
-      return { ...base, mark: { type: "area", opacity: 0.85 }, encoding: { x: xEncoding(values, x, kind), y: yEnc, ...color } } as TopLevelSpec;
+      return { ...base, mark: { type: "area", opacity: 0.85 }, encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color } } as TopLevelSpec;
     case "scatter":
       return {
         ...base,
