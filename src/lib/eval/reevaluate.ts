@@ -3,6 +3,7 @@ import type { AutomationTemplate } from "@/contracts/automation";
 import type { EvaluateInput, ReevaluateRun, Verdict } from "@/contracts/eval";
 import type { Run, RunEvent } from "@/contracts/run";
 import { db, schema } from "@/db";
+import { instructionsOf } from "@/lib/agent/follow-up";
 import { evaluateRun } from "./evaluate";
 import { templateOf, toEvaluateInput, toEvents, toFiles, toRun } from "./run-rows";
 
@@ -48,7 +49,11 @@ export async function loadRun(runId: string): Promise<LoadedRun | null> {
           .where(and(eq(schema.automations.id, row.automationId), eq(schema.automations.workspaceId, row.workspaceId)))
           .limit(1)
       : [];
-  return { run: toRun(row), events: toEvents(eventRows), files: toFiles(fileRows), template: templateOf(row, automation) };
+  // Q85: judge the brief the live run was judged on. A follow-up's own prompt is only the change ("Add a summary
+  // column"); the thread's first instructions plus every change since are rebuilt by the engine's own function, so
+  // the two can never disagree. For any other run instructionsOf() returns its prompt as it is.
+  const prompt = row.workspaceId ? await instructionsOf(row, row.workspaceId) : row.prompt;
+  return { run: { ...toRun(row), prompt }, events: toEvents(eventRows), files: toFiles(fileRows), template: templateOf(row, automation) };
 }
 
 export async function saveVerdict(runId: string, verdict: Verdict): Promise<void> {
