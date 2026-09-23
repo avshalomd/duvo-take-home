@@ -1,14 +1,13 @@
 import type { Tone } from "./status-dot";
 
 // The one line the user reads first. Statuses and verdicts are the system's words; this is the user's.
-// verdict is Run.outcome, which the contract marks optional: an absent field is "not judged", never a pass
-export function statusLabel(status: string): string {
-  return status;
-}
-
+// verdict is Run.outcome, which the contract marks optional: an absent field is "not judged", never a pass.
+// stopping is Run.cancelRequested: Stop was pressed and the runner has not closed the run yet (it checks every 2 s).
 export function outcome(runStatus: string, verdict: string | null | undefined, stopping?: boolean): { label: string; tone: Tone } {
-  void stopping;
+  if (runStatus === "cancelled") return { label: "Stopped by you", tone: "idle" }; // the person chose this: not a failure
   if (runStatus === "failed") return { label: "Something went wrong", tone: "bad" }; // a broken run is a problem whatever the judge said
+  const live = runStatus === "queued" || runStatus === "running" || runStatus === "evaluating";
+  if (live && stopping) return { label: "Stopping...", tone: "busy" };
   if (runStatus === "queued") return { label: "Getting ready", tone: "idle" };
   if (runStatus === "running") return { label: "Working on it", tone: "busy" };
   if (runStatus === "evaluating") return { label: "Checking the result", tone: "busy" };
@@ -25,4 +24,10 @@ export function outcome(runStatus: string, verdict: string | null | undefined, s
     default:
       return { label: "Done", tone: "ok" };
   }
+}
+
+/** The status and verdict enums as words, for the badges in Details. */
+export function statusLabel(status: string): string {
+  if (status === "cancelled") return "stopped by you";
+  return status.replace(/_/g, " ");
 }

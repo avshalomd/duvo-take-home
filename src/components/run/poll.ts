@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Verdict } from "@/contracts/eval";
 import { FileMeta, Run, RunEvent, RunState } from "@/contracts/run";
+import { deriveState } from "@/lib/runs/state";
 import type { RunView } from "./types";
 
 // What GET /api/runs/[id] answers. Validating it here is the boundary check: the panel is a client and the
@@ -13,6 +14,11 @@ const Payload = z.object({
   verdict: Verdict.nullable().default(null),
 });
 
+// What each message of the events stream (GET /api/runs/[id]/events, server-sent) carries: no files and no verdict,
+// which only exist once the run has ended - the panel fetches the full payload once when done is true.
+const Message = z.object({ events: z.array(RunEvent), run: Run, done: z.boolean() });
+export type StreamMessage = z.infer<typeof Message>;
+
 export function shouldPoll(status: string): boolean {
   return status === "queued" || status === "running" || status === "evaluating";
 }
@@ -20,7 +26,7 @@ export function shouldPoll(status: string): boolean {
 // A run that has settled. The panel polls until then; the runs list beside it is a server render, so reaching
 // this is also the moment to ask the server for a fresh page (Q79: the row said "Working on it" until a reload).
 export function isTerminal(status: string): boolean {
-  return status === "succeeded" || status === "failed";
+  return status === "succeeded" || status === "failed" || status === "cancelled";
 }
 
 export function parseRunPayload(json: unknown): RunView | null {
@@ -29,28 +35,32 @@ export function parseRunPayload(json: unknown): RunView | null {
   return parsed.data;
 }
 
-// How far along a view is: more events, or a newer verdict, means it is the later picture of the run.
-function freshness(view: RunView): [number, string] {
-  return [view.events.length, view.verdict?.evaluatedAt ?? ""];
+export function parseStreamMessage(json: unknown): StreamMessage | null {
+  const parsed = Message.safeParse(json);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Folds one stream message into the view. The events are merged by seq, so it does not matter whether the stream
+ * sends every event each time or only the new ones; the key state is derived again, exactly as the server does.
+ */
+export function mergeStreamMessage(view: RunView, msg: StreamMessage): RunView {
+  const bySeq = new Map(view.events.map((e) => [e.seq, e]));
+  for (const e of msg.events) bySeq.set(e.seq, e);
+  const events = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
+  return { ...view, run: msg.run, events, state: deriveState(msg.run, events) };
+}
+
+// How far along a view is: more events, a newer verdict, or Stop having been pressed, means it is the later picture.
+function freshness(view: RunView): [number, string, number] {
+  return [view.events.length, view.verdict?.evaluatedAt ?? "", view.run.cancelRequested ? 1 : 0];
 }
 
 // The panel holds two pictures of a run: the server's render and the last poll. The poll is usually ahead, but a
 // server render that is newer must win - otherwise Re-evaluate writes a verdict the stale poll keeps hidden.
-export type StreamMessage = { events: RunEvent[]; run: Run; done: boolean };
-
-export function parseStreamMessage(json: unknown): StreamMessage | null {
-  void json;
-  return null;
-}
-
-export function mergeStreamMessage(view: RunView, msg: StreamMessage): RunView {
-  void msg;
-  return view;
-}
-
 export function chooseView(server: RunView, polled: RunView | null): RunView {
   if (!polled || polled.run.id !== server.run.id) return server;
-  const [polledEvents, polledAt] = freshness(polled);
-  const [serverEvents, serverAt] = freshness(server);
-  return polledEvents >= serverEvents && polledAt >= serverAt ? polled : server;
+  const p = freshness(polled);
+  const s = freshness(server);
+  return p[0] >= s[0] && p[1] >= s[1] && p[2] >= s[2] ? polled : server;
 }

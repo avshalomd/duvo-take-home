@@ -1,4 +1,5 @@
 import { AgentLimits } from "@/contracts/agent";
+import type { StepCheck } from "@/contracts/eval";
 import type { DeriveState, Plan, PlanStep, RunEvent, RunState } from "@/contracts/run";
 
 // Nothing here is stored: the key state is recomputed from the events at any point of the run.
@@ -59,7 +60,21 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
   }
 
   const last = calls[calls.length - 1];
-  const currentStep: PlanStep | null = plan?.steps.find((s) => s.status === "running") ?? null;
+  const stopped = run.status === "cancelled";
+  // a stopped run is working on nothing, whatever its last plan said: the stepper shows where it stopped instead
+  const currentStep: PlanStep | null = stopped ? null : (plan?.steps.find((s) => s.status === "running") ?? null);
+
+  // The per-step check is asked again if a step is re-done; the latest answer is the one that counts.
+  const latestCheck = new Map<number, StepCheck>();
+  for (const e of events) if (e.kind === "check") latestCheck.set(e.payload.stepIndex, pickCheck(e.payload));
+  const stepChecks = [...latestCheck.values()].sort((a, b) => a.stepIndex - b.stepIndex);
+
+  // "allowed" is the guard doing nothing worth saying; everything else is shown (blocked, flagged, unchecked).
+  const guards = events.flatMap((e) =>
+    e.kind === "guard" && e.payload.decision !== "allowed"
+      ? [{ guard: e.payload.guard, decision: e.payload.decision, reason: e.payload.reason, ...(e.payload.target ? { target: e.payload.target } : {}) }]
+      : [],
+  );
 
   return {
     status: run.status,
@@ -79,6 +94,14 @@ export const deriveState: DeriveState = (run, events: RunEvent[]): RunState => {
     costUsd: finished ? finished.total_cost_usd : null,
     durationMs: finished ? finished.duration_ms : null,
     // The agent's own last words are the most useful error we have; run.error carries a crash before any result.
-    error: finished?.is_error ? finished.result || finished.subtype : run.error,
+    // Pressing Stop aborts the agent, which reports an error; it is the person's choice, not a failure to show.
+    error: stopped ? null : finished?.is_error ? finished.result || finished.subtype : run.error,
+    stepChecks,
+    guards,
   };
 };
+
+// The event payloads are loose objects (the engine may add fields): the state carries only the three it promises.
+function pickCheck(p: StepCheck): StepCheck {
+  return { stepIndex: p.stepIndex, onTrack: p.onTrack, note: p.note };
+}
