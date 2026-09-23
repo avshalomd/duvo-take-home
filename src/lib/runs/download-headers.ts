@@ -12,3 +12,7 @@ export function downloadHeaders(name: string, mime: string): Record<string, stri
     "X-Content-Type-Options": "nosniff", // the agent names its own files: never let the browser sniff a type
   };
 }
+
+export function inlineSvgHeaders(_name: string): Record<string, string> {
+  throw new Error("not built yet");
+}
