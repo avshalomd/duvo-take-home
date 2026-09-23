@@ -64,3 +64,49 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/eval/checks.ts` - strict field counts (a ragged row fails `parses` by row number), a `urls` check on the url column, skip counts in the details, and `connectionRequired()` that reads the sentence naming a connection to tell a route from an offer.
 - `src/contracts/connection.ts` - `publicHttpUrl`: http(s) only, no loopback, link-local or private hosts, because the SDK child fetches the URL server-side.
 - `.claude/scripts/qa-env.mjs`, `npm run qa:dev` - the app against the separate QA database, so QA never writes to production again.
+
+## v2 (local, `v2` branch)
+
+### Foundation
+- `src/db/auth-schema.ts` - Better Auth's tables, generated; its `organization` is our workspace, so tenancy is one
+  `workspace_id` column on our own tables and one filter in every query.
+- `src/contracts/automation.ts` - the automation builder's seams: `AutomationDraft` (the LLM's output), `AutomationEdit`
+  (the form), `Trial` (an example with the evaluator's outcome and the person's judgment), `canApprove`.
+- `src/lib/agent/run.ts` - one serialized writer for events: the agent's messages, guard decisions and step checks
+  come from different callbacks and each gets its seq when written, so the trace stays one ordered stream.
+
+### oauth
+- `src/lib/connections/oauth/complete.ts` - the pending state is cleared before the code is exchanged: a state works once.
+- `src/app/api/connections/oauth/redirect.ts` - a cookie ties a sign-in to the browser that started it, so a link
+  someone else sends cannot attach their account to your connection.
+- `src/lib/connections/oauth/headers.ts` - a refused refresh marks the connection as needing sign-in; a server that
+  is down keeps the tokens; a refresh another run already did is reused.
+
+### outputs
+- `src/lib/outputs/tools/make-chart.ts` - the agent draws nothing: it passes data, our code renders the SVG. The tool
+  advertises a catchall object instead of the contract's `z.record`, which the SDK cannot turn into JSON Schema
+  (the tools silently vanished in the first live run).
+- `src/lib/outputs/file-response.ts` - a quarantined file answers 409 until `?confirm=1`; only an SVG is served
+  inline, with a no-script content policy.
+- `src/lib/outputs/chart-render.ts` - vega is loaded on first use: its top-level await broke every `tsx` script.
+
+### guards
+- `src/lib/agent/guards/index.ts` - one PreToolUse hook per tool; its guards run in a fixed order and the first block
+  wins. Only decisions that are not "allowed" are recorded, so the timeline stays quiet.
+- `src/lib/agent/guards/url.ts` - code decides first (private hosts, denied domains); Jev is asked only when a query
+  string is long enough to carry data out (CSV rows in a query scored 0.94, a long search 0.17). Jev down or slow
+  lets the fetch through, recorded as "unchecked": a guard must not stop honest work.
+- `src/lib/agent/guards/scan.ts` - credentials quarantine a file; personal data (emails, phones, Luhn-checked cards,
+  mod-97-checked IBANs) is only counted, because a contact list is often the task.
+- `src/contracts/connection.ts` `isPrivateHost` - one rule for "private or local" shared by the connection form and
+  the url guard, so they cannot drift; `plan` and `outputs` are reserved connection names.
+
+### auth
+- `src/lib/auth/workspaces.ts` `createPersonalWorkspace` - one `db.batch` writes the workspace and its owner and points
+  the sign-up session at them: Better Auth runs the user "after" hook once the session already exists.
+- `src/lib/auth/paths.ts` `needsSignIn` - the proxy leaves `/api/*` to the routes: a 401 JSON is something a fetch or
+  a poll can read, a redirect would hand it the sign-in page's HTML.
+- `src/lib/auth/actions.ts` `openWorkspaceHome` - switching, creating or accepting a workspace revalidates the layout
+  before opening Home, or the top bar keeps naming the old workspace.
+- `src/app/(auth)/invite/[id]` - explains the invitation before asking anyone to sign in, pre-fills the email, and
+  refuses a different signed-in account with "Sign in as ...".
