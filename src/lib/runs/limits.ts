@@ -13,7 +13,16 @@ export const STARTS_PER_IP = 5;
 export const STARTS_WINDOW_MS = 10 * 60_000;
 
 export const IN_FLIGHT_MESSAGE = "Handover is busy with other runs right now - try again in a minute";
-export const RATE_LIMIT_MESSAGE = "Too many runs from this address - try again later";
+
+/** "in about 5 minutes": the wait rounded up to whole minutes, so the person is never told to come back too early. */
+function inWords(ms: number): string {
+  if (ms < 60_000) return "in less than a minute";
+  const minutes = Math.ceil(ms / 60_000);
+  return minutes === 1 ? "in about a minute" : `in about ${minutes} minutes`;
+}
+
+/** Q206: when to try again, as the daily limit says when it resets, instead of "later". */
+export const rateLimitMessage = (waitMs: number) => `Too many runs from this address - try again ${inWords(waitMs)}`;
 
 /** The process-wide bucket. Per instance, and that is the point: it needs no table and no round trip. */
 export const startsByIp = tokenBucket(STARTS_PER_IP, STARTS_WINDOW_MS);
@@ -25,7 +34,7 @@ export const startsByIp = tokenBucket(STARTS_PER_IP, STARTS_WINDOW_MS);
 export function startBlockReason(args: { inFlight: number; ip: string | null; now: number; bucket: Bucket }): string | null {
   // The deployment's cap is checked first so a visitor refused because others filled it keeps their tokens.
   if (args.inFlight >= MAX_IN_FLIGHT) return IN_FLIGHT_MESSAGE;
-  if (args.ip !== null && !args.bucket.take(args.ip, args.now)) return RATE_LIMIT_MESSAGE;
+  if (args.ip !== null && !args.bucket.take(args.ip, args.now)) return rateLimitMessage(args.bucket.retryAfter(args.ip, args.now));
   return null;
 }
 
