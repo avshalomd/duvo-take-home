@@ -86,7 +86,7 @@ describe("healPrompt", () => {
   });
 
   it("allows at most one closing sentence on what the check made it fix", () => {
-    expect(healPrompt(feedback)).toMatch(/at most one closing sentence may say what the automatic check made you fix/i);
+    expect(healPrompt(feedback)).toMatch(/at most one closing sentence may say what the check made you fix/i);
   });
 });
 

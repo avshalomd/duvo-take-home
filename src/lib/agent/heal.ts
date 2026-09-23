@@ -57,7 +57,9 @@ export function noProgress(current: AttemptFingerprint, earlier: AttemptFingerpr
 
 /**
  * The prompt of a heal attempt. feedbackForAgent already says what failed and ends with what to do, so it is used as
- * it is (QA Q149); only what the session does not know from it is added: where the files are, and the plan tool.
+ * it is (QA Q149); only what the session does not know from it is added: where the files are, the plan tool, and
+ * what the report must be. The attempt's last message becomes the run's report - the one the person reads, the
+ * evaluator judges and a follow-up or "Make an automation" builds on - so it is the whole task's, not the fix's.
  */
 export function healPrompt(feedback: string): string {
   return [
@@ -66,5 +68,9 @@ export function healPrompt(feedback: string): string {
     "Your files are still in your working directory: write each one you change back under the same name. Keep your " +
       "plan as it is and do not call mcp__plan__set_plan again: mark the steps you redo with mcp__plan__update_step " +
       "(running, then done with a note of what you fixed), and check the files yourself before you finish.",
+    "",
+    "Then end with your report for the person on the whole task as it now stands - what you did, what the files hold " +
+      "and anything you could not do - written as your answer to the task, not a note of the fix. At most one closing " +
+      "sentence may say what the check made you fix.",
   ].join("\n");
 }
