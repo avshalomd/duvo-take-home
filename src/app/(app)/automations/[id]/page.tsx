@@ -10,7 +10,7 @@ import { ExampleCard, type ExampleView } from "@/components/automations/example-
 import { History } from "@/components/automations/history";
 import { RunForm } from "@/components/automations/run-form";
 import { ScheduleForm } from "@/components/automations/schedule-form";
-import { StatePill } from "@/components/automations/state-pill";
+import { StateGlyph } from "@/components/automations/state-glyph";
 import { StatusToggle } from "@/components/automations/status-toggle";
 import { LINK, SECTION, SHEET } from "@/components/automations/surfaces";
 import { TryExampleForm } from "@/components/automations/try-example-form";
@@ -136,9 +136,9 @@ export default async function AutomationPage({ params, searchParams }: PageProps
 function Header({ automation: a }: { automation: Automation }) {
   return (
     <header className="space-y-5">
-      <h1 className="display text-[32px] break-words text-graphite sm:text-[40px]">{a.name}</h1>
+      <h1 className="page-title break-words text-graphite">{a.name}</h1>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <StatePill status={a.status} />
+        <StateGlyph status={a.status} className="text-[15px]" />
         {/* a draft's next step is said once, on the approval bar; a ready one gets its switch here (Q106) */}
         {a.status !== "draft" && <StatusToggle automationId={a.id} command={a.command} active={a.status === "active"} />}
       </div>
@@ -228,7 +228,7 @@ function Missing() {
     <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-8 sm:px-6 sm:py-12">
       <BackLink />
       <section className={cn(SHEET, "space-y-3 p-6 sm:p-10")}>
-        <h1 className="display text-[28px] text-graphite">That automation was not found</h1>
+        <h1 className="page-title text-graphite">That automation was not found</h1>
         <p className="text-slate">It may have been deleted.</p>
       </section>
     </main>
