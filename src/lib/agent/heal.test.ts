@@ -64,17 +64,29 @@ describe("healPrompt", () => {
     expect(healPrompt(feedback)).toMatch(/keep your plan.*set_plan/i);
   });
 
-  // Q149: feedbackForAgent already opens with its lead and closes with "report what you changed".
+  // Q149: feedbackForAgent already opens with its lead and closes with what to do with the files.
   it("uses the feedback as it is, framed once: no second lead or closing line of its own", () => {
     const real = [
       "An automatic check of the result found this to fix:",
       "- In output.csv, row 3 has 3 values but the header has 2: put every value that contains a comma in double quotes.",
-      "Fix the files in place, keep what was already right, and report what you changed.",
+      "Fix the files in place and keep what was already right.",
     ].join("\n");
     const p = healPrompt(real);
     expect(p.startsWith(real)).toBe(true);
     expect(p.match(/automatic check/gi)).toHaveLength(1);
     expect(p.match(/report/gi)).toHaveLength(1);
+  });
+
+  // The run's report is the fix attempt's last message: a healed run's report read "**What I changed:** Only Spain's
+  // languages field..." (run 15f8b99d), and that note was judged, followed up and made into an automation.
+  it("asks for the report on the whole task as it now stands, for the person, not a note of the fix", () => {
+    const p = healPrompt(feedback);
+    expect(p).toMatch(/report for the person on the whole task as it now stands/i);
+    expect(p).toMatch(/not a note of the fix/i);
+  });
+
+  it("allows at most one closing sentence on what the check made it fix", () => {
+    expect(healPrompt(feedback)).toMatch(/at most one closing sentence may say what the automatic check made you fix/i);
   });
 });
 

@@ -80,6 +80,14 @@ describe("carryOverPrompt", () => {
   it("tells the agent to write changed files back under the same names", () => {
     expect(carryOverPrompt(parent, change)).toMatch(/same name/i);
   });
+
+  // The follow-up's report is its run's report: judged against the whole thread, and what "Make an automation" reads.
+  it("asks for the report on the whole task as it now stands, with at most one sentence on the change", () => {
+    for (const p of [carryOverPrompt(parent, change), carryOverPrompt(hisParent, "fix the table")]) {
+      expect(p).toMatch(/report for the person on the whole task as it now stands/i);
+      expect(p).toMatch(/at most one closing sentence may say what this change did/i);
+    }
+  });
 });
 
 describe("carryOverPrompt: the earlier run's plan and its check (his words: the relevant info, the evaluator outputs)", () => {
