@@ -10,20 +10,15 @@ const NAME = "e2e Settings server";
 const RENAMED = "e2e Settings renamed";
 const TOKEN = "e2e-secret-token-value";
 
-// Signs in as the demo user when the auth package's gate is in front of the page; a no-op before it lands.
-async function open(page: Page, path: string) {
-  await page.goto(path);
-  if (!new URL(page.url()).pathname.startsWith("/sign-in")) return;
-  await page.getByLabel(/email/i).fill("demo@example.com");
-  await page.getByLabel(/password/i).fill("demo-password");
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/sign-in"));
-  await page.goto(path);
-}
+// Every test starts signed in as the demo user (an owner): the "setup" project in playwright.config.ts signs in once.
+const open = (page: Page, path: string) => page.goto(path);
+const INVITED = `e2e-invite-${Date.now()}@example.com`;
 
 test.afterAll(async () => {
-  if (!process.env.DATABASE_URL) return; // the test deletes its own row; the sweep only runs when the database is reachable
-  await neon(process.env.DATABASE_URL).query("delete from connections where name like 'e2e Settings%'"); // only this spec's names: other agents share the database
+  if (!process.env.DATABASE_URL) return; // the tests delete their own rows; the sweep only runs when the database is reachable
+  const sql = neon(process.env.DATABASE_URL);
+  await sql.query("delete from connections where name like 'e2e Settings%'"); // only this spec's names: other agents share the database
+  await sql.query("delete from invitation where email like 'e2e-invite-%@example.com'");
 });
 
 test("a connection is added with a token, edited, switched off and deleted", async ({ page }) => {
@@ -115,4 +110,31 @@ test("a changed limit is saved and shown again after a reload", async ({ page })
   await expect(page.getByText("Limits saved").first()).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Runs per day")).toHaveValue(before);
+});
+
+test("the members list shows who is in the workspace and their role", async ({ page }) => {
+  await open(page, "/settings/members");
+  await expect(page.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");
+  const me = page.getByTestId("members").getByRole("listitem").filter({ hasText: "demo@example.com" });
+  await expect(me).toContainText("(you)");
+  await expect(me).toContainText("Owner");
+});
+
+test("an owner invites someone and gets the link to send them", async ({ page }) => {
+  await open(page, "/settings/members");
+  await page.getByLabel("Email").fill(INVITED);
+  await page.getByRole("button", { name: "Create invite link" }).click();
+  const link = page.getByTestId("invite-link");
+  await expect(link).toContainText(`Send this link to ${INVITED}`);
+  await expect(link.getByLabel("Invite link")).toHaveValue(/\/invite\/[\w-]+$/);
+  await expect(page.getByLabel("Email")).toHaveValue(""); // emptied for the next person
+});
+
+test("inviting someone who is already a member says so in plain words", async ({ page }) => {
+  await open(page, "/settings/members");
+  await page.getByLabel("Email").fill("demo@example.com");
+  await page.getByRole("button", { name: "Create invite link" }).click();
+  const invite = page.locator("section", { has: page.getByRole("heading", { name: "Invite someone" }) }); // Next's route announcer is an alert too
+  await expect(invite.getByRole("alert")).toHaveText("demo@example.com is already a member of this workspace.");
+  await expect(page.getByLabel("Email")).toHaveValue("demo@example.com"); // kept, to be corrected
 });
