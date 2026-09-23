@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useActionState } from "react";
 import { approveAction, type ActionState } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/button";
-import { approvalLabel, type ApprovalProgress } from "@/lib/automations/approval";
+import { approvalLabel, memberApprovalLine, type ApprovalProgress } from "@/lib/automations/approval";
 import { cn } from "@/lib/utils";
 import { SMALL, TILE } from "./surfaces";
 
@@ -21,7 +21,8 @@ type Props = {
 
 // Approval as a bar that fills as the examples are judged: one segment per example of this version, fern when it
 // looks right, crimson when it does not. The Approve action sits on the bar; when it cannot be pressed the reason
-// (from canApprove on the server) says what is missing. A member sees the bar and who approves, not a button (Q178).
+// (from canApprove on the server) says what is missing. A member sees the bar and the same next step, then who
+// approves it, not a button (Q178).
 export function ApprovalBar({ automationId, progress, allowed, reason, approver }: Props) {
   const [state, action, pending] = useActionState<ActionState, FormData>(approveAction, {});
 
@@ -30,7 +31,7 @@ export function ApprovalBar({ automationId, progress, allowed, reason, approver 
       <div className={cn(TILE, "space-y-4 p-5")}>
         <Segments progress={progress} />
         <p data-testid="approve-reason" className={SMALL}>
-          {allowed ? "An example looks right, so an owner or an admin can approve it now." : "An owner or an admin approves it once an example looks right."}
+          {memberApprovalLine(allowed, reason)}
         </p>
       </div>
     );
