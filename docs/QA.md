@@ -164,9 +164,9 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q125 | qa-func | .xlsx served with "; charset=utf-8" | no charset on a binary type | minor | outputs | fixed (07469f9) |
 | Q126 | qa-func | two connections whose names map to the same key are both accepted; one silently replaces the other in a run | the second name refused as taken | minor | settings | fixing |
 | Q127 | qa-func | every url-guard block reads "A web page tried to make the agent send your data elsewhere", also for a private address or a site blocked in Settings | wording by cause | minor | home (guard-notice) | fixing |
-| Q128 | qa-func | a run the model refused shows one text event; the refused action (turns 1-2) is not in the timeline | the refusal visible in the timeline | minor | engine (map-message) | fixing |
-| Q129 | qa-func | a stopped run records no cost or duration, so Limits' "Spent today" leaves it out | the partial cost recorded | minor | engine | fixing |
+| Q128 | qa-func | a run the model refused shows one text event; the refused action (turns 1-2) is not in the timeline | the refusal visible in the timeline | minor | engine (map-message) | fixed (67ec481: every refusal and error shape in sdk.d.ts becomes a plain notice; the QA run itself was deleted, so the exact case is unconfirmed) |
+| Q129 | qa-func | a stopped run records no cost or duration, so Limits' "Spent today" leaves it out | the partial cost recorded | minor | engine | fixed (8ab2600: cost from the result or the SDK's cost-state, else the duration; follow-ups no longer count their parent's cost) |
 | Q130 | qa-func | a stale session cookie on a deep link redirects to /sign-in without ?next= | next kept | minor | auth | fixing |
-| Q131 | qa-func | "Controller is already closed" logged when a client leaves the event stream mid-read | a quiet end | minor | engine | fixing |
-| Q132 | qa-func | POST /api/runs with a non-JSON body answers Zod's wording, and runs `\cmd input` as paid free text where Home refuses it | plain words; the same command rule as Home | minor | engine | fixing |
+| Q131 | qa-func | "Controller is already closed" logged when a client leaves the event stream mid-read | a quiet end | minor | engine | fixed (3c39242) |
+| Q132 | qa-func | POST /api/runs with a non-JSON body answers Zod's wording, and runs `\cmd input` as paid free text where Home refuses it | plain words; the same command rule as Home | minor | engine | fixed (14ca4e4: plain words; parseCommand then runCommand, else startRun) |
 | Q133 | qa-func | the rail search does not match a run's command | a match | minor | home | fixing |
