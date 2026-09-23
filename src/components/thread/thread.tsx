@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 /**
  * The thread (docs/DESIGN-V2.md): the agent's work drawn as one line through its plan. The line fills as steps
  * finish, a bead marks the step being worked on, and the filled part takes the run's colour - saffron while the
- * agent works, fern when it is done, crimson where it failed, slate where it was stopped.
+ * agent works, fern when it is done, slate where it was stopped. A run that failed draws its finished steps done:
+ * they did run, and red checks said "done" and "failed" at once; the failure is said once, in the outcome line.
  *
  * One component for every place the plan is shown: the run (size "full", with notes), an automation's example
  * cards (size "mini") and the sign-in page's illustration. It knows nothing about runs: callers map their data in.
@@ -22,10 +23,11 @@ export type ThreadStep = {
 };
 export type ThreadTone = "live" | "done" | "failed" | "stopped";
 
+const DONE = { fill: "bg-fern", node: "bg-fern border-fern text-white", text: "text-fern" };
 const TONE: Record<ThreadTone, { fill: string; node: string; text: string }> = {
   live: { fill: "bg-saffron", node: "bg-saffron border-saffron text-white", text: "text-saffron" },
-  done: { fill: "bg-fern", node: "bg-fern border-fern text-white", text: "text-fern" },
-  failed: { fill: "bg-crimson", node: "bg-crimson border-crimson text-white", text: "text-crimson" },
+  done: DONE,
+  failed: DONE, // the steps that ran are done; only the outcome is red
   stopped: { fill: "bg-slate", node: "bg-slate border-slate text-white", text: "text-slate" },
 };
 

@@ -113,12 +113,25 @@ describe("emptyListLine - what the command list says when it has nothing to offe
 });
 
 // Q118: "makes facts.md with three facts about {input}" showed the template's placeholder
-describe("describeOutput - an automation's output line with its input named", () => {
+describe("describeOutput - an automation's output line in plain words, with its input named", () => {
   it("puts the input's label where the template says {input}", () => {
-    expect(describeOutput("facts.md with three facts about {input}", "Topic")).toBe("facts.md with three facts about the topic");
+    expect(describeOutput("facts.md with three facts about {input}", "Topic")).toBe("a document with three facts about the topic");
   });
 
-  it("leaves a line without a placeholder as it is", () => {
-    expect(describeOutput("news.csv with 8 rows", "Topic")).toBe("news.csv with 8 rows");
+  it("says what kind of file it makes rather than the file's name", () => {
+    expect(describeOutput("news.csv with 8 rows", "Topic")).toBe("a CSV table with 8 rows");
+    expect(describeOutput("chart.svg of the counts", "Topic")).toBe("a chart of the counts");
+    expect(describeOutput("data.xlsx with one sheet per region", "Topic")).toBe("a spreadsheet with one sheet per region");
+  });
+
+  // the list read "Makes output.csv with columns title, source, url, published_at, summary, at least 8 rows, ..."
+  it("leaves out the column names and the fine print after the first comma", () => {
+    const spec = "output.csv with columns title, source, url, published_at, summary, at least 8 rows, all dated within the last 7 days, no duplicate urls";
+    expect(describeOutput(spec, "News topic")).toBe("a CSV table");
+    expect(describeOutput("news.csv with 8 rows, all dated this week", "Topic")).toBe("a CSV table with 8 rows");
+  });
+
+  it("leaves a line that names no file as it is", () => {
+    expect(describeOutput("a short answer in the report", "Topic")).toBe("a short answer in the report");
   });
 });

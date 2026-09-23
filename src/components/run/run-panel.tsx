@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ActionsRow } from "./actions-row";
 import { DetailsPanel } from "./details-panel";
 import { Elapsed } from "./elapsed";
+import { failureCause } from "./failure";
 import { FilesSection } from "./files-section";
 import { GuardNotices } from "./guard-notices";
 import { fixesRun, healsOf } from "./heal";
@@ -27,7 +28,7 @@ import { TimeAgo } from "./time-ago";
 import type { RunView } from "./types";
 import { useRunPoll } from "./use-run-poll";
 import { whyLines } from "./why";
-import { WhyButton, WhyList } from "./why-section";
+import { NotChecked, WhyButton, WhyList } from "./why-section";
 
 const gutter = SHEET_GUTTER;
 
@@ -65,8 +66,8 @@ export function RunPanel({
   const heals = healsOf(state.heals, events);
   const result = outcome(run.status, headline, run.cancelRequested, { attempts: fixesRun(heals), max: heals.at(-1)?.max });
   const why = whyLines(verdict, run.status, run.outcome, heals);
-  const progress = planProgress(state.plan);
   const steps = threadSteps(state.plan, run.status, state.stepChecks, heals);
+  const progress = planProgress(state.plan, steps); // counts what the thread draws, fixes included
 
   function closeDetails() {
     setDetailsOpen(false);
@@ -113,6 +114,8 @@ export function RunPanel({
             </p>
             {why.length > 0 && <WhyButton open={whyOpen} onToggle={() => setWhyOpen(!whyOpen)} />}
           </div>
+          {/* Q208: nobody could check the result (the checker was down): said here, with the way to check it again */}
+          {run.status === "succeeded" && headline === "unknown" && <NotChecked runId={run.id} />}
           {whyOpen && why.length > 0 && <WhyList lines={why} />}
         </header>
 
@@ -124,8 +127,10 @@ export function RunPanel({
           )}
           {run.status === "failed" && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[16px] bg-crimson-wash px-4 py-3">
-              <p className="min-w-0 flex-1 text-[14px] leading-5">
-                The run stopped before it finished. You can run the same brief again; what went wrong is in Details.
+              {/* the cause in one plain sentence when it is one we know; the raw error stays in Details */}
+              <p data-testid="failure" className="min-w-0 flex-1 text-[14px] leading-5">
+                {failureCause(run.error) ?? "The run stopped before it finished."} You can run the same brief again; the technical detail is in
+                Details.
               </p>
               <RunAgainButton runId={run.id} prominent />
             </div>

@@ -17,13 +17,15 @@ function client() {
 
 export type HomeRuns = {
   parent: string; followUp: string; live: string; stopped: string; failed: string; legacy: string; audit: string; automation: string;
-  example: string; long: string; healing: string; healed: string; unfixed: string; stuck: string;
+  example: string; long: string; healing: string; healed: string; unfixed: string; stuck: string; carried: string; unchecked: string;
 };
 export const AUTOMATION = { name: `${PREFIX} audit`, command: COMMAND, input: "Acme Ltd" }; // a draft
 export const READY = { name: `${PREFIX} ready check`, command: "e2e-home-ready", hint: "The registered name, e.g. Acme Ltd" };
 export const TITLES = {
   parent: `${PREFIX} parent: list three facts about the Moon`,
   followUp: `${PREFIX} follow-up: add the Moon's distance from Earth`,
+  carried: `${PREFIX} carried: write the report again, shorter`, // a follow-up of the follow-up that keeps its files
+  unchecked: `${PREFIX} unchecked: sum the fruit counts while the judge is away`, // the model was down when it was judged
   live: `${PREFIX} live: count to three slowly`,
   stopped: `${PREFIX} stopped: summarise the week's AI news`,
   failed: `${PREFIX} failed: fetch a page that is not there`,
@@ -37,6 +39,8 @@ export const TITLES = {
   unfixed: `${PREFIX} unfixed: list at least eight space stories in a CSV`,
   stuck: `${PREFIX} stuck: list at least eight sea stories in a CSV`,
 };
+// The failed run's error as the engine records a run that hit its time limit (src/lib/agent/run.ts)
+export const FAILED_ERROR = "timed out after 290 s";
 // Auto-heal: what the check found on the first result, what the agent was then told, and the engine's words when it
 // stops trying (src/lib/agent/heal.ts, noProgress)
 export const HEAL = {
@@ -78,6 +82,18 @@ const V2_NOTES = {
   evaluatedAt: new Date().toISOString(),
   decidedBy: "review",
   path: ["checks", "judge", "review"],
+};
+
+// The checks passed and the judge could not be reached (the model was down): nobody looked at the content (Q208)
+const UNKNOWN = {
+  verdict: "unknown",
+  checks: CHECKS,
+  judgment: null,
+  review: null,
+  reasons: ["The judge was unavailable: 503 Service Unavailable"],
+  evaluatedAt: new Date().toISOString(),
+  decidedBy: "nobody",
+  path: ["checks", "judge"],
 };
 
 // A result that still did not pass after every attempt to fix it
@@ -163,8 +179,9 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const audit = await insert({ prompt: TITLES.audit, status: "succeeded", minutesAgo: 6, purpose: "automation", automation, input: AUTOMATION.input, verdict: V1_PASS, report: "Acme Ltd is owned by ..." });
   await events(audit, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
 
-  const failed = await insert({ prompt: TITLES.failed, status: "failed", minutesAgo: 5, error: "error_during_execution: the page returned 404" });
-  await events(failed, [started, { kind: "plan", payload: PLAN(1) }, finished("error_during_execution", true)]);
+  // it ran out of time in the middle of a call: the call never answered, and the run has no finished event
+  const failed = await insert({ prompt: TITLES.failed, status: "failed", minutesAgo: 5, error: FAILED_ERROR });
+  await events(failed, [started, { kind: "plan", payload: PLAN(1) }, call("t0", "WebFetch", { url: "https://example.com/not-there" })]);
 
   const followUp = await insert({ prompt: TITLES.followUp, status: "succeeded", minutesAgo: 4, purpose: "followup", parent, verdict: V2_NOTES, human: "approved", report: REPORT });
   await events(followUp, [
@@ -187,6 +204,15 @@ export async function createHomeRuns(): Promise<HomeRuns> {
     quarantined: true,
   });
   await file(followUp, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("not a real workbook").toString("base64"), { encoding: "base64" });
+
+  // Q205: a follow-up gets its parent's files back and keeps them without making them again, so its events have no
+  // spreadsheet call for table.xlsx: the tile must still say what the sheets are
+  const carried = await insert({ prompt: TITLES.carried, status: "succeeded", minutesAgo: 3, purpose: "followup", parent: followUp, verdict: V1_PASS, report: "Shorter now." });
+  await events(carried, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
+  await file(carried, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("not a real workbook").toString("base64"), { encoding: "base64" });
+
+  const unchecked = await insert({ prompt: TITLES.unchecked, status: "succeeded", minutesAgo: 15, verdict: UNKNOWN, report: "Ten pieces of fruit." });
+  await events(unchecked, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
 
   const stopped = await insert({ prompt: TITLES.stopped, status: "cancelled", minutesAgo: 2 });
   await events(stopped, [started, { kind: "plan", payload: PLAN(1) }]);
@@ -216,7 +242,7 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const stuck = await insert({ prompt: TITLES.stuck, status: "succeeded", minutesAgo: 14, heals: 1, verdict: FAIL_ROWS, report: "Six sea stories.", cost: 0.15 });
   await events(stuck, [started, { kind: "plan", payload: PLAN(null) }, attempt(0.1, 0.1), heal(1, HEAL.reason), attempt(0.15, 0.05), { kind: "heal", payload: { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"], feedback: HEAL.feedback, stopped: HEAL.stopped } }]);
 
-  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck };
+  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck, carried, unchecked };
 }
 
 export async function deleteHomeRuns(): Promise<void> {

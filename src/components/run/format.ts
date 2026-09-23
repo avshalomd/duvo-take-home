@@ -54,17 +54,42 @@ export function toolLine(name: string, input: unknown, connections: { name: stri
   return arg ? `${label} ${arg}` : label;
 }
 
-export type ToolKind = "search" | "fetch" | "write" | "connection" | "tool";
+export type ToolKind = "search" | "fetch" | "read" | "write" | "connection" | "tool";
 
-// Four kinds cover every tool the agent is given; the card shows the kind so a run can be scanned, not read.
+// A handful of kinds cover every tool the agent is given; the card shows the kind so a run can be scanned, not read.
 export function toolKind(name: string): ToolKind {
   if (name.startsWith("mcp__outputs__")) return "write"; // the chart and spreadsheet tools each make a file
   if (name.startsWith("mcp__plan__")) return "tool";
   if (name.startsWith("mcp__")) return "connection";
   if (name === "WebSearch" || name === "Grep" || name === "Glob") return "search";
-  if (name === "WebFetch" || name === "Read") return "fetch";
+  if (name === "WebFetch") return "fetch"; // the web
+  if (name === "Read") return "read"; // a file in the run's own folder, never the web
   if (name === "Write" || name === "Edit") return "write";
   return "tool";
+}
+
+/** The run's working folder(s), from its started events (one per attempt; the engine records its cwd). */
+export function runFolders(events: { kind: string; payload: unknown }[]): string[] {
+  const folders = events.flatMap((e) => {
+    const cwd = e.kind === "started" ? (e.payload as { cwd?: unknown }).cwd : undefined;
+    return typeof cwd === "string" && cwd ? [cwd] : [];
+  });
+  return [...new Set(folders)];
+}
+
+/**
+ * A tool's words with the run's folder taken off its paths (Q187): "The file /Users/.../runs/<id>/countries.csv has
+ * been updated" reads "The file countries.csv ...". The machine's layout says nothing to the reader, and is not theirs.
+ */
+export function relativeToRun(text: string, folders: string[]): string {
+  let out = text;
+  for (const folder of folders) {
+    const base = folder.replace(/\/+$/, "");
+    out = out.split(`${base}/`).join(""); // a path inside the folder loses the folder
+    // what is left is the folder on its own, which reads ".", or a sibling ("<folder>-other"), which is left alone
+    out = out.split(base).reduce((acc, part, i) => (i === 0 ? part : `${acc}${/^[\w.-]/.test(part) ? base : "."}${part}`), "");
+  }
+  return out;
 }
 
 /**
@@ -74,6 +99,16 @@ export function toolKind(name: string): ToolKind {
  */
 export function attemptCost(payload: { total_cost_usd: number; attempt_cost_usd?: unknown }): number {
   return typeof payload.attempt_cost_usd === "number" ? payload.attempt_cost_usd : payload.total_cost_usd;
+}
+
+/**
+ * The state card's turns (Q198): the state's turn is the live turn while the run works, counted against the cap,
+ * and the run's total once it has ended, when a cap says nothing. null before the first turn.
+ */
+export function turnsLine(status: string, turn: number, maxTurns: number): string | null {
+  if (turn <= 0) return null;
+  if (status === "queued" || status === "running" || status === "evaluating") return `turn ${turn} of ${maxTurns}`;
+  return `${turn} ${turn === 1 ? "turn" : "turns"}`;
 }
 
 export function formatDuration(ms: number | null): string {

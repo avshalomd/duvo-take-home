@@ -58,26 +58,27 @@ const FROM_AUTOMATION = ["automation", "schedule", "trial"];
 /**
  * A run's name. For a run of a saved automation - called, scheduled or an example - the instructions are the filled
  * template, which is nobody's name for it: "<automation name>: <input>" is (Q94, Q95). names maps an automation's id
- * to its name; a deleted automation leaves the input, and a run with neither falls back to the instructions.
+ * to its name. A deleted automation leaves no name, and its input alone ("cherries 7, grapes 3") names nothing, so
+ * such a run reads as a plain run, by the first line of its instructions (Q204).
  */
 export function runTitle(run: Pick<Run, "prompt" | "purpose" | "input" | "automationId">, names: Record<string, string> = {}): string {
-  if (run.purpose && FROM_AUTOMATION.includes(run.purpose)) {
-    const name = run.automationId ? names[run.automationId] : undefined;
+  const name = run.purpose && FROM_AUTOMATION.includes(run.purpose) && run.automationId ? names[run.automationId] : undefined;
+  if (name) {
     const input = run.input?.trim();
-    if (name && input) return `${name}: ${input}`;
-    if (name || input) return (name ?? input)!;
+    return input ? `${name}: ${input}` : name;
   }
   return run.prompt.split("\n").map((l) => l.trim()).find(Boolean) ?? run.prompt;
 }
 
-/** Why the run exists, when it is not plain typed text. commands maps an automation's id to its command. */
-export function runTag(run: Pick<Run, "purpose" | "automationId">, commands: Record<string, string>): string | null {
-  const command = run.automationId ? commands[run.automationId] : undefined;
+/**
+ * Why the run exists, when its title does not say it. A called automation's run is titled by the automation, so a
+ * tag with its command only repeated the name and squeezed the input out of the row; the command is still searched
+ * (matchesSearch). A run whose automation was deleted reads as a plain run, with no tag either.
+ */
+export function runTag(run: Pick<Run, "purpose">): string | null {
   switch (run.purpose) {
-    case "automation":
-      return command ? `/${command}` : "automation"; // the automation may have been deleted since
     case "schedule":
-      return command ? `/${command}, scheduled` : "scheduled";
+      return "scheduled";
     case "trial":
       return "example";
     case "followup":

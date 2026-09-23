@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { AUTOMATION, createHomeRuns, deleteHomeRuns, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
+import { AUTOMATION, createHomeRuns, deleteHomeRuns, FAILED_ERROR, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
 
 // The Home page: the rail, the first-visit question, the run sheet with its thread, the floating composer and the
 // Details panel. Runs against a dev server on the local database, signed in as the demo user:
@@ -87,7 +87,7 @@ test.describe("the frame", () => {
   test("the search box filters the rail by the instructions, and by an automation's command and name", async ({ page }) => {
     await page.goto("/");
     const search = rail(page).getByRole("searchbox", { name: /search runs/i });
-    await search.fill("e2e home follow-up");
+    await search.fill("e2e home follow-up distance"); // every word, in any order: the tag and the title together
     await expect(rail(page).getByRole("link")).toHaveCount(1);
     await expect(rail(page).getByRole("link")).toContainText("follow-up");
 
@@ -98,6 +98,35 @@ test.describe("the frame", () => {
     await search.fill("zzzz no run says this");
     await expect(rail(page).getByRole("link")).toHaveCount(0);
     await expect(rail(page)).toContainText(/no runs match/i);
+  });
+
+  // Q201: an unknown address showed Next's bare 404, with no frame and no way back
+  test("an unknown address says so in the app's own look, with a way back to Home", async ({ page }) => {
+    for (const path of ["/nope", "/settings/nope"]) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole("heading", { name: "This page was not found" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Back to Home" })).toHaveAttribute("href", "/");
+    }
+  });
+
+  // the field showed the browser's own blue clear "x"; it has a quiet clear button of its own, there only with text
+  test("the rail's search clears with its own button, not the browser's", async ({ page }) => {
+    await page.goto("/");
+    const search = rail(page).getByRole("searchbox", { name: /search runs/i });
+    const clear = rail(page).getByRole("button", { name: "Clear search" });
+    await expect(clear).toHaveCount(0);
+    await search.fill("zzzz no run says this");
+    await clear.click();
+    await expect(search).toHaveValue("");
+    await expect(search).toBeFocused();
+    await expect(clear).toHaveCount(0);
+  });
+
+  // "News digest CSV: el... /news-digest": the tag repeated the automation's name and cut the input short
+  test("a rail row of a saved automation's run carries no tag that repeats its name", async ({ page }) => {
+    await page.goto("/");
+    await expect(rail(page).locator(`a[href="/?run=${runs.audit}"]`)).not.toContainText(`/${AUTOMATION.command}`);
   });
 
   test("a rail row says its outcome in words, and says the same thing as the run", async ({ page }) => {
@@ -165,6 +194,23 @@ test.describe("the composer", () => {
     expect(hint!.y + hint!.height).toBeLessThanOrEqual(controls!.y);
   });
 
+  // the list opened over the composer's own Run button and connection chips, on the first visit and under a run
+  test("the command list leaves the Run button and the chips uncovered", async ({ page }) => {
+    const uncovered = (target: Locator) =>
+      target.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return Boolean(top && el.contains(top));
+      });
+    for (const url of ["/", `/?run=${runs.parent}`]) {
+      await page.goto(url);
+      await composer(page).fill("/");
+      await expect(page.getByRole("listbox", { name: /saved automations/i })).toBeVisible();
+      expect(await uncovered(page.getByRole("button", { name: "Run", exact: true }))).toBe(true);
+      expect(await uncovered(page.getByTestId("composer-connections"))).toBe(true);
+    }
+  });
+
   // his call, 2026-09-23: commands are "/audit ..."; a backslash is plain text and opens nothing
   test("a backslash does not open the list", async ({ page }) => {
     await page.goto("/");
@@ -187,6 +233,58 @@ test.describe("the composer", () => {
     await page.getByRole("button", { name: "Run", exact: true }).click();
     await expect(page.getByText(/say what the agent should do/i)).toBeVisible();
     await expect(composer(page)).toHaveValue("do it");
+  });
+
+  // Q202: the reason stayed under the box after the text had changed; Q203: a square pink border was drawn inside the
+  // rounded capsule
+  test("a refusal is said in the capsule's own shape, and goes once the text changes", async ({ page }) => {
+    await page.goto("/");
+    await composer(page).fill("do it");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const reason = page.getByText(/say what the agent should do/i);
+    await expect(reason).toBeVisible();
+    // no ring or border of the box's own (a ring is a box-shadow: every layer of it is 0 px wide)
+    expect(await composer(page).evaluate((el) => getComputedStyle(el).boxShadow)).not.toMatch(/\b[1-9]\d*px/);
+    await expect(composer(page)).toHaveCSS("border-top-width", "0px");
+    const capsule = page.getByTestId("composer-capsule");
+    await expect(capsule).toHaveAttribute("data-invalid", "true"); // the capsule draws it, in its own rounded shape
+    await composer(page).press("End");
+    await composer(page).pressSequentially(" now");
+    await expect(reason).toHaveCount(0);
+    await expect(capsule).not.toHaveAttribute("data-invalid");
+  });
+
+  // Q195: a double-click on Run started two identical paid runs half a second apart. The start is never let through
+  // to the server here (the request is aborted in the browser), so no run is created
+  test("one press, one start: a double-click or a second Ctrl/Cmd+Enter sends the brief once", async ({ page }) => {
+    let starts = 0;
+    await page.route("**/*", (route) => {
+      const request = route.request();
+      if (request.method() === "POST" && request.headers()["next-action"]) {
+        starts++;
+        return route.abort();
+      }
+      return route.continue();
+    });
+    await page.goto("/");
+    await composer(page).fill("[e2e] home double press: list three facts about Mars");
+    await page.getByRole("button", { name: "Run", exact: true }).dblclick();
+    await expect(page.getByText(/could not reach the app/i)).toBeVisible();
+    expect(starts).toBe(1);
+
+    // the lock lets go once the start is answered: the next press sends again, and only once
+    await composer(page).press("ControlOrMeta+Enter");
+    await composer(page).press("ControlOrMeta+Enter");
+    await expect.poll(() => starts).toBe(2);
+    await page.waitForTimeout(1_000);
+    expect(starts).toBe(2);
+  });
+
+  // Q209: Enter makes a new line and only Cmd/Ctrl+Enter runs, and nothing said so
+  test("the keyboard shortcut is named beside Run, in the platform's own words", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("run-shortcut")).toHaveText(/^(⌘|Ctrl) Enter$/);
+    await expect(page.getByRole("button", { name: "Run", exact: true })).toHaveAttribute("aria-keyshortcuts", /^(Meta|Control)\+Enter$/);
   });
 
   test("Ctrl/Cmd+Enter submits the box", async ({ page }) => {
@@ -303,7 +401,7 @@ test.describe("a finished run", () => {
     await why.click();
     const lines = panel.getByTestId("why");
     await expect(lines).toContainText("4 checks passed");
-    await expect(lines).toContainText("The judge was sure the result answers your instructions but not that the plan was finished");
+    await expect(lines).toContainText("The judge was sure the result answers your instructions, but could not tell whether the plan was finished");
     await expect(lines).toContainText("A reviewer read the whole run: finished and usable.");
     await expect(lines).not.toContainText("%");
   });
@@ -358,6 +456,21 @@ test.describe("a finished run", () => {
     await expect(files.getByRole("link", { name: /^Download contacts\.csv \(\d+ bytes\)$/ })).toBeVisible(); // Q72, Q99
   });
 
+  // a chart styles itself for the viewer's scheme; a white box behind it put its light dark-mode text on white
+  test("a chart's preview sits on the sheet's paper, in light and in dark", async ({ page }) => {
+    for (const [scheme, paper] of [["light", "rgb(255, 255, 255)"], ["dark", "rgb(21, 28, 38)"]] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      const panel = await openRun(page, runs.followUp);
+      await expect(panel.getByTestId("files").getByRole("img", { name: /chart\.svg/ })).toHaveCSS("background-color", paper);
+    }
+  });
+
+  // Q205: a follow-up's carried-over spreadsheet lost its "One sheet, ... with ... rows" line
+  test("a follow-up's carried-over spreadsheet says its sheets, as it did on the run that made it", async ({ page }) => {
+    const panel = await openRun(page, runs.carried);
+    await expect(panel.getByTestId("files")).toContainText("One sheet, Measures, with 2 rows");
+  });
+
   test("the report renders its tables", async ({ page }) => {
     const panel = await openRun(page, runs.followUp);
     const table = panel.getByTestId("report").getByRole("table");
@@ -398,7 +511,9 @@ test.describe("a finished run", () => {
     await opener.click();
     const details = page.getByRole("dialog", { name: /details/i });
     await expect(details.getByTestId("timeline")).toBeVisible();
-    await expect(details.getByTestId("state-card")).toContainText(/turn \d+ of \d+/);
+    // Q198: a finished run says its total, not "turn 17 of 25" as if it were still counting
+    await expect(details.getByTestId("state-card")).toContainText(/succeeded - \d+ turns?/);
+    await expect(details.getByTestId("state-card")).not.toContainText(/turn \d+ of \d+/);
     await expect(details.getByTestId("state-card")).toContainText("contacts.csv, chart.svg, table.xlsx"); // Q103: the tools' files too, in the order made
     await expect(details.getByTestId("state-card")).not.toContainText("outputs"); // Q103: the built-in tools are not a connection
     await expect(details.getByTestId("verdict")).toContainText("%"); // the probabilities live here
@@ -416,6 +531,18 @@ test.describe("a finished run", () => {
     expect(keyWarnings).toEqual([]);
   });
 
+  // Q208: with the model down the result was never checked, and the only way to check it again was inside Details.
+  // Check again is not pressed here: it would call the model
+  test("a result nobody could check says so in words beside the outcome, with Check again there", async ({ page }) => {
+    const panel = await openRun(page, runs.unchecked);
+    await expect(panel.getByTestId("outcome")).toHaveText("Done - not checked");
+    await expect(panel.getByTestId("not-checked")).toContainText("The result was not checked: the checker could not be reached.");
+    await expect(panel.getByTestId("not-checked").getByRole("button", { name: "Check again" })).toBeVisible();
+
+    const checked = await openRun(page, runs.parent); // a run that was checked has nothing to check again here
+    await expect(checked.getByTestId("not-checked")).toHaveCount(0);
+  });
+
   test("a stopped run reads 'Stopped' and the thread shows where it stopped", async ({ page }) => {
     const panel = await openRun(page, runs.stopped);
     await expect(panel.getByTestId("outcome")).toHaveText("Stopped"); // Q114
@@ -428,6 +555,21 @@ test.describe("a finished run", () => {
     await expect(panel.getByTestId("outcome")).toHaveText("Something went wrong");
     await expect(panel.getByRole("button", { name: "Run again", exact: true })).toBeVisible(); // Q101
     await expect(panel.getByRole("button", { name: /why\?/i })).toHaveCount(0); // Q102
+  });
+
+  // the banner sent the reader to Details, where there was only a red monospace raw error; and Details still showed
+  // a pending Planning and a call "waiting for the result..." on a run that had ended
+  test("a failed run says why in plain words, and Details shows nothing still waiting", async ({ page }) => {
+    const panel = await openRun(page, runs.failed);
+    await expect(panel.getByTestId("failure")).toContainText("It ran out of time before it finished.");
+    await expect(panel.getByTestId("failure")).not.toContainText(FAILED_ERROR);
+    await panel.getByRole("button", { name: /details/i }).click();
+    const details = page.getByRole("dialog", { name: /details/i });
+    await expect(details).toContainText(FAILED_ERROR); // the raw error is kept, for a bug report
+    const timeline = details.getByTestId("timeline");
+    await expect(timeline).toContainText("no result: the run ended before this call answered");
+    await expect(timeline).not.toContainText(/waiting/i);
+    await expect(timeline.getByLabel("Stopped here")).toHaveCount(1);
   });
 });
 
@@ -442,7 +584,8 @@ test.describe("a run that fixes what the check found", () => {
     await expect(last).toContainText("Fix what the check found (attempt 1 of 2)");
     await expect(last).toHaveAttribute("aria-current", "step");
     await panel.getByRole("button", { name: /why\?/i }).click();
-    await expect(panel.getByTestId("why")).toContainText(`The first result did not pass the check: ${HEAL.reason}`);
+    // HEAL.reason is "At least 8 rows: 3 rows": said in one sentence, lower case, with no chain of colons
+    await expect(panel.getByTestId("why")).toContainText("The first result did not pass the check: at least 8 rows (3 rows)");
   });
 
   test("a fixed run reads like any good run, Why? notes the fix, and Details shows what the agent was told", async ({ page }) => {
@@ -458,6 +601,16 @@ test.describe("a run that fixes what the check found", () => {
     // Q149: each attempt shows its own cost, and the run one total - never the SDK's running total per attempt
     await expect(timeline).toContainText("$0.050");
     await expect(details.getByTestId("state-card")).toContainText("$0.170");
+  });
+
+  // the steps were drawn as red circles with a check mark: "done" and "failed" at once. The steps did run; the
+  // outcome line is where the result's failure is said
+  test("on a run whose result did not pass, the steps that ran look done and only the outcome is red", async ({ page }) => {
+    const panel = await openRun(page, runs.unfixed);
+    await expect(panel.getByTestId("outcome")).toContainText("Did not pass");
+    const done = panel.getByTestId("thread").getByText("Done", { exact: true });
+    await expect(done).toHaveCount(5); // the plan's three steps and the two fixes
+    for (const node of await done.all()) await expect(node.locator("..")).toHaveCSS("background-color", "rgb(21, 132, 90)"); // fern
   });
 
   test("a run the fixes did not save says so once, and Ask for a change starts from what did not pass", async ({ page }) => {

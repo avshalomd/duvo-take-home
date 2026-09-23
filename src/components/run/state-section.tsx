@@ -1,6 +1,6 @@
 import { Plug } from "lucide-react";
 import type { RunState } from "@/contracts/run";
-import { connectionName, formatCost, formatDuration, toolLabel } from "./format";
+import { connectionName, formatCost, formatDuration, toolLabel, turnsLine } from "./format";
 import { Section } from "./section";
 import { StatusBadge } from "./status-badge";
 
@@ -9,14 +9,15 @@ export function StateSection({ state, connections }: { state: RunState; connecti
   const checks = state.stepChecks ?? [];
   const guards = state.guards ?? [];
   const stepTitle = (i: number) => state.plan?.steps.find((s) => s.index === i)?.title ?? `step ${i + 1}`;
+  const turns = turnsLine(state.status, state.turn, state.maxTurns);
 
   return (
     <Section title="State" aside={<StatusBadge status={state.status} />}>
       <dl data-testid="state-card" className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1.5 text-[14px]">
         <Row label="Status">
           {state.status}
-          {/* a run that failed before its first turn has no turn count worth showing */}
-          {state.turn > 0 && ` - turn ${state.turn} of ${state.maxTurns}`}
+          {/* live: the turn it is on, of the cap; ended: how many it took (a run that failed before its first has none) */}
+          {turns && ` - ${turns}`}
         </Row>
         <Row label="Last tool">
           {state.lastTool ? (

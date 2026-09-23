@@ -1,8 +1,8 @@
 "use client";
 
-import { Search, SquarePen } from "lucide-react";
+import { Search, SquarePen, X } from "lucide-react";
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import { outcome } from "./outcome";
 import { groupByDay, matchesSearch } from "./rail";
@@ -29,6 +29,7 @@ const noSubscribe = () => () => {};
 // keeps it open; the search is client state, because it only filters what is on screen.
 export function RunsRail({ runs, selectedId, onPick }: { runs: RailRun[]; selectedId?: string; onPick?: () => void }) {
   const [query, setQuery] = useState("");
+  const search = useRef<HTMLInputElement>(null);
   // "Today" is the reader's today: the server groups in UTC, the browser in its own zone, without a hydration error
   const timeZone = useSyncExternalStore(noSubscribe, () => Intl.DateTimeFormat().resolvedOptions().timeZone, () => "UTC");
   const groups = groupByDay(runs.filter((r) => matchesSearch(r, query)), new Date(), timeZone);
@@ -50,13 +51,28 @@ export function RunsRail({ runs, selectedId, onPick }: { runs: RailRun[]; select
         <div className="relative px-3 pt-1 pb-2">
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-6 size-3.5 -translate-y-1/2 text-slate" />
           <input
+            ref={search}
             type="search"
             aria-label="Search runs"
             placeholder="Search runs"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-8 w-full rounded-full bg-paper/60 pr-3 pl-8 text-[14px] outline-none placeholder:text-slate focus-visible:bg-paper focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            // the browser's own clear "x" is blue in Chrome: hidden, and the field's graphite one below stands in
+            className="h-8 w-full rounded-full bg-paper/60 pr-8 pl-8 text-[14px] outline-none placeholder:text-slate focus-visible:bg-paper focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-search-cancel-button]:appearance-none"
           />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => {
+                setQuery("");
+                search.current?.focus(); // the person is still searching: the cursor stays in the field
+              }}
+              className="absolute top-1/2 right-5 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-slate transition-[color,transform] duration-100 hover:text-graphite focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.97]"
+            >
+              <X aria-hidden className="size-3.5" />
+            </button>
+          )}
         </div>
 
         <div data-testid="runs" className="min-h-0 flex-1 overflow-y-auto px-2 pb-6">
