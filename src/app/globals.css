@@ -183,12 +183,29 @@
   @apply backdrop-blur-[20px] backdrop-saturate-[1.8];
   box-shadow: inset 0 1px 0 var(--glass-edge);
 }
-/* Display type: tighter tracking and leading as it grows (Apple's size-specific tracking). */
+/* Display type: the family and weight; tracking is set per size below (Apple's size-specific tracking - tighter
+   as it grows), so a 19 px command and a 44 px question do not share one letter-spacing. */
 @utility display {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
-  line-height: 1.08;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+/* One size for every page title (Home's question, Automations, an automation, Settings). */
+@utility page-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.25rem;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+/* A run's brief as its title: large, but never taller than two lines, so the thread under it stays the hero. */
+@utility run-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
 }
 
 /* The thread's running bead (src/components/thread/thread.tsx). */

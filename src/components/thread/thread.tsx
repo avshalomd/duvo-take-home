@@ -81,8 +81,8 @@ export function Thread({
   }, [steps, reached]);
 
   const t = TONE[tone];
-  const gutter = mini ? "w-5" : "w-7";
-  const nodeSize = mini ? "size-2.5" : "size-4";
+  const gutter = mini ? "w-5" : "w-8";
+  const nodeSize = mini ? "size-2.5" : "size-5";
 
   return (
     // "user": under reduced motion, motion skips transform animations (the fill and the pop jump to their end)
@@ -96,10 +96,7 @@ export function Thread({
         {/* the track: a quiet hairline groove the whole length of the plan */}
         <span
           aria-hidden
-          className={cn(
-            "absolute rounded-full bg-hairline",
-            mini ? "left-[9px] w-0.5" : "left-[13px] w-[3px]",
-          )}
+          className={cn("absolute rounded-full bg-hairline", mini ? "left-[9px] w-0.5" : "left-[14px] w-1")}
           style={{ top: track.top, height: track.height }}
         />
         {/* the thread itself: grows from the top with a spring as steps finish */}
@@ -108,7 +105,7 @@ export function Thread({
           className={cn(
             "absolute origin-top rounded-full",
             t.fill,
-            mini ? "left-[9px] w-0.5" : "left-[13px] w-[3px]",
+            mini ? "left-[9px] w-0.5" : "left-[14px] w-1",
           )}
           style={{ top: track.top, height: track.height || 1 }}
           initial={false}
@@ -119,12 +116,19 @@ export function Thread({
           const current = step.status === "running";
           return (
             <li key={step.key} className="relative flex gap-3" aria-current={current ? "step" : undefined}>
-              <span className={cn("flex shrink-0 justify-center", gutter, mini ? "pt-[5px]" : "pt-[3px]")}>
+              {/* items-start: the node sits beside the title's first line, not in the middle of the title and its note */}
+              <span
+                className={cn(
+                  "flex shrink-0 items-start justify-center",
+                  gutter,
+                  mini ? "pt-[5px]" : "pt-[2px]",
+                )}
+              >
                 <span
                   ref={(el) => {
                     nodes.current[i] = el;
                   }}
-                  className="relative flex items-center justify-center"
+                  className="relative flex shrink-0 items-center justify-center"
                 >
                   <Node
                     status={step.status}
@@ -138,7 +142,7 @@ export function Thread({
               <div className="min-w-0 flex-1">
                 <p
                   className={cn(
-                    mini ? "text-[13px] leading-5" : "text-[15px] leading-6",
+                    mini ? "text-[13px] leading-5" : "text-[16px] leading-6",
                     step.status === "pending" && "text-slate",
                     step.status === "skipped" && "text-slate line-through decoration-hairline",
                     current && "font-semibold",
@@ -190,7 +194,7 @@ function Node({
       >
         {/* the bead breathes slowly (opacity and scale, not a spin): work is happening here, calmly. CSS, so
             reduced motion simply switches it off, with nothing for the server and the browser to disagree on */}
-        <span className="absolute inset-[3px] animate-[thread-breathe_1.6s_ease-in-out_infinite] rounded-full bg-saffron motion-reduce:animate-none" />
+        <span className="absolute inset-1 animate-[thread-breathe_1.6s_ease-in-out_infinite] rounded-full bg-saffron motion-reduce:animate-none" />
         <span className="sr-only">In progress</span>
       </span>
     );
@@ -204,7 +208,7 @@ function Node({
         transition={{ type: "spring", bounce: 0.35, duration: 0.4 }}
         className={cn("flex items-center justify-center rounded-full border-2", tone.node, size)}
       >
-        {!mini && <Check aria-hidden strokeWidth={3.5} className="size-2.5" />}
+        {!mini && <Check aria-hidden strokeWidth={3.5} className="size-3" />}
         <span className="sr-only">Done</span>
       </motion.span>
     );
@@ -217,7 +221,7 @@ function Node({
           size,
         )}
       >
-        {!mini && <Minus aria-hidden strokeWidth={3} className="size-2.5" />}
+        {!mini && <Minus aria-hidden strokeWidth={3} className="size-3" />}
         <span className="sr-only">Skipped</span>
       </span>
     );
