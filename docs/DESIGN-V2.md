@@ -68,13 +68,13 @@ No blue anywhere except the browser's own focus ring colour, which is graphite h
 
 - **Home, no run open (first visit)**: the paper sheet holds one large question in display type, "What should
   the agent do?", the composer under it (large, glass, focused), and under the composer the workspace's saved
-  automations as `\command` tokens you can click. No example prompts (his rule: free text, no presets).
+  automations as `/command` tokens you can click. No example prompts (his rule: free text, no presets).
 - **Home, a run open**: the brief as the title (display type); one line of outcome in plain words beside a status
   glyph; "Why?" as a quiet disclosure; the thread with its steps and notes (the hero); "What it made" as deliverable
   tiles (a CSV tile shows its row count and first columns; a chart tile shows the chart; a spreadsheet tile its
   sheets); the report at a reading width of 66 ch; actions (Make an automation, Ask for a change) as a quiet row at
   the end. The composer floats at the bottom of the sheet as a glass capsule.
-- **Automations**: a gallery where each automation is a command token in display type (`\audit`) with one line of
+- **Automations**: a gallery where each automation is a command token in display type (`/audit`) with one line of
   what it produces and its state (Draft, Ready, Off). The builder reads like a document: the brief with `{input}`
   shown as an inline token, the outputs and steps as editable lists; "Try it" is a column of example cards, each
   with a mini thread and Looks right / Not right; approval is a bar that fills as examples are judged.

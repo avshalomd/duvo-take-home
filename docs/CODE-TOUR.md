@@ -149,7 +149,7 @@ Per file: what it does and why it is built that way. Grows at every merge.
   Details); a v1 verdict without `path` still gets a sensible answer.
 - `src/components/run/use-run-poll.ts` - the event stream first, resumed with `?after=<seq>` when it ends at 280 s;
   a stream that never delivers falls back to polling every 2 s.
-- `src/components/run/command-query.ts` - text starting with `\` or `/` is always a command: a mistyped command
+- `src/components/run/command-query.ts` - text starting with `/` is always a command: a mistyped command
   names itself in an error instead of becoming a paid free-text run.
 
 ### automations

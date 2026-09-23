@@ -22,7 +22,7 @@ export const runs = pgTable("runs", {
   purpose: text("purpose").notNull().default("adhoc"), // adhoc | trial (an automation's example) | automation | schedule | followup
   automationId: uuid("automation_id"), // set when the run was started from an automation or as its trial
   automationVersion: integer("automation_version"), // the version it ran, so an edit invalidates earlier trials
-  input: text("input"), // the text after the command: "\audit Apple Inc." -> "Apple Inc."
+  input: text("input"), // the text after the command: "/audit Apple Inc." -> "Apple Inc."
   parentRunId: uuid("parent_run_id"), // a follow-up ("ask for a change") points at the run it continues
   sessionId: text("session_id"), // the Agent SDK session, so a follow-up can resume it
   cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }), // Stop sets it; the loop aborts within 2 s
@@ -86,7 +86,7 @@ export const connections = pgTable("connections", {
 });
 
 // A saved automation: a template the user drafted from a run, tested on examples, approved, and now calls as
-// "\<command> <input>" (or "/<command> <input>"). An edit bumps the version and sends it back to draft until an example is approved again.
+// "/<command> <input>". An edit bumps the version and sends it back to draft until an example is approved again.
 export const automations = pgTable("automations", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: text("workspace_id").notNull(),
