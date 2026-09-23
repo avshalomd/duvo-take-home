@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { LlmError } from "@/lib/llm/errors";
+import { CancelError } from "@/lib/runs/cancel";
+import { FollowUpError } from "@/lib/runs/follow-up";
 import { RunLimitError } from "@/lib/runs/limits";
 import { readable } from "./readable";
 
@@ -21,6 +23,16 @@ describe("readable", () => {
   it("forwards a limit's refusal, which says when to try again", () => {
     expect(readable(new RunLimitError("Three runs are already in progress - try again in a minute"))).toBe(
       "Three runs are already in progress - try again in a minute",
+    );
+  });
+
+  it("forwards Stop's refusal, which the engine words for the person", () => {
+    expect(readable(new CancelError("This run has already finished", 409))).toBe("This run has already finished");
+  });
+
+  it("forwards a follow-up's refusal", () => {
+    expect(readable(new FollowUpError("Wait until this run has finished before asking for a change", 409))).toBe(
+      "Wait until this run has finished before asking for a change",
     );
   });
 

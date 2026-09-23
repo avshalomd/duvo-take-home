@@ -35,6 +35,11 @@ export function parseRunPayload(json: unknown): RunView | null {
   return parsed.data;
 }
 
+export function streamUrl(runId: string, events: RunEvent[]): string {
+  void events;
+  return `/api/runs/${runId}/events`;
+}
+
 export function parseStreamMessage(json: unknown): StreamMessage | null {
   const parsed = Message.safeParse(json);
   return parsed.success ? parsed.data : null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, shouldPoll } from "./poll";
+import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, shouldPoll, streamUrl } from "./poll";
 
 const payload = {
   run: {
@@ -122,6 +122,19 @@ describe("parseStreamMessage - a stream message is validated like a poll", () =>
   it("returns null for anything else, so a changed shape falls back to polling instead of blanking the run", () => {
     expect(parseStreamMessage({ events: [] })).toBeNull();
     expect(parseStreamMessage("ping")).toBeNull();
+  });
+});
+
+// The stream sends the events after a cursor, and ends itself after 280 s: every (re)connection asks from the last
+// event the panel already has, so nothing is sent twice and nothing is missed.
+describe("streamUrl - where the panel listens", () => {
+  it("asks for the events after the last one the panel has", () => {
+    const events = parseRunPayload(payload)!.events;
+    expect(streamUrl("run_1", [...events, { ...events[0], seq: 7 }, { ...events[0], seq: 3 }])).toBe("/api/runs/run_1/events?after=7");
+  });
+
+  it("asks for everything when the panel has no events yet", () => {
+    expect(streamUrl("run_1", [])).toBe("/api/runs/run_1/events");
   });
 });
 
