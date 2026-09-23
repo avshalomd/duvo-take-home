@@ -14,6 +14,7 @@ import type {
 } from "@/contracts/connection";
 import { ConnectionEdit } from "@/contracts/connection";
 import { encryptSecret } from "./crypto";
+import { connectionKey } from "./key";
 import { readToken, toConnection } from "./store-map";
 import { sameServer } from "./store-origin";
 
@@ -23,6 +24,25 @@ export class ConnectionNotFoundError extends Error {
     super("That connection could not be found. It may have been deleted - reload the page.");
     this.name = "ConnectionNotFoundError";
   }
+}
+
+/**
+ * Q126: a run registers each server under connectionKey(name), so two names with one key ("QA-Bearer", "qa bearer")
+ * would let one server silently replace the other. The second name is refused, naming the one that has it.
+ */
+export class ConnectionNameTakenError extends Error {
+  constructor(otherName: string) {
+    super(`That name is already used by ${otherName}`);
+    this.name = "ConnectionNameTakenError";
+  }
+}
+
+/** Throws when another connection of the workspace (not `self`, the one being edited) already has the name's key. */
+async function ensureNameFree(workspaceId: string, name: string, self?: string): Promise<void> {
+  const key = connectionKey(name);
+  const rows = await db.select({ id: connections.id, name: connections.name }).from(connections).where(eq(connections.workspaceId, workspaceId));
+  const clash = rows.find((r) => r.id !== self && connectionKey(r.name) === key); // compared in code: the key is derived, not a column
+  if (clash) throw new ConnectionNameTakenError(clash.name);
 }
 
 // Every query below names the workspace: the id alone is never enough to read or change a row.
@@ -46,6 +66,7 @@ export const setConnectionEnabled: SetConnectionEnabled = async (workspaceId, id
 
 /** The input is already validated with NewConnection in the Server Action; the store writes it. */
 export const addConnection: AddConnection = async (workspaceId, input) => {
+  await ensureNameFree(workspaceId, input.name);
   const token = input.token ? input.token : null; // the add form sends "" when the field is left empty
   const authType: AuthType = input.authType ?? (token ? "bearer" : "none");
   const [row] = await db
@@ -71,6 +92,7 @@ export const updateConnection: UpdateConnection = async (workspaceId, id, input)
   const edit = ConnectionEdit.parse(input);
   const [current] = await db.select().from(connections).where(mine(workspaceId, id));
   if (!current) throw new ConnectionNotFoundError();
+  await ensureNameFree(workspaceId, edit.name, id); // its own name is not a clash
 
   const typed = edit.token ? edit.token : null; // "" is an empty field: keep what is saved
   const authType: AuthType = edit.authType ?? (typed ? "bearer" : (toConnection(current).authType ?? "none"));
