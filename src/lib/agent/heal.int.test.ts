@@ -17,6 +17,7 @@ const BROKEN = 'rank,model,why\n1,a,"fine"\n2,b,small, fast\n';
 const FIXED = 'rank,model,why\n1,a,"fine"\n2,b,"small, fast"\n';
 const calls: { prompt: string; resume?: string }[] = [];
 const hooks: { onAttempt?: (attempt: number) => Promise<void> } = {}; // lets a test look at the run while it heals
+const script: { files: string[] } = { files: [BROKEN, FIXED] }; // what output.csv holds after each attempt
 
 vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@anthropic-ai/claude-agent-sdk")>()),
@@ -27,7 +28,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
     return (async function* fakeAgent() {
       yield { type: "system", subtype: "init", session_id: SESSION, model: "fake", tools: [], mcp_servers: [{ name: "plan", status: "connected" }, { name: "outputs", status: "connected" }], cwd: options.cwd };
       await hooks.onAttempt?.(attempt);
-      await writeFile(path.join(options.cwd, "output.csv"), attempt === 0 ? BROKEN : FIXED);
+      await writeFile(path.join(options.cwd, "output.csv"), script.files[attempt] ?? FIXED);
       yield { type: "assistant", message: { content: [{ type: "text", text: `Attempt ${attempt + 1}: wrote output.csv.` }] } };
       // the SDK's total for a resumed session continues from the saved one: 0.01, then 0.03 (0.02 of its own)
       yield { type: "result", subtype: "success", is_error: false, num_turns: 2, duration_ms: 1000, total_cost_usd: 0.01 * (2 * attempt + 1), result: "Wrote output.csv." };
@@ -46,6 +47,7 @@ const PASS = verdict("pass");
 
 const WS = `int-engine-heal-${process.pid}`; // per process: other worktrees run these tests against the same database
 const OFF_WS = `int-engine-heal-off-${process.pid}`;
+const THREE_WS = `int-engine-heal-three-${process.pid}`; // three attempts allowed: room for an attempt to undo another
 
 async function queuedRun(workspaceId: string, what: string) {
   const [row] = await db.insert(runs).values({ prompt: `[int] ${what}`, status: "queued", model: "test", workspaceId }).returning({ id: runs.id });
@@ -56,16 +58,18 @@ const healEvents = async (runId: string) => (await db.select().from(runEvents).w
 beforeEach(async () => {
   calls.length = 0;
   hooks.onAttempt = undefined;
+  script.files = [BROKEN, FIXED];
+  await db.insert(workspaceSettings).values({ workspaceId: THREE_WS, autoHealAttempts: 3 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 3 } });
   vi.mocked(evaluateRun).mockReset();
   await db.insert(workspaceSettings).values({ workspaceId: WS, autoHealAttempts: 2 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 2 } });
   await db.insert(workspaceSettings).values({ workspaceId: OFF_WS, autoHealAttempts: 0 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 0 } });
 });
 afterAll(async () => {
-  const mine = db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS, OFF_WS]));
+  const mine = db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS, OFF_WS, THREE_WS]));
   await db.delete(runEvents).where(inArray(runEvents.runId, mine));
   await db.delete(files).where(inArray(files.runId, mine));
-  await db.delete(runs).where(inArray(runs.workspaceId, [WS, OFF_WS]));
-  await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OFF_WS]));
+  await db.delete(runs).where(inArray(runs.workspaceId, [WS, OFF_WS, THREE_WS]));
+  await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OFF_WS, THREE_WS]));
 });
 
 describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
@@ -94,6 +98,33 @@ describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
     const stored = await db.select().from(files).where(eq(files.runId, id));
     expect(stored.map((f) => f.name)).toEqual(["output.csv"]); // replaced, not added twice
     expect(stored[0].content).toBe(FIXED);
+
+    // Q149: each attempt's own cost beside the SDK's raw running total, for Details
+    const finished = (await db.select().from(runEvents).where(eq(runEvents.runId, id))).filter((e) => e.kind === "finished");
+    const costs = finished.map((e) => e.payload as { total_cost_usd: number; attempt_cost_usd: number });
+    expect(costs.map((c) => c.total_cost_usd)).toEqual([0.01, 0.03]);
+    expect(costs[0].attempt_cost_usd).toBeCloseTo(0.01, 10);
+    expect(costs[1].attempt_cost_usd).toBeCloseTo(0.02, 10);
+  }, 30_000);
+
+  // Q148: the live heal of 2026-09-23 put quotes in for the CSV check, took them out for the reviewer, and was back
+  // where it started. An attempt that brings back an earlier attempt's files or failures stops the healing.
+  it("stops healing when an attempt brings back an earlier attempt's files, and writes the final verdict", async () => {
+    script.files = [BROKEN, FIXED, BROKEN, FIXED];
+    const REVIEWER = verdict("fail", ['Remove the quotes around "small, cheap" - the rows were asked for as given']);
+    vi.mocked(evaluateRun).mockResolvedValueOnce(FAIL).mockResolvedValueOnce(REVIEWER).mockResolvedValueOnce(FAIL).mockResolvedValue(PASS);
+    const id = await queuedRun(THREE_WS, "a heal that undoes itself");
+
+    await runAutomation(id);
+
+    expect(calls).toHaveLength(3); // the fourth attempt, which would only undo the third, is never paid for
+    const [run] = await db.select().from(runs).where(eq(runs.id, id));
+    expect(run.healAttempts).toBe(2);
+    expect((run.verdict as Verdict).verdict).toBe("fail");
+    const heals = (await healEvents(id)).map((e) => e.payload as { attempt: number; stopped?: string });
+    expect(heals.map((h) => h.attempt)).toEqual([1, 2, 3]);
+    expect(heals.slice(0, 2).every((h) => h.stopped === undefined)).toBe(true);
+    expect(heals[2].stopped).toBe("The fix undid an earlier one: the files are back to an earlier attempt's, so healing stopped here.");
   }, 30_000);
 
   it("stops after the workspace's number of attempts and keeps the last failing verdict", async () => {

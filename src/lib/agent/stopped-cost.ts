@@ -1,4 +1,5 @@
 import { importSessionToStore, type SessionStore } from "@anthropic-ai/claude-agent-sdk";
+import type { RunEvent } from "@/contracts/run";
 
 // A run stopped mid-way gets no result message, so no cost: Limits' "Spent today" left it out (QA Q129). The CLI still
 // writes its own totals to the session transcript as it shuts down after the abort - a "cost-state" entry, checked on
@@ -74,4 +75,9 @@ export function stoppedTotals(args: {
  */
 export function ownCost(sessionTotal: number, base: number): number {
   return Math.max(0, sessionTotal - base); // never negative: the SDK's figure is an estimate, not a ledger
+}
+
+/** An attempt's events, with its own share of the SDK's running total written beside the raw one on `finished`. */
+export function withAttemptCost(events: RunEvent[], base: number): RunEvent[] {
+  throw new Error(`not implemented: withAttemptCost(${events.length}, ${base})`);
 }

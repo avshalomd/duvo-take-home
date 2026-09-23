@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { costStateOf, ownCost, readSdkTotals, stoppedTotals } from "./stopped-cost";
+import type { RunEvent } from "@/contracts/run";
+import { costStateOf, ownCost, readSdkTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
 
 // The shape the CLI wrote for a run stopped mid-way on 2026-09-23 (cancel check db56bab3): its own total, written as
 // it shut down after the abort - $0.0529 on claude-sonnet-5 plus $0.0459 on the web-search helper model.
@@ -97,5 +98,31 @@ describe("ownCost", () => {
   it("applies to a stopped follow-up too", () => {
     const t = stoppedTotals({ end: null, sdk: { costUsd: 0.05, durationMs: 1000 }, startedAt: 0, now: 2000, turns: 1, costBase: 0.02 });
     expect(t.costUsd).toBeCloseTo(0.03, 10);
+  });
+});
+
+// Q149: each attempt's finished event keeps the SDK's raw running total, which for a resumed attempt includes the
+// earlier ones; its own share goes beside it, so Details can show what each attempt cost.
+describe("withAttemptCost", () => {
+  const finished: RunEvent = {
+    seq: 9,
+    at: "t",
+    kind: "finished",
+    payload: { subtype: "success", is_error: false, num_turns: 3, duration_ms: 1000, total_cost_usd: 0.0652, result: "done" },
+  };
+  const text: RunEvent = { seq: 8, at: "t", kind: "text", payload: { text: "working" } };
+
+  it("adds the attempt's own cost to its finished event and keeps the SDK's raw total", () => {
+    const [out] = withAttemptCost([finished], 0.0304);
+    expect(out.payload).toMatchObject({ total_cost_usd: 0.0652 });
+    expect((out.payload as { attempt_cost_usd: number }).attempt_cost_usd).toBeCloseTo(0.0348, 10);
+  });
+
+  it("gives the first attempt of a fresh session its whole total", () => {
+    expect(withAttemptCost([finished], 0)[0].payload).toMatchObject({ attempt_cost_usd: 0.0652 });
+  });
+
+  it("leaves every other event as it is", () => {
+    expect(withAttemptCost([text], 0.03)).toEqual([text]);
   });
 });

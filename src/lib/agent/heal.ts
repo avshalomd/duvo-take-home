@@ -1,4 +1,5 @@
 import { AgentLimits } from "@/contracts/agent";
+import type { Verdict } from "@/contracts/eval";
 
 // Auto-heal (his call, 2026-09-23): when the evaluator fails a run's result, the same agent session gets the findings
 // and fixes its own result, inside the same run, at most the workspace's number of times. The run says pass or fail
@@ -18,6 +19,18 @@ export function runBudgetMs(mode: "inline" | "queue"): number {
 /** Whether a run the evaluator failed gets another attempt. */
 export function shouldHeal(args: { healable: boolean; healsSoFar: number; limit: number; remainingMs: number }): boolean {
   return args.healable && args.healsSoFar < args.limit && args.remainingMs >= MIN_HEAL_MS; // limit 0: never
+}
+
+/** What an attempt left: its failures and its files, reduced to strings an earlier attempt can be compared with. */
+export type AttemptFingerprint = { reasons: string; checks: string; files: string };
+
+export function attemptFingerprint(verdict: Verdict, files: { name: string; content: string }[]): AttemptFingerprint {
+  throw new Error(`not implemented: attemptFingerprint(${verdict.verdict}, ${files.length})`);
+}
+
+/** Why healing should stop because this attempt made no progress over an earlier one, or null to go on. */
+export function noProgress(current: AttemptFingerprint, earlier: AttemptFingerprint[]): string | null {
+  throw new Error(`not implemented: noProgress(${current.files.length}, ${earlier.length})`);
 }
 
 /** The prompt of a heal attempt: the evaluator's findings, and what to do about them. The session holds the rest. */
