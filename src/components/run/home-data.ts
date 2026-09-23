@@ -1,13 +1,14 @@
 import "server-only";
 import { cache } from "react";
 import type { Automation } from "@/contracts/automation";
-import type { FileMeta } from "@/contracts/run";
+import type { FileMeta, Run, RunEvent } from "@/contracts/run";
 import { listAutomations } from "@/lib/automations/store";
 import { listConnections } from "@/lib/connections/store";
-import { getFile } from "@/lib/runs/queries";
+import { getFile, getRun } from "@/lib/runs/queries";
 import type { CommandOption } from "./command-list";
 import { describeOutput } from "./command-query";
 import { csvSummary } from "./csv-summary";
+import { carriedSheets, type Sheet } from "./file-kind";
 
 // What Home reads besides its runs: the workspace's automations (for the command list, the tokens and the runs'
 // titles and tags), the connections that are on, and the facts on each CSV tile. Server only.
@@ -49,16 +50,37 @@ export async function composerProps(workspaceId: string): Promise<ComposerData> 
   };
 }
 
-export type FileFacts = Record<string, { rows: number; columns: string[] }>;
+/** A tile's facts, by file name: a CSV's rows and columns, or the sheets of a spreadsheet a follow-up carried over. */
+export type FileFacts = Record<string, { rows: number; columns: string[] } | { sheets: Sheet[] }>;
 
-/** The rows and columns of each CSV the run made, for its tile. Read once, on the server, where the file is. */
-export async function fileFacts(workspaceId: string, runId: string, files: FileMeta[]): Promise<FileFacts> {
+/**
+ * What each tile says that the file's name cannot: the rows and columns of each CSV the run made, read once on the
+ * server where the file is, and the sheets of each spreadsheet a follow-up carried over from the runs it continues
+ * (Q205) - their events are on the server too, and the client only holds this run's.
+ */
+export async function fileFacts(workspaceId: string, run: Pick<Run, "id" | "parentRunId">, files: FileMeta[]): Promise<FileFacts> {
   const csvs = files.filter((f) => f.name.toLowerCase().endsWith(".csv") && !f.quarantined); // a held-back file is not opened
-  const read = await Promise.all(csvs.map((f) => getFile(workspaceId, runId, f.name)));
+  const [read, earlier] = await Promise.all([Promise.all(csvs.map((f) => getFile(workspaceId, run.id, f.name))), earlierEvents(workspaceId, run)]);
   const facts: FileFacts = {};
   read.forEach((file, i) => {
     const summary = file ? csvSummary(file.content) : null;
     if (summary) facts[csvs[i].name] = summary;
   });
+  for (const [name, sheets] of Object.entries(carriedSheets(files.map((f) => f.name), earlier))) facts[name] = { sheets };
   return facts;
+}
+
+const CHAIN = 5; // follow-ups of follow-ups: a few levels are plenty, and a loop in the data cannot run away
+
+/** The events of the runs a follow-up continues, oldest first: its parent, the parent's parent, and so on. */
+async function earlierEvents(workspaceId: string, run: Pick<Run, "parentRunId">): Promise<RunEvent[]> {
+  const chain: RunEvent[][] = [];
+  let parentId = run.parentRunId ?? null;
+  for (let i = 0; parentId && i < CHAIN; i++) {
+    const parent = await getRun(workspaceId, parentId);
+    if (!parent) break;
+    chain.unshift(parent.events);
+    parentId = parent.run.parentRunId ?? null;
+  }
+  return chain.flat();
 }

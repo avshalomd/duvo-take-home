@@ -64,6 +64,27 @@ export function sheetsOf(events: EventLike[], file: string): Sheet[] {
   return sheets;
 }
 
+/**
+ * The sheets of each spreadsheet among a run's files, read from the events of the runs it follows up (oldest first).
+ * Q205: a follow-up gets its parent's files back and keeps them without making them again, so its own events have
+ * no call for them; the run that made the file still has it.
+ */
+export function carriedSheets(files: string[], earlier: EventLike[]): Record<string, Sheet[]> {
+  const found: Record<string, Sheet[]> = {};
+  for (const file of files) {
+    if (fileKind(file) !== "spreadsheet") continue;
+    const sheets = sheetsOf(earlier, file);
+    if (sheets.length) found[file] = sheets;
+  }
+  return found;
+}
+
+/** A spreadsheet tile's sheets: from the run's own call when it made the file, else what was carried over. */
+export function tileSheets(file: string, events: EventLike[], carried: Sheet[] = []): Sheet[] {
+  const own = sheetsOf(events, file);
+  return own.length ? own : carried;
+}
+
 /** "Sheets Summary (2 rows) and Data (1 row)", or "One sheet, Sheet1, with 40 rows". */
 export function sheetsLine(sheets: Sheet[]): string | null {
   if (sheets.length === 0) return null;

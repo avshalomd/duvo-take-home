@@ -1,7 +1,7 @@
 import { Download, FileSpreadsheet, FileText, Info, ShieldAlert, Table2 } from "lucide-react";
 import type { FileMeta, RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { csvLine, fileKind, flagLine, formatBytes, noFilesLine, sheetsLine, sheetsOf } from "./file-kind";
+import { csvLine, fileKind, flagLine, formatBytes, noFilesLine, sheetsLine, tileSheets } from "./file-kind";
 import type { FileFacts } from "./home-data";
 
 const pill =
@@ -43,9 +43,11 @@ function FileTile({ runId, file, events, facts }: { runId: string; file: FileMet
   const url = `/api/runs/${runId}/files/${encodeURIComponent(file.name)}`;
   const size = formatBytes(file.bytes);
   const kind = fileKind(file.name);
-  const csv = facts[file.name];
-  const line =
-    kind === "spreadsheet" ? sheetsLine(sheetsOf(events, file.name)) : kind === "chart" ? "Chart" : csv ? csvLine(csv) : null;
+  const fact = facts[file.name];
+  const csv = fact && "columns" in fact ? fact : null;
+  // a spreadsheet's sheets come from the call that made it: this run's, or the run a follow-up carried it over from
+  const sheets = kind === "spreadsheet" ? tileSheets(file.name, events, fact && "sheets" in fact ? fact.sheets : []) : [];
+  const line = kind === "spreadsheet" ? sheetsLine(sheets) : kind === "chart" ? "Chart" : csv ? csvLine(csv) : null;
   const flags = flagLine(file.flags);
   const Icon = kind === "spreadsheet" ? FileSpreadsheet : csv ? Table2 : FileText;
   const chart = kind === "chart" && !file.quarantined; // a held-back file is never opened, not even as a picture

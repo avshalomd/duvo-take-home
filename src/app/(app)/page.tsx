@@ -92,7 +92,7 @@ async function MainColumn({ workspaceId, selectedId }: { workspaceId: string; se
       title={runTitleOf(run, names)}
       parentTitle={parent ? runTitleOf(parent.run, names) : null}
       automationName={run.automationId ? (names[run.automationId] ?? null) : null}
-      facts={await fileFacts(workspaceId, run.id, data.files)}
+      facts={await fileFacts(workspaceId, run, data.files)}
       connections={connections}
       composer={composer}
     />
