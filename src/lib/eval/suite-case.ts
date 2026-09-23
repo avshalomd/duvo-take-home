@@ -35,16 +35,19 @@ export const SuiteCase = z.object({
 });
 export type SuiteCase = z.infer<typeof SuiteCase>;
 
+export type LoadedCase = SuiteCase & { file: string }; // the path it came from, so a live run can record into it
+
 /** Every case in fixtures/runs/, sorted by file name. A file that does not parse throws with its name. */
-export function loadCases(dir = CASES_DIR): SuiteCase[] {
+export function loadCases(dir = CASES_DIR): LoadedCase[] {
   return readdirSync(dir)
     .filter((f) => f.endsWith(".json"))
     .sort()
     .map((f) => {
-      const parsed = SuiteCase.safeParse(JSON.parse(readFileSync(path.join(dir, f), "utf8")));
+      const file = path.join(dir, f);
+      const parsed = SuiteCase.safeParse(JSON.parse(readFileSync(file, "utf8")));
       // record-run.ts leaves expected.verdict for a person to fill in: an unlabelled case is not a test yet
-      if (!parsed.success) throw new Error(`${dir}/${f}: ${z.prettifyError(parsed.error)}`);
-      return parsed.data;
+      if (!parsed.success) throw new Error(`${file}: ${z.prettifyError(parsed.error)}`);
+      return { ...parsed.data, file };
     });
 }
 
