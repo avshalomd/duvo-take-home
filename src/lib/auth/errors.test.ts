@@ -50,7 +50,7 @@ describe("friendlyAuthError", () => {
   });
 
   it("asks to wait when there were too many tries", () => {
-    expect(friendlyAuthError({ status: 429 })).toBe("Too many tries. Wait a minute, then try again.");
+    expect(friendlyAuthError({ status: 429 })).toBe("Too many tries. Wait a few seconds, then try again.");
   });
 
   it("falls back to a calm general sentence for anything else", () => {

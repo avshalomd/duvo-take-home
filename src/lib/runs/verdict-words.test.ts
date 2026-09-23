@@ -17,11 +17,11 @@ describe("the words for a person's judgment", () => {
   });
 
   it("stays neutral when nobody was recorded, as on rows judged before it was stored", () => {
-    expect(verdictWords("approved", null, ME)).toBe("Marked: looks right");
-    expect(verdictWords("rejected", null, ME)).toBe("Marked: not right");
+    expect(verdictWords("approved", null, ME)).toBe("Marked as looking right");
+    expect(verdictWords("rejected", null, ME)).toBe("Marked as not right");
   });
 
   it("stays neutral when the judge's account is gone and has no name to show", () => {
-    expect(verdictWords("approved", { id: "user-gone", name: null }, ME)).toBe("Marked: looks right");
+    expect(verdictWords("approved", { id: "user-gone", name: null }, ME)).toBe("Marked as looking right");
   });
 });

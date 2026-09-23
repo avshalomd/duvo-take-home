@@ -429,7 +429,7 @@ test.describe("a finished run", () => {
     await expect(link).toContainText(TITLES.parent);
     await expect(link).toHaveAttribute("href", `/?run=${runs.parent}`);
     // the fixture's mark has no judge, like rows from before human_verdict_by: never "You" unless it was you
-    await expect(panel).toContainText("Marked: looks right");
+    await expect(panel).toContainText("Marked as looking right");
     await expect(panel).not.toContainText("You marked this");
   });
 

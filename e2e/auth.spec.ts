@@ -107,7 +107,7 @@ test("the fourth wrong password in a row says to wait, and another browser can s
   await page.getByLabel("Password", { exact: true }).fill("not-the-password"); // the form keeps both between tries
   for (let i = 0; i < 3; i++) expect(await tryToSignIn(page)).toBe(401);
   expect(await tryToSignIn(page)).toBe(429);
-  await expect(formError(page)).toHaveText("Too many tries. Wait a minute, then try again.");
+  await expect(formError(page)).toHaveText("Too many tries. Wait a few seconds, then try again.");
 
   const other = await browser.newContext({ storageState: SIGNED_OUT, extraHTTPHeaders: asNewClient() });
   try {
