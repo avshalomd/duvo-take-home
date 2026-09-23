@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | 1 | - | Live run from the form: succeeded in 1 min 29 s, $0.39; plan of 4 steps with the agent's notes, state card, timeline, output.csv downloadable (attachment header), verdict pass with 7 checks and Jev 0.90 / 0.93 | - | verified |
 | 2 | minor | The seeded "running" fixture run never finished, so its panel polled for ever | data | fixed at T+58: the seeded row was deleted from the database |
-| 3 | minor | `reevaluateRun`'s two database queries have no integration test | eval | open, listed in the README |
+| 3 | minor | `reevaluateRun`'s two database queries have no integration test | eval | fixed in v2 (src/lib/eval/reevaluate.int.test.ts) |
 
 No open blocker.
 
@@ -79,7 +79,7 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 |---|---|---|---|---|---|---|
 | Q46 | qa-edge | `NewConnection.url` accepts any scheme and host (`javascript:`, `file:`, `http://localhost:3000`, `http://169.254.169.254/...`); the SDK child fetches it server-side | only http(s), no loopback/link-local/private hosts, readable error | major | main (contracts) | fixed (publicHttpUrl in the contract) |
 | Q47 | qa-edge | no rate limit on run creation: 10 runs in 10 min from one client, each up to $1 | a per-IP/per-window cap on starting runs | major | engine | fixed (3 in flight cap + 5 per 10 min per address, inside startRun; verified with curl on the QA db) |
-| Q48 | qa-edge | no authentication: any visitor reads every run, report and file and starts runs | known for a single-user demo; on the roadmap (1e) | minor | main | open (roadmap) |
+| Q48 | qa-edge | no authentication: any visitor reads every run, report and file and starts runs | known for a single-user demo; on the roadmap (1e) | minor | main | fixed in v2 (sign-in, workspaces, invite-only sign-up) |
 | Q49 | qa-edge | on the injection prompt the agent called no tool at all, so the run closed with no plan (the judge failed it) | the plan tool is called before the agent decides anything, even to refuse | minor | engine | fixed (set_plan first even on a refusal) |
 | Q50 | qa-edge | the markdown link regex stops at the first `)`: `[x](javascript:alert(1))` leaves a stray `)` | the whole link consumed (React already neutralises the javascript: href) | minor | ui | fixed (FIX4-ui, merged 26d78e2; e2e 24/24 on the QA db) |
 | Q51 | qa-edge | a file named `a"b.csv` is served as `filename="ab.csv"` while the UI shows the original name | the same name, or RFC 5987 `filename*` | minor | engine | fixed (filename* keeps the original name) |
@@ -151,7 +151,7 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q112 | qa-ux | Settings repeats its tab name as a card title (Connections, Members) | no repeated heading | minor | settings | fixed (dd6025b: no repeated headings) |
 | Q113 | qa-ux | the product name "Automations" reads as a second nav link; on a phone the workspace name is hidden | a distinct product mark; the workspace named in the phone menu | minor | home + auth | fixed (re-checked on the merged app, f44875d) |
 | Q114 | qa-ux | "Stopped by you" also when another member stopped it; a skipped step counts toward "4 of 4" | "Stopped"; "3 of 4 done, 1 skipped" | minor | home | fixed (re-checked on the merged app, f44875d) |
-| Q115 | qa-ux | every page logs "Only plain objects can be passed to Client Components ... Set objects are not supported" in dev | no error | minor | home | open: every page, /sign-in and a 404 included, so from the root layout or the framework (payload m: Set) |
+| Q115 | qa-ux | every page logs "Only plain objects can be passed to Client Components ... Set objects are not supported" in dev | no error | minor | home | dev only: Next puts a Set of missing slots into its own dev payload; not in a production build |
 | Q116 | qa-func | a command to a turned-off or draft automation answers "There is no saved automation called \x" | runCommand's own words ("is turned off", "is not approved yet") | minor | home (actions) | fixed (re-checked on the merged app, f44875d) |
 | Q117 | qa-func | with automations that are all off or draft, the `\` list says "No saved automations yet" | "none ready yet" wording | minor | home | fixed (re-checked on the merged app, f44875d) |
 | Q118 | qa-func | the `\` list and the automation card show the raw placeholder: "makes facts.md with three facts about {input}" | the input's label in place of `{input}` | minor | home + automations | fixed (the input label in place of {input}) |
@@ -181,7 +181,7 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q142 | final | a chart is labelled "contains 2 payment card numbers" (long decimals pass the card check) | no card warning on decimals or charts | minor | guards | fixed (474d81a: no card inside a decimal; charts skip phone/card/IBAN counts; hand-written .svg/.xlsx refused) |
 | Q143 | final | press feedback missing on rail rows, New run, top-bar links, Why?, gallery tiles; no focus ring on the composer capsule | the same press feedback and a visible focus everywhere | minor | home + automations | fixed (home a79f939; checked with screenshots and e2e 76/76) |
 | Q144 | final | inline code in the report is monospace; some reports show "Report" twice | no monospace in the glance view; one heading | minor | home | fixed (home a79f939; checked with screenshots and e2e 76/76) |
-| Q145 | final | page titles differ (34, 40, 44 px) and every display size has the same tracking | one page-title size, tracking by size | minor | main + owners | fixing (utilities in d7689ae) |
+| Q145 | final | page titles differ (34, 40, 44 px) and every display size has the same tracking | one page-title size, tracking by size | minor | main + owners | fixed (page-title / run-title utilities used by every page) |
 | Q146 | final | a focused row in the Add a server dialog draws a square ring over the group's rounded corners | the ring follows the shape | minor | settings | fixed (ca8a6cf) |
 | Q147 | final | connection names under the composer run together ("DeepWiki e2e Settings moved"); a settings e2e leaves a connection and invitations behind | separated names; tests clean up | minor | home + settings | fixed (home a79f939; checked with screenshots and e2e 76/76) |
 | Q148 | engine (live heal) | auto-heal went back and forth: the CSV check demanded quotes, the reviewer held the agent to "without adding any quotes", and each attempt undid the last | a valid file wins over an instruction it cannot satisfy (the report says why), the reviewer never asks for a change that fails a check, and healing stops when an attempt makes no progress | major | eval + engine | fixed (eval 189c7a3: a valid file wins, the reviewer sees the checks - live 20/20; engine 0ae0311: stops when an attempt makes no progress) |
