@@ -70,9 +70,9 @@ export function runTag(run: Pick<Run, "purpose" | "automationId">, commands: Rec
   const command = run.automationId ? commands[run.automationId] : undefined;
   switch (run.purpose) {
     case "automation":
-      return command ? `\\${command}` : "automation"; // the automation may have been deleted since
+      return command ? `/${command}` : "automation"; // the automation may have been deleted since
     case "schedule":
-      return command ? `\\${command}, scheduled` : "scheduled";
+      return command ? `/${command}, scheduled` : "scheduled";
     case "trial":
       return "example";
     case "followup":
