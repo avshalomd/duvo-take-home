@@ -84,6 +84,17 @@ describe("write guard", () => {
     expect(v).toMatchObject({ decision: "allowed" });
   });
 
+  // AgentLimits.toolFileExtensions: .svg and .xlsx are made only by the output tools. Enforced here, so the output
+  // scan can trust that an .svg is the chart tool's (Q142) and a hand-written one never reaches the user.
+  it.each([
+    ["chart.svg", /make_chart/],
+    ["Report.XLSX", /make_spreadsheet/],
+  ])("blocks a Write of %s and names the tool that makes it", (file, tool) => {
+    const v = writeCheck("Write", { file_path: file, content: "<svg/>" });
+    expect(v).toMatchObject({ decision: "blocked", target: file });
+    expect(v.reason).toMatch(tool);
+  });
+
   it("allows a call with no content to scan", () => {
     expect(writeCheck("Write", { file_path: "empty.txt" })).toMatchObject({ decision: "allowed" });
   });

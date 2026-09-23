@@ -86,3 +86,23 @@ describe("connection guard: tools that are not connections", () => {
     expect(guard(null, true)("WebSearch", {})).toMatchObject({ decision: "allowed" });
   });
 });
+
+// Q134: a run was offered the developer's own claude.ai connectors (mcp__claude_ai_Gmail__*). Any tool source the
+// workspace did not add is refused outright, strict or not, plan or no plan: nobody chose it for this run.
+describe("connection guard: a tool source the workspace never added", () => {
+  it("blocks a claude.ai connector, even in a workspace that is not strict and a plan that names it", () => {
+    const v = guard(planWith(["Gmail"]))("mcp__claude_ai_Gmail__search_threads", {});
+    expect(v).toMatchObject({ decision: "blocked", target: "claude_ai_Gmail" });
+    expect(v.reason).toMatch(/this tool source was not added to the workspace/i);
+  });
+
+  it("blocks it before any plan exists too", () => {
+    expect(guard(null)("mcp__unknown_server__do_thing", {})).toMatchObject({ decision: "blocked" });
+  });
+});
+
+describe("connection guard: native tools", () => {
+  it("leaves a native tool alone even without a plan", () => {
+    expect(guard(null, true)("WebSearch", {})).toMatchObject({ decision: "allowed" });
+  });
+});
