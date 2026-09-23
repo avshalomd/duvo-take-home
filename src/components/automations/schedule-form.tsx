@@ -17,6 +17,7 @@ type Props = {
   scheduleInput: string | null;
   scheduleTz: string | null; // the zone the cron is read in; a schedule from before zones were stored reads in UTC
   nextRunAt: string | null;
+  canEdit: boolean; // owners and admins set the schedule; a member reads it (Q178)
 };
 
 const noSubscribe = () => () => {};
@@ -27,29 +28,45 @@ const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 export function ScheduleForm(props: Props) {
   const zone = useSyncExternalStore(noSubscribe, browserZone, () => null);
   if (zone === null) return <p className={SMALL}>Loading the schedule...</p>;
+  if (!props.canEdit)
+    // a member sees when it runs and who changes that, not a form whose save would be refused (Q178)
+    return (
+      <div className="space-y-2">
+        {props.schedule ? <ScheduleSummary {...props} zone={zone} /> : <p className="text-[15px] text-graphite">It runs only when someone runs it.</p>}
+        <p className={SMALL}>An owner or an admin sets its schedule.</p>
+      </div>
+    );
   return <ScheduleEditor {...props} zone={zone} />;
 }
 
-// Not keyed by anything that changes on a save, so its state - "Schedule saved." - outlives the page's refresh (Q120).
-function ScheduleEditor({ automationId, inputLabel, inputExample, schedule, scheduleInput, scheduleTz, nextRunAt, zone }: Props & { zone: string }) {
-  const [state, action, pending] = useActionState<ActionState, FormData>(setScheduleAction, {});
-  const saved = schedule ? cronToChoice(schedule) : null;
+// The saved schedule in words: Every weekday at 08:00, with "Acme Ltd". Next run: Monday 28 September at 08:00.
+function ScheduleSummary({ schedule, scheduleInput, scheduleTz, nextRunAt, zone }: Props & { zone: string }) {
+  if (!schedule) return null;
+  const saved = cronToChoice(schedule);
   const savedZone = scheduleTz || "UTC";
   // the zone is named only when it is not the viewer's own: a teammate elsewhere sees whose 08:00 it is
   const inZone = savedZone === zone ? "" : `, ${zoneName(savedZone)}`;
+  return (
+    <p className="text-[15px] text-graphite">
+      {saved ? describeChoice(saved) : `A custom schedule (${schedule})`}
+      {inZone}
+      {scheduleInput ? `, with "${scheduleInput}"` : ""}.
+      {nextRunAt && <span className="text-slate"> Next run: {whenIn(nextRunAt, savedZone)}.</span>}
+    </p>
+  );
+}
+
+// Not keyed by anything that changes on a save, so its state - "Schedule saved." - outlives the page's refresh (Q120).
+function ScheduleEditor(props: Props & { zone: string }) {
+  const { automationId, inputLabel, inputExample, schedule, scheduleInput, zone } = props;
+  const [state, action, pending] = useActionState<ActionState, FormData>(setScheduleAction, {});
+  const saved = schedule ? cronToChoice(schedule) : null;
   const [preset, setPreset] = useState<string>(state.values?.preset ?? (schedule ? (saved?.repeat ?? "custom") : "none"));
   const v = state.values;
 
   return (
     <div className="space-y-4">
-      {schedule && (
-        <p className="text-[15px] text-graphite">
-          {saved ? describeChoice(saved) : `A custom schedule (${schedule})`}
-          {inZone}
-          {scheduleInput ? `, with "${scheduleInput}"` : ""}.
-          {nextRunAt && <span className="text-slate"> Next run: {whenIn(nextRunAt, savedZone)}.</span>}
-        </p>
-      )}
+      <ScheduleSummary {...props} />
       {/* keyed by the values a refused save sent back: they become the inputs' defaults (Base UI warns when a default changes) */}
       <form key={JSON.stringify(v ?? null)} action={action} className="space-y-4">
         <input type="hidden" name="id" value={automationId} />

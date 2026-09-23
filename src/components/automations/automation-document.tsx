@@ -9,7 +9,17 @@ import { AutomationEditor } from "./editor";
 
 // The builder's document: read like a page, edited in place on the same sheet. It holds the save's state, so a
 // successful save can return to reading and still say "Saved." there.
-export function AutomationDocument({ automation, connections, footer }: { automation: Automation; connections: { name: string; enabled: boolean }[]; footer?: React.ReactNode }) {
+export function AutomationDocument({
+  automation,
+  connections,
+  footer,
+  approver,
+}: {
+  automation: Automation;
+  connections: { name: string; enabled: boolean }[];
+  footer?: React.ReactNode;
+  approver: boolean; // an owner or an admin (Q178): the editor's note says who approves a new version
+}) {
   const [state, action, pending] = useActionState<EditState, FormData>(saveAutomationAction, {});
   const [editing, setEditing] = useState(false);
   const [seen, setSeen] = useState(state);
@@ -20,7 +30,17 @@ export function AutomationDocument({ automation, connections, footer }: { automa
   }
 
   if (editing)
-    return <AutomationEditor automation={automation} connections={connections} state={state} action={action} pending={pending} onCancel={() => setEditing(false)} />;
+    return (
+      <AutomationEditor
+        automation={automation}
+        connections={connections}
+        state={state}
+        action={action}
+        pending={pending}
+        onCancel={() => setEditing(false)}
+        approver={approver}
+      />
+    );
 
   return (
     <div className="space-y-8">

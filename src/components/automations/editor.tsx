@@ -45,6 +45,7 @@ export function AutomationEditor({
   action,
   pending,
   onCancel,
+  approver,
 }: {
   automation: Automation;
   connections: ConnectionChoice[];
@@ -52,6 +53,7 @@ export function AutomationEditor({
   action: (formData: FormData) => void;
   pending: boolean;
   onCancel: () => void;
+  approver: boolean;
 }) {
   const v = state.values ?? valuesOf(automation);
   const err = state.fieldErrors ?? {};
@@ -144,7 +146,11 @@ export function AutomationEditor({
           {state.error ?? (state.fieldErrors ? "Some fields need a change, see above." : null)}
         </p>
       </div>
-      <p className="text-[13px] tracking-[0.01em] text-slate">Changing what the agent is told makes a new version, which needs a new example before it can be used.</p>
+      <p className="text-[13px] tracking-[0.01em] text-slate">
+        Changing what the agent is told makes a new version, which needs a new example
+        {/* a member's edit of a ready automation takes it out of use until someone who can approve does (Q178) */}
+        {approver ? " before it can be used." : " and an owner's or an admin's approval before it can be used."}
+      </p>
     </form>
   );
 }
