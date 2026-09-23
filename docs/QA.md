@@ -199,7 +199,7 @@ route a function of its own). Runs now execute in `/api/runner/<id>`, the only f
 | Q151 | qa-func (live) | "Make the bars horizontal" could not be done: the chart tool drew only vertical bars | horizontal bars | major | main (outputs) | fixed (88f1083: kind horizontal-bar; live: the follow-up drew horizontal bars and passed) |
 | Q152 | qa-func (live) | a chart-only run's Why? said it "may have followed instructions it found on a page"; it read no page | no such warning when nothing outside was read | major | main (eval) | fixed (f1d8203; live: a chart-only run asked two questions and Why? says nothing about pages) |
 | Q153 | qa-func (live) | a doubted step read "This step may not have done what it says. May not have done what it says: ..." | the sentence once | minor | main (home) | fixed (ddd6467; live on the CSV run) |
-| Q154 | qa-func (live) | a fix attempt called set_plan again and the person's steps left the thread | the plan kept, the fix added as a step | minor | main (engine) | re-check (ddd6467: the fix prompt says keep the plan; no live run needed a fix since) |
+| Q154 | qa-func (live) | a fix attempt called set_plan again and the person's steps left the thread | the plan kept, the fix added as a step | minor | main (engine) | fixed (re-checked in the deep QA round), was re-check (ddd6467: the fix prompt says keep the plan; no live run needed a fix since) |
 | Q155 | qa-func (live) | a report opening with a bold "Report:" line under the page's "Report" heading | the word once | minor | main (home) | fixed (ddd6467; live: both reports open with a sentence) |
 | Q156 | qa-func (live) | an unknown invitation link said "This invitation is closed" | "We could not find this invitation" | minor | main (auth) | fixed (ddd6467, e2e; live, signed in and out) |
 | Q157 | qa-func (live) | on a horizontal bar chart the value labels "80" and "90" nearly touch | labels apart | minor | main (outputs) | fixed (about five ticks on the value axis; next deploy) |
@@ -236,13 +236,13 @@ Fixes are made locally, on branches merged into v2; the next deploy is his call.
 | Q178 | qa-func (admin) | any member can edit, approve, turn off or delete any automation | his call: members may, or admins only | question | automations | open (his call) |
 | Q179 | qa-ux | a chart's preview box is white in dark mode, so the chart's light text is invisible | the box follows the theme | major | home | fixing |
 | Q180 | qa-ux | the report-only automation /compare-concepts fails "a file was written": "Write a short answer" reads as asking for a file | "write" counts only with a file as its object | major | eval | fixing |
-| Q181 | qa-ux | a healed run says "3 of 3 done" above four thread nodes | the count agrees with the thread | minor | home | fixing |
-| Q182 | qa-ux | Details on a healed run: two groups keyed "step-2" (React warning) | unique keys | minor | home | fixing |
+| Q181 | qa-ux, qa-func | a healed run says "3 of 3 done" above four thread nodes | the count agrees with the thread | minor | home | fixing |
+| Q182 | qa-ux, qa-func | Details on a healed run: two groups keyed "step-2" (React warning) | unique keys | minor | home | fixing |
 | Q183 | qa-ux | tool names in step notes, the report and the reviewer's quoted reasons ("WebFetch blocked ... no shell/curl tool") | plain words | minor | engine | fixing |
 | Q184 | qa-ux | Why? sentences such as "The judge was sure the result does not answer your instructions but not that the plan was finished"; chained colons | one readable sentence each | minor | home | fixing |
 | Q185 | qa-ux | finished runs show a pending "Planning" and "waiting for the result..."; the failed banner points to Details, which has only a raw error | no pending marks on a finished run; the cause in the banner | minor | home | fixing |
 | Q186 | qa-ux | the steps of a run that did not pass are red circles with check marks | steps that ran look done; only the outcome is red | minor | home | fixing |
-| Q187 | qa-ux | Details: a local read badged "fetch", the machine's absolute path, the report as raw markdown pipes | "read", a path inside the run, no raw markdown | minor | home | fixing |
+| Q187 | qa-ux, qa-func | Details: a local read badged "fetch", the machine's absolute path in tool results, the report as raw markdown pipes | "read", a path inside the run, no raw markdown | minor | home | fixing |
 | Q188 | qa-ux | the / command list covers the Run button; its output line is raw column names | Run visible; plain words | minor | home | fixing |
 | Q189 | qa-ux | the rail search shows the browser's blue clear button | graphite or none | minor | home | fixing |
 | Q190 | qa-ux | an automation run's rail row repeats the command as a tag and truncates the input | no repeated name | minor | home | fixing |
@@ -250,3 +250,17 @@ Fixes are made locally, on branches merged into v2; the next deploy is his call.
 | Q192 | qa-ux | the workspace menu's white popover has no visible edge in light mode | a hairline edge | minor | home | fixing |
 | Q193 | qa-ux | inactive Settings tabs at 4.44:1 | 4.5:1 | minor | settings | fixing |
 | Q194 | qa-ux | the sign-in demo card grows as it plays (layout shifts ~22 px) and never reaches done | fixed height, ends green | minor | auth | fixing |
+| Q195 | qa-func | a double-click on Run (or a second Cmd/Ctrl+Enter) started two identical paid runs 0.5 s apart | one press, one run | major | home | fixing |
+| Q196 | qa-func | Check the result again with the model down turned a stored pass into "not checked", silently | the earlier verdict kept, the failure said | minor | eval | fixing |
+| Q197 | qa-func | a command with a 3,900-character input: POST /api/runs answers 500 with an empty body; Home says the brief is over 4000 characters; the input limit is never checked | the input limit enforced in plain words; 400 on the API | minor | automations | fixing |
+| Q198 | qa-func | Details shows "turn 31 of 25"; a healed run shows only its last attempt's turns | one number that agrees with the cap | minor | engine | fixing |
+| Q199 | qa-func | a stopped run's Details show Duration and Cost "-" although both are stored | the stored values | minor | engine | fixing |
+| Q200 | qa-func | a NUL byte in a file name answers 500 on the file route | 404 | minor | engine | fixing |
+| Q201 | qa-func | unknown pages show Next's bare 404 with no way back | an in-app not-found page | minor | home | fixing |
+| Q202 | qa-func | a composer error stays after the text changes | cleared on edit | minor | home | fixing |
+| Q203 | qa-func | an invalid composer draws a square pink border inside the rounded capsule | the error in the capsule's shape | minor | home | fixing |
+| Q204 | qa-func | runs of a deleted automation are titled by the bare input | read as plain runs | minor | home | fixing |
+| Q205 | qa-func | a follow-up's carried-over .xlsx loses its sheet summary | the parent's summary | minor | home | fixing |
+| Q206 | qa-func | "Too many runs from this address" gives no time to retry | when to retry | minor | engine | fixing |
+| Q207 | qa-func | with the model down the step checks vanish silently and "Done - not checked" has no retry on the main view | said in plain words, Check again beside the outcome | minor | home | fixing |
+| Q208 | qa-func | only Cmd/Ctrl+Enter submits, and that is hinted nowhere | a quiet hint near Run | minor | home | fixing |
