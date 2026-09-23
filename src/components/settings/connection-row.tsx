@@ -41,7 +41,8 @@ export function ConnectionRow({ connection }: { connection: Connection }) {
       <StatusDot tone={status.tone} className="mt-1.5" />
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="truncate text-sm font-medium">{connection.name}</p>
-        <p className="truncate text-xs text-muted-foreground">
+        {/* wraps rather than truncates: on a phone the status is the part that must stay readable */}
+        <p className="text-xs [overflow-wrap:anywhere] text-muted-foreground">
           {host(connection.url)} · {status.label}
         </p>
         {tools.length > 0 ? (
@@ -81,11 +82,12 @@ export function ConnectionRow({ connection }: { connection: Connection }) {
           // the pseudo-element gives the 18 px switch a 44 px hit area on a phone (Q75)
           className="relative mx-2 shrink-0 data-checked:bg-emerald-700 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']"
         />
+        {/* icon-only on a phone, so the name keeps the room; the hidden word still names the button for a screen reader */}
         <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
-          <Pencil /> Edit
+          <Pencil /> <span className="sr-only sm:not-sr-only">Edit</span>
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setDeleting(true)} className="text-muted-foreground hover:text-destructive">
-          <Trash2 /> Delete
+          <Trash2 /> <span className="sr-only sm:not-sr-only">Delete</span>
         </Button>
       </div>
 
