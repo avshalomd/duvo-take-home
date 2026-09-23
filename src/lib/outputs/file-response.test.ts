@@ -62,6 +62,7 @@ describe("fileResponse", () => {
     const file = { meta: { name: "data.xlsx", mime: XLSX, bytes: 6, encoding: "base64" } as FileMeta, content: bytes.toString("base64") };
     const res = fileResponse(file, q());
     expect(Buffer.from(await res.arrayBuffer())).toEqual(bytes);
+    expect(res.headers.get("Content-Type")).toBe(XLSX); // bytes, so no charset (Q125)
     expect(res.headers.get("Content-Disposition")).toBe("attachment; filename=\"data.xlsx\"; filename*=UTF-8''data.xlsx");
   });
 });
