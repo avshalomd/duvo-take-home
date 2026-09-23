@@ -65,8 +65,8 @@ export function RunPanel({
   const heals = healsOf(state.heals, events);
   const result = outcome(run.status, headline, run.cancelRequested, { attempts: fixesRun(heals), max: heals.at(-1)?.max });
   const why = whyLines(verdict, run.status, run.outcome, heals);
-  const progress = planProgress(state.plan);
   const steps = threadSteps(state.plan, run.status, state.stepChecks, heals);
+  const progress = planProgress(state.plan, steps); // counts what the thread draws, fixes included
 
   function closeDetails() {
     setDetailsOpen(false);
