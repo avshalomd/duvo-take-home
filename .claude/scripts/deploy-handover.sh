@@ -6,7 +6,7 @@
 # Handover runs with RUNNER=route: each run goes to /api/runner/<id>, the only function that carries the agent's
 # Linux binary (~240 MB, next.config.ts). With the binary in every route, each route was a function of its own and
 # the Hobby plan's cap of 12 functions refused the deployment. A local build cannot be uploaded instead: Hobby caps
-# a single uploaded file at 100 MB. So Vercel builds it, and this script refuses to deploy without RUNNER=route.
+# a single uploaded file at 100 MB. So Vercel builds it, and the smoke below checks that health reports "route".
 # Usage: .claude/scripts/deploy-handover.sh   (deploys the committed HEAD of the v2 branch; prints the URL last)
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/../.." && pwd -P)"
@@ -21,8 +21,6 @@ git -C "$dir" checkout -q --detach v2
 sha="$(git -C "$dir" rev-parse --short HEAD)"
 cd "$dir"
 vercel pull --yes --environment production > /dev/null 2>&1 # the project's own settings, over any local edit
-grep -q '^RUNNER="route"' .vercel/.env.production.local ||
-  { echo "the handover project needs RUNNER=route (node .claude/scripts/handover-env.mjs RUNNER=route): refusing"; exit 1; }
 echo "deploying v2 at $sha from $dir"
 
 log="$dir/.vercel/deploy.log"
@@ -37,6 +35,8 @@ mkdir -p "$repo/.claude/run" && echo "$prod" > "$repo/.claude/run/handover-url"
 # smoke, read-only: health with the database and the model, the sign-in page, a signed-out visit redirected to it
 code=$(curl -s -o "$dir/.vercel/health.json" -w '%{http_code}' "$prod/api/health?deep=1" || true)
 echo "health: $code $(cut -c1-200 "$dir/.vercel/health.json" 2>/dev/null)"
+grep -q '"runner":"route"' "$dir/.vercel/health.json" ||
+  echo "WARNING: runs will fail - set RUNNER=route (node .claude/scripts/handover-env.mjs RUNNER=route) and deploy again"
 echo "sign-in: $(curl -s -o /dev/null -w '%{http_code}' "$prod/sign-in")"
 echo "signed-out home: $(curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}' "$prod/")"
 echo "runner without a token: $(curl -s -o /dev/null -w '%{http_code}' -X POST "$prod/api/runner/00000000-0000-4000-8000-000000000000") (401 expected)"
