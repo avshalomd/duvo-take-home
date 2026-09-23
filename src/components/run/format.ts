@@ -101,6 +101,16 @@ export function attemptCost(payload: { total_cost_usd: number; attempt_cost_usd?
   return typeof payload.attempt_cost_usd === "number" ? payload.attempt_cost_usd : payload.total_cost_usd;
 }
 
+/**
+ * The state card's turns (Q198): the state's turn is the live turn while the run works, counted against the cap,
+ * and the run's total once it has ended, when a cap says nothing. null before the first turn.
+ */
+export function turnsLine(status: string, turn: number, maxTurns: number): string | null {
+  if (turn <= 0) return null;
+  if (status === "queued" || status === "running" || status === "evaluating") return `turn ${turn} of ${maxTurns}`;
+  return `${turn} ${turn === 1 ? "turn" : "turns"}`;
+}
+
 export function formatDuration(ms: number | null): string {
   if (ms === null || ms === undefined) return "-";
   if (ms < 1000) return `${(ms / 1000).toFixed(1)} s`;
