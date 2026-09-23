@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { canChangeSettings } from "@/lib/auth/roles";
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { startOAuth } from "@/lib/connections/oauth";
 import { SignInError } from "@/lib/connections/oauth/errors";
@@ -13,6 +14,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest): Promise<Response> {
   const session = await sessionFromHeaders(req.headers);
   if (!session) return Response.json({ error: "sign in first" }, { status: 401 });
+  // The same rule as the settings actions: the page hides the button from members, but anyone can open this link.
+  if (!canChangeSettings(session.role)) return backToSettings(req, { oauth_error: "Only an owner or an admin can sign a connection in" });
   const id = z.uuid().safeParse(req.nextUrl.searchParams.get("id"));
   if (!id.success) return backToSettings(req, { oauth_error: "That connection was not found" });
 

@@ -107,8 +107,8 @@ describe("buildChartSpec", () => {
   });
 
   it("puts the title on top, left-aligned, and uses the one accent colour for a single series", () => {
-    const s = spec({ title: "Population of the EU's largest countries", kind: "bar", data: countries, x: "country", y: "population" });
-    expect(s.title.text).toBe("Population of the EU's largest countries");
+    const s = spec({ title: "EU population", kind: "bar", data: countries, x: "country", y: "population" }); // long titles wrap: chart-look.test.ts
+    expect(s.title.text).toBe("EU population");
     expect(s.config.title.anchor).toBe("start");
     expect(s.config.mark.color).toBe(ACCENT);
   });

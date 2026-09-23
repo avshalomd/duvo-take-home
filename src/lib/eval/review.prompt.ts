@@ -1,4 +1,5 @@
 import type { EvaluateInput } from "@/contracts/eval";
+import { forModel } from "./file-view";
 
 // Tier two's prompt, kept in one module so it can be read and changed without touching the cascade. It is asked
 // only when the cheap judgment could not decide, and it is the one place the evaluator writes prose.
@@ -25,7 +26,10 @@ const HEAD_LINES = 60;
 export function reviewInput(input: EvaluateInput): string {
   const files = input.files.length
     ? input.files
-        .map((f) => `FILE ${f.name} (first ${HEAD_LINES} lines of ${f.content.split("\n").length}):\n${f.content.split("\n").slice(0, HEAD_LINES).join("\n")}`)
+        .map((f) => {
+          const lines = forModel(f).split("\n"); // a spreadsheet is shown as what it is and its size, never as base64
+          return `FILE ${f.name} (first ${HEAD_LINES} lines of ${lines.length}):\n${lines.slice(0, HEAD_LINES).join("\n")}`;
+        })
         .join("\n\n")
     : "(no files were written)";
   const plan = input.plan

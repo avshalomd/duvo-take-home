@@ -11,7 +11,7 @@ listed under **Decisions** at the end with the default the plan assumes.
 v1 proved the loop: free text in, a plan the agent keeps updated, files out, connections enforced at the run, a
 verdict before "done". v2 turns that loop into a product other people can use: **sign-in and workspaces**, a
 **calmer three-page layout** (Home, Automations, Settings), an **automation builder** that turns a run into a
-tested, approved automation invoked as `\audit Acme Ltd`, **a verdict that explains itself**, and **guardrails** for an
+tested, approved automation invoked as `/audit Acme Ltd`, **a verdict that explains itself**, and **guardrails** for an
 agent that reads the open web. The runtime stays the Claude Agent SDK, one subprocess per run, and the trace
 stays one ordered stream of events from which everything on screen is derived. What is overhauled: tenancy (every
 row belongs to a workspace), the information architecture, the engine's extension points (templates, guards,
@@ -22,7 +22,7 @@ single trace, `deriveState`, the evaluator cascade, and the glance view.
 
 1. **Sign in** (email and password; Google when configured). A personal workspace is created; runs, connections
    and automations belong to it. Nobody else sees them.
-2. **Home**: one box, "What should the agent do?". Free text as today, or `\audit Acme Ltd` to run a saved
+2. **Home**: one box, "What should the agent do?". Free text as today, or `/audit Acme Ltd` to run a saved
    automation with an input. The chips under the box say which connections are on. Runs sit in a rail on the
    left, grouped by day, each with its outcome dot. The selected run is the main column: the glance view as in
    v1.1, plus **Why?** under the outcome, **Stop** while it runs, **Save as automation** when it is done, and
@@ -32,7 +32,7 @@ single trace, `deriveState`, the evaluator cascade, and the glance view.
    with `{input}`, the expected output and steps); the user tries it on one or two example inputs, sees each
    example's result with the automatic verdict, and judges each one (looks right / not right, with a note).
    **Approve** needs one approved example of the current version and no rejected one; an edit sends it back to
-   draft. Once approved it is callable from the Home box as `\audit Apple Inc.` (or `/audit`), can run on a
+   draft. Once approved it is callable from the Home box as `/audit Apple Inc.`, can run on a
    schedule, and has a history.
 4. **Settings**: Connections (moved off Home; each server shows its tools and status, bearer or OAuth sign-in),
    Limits (budget per day, runs per day, runs in flight, today's usage, guard switches), Members.
@@ -52,7 +52,7 @@ the rail is the only other element on the page.
 | Automations          Home    Automations    Settings                          (A) Avshalom |
 +------------------+-------------------------------------------------------------------------+
 | Today            | [ What should the agent do?                                            ] |
-| * AI news to CSV | [ \ runs a saved automation                                            ] |
+| * AI news to CSV | [ / runs a saved automation                                            ] |
 | o Nvidia Q2 ...  |   Using: DeepWiki (on)  GitHub (off)                            [ Run ] |
 | Yesterday        +-------------------------------------------------------------------------+
 | * DeepWiki digest| Fetch the latest AI news from the web and save them into a CSV          |
@@ -69,10 +69,10 @@ The composer with a command typed. The popover lists the workspace's automations
 rest of the line is the input.
 
 ```
-[ \aud                                                                                      ]
+[ /aud                                                                                      ]
   +-------------------------------------------------------------------+
-  | \audit    Audit a company: web + Companies House -> audit.md      |
-  | \news     Weekly AI news digest -> news.csv                       |
+  | /audit    Audit a company: web + Companies House -> audit.md      |
+  | /news     Weekly AI news digest -> news.csv                       |
   +-------------------------------------------------------------------+
 ```
 
@@ -174,7 +174,7 @@ export const AutomationTemplate = z.object({
   connections: z.array(z.string()),        // connection names that must be on, or the run refuses to start
 });
 export const Command = z.object({ command: z.string().regex(/^[a-z][a-z0-9-]{1,23}$/), input: z.string().max(2000) });
-export type ParseCommand = (text: string) => Command | null;       // "\audit Acme Ltd" and "/audit Acme Ltd"
+export type ParseCommand = (text: string) => Command | null;       // "/audit Acme Ltd"
 export type DraftTemplate = (run: { prompt; plan; files }) => Promise<AutomationTemplate>; // extract(), user edits before save
 
 // src/contracts/eval.ts, added to Verdict
@@ -240,8 +240,8 @@ export type CancelRun = (runId: string) => Promise<void>;    // sets cancel_requ
   and none rejected.
 - **Approve and save**: status `active`, `approved_at`; the command must be unique among the workspace's
   automations. Disable and re-enable from the automation's page; an edit returns it to draft.
-- **Calling it**: the Home composer recognises `\command input` and `/command input` (`parseCommand`), offers the
-  workspace's active automations in a popover as soon as `\` or `/` is typed, and starts the run through
+- **Calling it**: the Home composer recognises `/command input` (`parseCommand`), offers the
+  workspace's active automations in a popover as soon as `/` is typed, and starts the run through
   `runCommand()` (purpose `automation`). A required connection that is off refuses the start with the reason.
 - **Keeping to the template at run time**: `fillTemplate()` gives the prompt (the instructions with the input) and
   a system-prompt addendum ("this run follows the saved automation <name>: plan these steps, produce these
@@ -313,7 +313,7 @@ contracts; E's worker, schedules, follow-ups and streaming are built beside them
 |---|---|
 | A | sign-in, workspaces, encrypted tokens, Settings with Connections, Limits and Members |
 | B | new Home: runs rail by day, composer with commands, Details drawer, Stop, "Why?", follow-up |
-| C | the automation builder: draft from a run, editor, examples judged by a person, approve, `\command input` |
+| C | the automation builder: draft from a run, editor, examples judged by a person, approve, `/command input` |
 | D | guards (url, write, connection), output scan, per-step checks, budget, the offline suite |
 | E | the queue and worker, schedules, follow-ups on the SDK session, streaming, OAuth connections, charts and spreadsheets |
 
@@ -340,6 +340,8 @@ v1.1.0. The v1 curated runs are re-seeded into the demo workspace of v2.
 - Implement all of it locally; no tags for now.
 - Skills dropped: untested user prompt text must not reach the agent. Automations only, built from a run, tested on
   one or two examples that the person judges, then approved (section C).
+- Commands use a front slash only: `/audit Apple Inc.` (familiar to people who use coding agents; the backslash in
+  the mail was a slip).
 
 ## Decisions (his; the plan assumes the default)
 
@@ -347,7 +349,7 @@ v1.1.0. The v1 curated runs are re-seeded into the demo workspace of v2.
 2. **Tenant**: workspaces with members from day one, one personal workspace per user (default) | per user only.
 3. **Runner**: keep the in-function loop through phase 4, worker in phase 5 (default) | worker first.
 4. **Skills**: dropped for v2 (his call): behaviour a user adds goes through a tested, approved automation.
-5. **Command prefix**: `\` as written in the mail, `/` accepted too (default) | one of them.
+5. **Command prefix**: `/` only (his call, 2026-09-23: familiar to people who use coding agents; the mail said `\` by mistake).
 6. **Connection calls outside the plan**: flagged (default) | blocked ("strict" as a setting).
 7. **The live URL**: v2 on a new project and URL, v1 frozen for the reviewer (default) | replace in place.
 8. **Order**: privacy before the new look (phase 1 then 2, default) | the look first.

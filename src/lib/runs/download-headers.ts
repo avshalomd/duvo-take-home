@@ -9,10 +9,13 @@ function disposition(kind: "attachment" | "inline", name: string): string {
   return `${kind}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
+// Text is text/* and the XML types (image/svg+xml); everything else (an .xlsx) is bytes, and a charset on bytes is wrong.
+const isText = (mime: string) => mime.startsWith("text/") || mime.endsWith("+xml");
+
 /** The headers for one downloaded file: always an attachment under its own name. */
 export function downloadHeaders(name: string, mime: string): Record<string, string> {
   return {
-    "Content-Type": `${mime}; charset=utf-8`,
+    "Content-Type": isText(mime) ? `${mime}; charset=utf-8` : mime, // Q125
     "Content-Disposition": disposition("attachment", name),
     "X-Content-Type-Options": "nosniff", // the agent names its own files: never let the browser sniff a type
   };

@@ -76,6 +76,13 @@ describe("judgeRun", () => {
     expect(q.criteria.false).not.toMatch(/page|tool result/);
   });
 
+  it("shows the judge a spreadsheet as what it is and its size, never its base64", async () => {
+    const workbook = Buffer.from("PK\x03\x04 the rest of the workbook", "binary").toString("base64");
+    await judgeRun({ ...input, files: [{ name: "data.xlsx", content: workbook }] });
+    const files = sent().state.files as { name: string; head: string }[];
+    expect(files[0].head).toBe("(a spreadsheet file, 29 bytes)");
+  });
+
   it("returns the three probabilities as the judgment", async () => {
     expect(await judgeRun(input)).toEqual({ answeredQuery: 0.9, followedPlan: 0.8, stayedInBounds: 0.95 });
   });

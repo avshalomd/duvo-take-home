@@ -27,6 +27,17 @@ describe("downloadHeaders", () => {
   it("tells the browser not to sniff the type: a .txt must never be run as something else", () => {
     expect(downloadHeaders("notes.txt", "text/plain")["X-Content-Type-Options"]).toBe("nosniff");
   });
+
+  // Q125: a charset describes text; on an .xlsx, which is a zip archive of bytes, it is simply wrong
+  it("sends a binary type with no charset", () => {
+    const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    expect(downloadHeaders("data.xlsx", xlsx)["Content-Type"]).toBe(xlsx);
+  });
+
+  it("keeps the utf-8 charset on every text type, an SVG's XML included", () => {
+    expect(downloadHeaders("notes.md", "text/markdown")["Content-Type"]).toBe("text/markdown; charset=utf-8");
+    expect(downloadHeaders("chart.svg", "image/svg+xml")["Content-Type"]).toBe("image/svg+xml; charset=utf-8");
+  });
 });
 
 describe("inlineSvgHeaders", () => {

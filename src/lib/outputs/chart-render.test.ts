@@ -3,7 +3,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { renderChartSvg } from "./chart-render";
-import { buildChartSpec } from "./chart-spec";
+import { buildChartSpec, CHART_HEIGHT, CHART_WIDTH } from "./chart-spec";
 
 const countries = [
   { country: "Germany", population: 83.4 },
@@ -30,6 +30,27 @@ describe("renderChartSvg", () => {
       const svg = await renderChartSvg(buildChartSpec({ title: `A ${kind} chart`, kind, data, x: "a", y: "b" }));
       expect(svg).toContain(`A ${kind} chart`);
     }
+  });
+
+  it("renders every kind at exactly the chart size, axes and legend included, so a tile scales it predictably", async () => {
+    for (const kind of ["bar", "line", "area", "pie", "scatter"] as const) {
+      const data = [
+        { a: "Germany", b: 84_700_000, s: "2024" },
+        { a: "France", b: 68_400_000, s: "2024" },
+      ];
+      const svg = await renderChartSvg(buildChartSpec({ title: "Size", kind, data, x: kind === "scatter" ? "b" : "a", y: "b", series: "s" }));
+      expect(svg).toMatch(new RegExp(`^<svg[^>]* width="${CHART_WIDTH}" height="${CHART_HEIGHT}"`));
+    }
+  });
+
+  // Without a canvas, vega guesses every character at 0.8 em; the system font runs 0.45-0.6 em (measured in Chromium).
+  // The guess cut "The five largest EU countries" to "The five largest EU c..." and sized the plot for text not there.
+  it("measures text at the system font's width, so a title line that fits the chart is drawn whole", async () => {
+    const svg = await renderChartSvg(
+      buildChartSpec({ title: "The five largest EU countries by population", kind: "bar", data: countries, x: "country", y: "population" }),
+    );
+    expect(svg).toContain(">The five largest EU countries<");
+    expect(svg).not.toContain("…");
   });
 
   it("escapes the title, so an ampersand from the agent cannot break the SVG", async () => {
