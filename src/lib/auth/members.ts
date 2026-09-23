@@ -76,3 +76,11 @@ export async function createInvite(requestHeaders: Headers, ctx: SessionCtx, inp
 }
 
 export const inviteMember: InviteMember = async (ctx, input) => createInvite(await headers(), ctx, input);
+
+export type PendingInvitation = { id: string; email: string; role: string; expiresAt: string; link: string };
+export async function listInvitations(_workspaceId: string): Promise<PendingInvitation[]> {
+  return []; // STUB
+}
+export async function revokeInvite(_headers: Headers, _ctx: SessionCtx, _id: string): Promise<void> {
+  // STUB
+}

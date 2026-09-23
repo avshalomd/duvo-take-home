@@ -5,7 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { member, organization, session, user } from "@/db/schema";
 import { auth } from "./auth";
-import { createInvite, getInvitation, listMembers, listWorkspaces } from "./members";
+import { createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, revokeInvite } from "./members";
 import { sessionFromHeaders } from "./session";
 
 const created: string[] = []; // emails, so afterAll deletes only what this file made
@@ -171,5 +171,76 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
     const { userId } = await signUp("Inty Alone", email("alone"));
     const workspaces = await listWorkspaces(userId);
     expect(workspaces).toEqual([{ id: expect.any(String), name: "Inty's workspace", role: "owner" }]);
+  });
+});
+
+// Q109: a pending invitation can be found again (its link copied) and revoked.
+describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
+  const idOf = (link: string) => link.split("/invite/")[1];
+
+  it("lists the workspace's open invitations with their role, expiry and link, newest first", async () => {
+    const owner = await signUp("Paula Pending", email("pending-owner"));
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const first = email("pending-a");
+    const second = email("pending-b");
+    const a = await createInvite(owner.headers, ctx, { email: first, role: "member" });
+    const b = await createInvite(owner.headers, ctx, { email: second, role: "admin" });
+
+    const list = await listInvitations(ctx.workspaceId);
+    expect(list.map((i) => [i.email, i.role, i.link])).toEqual([
+      [second, "admin", b.link],
+      [first, "member", a.link],
+    ]);
+    expect(new Date(list[0].expiresAt).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("an accepted invitation leaves the list, and another workspace's never shows in it", async () => {
+    const owner = await signUp("Paul Pending", email("pending-owner2"));
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const guestEmail = email("pending-guest");
+    const { link } = await createInvite(owner.headers, ctx, { email: guestEmail, role: "member" });
+    const guest = await signUp("Gina Guest", guestEmail);
+    await auth.api.acceptInvitation({ body: { invitationId: idOf(link) }, headers: guest.headers });
+    expect(await listInvitations(ctx.workspaceId)).toEqual([]);
+
+    const stranger = await signUp("Stan Stranger", email("pending-stranger"));
+    const strangerCtx = (await sessionFromHeaders(stranger.headers))!;
+    await createInvite(stranger.headers, strangerCtx, { email: email("pending-other"), role: "member" });
+    expect(await listInvitations(ctx.workspaceId)).toEqual([]);
+  });
+
+  it("revoking closes the link and takes the invitation off the list", async () => {
+    const owner = await signUp("Rita Revoker", email("revoke-owner"));
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const { link } = await createInvite(owner.headers, ctx, { email: email("revoke-guest"), role: "member" });
+
+    await revokeInvite(owner.headers, ctx, idOf(link));
+    expect(await listInvitations(ctx.workspaceId)).toEqual([]);
+    expect((await getInvitation(idOf(link)))?.open).toBe(false);
+  });
+
+  it("a plain member cannot revoke, and is told so in plain words", async () => {
+    const owner = await signUp("Rob Owner", email("revoke-owner2"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+    const memberEmail = email("revoke-member");
+    const joined = await createInvite(owner.headers, ownerCtx, { email: memberEmail, role: "member" });
+    const plain = await signUp("Pat Plain", memberEmail);
+    await auth.api.acceptInvitation({ body: { invitationId: idOf(joined.link) }, headers: plain.headers });
+    const plainCtx = (await sessionFromHeaders(plain.headers))!;
+    const pending = await createInvite(owner.headers, ownerCtx, { email: email("revoke-pending"), role: "member" });
+
+    await expect(revokeInvite(plain.headers, plainCtx, idOf(pending.link))).rejects.toThrow(/Only an owner or an admin can revoke/);
+    expect((await listInvitations(ownerCtx.workspaceId)).map((i) => i.link)).toEqual([pending.link]);
+  });
+
+  it("an invitation of another workspace cannot be revoked from this one", async () => {
+    const one = await signUp("Una One", email("revoke-one"));
+    const oneCtx = (await sessionFromHeaders(one.headers))!;
+    const { link } = await createInvite(one.headers, oneCtx, { email: email("revoke-one-guest"), role: "member" });
+    const two = await signUp("Tom Two", email("revoke-two"));
+    const twoCtx = (await sessionFromHeaders(two.headers))!;
+
+    await expect(revokeInvite(two.headers, twoCtx, idOf(link))).rejects.toThrow(/no longer pending/);
+    expect((await listInvitations(oneCtx.workspaceId)).map((i) => i.link)).toEqual([link]);
   });
 });

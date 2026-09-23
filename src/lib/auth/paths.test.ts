@@ -52,6 +52,11 @@ describe("withNext", () => {
   it("leaves the link bare when the page to return to is home", () => {
     expect(withNext("/sign-up", "/")).toBe("/sign-up");
   });
+
+  it("can carry an email to fill in, beside the page to return to", () => {
+    expect(withNext("/sign-in", "/", "demo@example.com")).toBe("/sign-in?email=demo%40example.com");
+    expect(withNext("/sign-up", "/invite/abc", "a@b.co")).toBe("/sign-up?next=%2Finvite%2Fabc&email=a%40b.co");
+  });
 });
 
 describe("safeNext", () => {

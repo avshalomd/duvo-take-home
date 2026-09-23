@@ -11,6 +11,10 @@ const MESSAGES: Record<string, string> = {
 
 const FALLBACK = "Something went wrong. Try again in a moment.";
 
+export function accountExists(_error: { code?: string } | null): boolean {
+  return false; // STUB
+}
+
 export function friendlyAuthError(error: { code?: string; status?: number } | null): string {
   if (!error) return FALLBACK;
   if (error.status === 429) return "Too many tries. Wait a minute, then try again.";
