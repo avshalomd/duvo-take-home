@@ -1,94 +1,90 @@
 # Automations
 
-An agentic automation platform: brief an agent in free text, watch it plan and work step by step, download the
-files it wrote, connect it to your own data through MCP servers, and get an automatic verdict on the result.
+An agentic automation platform for everyday office work: say what needs doing in plain words, watch an agent plan
+it and work through it, take the files it made, and turn a run that went well into a tested, reusable command.
 
-**Live:** https://duvo-take-home.vercel.app
+**Live:** https://duvo-take-home.vercel.app runs **v1.1.0** (the take-home as delivered). **This branch is v2**,
+built and tested locally; it is not deployed.
 
-**Versions.** `v1.0.0` is exactly what existed at the end of the one-hour timed build (the git history shows how it
-got there). `v1.1.0` is after about 30 more minutes of polish and bug fixing: the glance view for non-technical
-users, live runs working on Vercel, and a hardened run loop (tool allowlist, path guard, wall clock, runs always
-closed with a reason). Everything is deployed and works end to end on the live URL.
+## What it does (v2)
 
-## What it does
-
-1. **Free-text instructions.** No presets: the agent reads the instructions itself and states, through a plan
-   tool it must call first, what it understood: the intent, the expected outputs, the sources it will use, and
-   its steps. It updates each step as it starts and ends.
-2. **Step by step.** The side panel shows the plan (done / running / pending), a key-state card derived from the
-   trace (status, turn, last tool, tools used, connections used, files, cost, duration) and the full timeline
-   of text, tool calls and results, live while the run is running.
-3. **Files.** The agent writes only text files (`.txt`, `.md`, `.csv`) into a working directory per run; they are
-   copied into the database when it finishes and served as downloads.
-4. **Connections.** A list of the user's MCP servers over http (name, URL, optional bearer token), each on or
-   off. The agent is given exactly the enabled ones; the run records which servers it had (from the SDK's init
-   message) and labels every tool call that went through one.
-5. **Evaluation.** Before a run is marked done: code checks on the files (a file exists when asked, a CSV parses,
-   no duplicates, non-empty), then a decision model (Jev) answers "answered the query?" and "followed the plan?".
-   When it finds the plan was not followed or is unsure, an LLM review decides whether the task is finished and
-   whether the response is usable or what must change. The verdict, with reasons, is stored on the run.
+1. **Sign in** with email and password (Google when configured). Everyone gets a personal workspace; runs,
+   connections and automations belong to a workspace, and members can be invited by link.
+2. **Home**: one box, "What should the agent do?". The agent states its plan first, then works through it; the plan
+   is drawn as a single line that fills as steps finish. The outcome is one sentence, with **Why?** explaining how
+   the verdict was reached; **Stop** ends a run, **Ask for a change** continues it; everything technical (the
+   timeline, tool calls, costs, probabilities) is in **Details**.
+3. **Outputs**: text files (.txt, .md, .csv), charts (.svg) and spreadsheets (.xlsx). The agent passes data to the
+   chart and spreadsheet tools; our code renders the files. Files are scanned: credentials hold a file back until
+   you confirm, personal data is counted and shown.
+4. **Automations, built from a run**: pick a run that went well, press **Make an automation**, and a model drafts a
+   template (instructions with an `{input}`, what it produces, its steps, the connections it needs). You edit it,
+   run one or two examples, judge each one (looks right / not right), and approve it. Then `/audit Apple Inc.` in
+   the Home box runs it. Any edit to an approved automation sends it back to draft until a new example is approved.
+   Automations can run on a schedule, in your own time zone.
+5. **Connections**: the workspace's MCP servers over http, with no sign-in, a token (encrypted at rest), or OAuth
+   (discovery, dynamic client registration, PKCE). The agent gets exactly the connections that are on.
+6. **Evaluation**: before a run is marked done, code checks the files (per kind: CSV structure, chart well-formed,
+   workbook valid, freshness, duplicates, the automation's template kept), then a decision model (Jev) answers
+   three questions: did it answer the instructions, did it follow its plan, did it act only on your instructions
+   and not on text it read. Doubt goes to an LLM review. Every finished step is also checked as the run goes.
+7. **Guardrails**: the agent is told that pages and connection results are data, never instructions. Guards on
+   every tool call block private addresses and blocked sites, ask the decision model about addresses that could
+   carry data out (in the query, the path or a subdomain), refuse writing credentials, and flag connections the
+   plan did not name. Each workspace has a daily budget, a run limit and a cap on runs in progress.
 
 ## Run it
 
 ```bash
 npm ci
-cp .env.example .env.local   # DATABASE_URL, ANTHROPIC_API_KEY, TYPESAFE_API_KEY (Jev), OPENROUTER_API_KEY (fallback)
-npm run db:push && npm run seed
+cp .env.example .env.local   # DATABASE_URL, ANTHROPIC_API_KEY, TYPESAFE_API_KEY, BETTER_AUTH_SECRET, CONNECTION_KEY
+npm run db:push && npm run seed   # the seed adds demo@example.com / demo-password (local only)
 npm run dev
 ```
 
-`npm run check` runs typecheck, lint and the unit tests. `npm run test:int` runs the database tests.
-`EVAL=1 npx dotenv -e .env.local -- vitest run src/lib/eval/suite.eval.test.ts` runs the evaluator over the
-fixture cases and writes `docs/EVAL.md`.
+- `npm run worker` runs queued runs and schedules when `RUNNER=queue` (no function time limit).
+- `npm run check` runs typecheck, lint and the unit tests; `npm run test:int` the database tests;
+  `npx playwright test` the end-to-end suite (it signs in as the demo user).
+- `EVAL=1 npx dotenv -e .env.local -- npx vitest run src/lib/eval/suite.eval.test.ts` runs the evaluator over
+  the recorded runs with the live judge and writes `docs/EVAL.md`.
 
 ## Architecture
 
 Next.js 16 (App Router, Server Components for reads, Server Actions for writes), Postgres on Neon through Drizzle,
-Zod at every boundary. The agent runtime is the **Claude Agent SDK**: `query()` spawns Claude Code as a subprocess
-per run with a working directory per run, the built-in WebSearch / WebFetch / Read / Write tools, an in-process
-MCP server for the plan tool, and the enabled connections as http MCP servers. Our code records the message
-stream as `run_events` rows and derives everything the UI shows from them. See [docs/CODE-TOUR.md](docs/CODE-TOUR.md)
-for a per-file tour and [docs/DESIGN.md](docs/DESIGN.md) for the design.
+Better Auth for sign-in and workspaces, Zod at every boundary. The agent is the **Claude Agent SDK**: one Claude
+Code subprocess per run with its own working directory, the built-in WebSearch / WebFetch / Read / Write tools,
+in-process MCP servers for the plan and the output tools, and the workspace's connections. Every message becomes a
+`run_events` row; the state on screen is derived from those rows, and the page follows a run over Server-Sent
+Events. See [docs/V2-PLAN.md](docs/V2-PLAN.md) for the design, [docs/DESIGN-V2.md](docs/DESIGN-V2.md) for the look
+and [docs/CODE-TOUR.md](docs/CODE-TOUR.md) for a per-file tour.
 
 ## Decisions and trade-offs
 
-- **The agent's sandbox.** The SDK's `tools` option leaves the agent exactly Read, WebFetch, WebSearch, Write and the plan tools; a PreToolUse hook refuses any path outside the run's directory; a wall clock of 240 s, 25 turns and $1 end a runaway run and the run always closes with its reason. Connections may only point at public http(s) hosts. At most three runs in flight and five starts per address per ten minutes; without sign-in that is a brake, not a lock (see the roadmap).
-- **Dark mode and accessibility.** One palette through `light-dark()`, reduced motion honoured, a live region for the outcome, named landmarks and download links, 40 px controls on phones.
-- **QA never touches production.** A separate Neon project is the QA database (`npm run qa:dev`); the live database holds only the curated runs.
-
-- **The plan is data the agent emits, not a summary we infer.** The plan tool makes the agent say where it is;
-  the timeline still records every tool call, so a run that skips the tool is still observable.
-- **State is derived, never stored.** `deriveState(run, events)` is a pure function, tested on fixtures; the key
-  state at any point of a run is the last plan event plus the calls since.
-- **A decision model before a writing model.** Jev answers the closed questions cheaply with a probability; the
-  LLM review runs only when needed.
-- **Text files only, stored in Postgres.** A CSV needs no blob store; visuals are a later step.
-- **Connection tokens are stored as entered** and never rendered back. A demo trade-off, noted here.
+- **No user-written prompt text reaches the agent unless it was tested.** Free-form "skills" were dropped; reusable
+  behaviour is an automation, approved only after a person judged a real example of the current version.
+- **Commands start with `/`**, as in coding agents.
+- **A decision model before a writing model.** Closed judgments (the verdict, each step, a suspicious address) are
+  asked of Jev as probabilities; the LLM review runs only on doubt.
+- **Tenancy is one column and one filter.** Every query takes the workspace from the session, never from the
+  client; another workspace's run reads as "not found".
+- **Runs execute inline by default** (as v1, inside the request's time budget); `RUNNER=queue` and the worker lift
+  the limit and fire schedules. Follow-ups resume the agent's session where it still exists and always carry a
+  summary of the earlier run.
 
 ## Tests
 
-- Unit (`npm run check`, 341 tests): the contracts against fixtures, the SDK message mapper, the derived run state,
-  the evaluator's checks and its cascade with the model calls mocked, the UI formatting.
-- Integration (`npm run test:int`): the connections store against the real table, cleaning up after itself.
-- Evaluator accuracy (`EVAL=1 ...`): 10 of 10 labelled cases, [docs/EVAL.md](docs/EVAL.md).
-- End to end (`npx playwright test e2e/flow.spec.ts` against a running app): the page, a finished run with its file
-  and verdict, a failed run, validation of the form and of a new connection, re-evaluation.
-- Production smoke (`e2e/smoke.spec.ts`, read-only): health with the database and the model, the home page.
+- Unit (`npm run check`, 1,250+ tests): contracts, the message mapper, derived state, the evaluator and its
+  replayed suite of 18 recorded runs, the guards and scanners, the command parser, templates and approval, schedules
+  across daylight saving, crypto, budgets, the UI wording.
+- Integration (`npm run test:int`): tenancy, the stores, jobs and recovery, follow-ups, OAuth rows.
+- End to end (`npx playwright test`): sign-in and invitations, tenancy by URL, Home, the automation builder,
+  Settings.
+- Evaluator suite: 18/18 replayed and 18/18 live ([docs/EVAL.md](docs/EVAL.md)).
 
-## Extras
+## Not done
 
-- **The glance view.** The run is shown the way an office worker reads it: the instruction as the title, the outcome in a sentence ("Done - looks good"), the plan as an animated stepper with a progress bar, what it produced as file cards and prose. Everything technical (the timeline, the state grid, cost, turns, the judge's percentages, ids, raw errors) sits under a Details toggle.
-- The timeline groups events under the plan step that was running when they happened, shows each tool call as a card labelled by kind (search, fetch, write, connection) with its result folded to two lines, and renders the agent's own text quietly between them.
-
-## Not done, next
-
-- `reevaluateRun`'s database path has no integration test (the mapping and the cascade do).
-- No authentication: anyone with the URL can read runs and start new ones within the rate limits (QA item Q48, roadmap item 6).
-- The roadmap, in the order it would be built, is in [docs/ROADMAP.md](docs/ROADMAP.md): a less cluttered UX, a
-  settings menu for connections and configuration, editable skills, saving a run as a reusable automation
-  (`\audit Acme Ltd`), visibility into how each evaluation was decided, and authentication with prompt-injection
-  guardrails.
-
-## Evaluation results
-
-The evaluator over the twelve labelled fixture cases scores 12/12: [docs/EVAL.md](docs/EVAL.md).
+- v2 is not deployed. Schedules on Vercel need a cron that runs every few minutes (the Hobby plan allows one a day);
+  locally the worker fires them.
+- An OAuth sign-in has been checked up to the provider's page (Linear, Notion, Sentry), not completed.
+- A follow-up recorded with `npm run record-run` keeps only its change as the prompt (QA Q88).
+- Open QA items are listed in [docs/QA.md](docs/QA.md).
