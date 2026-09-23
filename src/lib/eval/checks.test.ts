@@ -140,12 +140,25 @@ describe("runChecks", () => {
 
   it("does not read a chart or a spreadsheet as text: no content, parse or row check on them", () => {
     const files = [
-      { name: "chart.svg", content: "" },
+      { name: "chart.svg", content: "<svg xmlns='http://www.w3.org/2000/svg'><title>Prices</title><text>apples 3</text></svg>" },
       { name: "data.xlsx", content: "(application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, 6120 bytes)" },
     ];
     const checks = runChecks(input({ prompt: "Chart the prices.", files }));
     expect(checks.map((c) => c.id).filter((id) => ["content", "parses", "rows"].includes(id))).toEqual([]);
     expect(failedIds(checks)).toEqual([]);
+  });
+
+  // Q124: with two files, "3 rows" or "29 characters" does not say which file it is about.
+  it("names the file in every check that reads one, so two files are never confused", () => {
+    const files = [
+      { name: "news.csv", content: goodCsv },
+      { name: "notes.md", content: "# Notes\nOne." },
+    ];
+    const prompt = "Save the news of the last 7 days into a CSV with title, source, url, published_at, summary. Add notes too.";
+    const perFile = runChecks(input({ prompt, files })).filter((c) => ["content", "parses", "rows", "columns", "urls", "duplicates", "freshness"].includes(c.id));
+    expect(perFile.map((c) => c.id).sort()).toEqual(["columns", "content", "duplicates", "freshness", "parses", "rows", "urls"]);
+    for (const c of perFile) expect(c.detail, c.id).toMatch(/^(news\.csv|notes\.md)[: ]/);
+    expect(perFile.find((c) => c.id === "content")?.label).toBe("notes.md has content");
   });
 
   it("rejects a file type the agent was not allowed to write", () => {

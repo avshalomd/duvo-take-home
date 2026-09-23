@@ -1,6 +1,7 @@
 import { parse } from "csv-parse/sync";
 import { AgentLimits } from "@/contracts/agent";
 import type { Check, EvaluateInput } from "@/contracts/eval";
+import { chartCheck, spreadsheetCheck } from "./output-checks";
 import { templateChecks } from "./template-checks";
 
 // The half of the evaluator that costs nothing and cannot be talked round: everything that can be decided by
@@ -42,10 +43,15 @@ function runChecksOnFiles(input: EvaluateInput): Check[] {
     wrongType.length ? `not allowed: ${names(wrongType)}` : names(input.files),
   );
 
+  // One check per output kind, and each names the file it read (Q124): with two files, "29 characters" says nothing.
   for (const file of input.files) {
-    if (file.name.toLowerCase().endsWith(".csv")) csvChecks(file, input, ok);
-    else if (/\.(md|txt)$/i.test(file.name)) {
-      ok("content", "The file has content", file.content.trim().length > 0, file.content.trim() ? `${file.content.trim().length} characters` : `${file.name} is empty`);
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".csv")) csvChecks(file, input, ok);
+    else if (name.endsWith(".svg")) checks.push(chartCheck(file));
+    else if (name.endsWith(".xlsx")) checks.push(spreadsheetCheck(file));
+    else if (/\.(md|txt)$/.test(name)) {
+      const size = file.content.trim().length;
+      ok("content", `${file.name} has content`, size > 0, size ? `${file.name}: ${size} characters` : `${file.name} is empty`);
     }
   }
   return checks;
@@ -57,7 +63,9 @@ type Push = (id: string, label: string, ok: boolean, detail: string) => void;
 // user sees when they open the file; its types only describe the plain string[][] shape, hence the cast.
 type CsvRecord = { record: string[]; info: { lines: number } };
 
-function csvChecks(file: { name: string; content: string }, input: EvaluateInput, ok: Push) {
+function csvChecks(file: { name: string; content: string }, input: EvaluateInput, push: Push) {
+  // Every detail below starts with the file's name (Q124), added here once rather than in each check.
+  const ok: Push = (id, label, okay, detail) => push(id, label, okay, detail.startsWith(file.name) ? detail : `${file.name}: ${detail}`);
   let records: CsvRecord[];
   try {
     // relax_column_count so a ragged row is still read: `parses` names it below with the row number and both

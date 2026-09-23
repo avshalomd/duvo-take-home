@@ -1,5 +1,6 @@
 import type { EvaluateInput, Judgment } from "@/contracts/eval";
 import { decide, noul } from "@/lib/llm/decide";
+import { forModel } from "./file-view";
 
 // Tier one of the judgment: three CLOSED questions answered by Jev in one request, with calibrated probabilities.
 // This is the judgment the app makes on every run, so it belongs in decide() and not in a prompt: it cannot
@@ -19,11 +20,10 @@ export function judgeState(input: EvaluateInput) {
     // wrote for itself: a run that planned less than the automation asks for could still "follow its own plan".
     ...(t ? { automation: { intent: t.intent, expectedOutputs: t.expectedOutputs, outputFormat: t.outputFormat, steps: t.steps } } : {}),
     report: input.report ?? "(the run wrote no report)",
-    files: input.files.map((f) => ({
-      name: f.name,
-      head: f.content.split("\n").slice(0, HEAD_LINES).map((l) => l.slice(0, LINE_CHARS)).join("\n"),
-      lines: f.content.split("\n").length,
-    })),
+    files: input.files.map((f) => {
+      const text = forModel(f); // a spreadsheet is shown as what it is and its size, never as base64
+      return { name: f.name, head: text.split("\n").slice(0, HEAD_LINES).map((l) => l.slice(0, LINE_CHARS)).join("\n"), lines: text.split("\n").length };
+    }),
   };
 }
 
