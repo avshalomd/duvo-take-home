@@ -164,9 +164,9 @@ test("an invitation link lets a new person create an account and join the worksp
   }
 });
 
-test("a used or unknown invitation link says it is closed", async ({ page }) => {
+test("an unknown invitation link says it was not found, not that it closed (production QA, 2026-09-23)", async ({ page }) => {
   await page.goto("/invite/e2e-no-such-invitation");
-  await expect(page.getByRole("heading", { name: "This invitation is closed" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We could not find this invitation" })).toBeVisible();
 });
 
 test("a new workspace made from the user menu opens at once, and the menu switches back", async ({ page }) => {
