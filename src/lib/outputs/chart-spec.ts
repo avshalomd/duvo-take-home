@@ -175,7 +175,8 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
       return {
         ...base,
         mark: { type: "bar" },
-        encoding: { y: category, x: { ...yEnc, axis: { labelAngle: 0, ...valueAxis(values, y) } }, ...color, ...(series ? { yOffset: { field: series } } : {}) },
+        // about five ticks: numbers sit side by side along the bottom, and ten of them ran together ("80 90")
+        encoding: { y: category, x: { ...yEnc, axis: { labelAngle: 0, tickCount: 5, ...valueAxis(values, y) } }, ...color, ...(series ? { yOffset: { field: series } } : {}) },
       } as TopLevelSpec;
     }
     case "line":
