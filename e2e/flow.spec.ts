@@ -358,6 +358,15 @@ test.describe("a finished run", () => {
     await expect(files.getByRole("link", { name: /^Download contacts\.csv \(\d+ bytes\)$/ })).toBeVisible(); // Q72, Q99
   });
 
+  // a chart styles itself for the viewer's scheme; a white box behind it put its light dark-mode text on white
+  test("a chart's preview sits on the sheet's paper, in light and in dark", async ({ page }) => {
+    for (const [scheme, paper] of [["light", "rgb(255, 255, 255)"], ["dark", "rgb(21, 28, 38)"]] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      const panel = await openRun(page, runs.followUp);
+      await expect(panel.getByTestId("files").getByRole("img", { name: /chart\.svg/ })).toHaveCSS("background-color", paper);
+    }
+  });
+
   test("the report renders its tables", async ({ page }) => {
     const panel = await openRun(page, runs.followUp);
     const table = panel.getByTestId("report").getByRole("table");
