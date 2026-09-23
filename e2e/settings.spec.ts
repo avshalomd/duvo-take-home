@@ -1,9 +1,9 @@
 import { neon } from "@neondatabase/serverless";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 // Settings in a browser: a connection added with a token, edited, switched off and deleted; a limit changed and
 // kept. Runs against a dev server on the demo workspace:
-//   npx dotenv -e .env.local -- env BASE_URL=http://localhost:3003 npx playwright test e2e/settings.spec.ts
+//   npx dotenv -e .env.local -- env BASE_URL=http://localhost:3009 npx playwright test e2e/settings.spec.ts
 // A connection name allows letters, digits, spaces, - and _ only, so what it creates is named "e2e Settings ..." (the
 // "[e2e]" prefix would be refused by the form) and deleted by the test itself, with a database sweep as the net.
 const NAME = "e2e Settings server";
@@ -12,6 +12,9 @@ const TOKEN = "e2e-secret-token-value";
 
 // Every test starts signed in as the demo user (an owner): the "setup" project in playwright.config.ts signs in once.
 const open = (page: Page, path: string) => page.goto(path);
+// A server's row in the Connections group. Its Edit and Delete sit on the row's second level: openRow unfolds it.
+const rowOf = (page: Page, name: string) => page.getByTestId("connections").getByRole("listitem").filter({ hasText: name });
+const openRow = (row: Locator) => row.getByRole("button", { expanded: false }).click();
 const INVITED = `e2e-invite-${Date.now()}@example.com`;
 
 test.afterAll(async () => {
@@ -35,11 +38,13 @@ test("a connection is added with a token, edited, switched off and deleted", asy
   await add.getByRole("button", { name: "Add" }).click();
   await expect(add).toBeHidden();
 
-  const row = page.getByTestId("connections").getByRole("listitem").filter({ hasText: NAME });
+  const row = rowOf(page, NAME);
   await expect(row).toContainText("example.com");
   await expect(page.locator("body")).not.toContainText(TOKEN); // the token is never rendered back
 
-  // Edit: rename it, keep the token by leaving the field empty
+  // Edit, from the row's second level: rename it, keep the token by leaving the field empty
+  await openRow(row);
+  await expect(row).toContainText("Signs in with a saved token");
   await row.getByRole("button", { name: "Edit" }).click();
   const edit = page.getByRole("dialog");
   await expect(edit.getByLabel("Name")).toHaveValue(NAME);
@@ -47,9 +52,9 @@ test("a connection is added with a token, edited, switched off and deleted", asy
   await edit.getByLabel("Name").fill(RENAMED);
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toBeHidden();
-  const renamed = page.getByTestId("connections").getByRole("listitem").filter({ hasText: RENAMED });
+  const renamed = rowOf(page, RENAMED);
   await expect(renamed).toBeVisible();
-  await expect(renamed).not.toContainText(/needs a token/); // the saved token was kept
+  await expect(renamed).not.toContainText(/needs a token/i); // the saved token was kept
 
   // Toggle it off, and it stays off after a reload
   const toggle = renamed.getByRole("switch");
@@ -58,17 +63,15 @@ test("a connection is added with a token, edited, switched off and deleted", asy
   await expect(toggle).toHaveAttribute("aria-checked", "false");
   await expect(page.getByText(`${RENAMED} off for the next run`)).toBeVisible(); // the toast only comes once the server saved it
   await page.reload();
-  await expect(page.getByTestId("connections").getByRole("listitem").filter({ hasText: RENAMED }).getByRole("switch")).toHaveAttribute(
-    "aria-checked",
-    "false",
-  );
+  await expect(rowOf(page, RENAMED).getByRole("switch")).toHaveAttribute("aria-checked", "false");
 
   // Delete, after a confirmation
-  await page.getByTestId("connections").getByRole("listitem").filter({ hasText: RENAMED }).getByRole("button", { name: "Delete" }).click();
+  await openRow(rowOf(page, RENAMED));
+  await rowOf(page, RENAMED).getByRole("button", { name: "Delete" }).click();
   const confirm = page.getByRole("dialog");
   await expect(confirm).toContainText(RENAMED);
   await confirm.getByRole("button", { name: "Delete" }).click();
-  await expect(page.getByTestId("connections").getByRole("listitem").filter({ hasText: RENAMED })).toHaveCount(0);
+  await expect(rowOf(page, RENAMED)).toHaveCount(0);
 });
 
 test("a refused server keeps the sign-in choice and everything typed, the token included", async ({ page }) => {
@@ -100,7 +103,8 @@ test("moving a connection to another server warns that the saved token stays beh
   await add.getByRole("button", { name: "Add" }).click();
   await expect(add).toBeHidden();
 
-  const row = page.getByTestId("connections").getByRole("listitem").filter({ hasText: "e2e Settings moved" });
+  const row = rowOf(page, "e2e Settings moved");
+  await openRow(row);
   await row.getByRole("button", { name: "Edit" }).click();
   const edit = page.getByRole("dialog");
   await edit.getByLabel("Address").fill("https://example.com/v2/mcp");
@@ -109,7 +113,8 @@ test("moving a connection to another server warns that the saved token stays beh
   await expect(edit.getByText("This is a different server, so the saved token will not be sent to it. Paste a token for the new server.")).toBeVisible();
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toBeHidden();
-  await expect(row).toContainText("attacker.example · needs a token before a run can use it");
+  await expect(row).toContainText("Needs a token before a run can use it"); // the status is the row's line while it needs something
+  await expect(row).toContainText("https://attacker.example/mcp"); // the address, on the second level still open
 
   await row.getByRole("button", { name: "Delete" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
@@ -127,10 +132,11 @@ test("a server that signs in with the service offers Sign in, linking to the OAu
   await add.getByRole("button", { name: "Add" }).click();
   await expect(add).toBeHidden();
 
-  const row = page.getByTestId("connections").getByRole("listitem").filter({ hasText: "e2e Settings oauth" });
-  await expect(row).toContainText("needs you to sign in");
+  const row = rowOf(page, "e2e Settings oauth");
+  await expect(row).toContainText("Needs you to sign in");
   await expect(row.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", /^\/api\/connections\/oauth\/start\?id=[0-9a-f-]{36}$/);
 
+  await openRow(row);
   await row.getByRole("button", { name: "Delete" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   await expect(row).toHaveCount(0);
@@ -150,7 +156,7 @@ test("a changed limit is saved and shown again after a reload", async ({ page })
   await open(page, "/settings/limits");
   await expect(page.getByRole("link", { name: "Limits" })).toHaveAttribute("aria-current", "page");
 
-  const field = page.getByLabel("Runs per day");
+  const field = page.getByLabel("Runs per day", { exact: true }); // exact: the stepper's buttons are named after it
   const before = await field.inputValue();
   const changed = String(Number(before) === 99 ? 98 : 99);
   await field.fill(changed);
@@ -158,15 +164,15 @@ test("a changed limit is saved and shown again after a reload", async ({ page })
   await expect(page.getByText("Limits saved")).toBeVisible();
 
   await page.reload();
-  await expect(page.getByLabel("Runs per day")).toHaveValue(changed);
+  await expect(page.getByLabel("Runs per day", { exact: true })).toHaveValue(changed);
   await expect(page.getByTestId("usage")).toContainText(`of ${changed}`); // today's meter reads the saved limit
 
   // put it back: the demo workspace is shared
-  await page.getByLabel("Runs per day").fill(before);
+  await page.getByLabel("Runs per day", { exact: true }).fill(before);
   await page.getByRole("button", { name: "Save limits" }).click();
   await expect(page.getByText("Limits saved").first()).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Runs per day")).toHaveValue(before);
+  await expect(page.getByLabel("Runs per day", { exact: true })).toHaveValue(before);
 });
 
 test("the members list shows who is in the workspace and their role", async ({ page }) => {
@@ -179,6 +185,7 @@ test("the members list shows who is in the workspace and their role", async ({ p
 
 test("an owner invites someone and gets the link to send them", async ({ page }) => {
   await open(page, "/settings/members");
+  await page.getByRole("button", { name: "Invite someone" }).click(); // the invite is a row that unfolds
   await page.getByLabel("Email").fill(INVITED);
   await page.getByRole("button", { name: "Create invite link" }).click();
   const link = page.getByTestId("invite-link");
@@ -189,9 +196,10 @@ test("an owner invites someone and gets the link to send them", async ({ page })
 
 test("inviting someone who is already a member says so in plain words", async ({ page }) => {
   await open(page, "/settings/members");
+  await page.getByRole("button", { name: "Invite someone" }).click();
   await page.getByLabel("Email").fill("demo@example.com");
   await page.getByRole("button", { name: "Create invite link" }).click();
-  const invite = page.locator("section", { has: page.getByRole("heading", { name: "Invite someone" }) }); // Next's route announcer is an alert too
+  const invite = page.getByTestId("invite"); // scoped: Next's route announcer is an alert too
   await expect(invite.getByRole("alert")).toHaveText("demo@example.com is already a member of this workspace.");
   await expect(page.getByLabel("Email")).toHaveValue("demo@example.com"); // kept, to be corrected
 });

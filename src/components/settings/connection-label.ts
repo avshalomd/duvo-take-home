@@ -25,6 +25,13 @@ export function connectionState(c: {
   return connectionStatus(c.lastStatus);
 }
 
+export function asSentence(_s: string): string {
+  throw new Error("not implemented yet");
+}
+export function signInWords(_c: { authType?: "none" | "bearer" | "oauth"; hasToken: boolean; signedIn?: boolean }): string {
+  throw new Error("not implemented yet");
+}
+
 /** "12 tools". The tool names come from a run's first message, so before any run there is nothing to count. */
 export function toolCount(n: number): string {
   if (n === 0) return "tools show after the first run";

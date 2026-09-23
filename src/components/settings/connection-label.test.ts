@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectionState, connectionStatus, toolCount, toolWords } from "./connection-label";
+import { asSentence, connectionState, connectionStatus, signInWords, toolCount, toolWords } from "./connection-label";
 
 describe("connectionStatus", () => {
   it("shows a connection the last run reached as connected", () => {
@@ -47,6 +47,29 @@ describe("connectionState, what the Connections list says beside a server", () =
   it("otherwise says what the last run saw", () => {
     expect(connectionState(c({ authType: "bearer", hasToken: true }))).toEqual({ label: "connected", tone: "ok" });
     expect(connectionState(c({ authType: "oauth", signedIn: true, lastStatus: null }))).toEqual({ label: "never used", tone: "idle" });
+  });
+});
+
+describe("asSentence", () => {
+  it("starts a status with a capital, as a line of its own under the name", () => {
+    expect(asSentence("needs a token before a run can use it")).toBe("Needs a token before a run can use it");
+    expect(asSentence("failed: 401 Unauthorized")).toBe("Failed: 401 Unauthorized");
+  });
+});
+
+describe("signInWords, how the server lets the agent in", () => {
+  it("says a server needs no sign-in", () => {
+    expect(signInWords({ authType: "none", hasToken: false })).toBe("Needs no sign-in");
+  });
+
+  it("says whether a token server has its token saved", () => {
+    expect(signInWords({ authType: "bearer", hasToken: true })).toBe("Signs in with a saved token");
+    expect(signInWords({ authType: "bearer", hasToken: false })).toBe("Signs in with a token, and none is saved yet");
+  });
+
+  it("says whether an OAuth server is signed in", () => {
+    expect(signInWords({ authType: "oauth", hasToken: false, signedIn: true })).toBe("Signed in with the service");
+    expect(signInWords({ authType: "oauth", hasToken: false, signedIn: false })).toBe("Signs in with the service, not signed in yet");
   });
 });
 
