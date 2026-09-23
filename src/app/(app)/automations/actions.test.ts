@@ -3,6 +3,7 @@
 // or on, deletes it or sets its schedule. The pages hide those controls from members, but anyone can post to an action.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionCtx } from "@/contracts/auth";
+import { AutomationError } from "@/lib/automations/errors";
 
 const session = vi.hoisted(() => ({ role: "member" as SessionCtx["role"] }));
 const store = vi.hoisted(() => ({
@@ -44,6 +45,7 @@ import {
 } from "./actions";
 
 const ID = "3b368c9a-231d-4fb5-874c-add3059f9c41";
+const LOCKED = "Only an owner or an admin can change the command of an approved automation.";
 const RUN = "9d1c4f0e-7c1b-4a55-9a3e-2f0b6a1d2c3e";
 function form(fields: Record<string, string>): FormData {
   const f = new FormData();
@@ -107,7 +109,7 @@ describe("a member", () => {
 
   it("edits it", async () => {
     expect(await saveAutomationAction({}, form(edit))).toMatchObject({ ok: true, message: "Saved." });
-    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ name: "Company audit" }));
+    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ name: "Company audit" }), { mayRenameApproved: false });
   });
 
   it("is told, when an edit makes a new version, that an owner or an admin approves it", async () => {
@@ -124,16 +126,24 @@ describe("a member", () => {
     expect(store.setHumanVerdict).toHaveBeenCalledWith({ workspaceId: "ws-a", userId: "u1" }, { runId: RUN, verdict: "approved", note: undefined });
   });
 
-  it("renames a draft's command", async () => {
+  it("renames a draft's command, telling the store it may not rename an approved one", async () => {
     store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft" });
     expect(await saveAutomationAction({}, form({ ...edit, command: "audit-2" }))).toMatchObject({ ok: true });
-    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }));
+    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }), { mayRenameApproved: false });
+  });
+
+  // Review R2: an owner approving between the page's read and the save; the store's write refuses, and says why
+  it("is refused in plain words when the automation was approved while they renamed it, keeping what they typed", async () => {
+    store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft" });
+    store.updateAutomation.mockRejectedValueOnce(new AutomationError(LOCKED));
+    const out = await saveAutomationAction({}, form({ ...edit, command: "audit-2" }));
+    expect(out).toMatchObject({ error: LOCKED, values: { command: "audit-2" } });
   });
 
   it.each(["active", "disabled"] as const)("is refused renaming an approved automation's command (%s), and nothing is written", async (status) => {
     store.getAutomation.mockResolvedValueOnce({ command: "audit", status });
     const out = await saveAutomationAction({}, form({ ...edit, command: "audit-2" }));
-    expect(out.error).toBe("Only an owner or an admin can change the command of an approved automation.");
+    expect(out.error).toBe(LOCKED);
     expect(out.values).toMatchObject({ command: "audit-2", name: "Company audit" }); // what was typed stays
     expect(store.updateAutomation).not.toHaveBeenCalled();
   });
@@ -180,7 +190,7 @@ describe.each(["owner", "admin"] as const)("an %s", (role) => {
   it("renames an approved automation's command", async () => {
     store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "active" });
     expect(await saveAutomationAction({}, form({ ...edit, command: "audit-2" }))).toMatchObject({ ok: true });
-    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }));
+    expect(store.updateAutomation).toHaveBeenCalledWith("ws-a", ID, expect.objectContaining({ command: "audit-2" }), { mayRenameApproved: true });
   });
 
   it("is told, when an edit makes a new version, to run an example before approving", async () => {

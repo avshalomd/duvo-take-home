@@ -139,6 +139,36 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect((await approveAutomation(WS, a.id).catch((e) => e)).message).toMatch(/earlier version/i);
   });
 
+  // Review R2: the save action reads the status, then writes. An owner approving in between made a member's rename land
+  // on a Ready automation (a new command does not bump the version), so the write itself holds the rule now.
+  it("renames an approved automation's command only for someone who may govern it, whatever the caller read before", async () => {
+    const LOCKED = "Only an owner or an admin can change the command of an approved automation.";
+    const a = await createAutomationDraft(ctx, draftWith("int-rename"), null);
+    await approvedTrial(a.id, 1);
+    await approveAutomation(WS, a.id); // lands after the member's page read "draft"
+
+    const refused = await updateAutomation(WS, a.id, editOf({ ...a, command: "int-renamed" }), { mayRenameApproved: false }).catch((e) => e);
+    expect(refused).toBeInstanceOf(AutomationError);
+    expect(refused.message).toBe(LOCKED);
+    // not said who asks: refused too, so a new caller cannot rename by forgetting to say
+    expect((await updateAutomation(WS, a.id, editOf({ ...a, command: "int-renamed" })).catch((e) => e)).message).toBe(LOCKED);
+    expect(await getAutomation(WS, a.id)).toMatchObject({ command: a.command, status: "active" });
+
+    const renamed = await updateAutomation(WS, a.id, editOf({ ...a, command: "int-renamed" }), { mayRenameApproved: true });
+    expect(renamed).toMatchObject({ command: "int-renamed", status: "active" });
+  });
+
+  it("renames a draft's command for anyone, and saves the rest of an approved automation's edit when the command stays", async () => {
+    const draft = await createAutomationDraft(ctx, draftWith("int-rename-draft"), null);
+    expect((await updateAutomation(WS, draft.id, editOf({ ...draft, command: "int-renamed-draft" }), { mayRenameApproved: false })).command).toBe("int-renamed-draft");
+
+    const ready = await createAutomationDraft(ctx, draftWith("int-rename-hint"), null);
+    await approvedTrial(ready.id, 1);
+    await approveAutomation(WS, ready.id);
+    const hinted = await updateAutomation(WS, ready.id, editOf({ ...ready, inputHint: "The registered name" }), { mayRenameApproved: false });
+    expect(hinted).toMatchObject({ inputHint: "The registered name", status: "active" });
+  });
+
   it("lists an automation's trials only, with the person's verdict and the version they ran", async () => {
     const a = await createAutomationDraft(ctx, draftWith("int-trials"), null);
     const trialId = await approvedTrial(a.id, 1);
