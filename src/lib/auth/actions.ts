@@ -30,12 +30,29 @@ export async function loadWorkspaces(): Promise<{ activeId: string; email: strin
   return { activeId: ctx.workspaceId, email: ctx.email, workspaces: await listWorkspaces(ctx.userId) };
 }
 
-/** Makes another of the user's workspaces the active one, then opens Home: a run open on screen belongs to the old one. */
-export async function switchWorkspace(workspaceId: string) {
-  await requireSession();
-  const id = z.string().min(1).max(100).parse(workspaceId);
-  await auth.api.setActiveOrganization({ headers: await headers(), body: { organizationId: id } });
+export type SwitchState = { error?: string };
+
+/**
+ * Makes another of the user's workspaces the active one, then opens Home: a run open on screen belongs to the old
+ * one. A workspace the user is not in (a forged request, or a membership removed while the menu was open) is refused
+ * here in words: Better Auth would refuse it too, but by throwing, which the browser got as a 500 (security QA).
+ */
+export async function trySwitchWorkspace(workspaceId: string): Promise<SwitchState> {
+  const ctx = await requireSession();
+  const id = z.string().min(1).max(100).safeParse(workspaceId);
+  const mine = id.success && (await listWorkspaces(ctx.userId)).some((w) => w.id === id.data);
+  if (!id.success || !mine) return { error: "You are not a member of that workspace, so it cannot be opened." };
+  await auth.api.setActiveOrganization({ headers: await headers(), body: { organizationId: id.data } });
   openWorkspaceHome();
+}
+
+/**
+ * The user menu's call. Its transition has no place for a returned message (the menu is another change's to edit),
+ * so the refusal is dropped here rather than shown; the menu only lists the user's own workspaces anyway. A menu
+ * that shows it calls trySwitchWorkspace and this one can go.
+ */
+export async function switchWorkspace(workspaceId: string): Promise<void> {
+  await trySwitchWorkspace(workspaceId);
 }
 
 export type NewWorkspaceState = { error?: string; name?: string };
