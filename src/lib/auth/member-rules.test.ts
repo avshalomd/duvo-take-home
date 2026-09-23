@@ -1,7 +1,7 @@
 // Q169: who may remove whom from a workspace, and who may change whose role. Pure: the people are plain objects
 // and the owners are a count, so every rule is read here without a database or Better Auth.
 import { describe, expect, it } from "vitest";
-import { removalRefusal, roleChangeRefusal, type Person } from "./member-rules";
+import { removalRefusal, roleChangeRefusal, rolesOffered, type Person } from "./member-rules";
 
 const owner: Person = { userId: "u-owner", role: "owner" };
 const otherOwner: Person = { userId: "u-owner-2", role: "owner" };
@@ -79,5 +79,24 @@ describe("changing someone's role", () => {
 
   it("never demotes the last owner", () => {
     expect(roleChangeRefusal(otherOwner, owner, "admin", 1)).toBe("A workspace needs an owner. Make someone else an owner first.");
+  });
+});
+
+// The Members page shows a role menu on a row only where the server would say yes, by asking the same rules.
+describe("the roles the Members page offers for someone", () => {
+  it("are all three for an owner looking at anyone else", () => {
+    expect(rolesOffered(owner, plain, 1)).toEqual(["member", "admin", "owner"]);
+    expect(rolesOffered(owner, otherOwner, 2)).toEqual(["member", "admin", "owner"]);
+  });
+
+  it("are member and admin for an admin looking at a member or another admin", () => {
+    expect(rolesOffered(admin, plain, 1)).toEqual(["member", "admin"]);
+    expect(rolesOffered(admin, otherAdmin, 1)).toEqual(["member", "admin"]);
+  });
+
+  it("are none on an owner's row for an admin, on your own row, and anywhere for a plain member", () => {
+    expect(rolesOffered(admin, owner, 1)).toEqual([]);
+    expect(rolesOffered(owner, owner, 2)).toEqual([]);
+    expect(rolesOffered(plain, otherPlain, 1)).toEqual([]);
   });
 });
