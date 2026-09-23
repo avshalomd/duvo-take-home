@@ -18,9 +18,27 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* the system font for everything (SF Pro on a Mac: optical sizes and tracking tables come with it); Funnel
+     Display only for the brief as a title, page titles, commands and the empty state's question */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  --font-heading: var(--font-display), system-ui, sans-serif;
+  --font-display: var(--font-funnel), system-ui, sans-serif;
+  --color-mist: var(--mist);
+  --color-mist-deep: var(--mist-deep);
+  --color-paper: var(--paper);
+  --color-graphite: var(--graphite);
+  --color-slate: var(--slate);
+  --color-saffron: var(--saffron);
+  --color-saffron-wash: var(--saffron-wash);
+  --color-fern: var(--fern);
+  --color-fern-wash: var(--fern-wash);
+  --color-crimson: var(--crimson);
+  --color-crimson-wash: var(--crimson-wash);
+  --color-hairline: var(--hairline);
+  --shadow-sheet: var(--shadow-sheet);
+  --shadow-float: var(--shadow-float);
+  --shadow-tile: var(--shadow-tile);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -59,43 +77,64 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* One value per token, light first, dark second: light-dark() follows the page's color-scheme, so the theme
-   flips with the system setting and there is no second copy of the palette to keep in step. */
+/* v2 "the thread" (docs/DESIGN-V2.md). One value per token, light first, dark second: light-dark() follows the
+   page's color-scheme, so there is no second copy of the palette to keep in step. The named colours are the
+   design's own words; the shadcn names below map onto them so every primitive picks the palette up. */
 :root {
   color-scheme: light dark;
-  --background: light-dark(oklch(1 0 0), oklch(0.145 0 0));
-  --foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-  --card: light-dark(oklch(1 0 0), oklch(0.205 0 0));
-  --card-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-  --popover: light-dark(oklch(1 0 0), oklch(0.205 0 0));
-  --popover-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-  --primary: light-dark(oklch(0.205 0 0), oklch(0.922 0 0));
-  --primary-foreground: light-dark(oklch(0.985 0 0), oklch(0.205 0 0));
-  --secondary: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-  --secondary-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
-  --muted: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-  /* 0.45 rather than the kit's 0.556: the secondary line on a muted row was 4.35:1, under the 4.5:1 floor (Q64) */
-  --muted-foreground: light-dark(oklch(0.45 0 0), oklch(0.75 0 0));
-  --accent: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-  --accent-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
-  --destructive: light-dark(oklch(0.577 0.245 27.325), oklch(0.704 0.191 22.216));
-  --border: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 12%));
-  --input: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 15%));
-  --ring: light-dark(oklch(0.708 0 0), oklch(0.556 0 0));
-  --chart-1: light-dark(oklch(0.87 0 0), oklch(0.87 0 0));
-  --chart-2: light-dark(oklch(0.556 0 0), oklch(0.556 0 0));
-  --chart-3: light-dark(oklch(0.439 0 0), oklch(0.439 0 0));
-  --chart-4: light-dark(oklch(0.371 0 0), oklch(0.371 0 0));
-  --chart-5: light-dark(oklch(0.269 0 0), oklch(0.269 0 0));
-  --radius: 0.625rem;
-  --sidebar: light-dark(oklch(0.985 0 0), oklch(0.205 0 0));
-  --sidebar-foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
-  --sidebar-primary: light-dark(oklch(0.205 0 0), oklch(0.488 0.243 264.376));
-  --sidebar-primary-foreground: light-dark(oklch(0.985 0 0), oklch(0.985 0 0));
-  --sidebar-accent: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
-  --sidebar-accent-foreground: light-dark(oklch(0.205 0 0), oklch(0.985 0 0));
-  --sidebar-border: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 10%));
-  --sidebar-ring: light-dark(oklch(0.708 0 0), oklch(0.556 0 0));
+  --mist: light-dark(#edf0f4, #0d1219); /* the ground behind every surface */
+  --mist-deep: light-dark(#e3e7ed, #0a0e14); /* the rail: a heavier material than the ground */
+  --paper: light-dark(#ffffff, #151c26); /* sheets, dialogs, the composer */
+  --graphite: light-dark(#17202b, #e6ebf2); /* text and the primary action */
+  --slate: light-dark(#5b6878, #98a4b3); /* secondary text, 4.5:1 on paper and mist */
+  --saffron: light-dark(#e89a0c, #f5b437); /* the agent at work: the thread while running */
+  --saffron-wash: light-dark(#fdf3de, #2a2210);
+  --fern: light-dark(#15845a, #3cc489); /* done, looks right, ready */
+  --fern-wash: light-dark(#e3f4ec, #10261d);
+  --crimson: light-dark(#c62f43, #f0697a); /* failed, blocked, not right */
+  --crimson-wash: light-dark(#fbe7ea, #2c1418);
+  --hairline: light-dark(rgb(23 32 43 / 0.08), rgb(255 255 255 / 0.09));
+  --glass: light-dark(rgb(255 255 255 / 0.72), rgb(21 28 38 / 0.72));
+  --glass-edge: light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.08));
+  /* depth: a contact shadow plus a soft ambient one; bigger surfaces read as thicker */
+  --shadow-sheet: 0 1px 1px rgb(15 22 32 / 0.04), 0 8px 24px -6px rgb(15 22 32 / 0.1);
+  --shadow-float: 0 1px 2px rgb(15 22 32 / 0.06), 0 18px 40px -12px rgb(15 22 32 / 0.28);
+  --shadow-tile: 0 1px 1px rgb(15 22 32 / 0.04), 0 2px 8px -2px rgb(15 22 32 / 0.08);
+  /* springs as CSS for the simple cases (critically damped); motion's spring() for anything a person moves */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --background: var(--mist);
+  --foreground: var(--graphite);
+  --card: var(--paper);
+  --card-foreground: var(--graphite);
+  --popover: var(--paper);
+  --popover-foreground: var(--graphite);
+  --primary: var(--graphite);
+  --primary-foreground: light-dark(#ffffff, #0d1219);
+  --secondary: light-dark(#e6eaf0, #1d2531);
+  --secondary-foreground: var(--graphite);
+  --muted: light-dark(#e9edf2, #1b232e);
+  --muted-foreground: var(--slate);
+  --accent: light-dark(#e6eaf0, #1d2531);
+  --accent-foreground: var(--graphite);
+  --destructive: var(--crimson);
+  --border: var(--hairline);
+  --input: light-dark(rgb(23 32 43 / 0.14), rgb(255 255 255 / 0.14));
+  --ring: light-dark(rgb(23 32 43 / 0.45), rgb(230 235 242 / 0.5));
+  --chart-1: var(--saffron);
+  --chart-2: var(--fern);
+  --chart-3: var(--graphite);
+  --chart-4: var(--slate);
+  --chart-5: var(--crimson);
+  --radius: 0.75rem; /* a control; sheets 22 px, tiles 16 px, chips fully round */
+  --sidebar: var(--mist-deep);
+  --sidebar-foreground: var(--graphite);
+  --sidebar-primary: var(--graphite);
+  --sidebar-primary-foreground: var(--paper);
+  --sidebar-accent: var(--paper);
+  --sidebar-accent-foreground: var(--graphite);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--ring);
 }
 
 /* A class on <html> overrides the system setting; nothing sets one today, so this is the hook a toggle would use. */
@@ -126,8 +165,39 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 0.9375rem; /* 15 px body, the system font's comfortable reading size */
+    line-height: 1.5;
+    font-optical-sizing: auto;
+    font-variant-numeric: tabular-nums;
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Glass: the floating layers (top bar, composer) - content scrolls under them. */
+@utility glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--glass-edge);
+}
+/* Display type: tighter tracking and leading as it grows (Apple's size-specific tracking). */
+@utility display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: var(--paper);
+  }
+}
+@media (prefers-contrast: more) {
+  :root {
+    --hairline: light-dark(rgb(23 32 43 / 0.35), rgb(255 255 255 / 0.4));
+    --glass: var(--paper);
   }
 }
