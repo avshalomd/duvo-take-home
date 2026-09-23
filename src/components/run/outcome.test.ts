@@ -20,13 +20,12 @@ describe("outcome", () => {
   });
 
   it("a run that broke reads as a problem whatever the judge said", () => {
-    expect(outcome("failed", "pass")).toEqual({ label: "Something went wrong", tone: "broken" });
+    expect(outcome("failed", "pass")).toEqual({ label: "Something went wrong", tone: "bad" });
   });
 
-  // Q105: both were one red dot; now "went wrong" and "did not pass" carry different marks
-  it("marks a run that broke differently from a result that did not pass", () => {
-    expect(outcome("failed", null).tone).toBe("broken");
-    expect(outcome("succeeded", "fail").tone).toBe("bad");
+  // Q105: "went wrong" and "did not pass" share a colour; their words tell them apart (the rail says them on hover)
+  it("tells a run that broke from a result that did not pass by its words", () => {
+    expect(outcome("failed", null).label).not.toBe(outcome("succeeded", "fail").label);
   });
 
   // the run rows call outcome() with Run.outcome, which is optional on the contract and absent on old rows
