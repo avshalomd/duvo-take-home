@@ -1,25 +1,15 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 
-// The automation builder, from a seeded finished run to a draft that cannot be approved yet. Run against a local
-// dev server with the database's URL in the environment (for the clean-up):
+// The automation builder, from a seeded finished run to a draft that cannot be approved yet. Signed in as the demo
+// user by the "setup" project (e2e/auth.setup.ts). Run against a local dev server with the database's URL in the
+// environment (for the clean-up):
 //   npx dotenv -e .env.local -- env BASE_URL=http://localhost:3002 npx playwright test e2e/automations.spec.ts
 // It makes one real, cheap LLM call (the draft) and starts no agent run. The draft is renamed "[e2e] ..." and
 // deleted through the page; afterAll deletes it by id as well, in case the test stopped half-way.
 
 const SOURCE_RUN = /What is the difference between an LLM agent and a workflow/; // seeded, finished, no files: the cheapest draft
 let createdId: string | null = null;
-
-// After the auth package lands every page asks for a sign-in; the seeded demo user is local-only.
-async function open(page: Page, path: string) {
-  await page.goto(path);
-  if (!page.url().includes("/sign-in")) return;
-  await page.getByLabel(/email/i).fill("demo@example.com");
-  await page.getByLabel(/password/i).fill("demo-password");
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
-  await page.goto(path);
-}
 
 test.afterAll(async () => {
   if (!createdId || !process.env.DATABASE_URL) return;
@@ -29,7 +19,7 @@ test.afterAll(async () => {
 test("a finished run becomes a draft automation that can be edited and cannot be approved before an example", async ({ page }) => {
   test.setTimeout(120_000); // the draft is a real model call
 
-  await open(page, "/automations");
+  await page.goto("/automations");
   await page.getByRole("button", { name: "New from a run" }).click();
   await page.getByRole("dialog").getByRole("link", { name: SOURCE_RUN }).first().click();
 
