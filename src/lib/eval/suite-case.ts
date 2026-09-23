@@ -5,7 +5,7 @@ import { AutomationTemplate } from "@/contracts/automation";
 import { Judgment, Review, type EvaluateInput } from "@/contracts/eval";
 import { Run, RunEvent } from "@/contracts/run";
 import type { EvaluateDeps } from "./evaluate";
-import { toEvaluateInput } from "./reevaluate";
+import { toEvaluateInput } from "./run-rows";
 
 // The offline suite's case file: a TEST of the evaluator, not a product feature. One file in fixtures/runs/ is one
 // recorded run (the rows the database holds for it), the verdict a person expects, and the answers the judge and the

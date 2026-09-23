@@ -1,9 +1,12 @@
 import { and, asc, eq } from "drizzle-orm";
-import { AutomationTemplate } from "@/contracts/automation";
+import type { AutomationTemplate } from "@/contracts/automation";
 import type { EvaluateInput, ReevaluateRun, Verdict } from "@/contracts/eval";
-import { RunEvent, RunPurpose, type Run } from "@/contracts/run";
+import type { Run, RunEvent } from "@/contracts/run";
 import { db, schema } from "@/db";
 import { evaluateRun } from "./evaluate";
+import { templateOf, toEvaluateInput, toEvents, toFiles, toRun } from "./run-rows";
+
+export { toEvaluateInput }; // its home is run-rows.ts (pure, shared with the offline suite); callers import it from here
 
 // Re-evaluating a stored run: the same evaluator, fed from the database instead of from a live run. It exists
 // because a verdict can come back "unknown" when Jev's routes are down - the user presses Re-evaluate and the
@@ -31,73 +34,21 @@ export async function reevaluate(runId: string, deps: ReevaluateDeps): Promise<V
   return verdict;
 }
 
-/** The run's rows as the evaluator's input. Pure, so what the judge is shown can be tested without a database. */
-export function toEvaluateInput(run: Run, events: RunEvent[], files: { name: string; content: string }[]): EvaluateInput {
-  const plans = events.filter((e) => e.kind === "plan");
-  const toolNames = events.filter((e) => e.kind === "tool_call").map((e) => e.payload.name);
-  return {
-    prompt: run.prompt,
-    runStatus: run.status,
-    report: run.report ?? run.error,
-    plan: plans.length ? plans[plans.length - 1].payload : null, // the last plan event is the plan as it ended
-    files,
-    // The run's own day, not today's: re-evaluating next week must not turn "the last 7 days" into a failure.
-    today: (run.finishedAt ?? run.createdAt).slice(0, 10),
-    toolsUsed: [...new Set(toolNames)],
-  };
-}
-
 export async function loadRun(runId: string): Promise<LoadedRun | null> {
   const [row] = await db.select().from(schema.runs).where(eq(schema.runs.id, runId)).limit(1);
   if (!row) return null;
   const eventRows = await db.select().from(schema.runEvents).where(eq(schema.runEvents.runId, runId)).orderBy(asc(schema.runEvents.seq));
   const fileRows = await db.select().from(schema.files).where(eq(schema.files.runId, runId));
-  const events = eventRows
-    .map((e) => RunEvent.safeParse({ seq: e.seq, at: e.at.toISOString(), kind: e.kind, payload: e.payload }))
-    .flatMap((r) => (r.success ? [r.data] : [])); // a row written by an older shape is skipped, not a 500
-  return {
-    run: {
-      id: row.id,
-      prompt: row.prompt,
-      status: row.status as Run["status"],
-      model: row.model,
-      connectionIds: row.connectionIds,
-      report: row.report,
-      error: row.error,
-      numTurns: row.numTurns,
-      durationMs: row.durationMs,
-      costUsd: row.costUsd,
-      createdAt: row.createdAt.toISOString(),
-      finishedAt: row.finishedAt?.toISOString() ?? null,
-      workspaceId: row.workspaceId,
-      purpose: RunPurpose.catch("adhoc").parse(row.purpose), // the column is free text; an unknown value reads as adhoc
-      automationId: row.automationId,
-      automationVersion: row.automationVersion,
-      input: row.input,
-    },
-    events,
-    // a binary file (.xlsx) is judged by its name and size, as the run loop does: base64 would tell the judge nothing
-    files: fileRows.map((f) => ({ name: f.name, content: f.encoding === "base64" ? `(${f.mime}, ${f.bytes} bytes)` : f.content })),
-    template: await templateFor(row),
-  };
-}
-
-/**
- * The template the run was held to when it ran, so a re-evaluation checks the same promises. Only while the
- * automation still has the run's version: an edit since then changed the promises, and holding an old run to new
- * steps would fail it for something it was never asked to do. Looked up by workspace as well as id (tenancy).
- */
-async function templateFor(row: typeof schema.runs.$inferSelect): Promise<AutomationTemplate | null> {
-  if (!row.automationId || !row.workspaceId) return null;
-  const [automation] = await db
-    .select({ template: schema.automations.template, version: schema.automations.version })
-    .from(schema.automations)
-    .where(and(eq(schema.automations.id, row.automationId), eq(schema.automations.workspaceId, row.workspaceId)))
-    .limit(1);
-  if (!automation) return null;
-  if (row.automationVersion !== null && row.automationVersion !== automation.version) return null;
-  const parsed = AutomationTemplate.safeParse(automation.template);
-  return parsed.success ? parsed.data : null; // a template stored in an older shape is no reason to fail Re-evaluate
+  // The automation is looked up by workspace as well as id: a run can only be held to its own workspace's template.
+  const [automation] =
+    row.automationId && row.workspaceId
+      ? await db
+          .select({ template: schema.automations.template, version: schema.automations.version })
+          .from(schema.automations)
+          .where(and(eq(schema.automations.id, row.automationId), eq(schema.automations.workspaceId, row.workspaceId)))
+          .limit(1)
+      : [];
+  return { run: toRun(row), events: toEvents(eventRows), files: toFiles(fileRows), template: templateOf(row, automation) };
 }
 
 export async function saveVerdict(runId: string, verdict: Verdict): Promise<void> {
