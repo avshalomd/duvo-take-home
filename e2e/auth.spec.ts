@@ -164,6 +164,36 @@ test("an invitation link lets a new person create an account and join the worksp
   }
 });
 
+// Security QA: a plain member could read pending invitations' ids from Better Auth's API, then sign up as the invited
+// address and accept one as an admin. Ids go to owners and admins only, over HTTP as in the pages.
+test("Better Auth's API hands a plain member no invitation ids, and still hands them to the owner", async ({ playwright, baseURL }) => {
+  const owner = e2eEmail("ids-owner");
+  const plain = e2eEmail("ids-member");
+  const pending = e2eEmail("ids-pending");
+  created.push(owner, plain, pending);
+  const asOwner = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL! } });
+  const asMember = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL! } });
+  try {
+    await expect(await asOwner.post("/api/auth/sign-up/email", { data: { name: "Oona Owner", email: owner, password: E2E_PASSWORD } })).toBeOK();
+    const joining = await inviteByRow(owner, plain);
+    const pendingId = await inviteByRow(owner, pending);
+    await expect(await asMember.post("/api/auth/sign-up/email", { data: { name: "Pia Plain", email: plain, password: E2E_PASSWORD } })).toBeOK();
+    await expect(await asMember.post("/api/auth/organization/accept-invitation", { data: { invitationId: joining } })).toBeOK();
+
+    expect((await asMember.get("/api/auth/organization/list-invitations")).status()).toBe(403);
+    const full = await asMember.get("/api/auth/organization/get-full-organization");
+    await expect(full).toBeOK();
+    expect((await full.json()).invitations).toEqual([]);
+    expect(await full.text()).not.toContain(pendingId);
+
+    const forOwner = await asOwner.get("/api/auth/organization/list-invitations");
+    expect((await forOwner.json()).map((i: { id: string }) => i.id)).toContain(pendingId);
+  } finally {
+    await asOwner.dispose();
+    await asMember.dispose();
+  }
+});
+
 test("an unknown invitation link says it was not found, not that it closed (production QA, 2026-09-23)", async ({ page }) => {
   await page.goto("/invite/e2e-no-such-invitation");
   await expect(page.getByRole("heading", { name: "We could not find this invitation" })).toBeVisible();

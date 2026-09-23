@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { invitation, member, organization, session, user } from "@/db/schema";
 import { auth } from "./auth";
+import { INVITATION_COOKIE } from "./invitation-cookie";
 import { createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, revokeInvite } from "./members";
 import { sessionFromHeaders } from "./session";
 
@@ -23,8 +24,10 @@ function cookieHeaders(setCookie: string | null): Headers {
   return new Headers({ cookie: pairs.join("; ") });
 }
 
-async function signUp(name: string, address: string) {
-  const { headers, response } = await auth.api.signUpEmail({ body: { name, email: address, password: PASSWORD }, returnHeaders: true });
+/** `fromLink`: the id of the invitation whose page this browser opened, sent back as the cookie that page leaves. */
+async function signUp(name: string, address: string, fromLink?: string) {
+  const request = fromLink ? new Headers({ cookie: `${INVITATION_COOKIE}=${fromLink}` }) : undefined;
+  const { headers, response } = await auth.api.signUpEmail({ body: { name, email: address, password: PASSWORD }, headers: request, returnHeaders: true });
   return { userId: response.user.id, headers: cookieHeaders(headers.get("set-cookie")) };
 }
 
@@ -174,6 +177,59 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
   });
 });
 
+// Security QA: an invitation's id plus its email was enough to take the invitation (sign up as that email, accept
+// it). The id is the proof of holding the link, so nothing hands it to anyone but the owners and admins who send it.
+describe.skipIf(!process.env.DATABASE_URL)("invitation ids reach owners and admins only", () => {
+  /** An owner, a plain member of the owner's workspace, and an invitation still pending in it. */
+  async function workspaceWithAMemberAndAnInvitation() {
+    const owner = await signUp("Oona Owner", email("ids-owner"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+    const memberEmail = email("ids-member");
+    const joined = await createInvite(owner.headers, ownerCtx, { email: memberEmail, role: "member" });
+    const plain = await signUp("Pia Plain", memberEmail);
+    await auth.api.acceptInvitation({ body: { invitationId: joined.link.split("/invite/")[1] }, headers: plain.headers });
+    const plainCtx = (await sessionFromHeaders(plain.headers))!;
+    const pendingEmail = email("ids-pending");
+    const pending = await createInvite(owner.headers, ownerCtx, { email: pendingEmail, role: "admin" });
+    return { owner, ownerCtx, plain, plainCtx, pendingEmail, pendingId: pending.link.split("/invite/")[1] };
+  }
+
+  it("Better Auth's list of a workspace's invitations refuses a plain member, and still answers an owner", async () => {
+    const { owner, ownerCtx, plain, pendingId } = await workspaceWithAMemberAndAnInvitation();
+    const query = { organizationId: ownerCtx.workspaceId };
+
+    await expect(auth.api.listInvitations({ headers: plain.headers, query })).rejects.toMatchObject({ status: "FORBIDDEN" });
+    await expect(auth.api.listInvitations({ headers: plain.headers })).rejects.toMatchObject({ status: "FORBIDDEN" }); // the active workspace, by default
+    const forOwner = await auth.api.listInvitations({ headers: owner.headers, query });
+    expect(forOwner.map((i) => i.id)).toContain(pendingId);
+  });
+
+  it("the full workspace Better Auth hands a plain member has no invitations in it; the owner's has them", async () => {
+    const { owner, ownerCtx, plain, pendingId } = await workspaceWithAMemberAndAnInvitation();
+    const query = { organizationId: ownerCtx.workspaceId };
+
+    const forMember = await auth.api.getFullOrganization({ headers: plain.headers, query });
+    expect(forMember?.id).toBe(ownerCtx.workspaceId);
+    expect(forMember?.members.length).toBe(2); // the rest of the answer is untouched
+    expect(forMember?.invitations).toEqual([]);
+    const forOwner = await auth.api.getFullOrganization({ headers: owner.headers, query });
+    expect(forOwner?.invitations.map((i) => i.id)).toContain(pendingId);
+  });
+
+  it("nobody reads the invitations sent to their own email through the API: the link is the only way to an id", async () => {
+    const { ownerCtx, pendingEmail } = await workspaceWithAMemberAndAnInvitation();
+    // An account for the invited address made before the invitation (possible when sign-up is open to anyone)
+    const early = await signUp("Early Bird", pendingEmail);
+    await expect(auth.api.listUserInvitations({ headers: early.headers })).rejects.toMatchObject({ status: "FORBIDDEN" });
+    expect((await listInvitations(ownerCtx)).map((i) => i.email)).toContain(pendingEmail); // still pending, still the owner's to send
+  });
+
+  it("our own list of pending invitations refuses a plain member in plain words", async () => {
+    const { plainCtx } = await workspaceWithAMemberAndAnInvitation();
+    await expect(listInvitations(plainCtx)).rejects.toThrow("Only an owner or an admin can see the pending invitations.");
+  });
+});
+
 // Q109: a pending invitation can be found again (its link copied) and revoked.
 describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
   const idOf = (link: string) => link.split("/invite/")[1];
@@ -186,7 +242,7 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
     const a = await createInvite(owner.headers, ctx, { email: first, role: "member" });
     const b = await createInvite(owner.headers, ctx, { email: second, role: "admin" });
 
-    const list = await listInvitations(ctx.workspaceId);
+    const list = await listInvitations(ctx);
     expect(list.map((i) => [i.email, i.role, i.link])).toEqual([
       [second, "admin", b.link],
       [first, "member", a.link],
@@ -201,12 +257,12 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
     const { link } = await createInvite(owner.headers, ctx, { email: guestEmail, role: "member" });
     const guest = await signUp("Gina Guest", guestEmail);
     await auth.api.acceptInvitation({ body: { invitationId: idOf(link) }, headers: guest.headers });
-    expect(await listInvitations(ctx.workspaceId)).toEqual([]);
+    expect(await listInvitations(ctx)).toEqual([]);
 
     const stranger = await signUp("Stan Stranger", email("pending-stranger"));
     const strangerCtx = (await sessionFromHeaders(stranger.headers))!;
     await createInvite(stranger.headers, strangerCtx, { email: email("pending-other"), role: "member" });
-    expect(await listInvitations(ctx.workspaceId)).toEqual([]);
+    expect(await listInvitations(ctx)).toEqual([]);
   });
 
   it("revoking closes the link and takes the invitation off the list", async () => {
@@ -215,7 +271,7 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
     const { link } = await createInvite(owner.headers, ctx, { email: email("revoke-guest"), role: "member" });
 
     await revokeInvite(owner.headers, ctx, idOf(link));
-    expect(await listInvitations(ctx.workspaceId)).toEqual([]);
+    expect(await listInvitations(ctx)).toEqual([]);
     expect((await getInvitation(idOf(link)))?.open).toBe(false);
   });
 
@@ -230,7 +286,7 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
     const pending = await createInvite(owner.headers, ownerCtx, { email: email("revoke-pending"), role: "member" });
 
     await expect(revokeInvite(plain.headers, plainCtx, idOf(pending.link))).rejects.toThrow(/Only an owner or an admin can revoke/);
-    expect((await listInvitations(ownerCtx.workspaceId)).map((i) => i.link)).toEqual([pending.link]);
+    expect((await listInvitations(ownerCtx)).map((i) => i.link)).toEqual([pending.link]);
   });
 
   it("an invitation of another workspace cannot be revoked from this one", async () => {
@@ -241,7 +297,7 @@ describe.skipIf(!process.env.DATABASE_URL)("pending invitations", () => {
     const twoCtx = (await sessionFromHeaders(two.headers))!;
 
     await expect(revokeInvite(two.headers, twoCtx, idOf(link))).rejects.toThrow(/no longer pending/);
-    expect((await listInvitations(oneCtx.workspaceId)).map((i) => i.link)).toEqual([link]);
+    expect((await listInvitations(oneCtx)).map((i) => i.link)).toEqual([link]);
   });
 });
 
@@ -267,18 +323,41 @@ describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
     expect(await accountFor(address)).toBe(0);
   });
 
-  it("lets an email with a pending invitation sign up, whatever the case it is typed in", async () => {
+  it("lets the invited person sign up from the invitation's link, whatever the case the email is typed in", async () => {
     const owner = await signUp("Ingrid Inviter", email("io-owner"));
     const ctx = (await sessionFromHeaders(owner.headers))!;
     const guestEmail = email("io-guest");
-    await createInvite(owner.headers, ctx, { email: guestEmail, role: "member" });
+    const { link } = await createInvite(owner.headers, ctx, { email: guestEmail, role: "member" });
 
-    const guest = await inInviteMode(() => signUp("Gil Guest", guestEmail.toUpperCase()));
+    const guest = await inInviteMode(() => signUp("Gil Guest", guestEmail.toUpperCase(), idOf(link)));
     expect(guest.userId).toBeTruthy();
     expect(await accountFor(guestEmail)).toBe(1);
   });
 
-  it("does not open sign-up for a revoked or an expired invitation", async () => {
+  // Security QA: knowing an invited address was enough to make its account first, and then to take the invitation.
+  it("refuses an invited email when the sign-up does not come from the invitation's link, and makes no account", async () => {
+    const owner = await signUp("Ines Inviter", email("io-owner3"));
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const guestEmail = email("io-nolink");
+    await createInvite(owner.headers, ctx, { email: guestEmail, role: "admin" });
+
+    await expect(inInviteMode(() => signUp("Mallory", guestEmail))).rejects.toMatchObject(inviteOnly);
+    expect(await accountFor(guestEmail)).toBe(0);
+  });
+
+  it("refuses the link of an invitation sent to another email, and a link to no invitation at all", async () => {
+    const owner = await signUp("Ivo Inviter", email("io-owner4"));
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const mine = await createInvite(owner.headers, ctx, { email: email("io-mine"), role: "member" });
+    const otherEmail = email("io-theirs");
+    await createInvite(owner.headers, ctx, { email: otherEmail, role: "member" });
+
+    await expect(inInviteMode(() => signUp("Mallory", otherEmail, idOf(mine.link)))).rejects.toMatchObject(inviteOnly);
+    await expect(inInviteMode(() => signUp("Mallory", otherEmail, "int-no-such-invitation"))).rejects.toMatchObject(inviteOnly);
+    expect(await accountFor(otherEmail)).toBe(0);
+  });
+
+  it("does not open sign-up for a revoked or an expired invitation, even from its link", async () => {
     const owner = await signUp("Otto Owner", email("io-owner2"));
     const ctx = (await sessionFromHeaders(owner.headers))!;
     const revokedEmail = email("io-revoked");
@@ -288,8 +367,8 @@ describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
     const expired = await createInvite(owner.headers, ctx, { email: expiredEmail, role: "member" });
     await db.update(invitation).set({ expiresAt: new Date(Date.now() - 60_000) }).where(eq(invitation.id, idOf(expired.link)));
 
-    await expect(inInviteMode(() => signUp("Rae Revoked", revokedEmail))).rejects.toMatchObject(inviteOnly);
-    await expect(inInviteMode(() => signUp("Ed Expired", expiredEmail))).rejects.toMatchObject(inviteOnly);
+    await expect(inInviteMode(() => signUp("Rae Revoked", revokedEmail, idOf(revoked.link)))).rejects.toMatchObject(inviteOnly);
+    await expect(inInviteMode(() => signUp("Ed Expired", expiredEmail, idOf(expired.link)))).rejects.toMatchObject(inviteOnly);
     expect(await accountFor(revokedEmail)).toBe(0);
     expect(await accountFor(expiredEmail)).toBe(0);
   });
