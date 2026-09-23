@@ -7,8 +7,8 @@ import { jobs, runs, workspaceSettings } from "@/db/schema";
 import { DEFAULT_LIMITS, updateLimits } from "@/lib/usage/budget";
 import { startFollowUp } from "./follow-up";
 
-const WS = "int-engine-followup";
-const OTHER_WS = "int-engine-followup-other";
+const WS = `int-engine-followup-${process.pid}`; // per process: other worktrees run these tests against the same database
+const OTHER_WS = `int-engine-followup-other-${process.pid}`; // per process: other worktrees run these tests against the same database
 const ctx = { workspaceId: WS, userId: "int-user" };
 
 async function makeRun(what: string, status: string, ws = WS) {
