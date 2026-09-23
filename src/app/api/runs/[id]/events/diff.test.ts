@@ -16,7 +16,7 @@ const run = (status: RunStatus): Run => ({
   createdAt: "2026-09-23T10:00:00.000Z",
   finishedAt: null,
 });
-const text = (seq: number): RunEvent => ({ seq, at: "2026-09-23T10:00:00.000Z", kind: "text", payload: { text: `event ${seq}` } });
+const text = (seq: number, body = `event ${seq}`): RunEvent => ({ seq, at: "2026-09-23T10:00:00.000Z", kind: "text", payload: { text: body } });
 const events = [text(1), text(2), text(3), text(4)];
 
 describe("parseAfter", () => {
@@ -64,7 +64,7 @@ describe("nextMessage", () => {
 
 describe("sseFrame", () => {
   it("is one data line with the JSON message, ended by a blank line", () => {
-    const message = nextMessage({ run: run("running"), events: [{ ...text(1), payload: { text: "two\nlines" } }] }, 0).message;
+    const message = nextMessage({ run: run("running"), events: [text(1, "two\nlines")] }, 0).message;
     const frame = sseFrame(message);
     expect(frame.startsWith("data: ")).toBe(true);
     expect(frame.endsWith("\n\n")).toBe(true);
