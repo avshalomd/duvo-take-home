@@ -23,7 +23,7 @@ import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
 import { runnerMode } from "@/lib/runner/mode";
-import { getLimits } from "@/lib/usage/budget";
+import { getLimits, healBudgetStop } from "@/lib/usage/budget";
 import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
 import { childEnv, ISOLATION } from "./child-env";
@@ -396,13 +396,13 @@ export const runAutomation: RunAutomation = async (runId) => {
         return;
       }
       const feedback = feedbackForAgent(verdict);
-      // No progress, no further attempt (QA Q148): the same files or the same failure as an earlier attempt means the
-      // next one would only go round again. The stop is recorded where the heals are, and the verdict is written now.
+      // No further attempt when it would only go round again (QA Q148: the same files or the same failure as an earlier
+      // attempt), or when the workspace's money for today is spent: a fix attempt may cost up to maxBudgetUsd, and the
+      // check at the start saw none of it. The stop is recorded where the heals are, and the verdict is written now.
       const print = attemptFingerprint(verdict, written);
-      const stuck = noProgress(print, earlierAttempts);
-      if (stuck) {
-        await write([{ kind: "heal", payload: { attempt: heals + 1, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback, stopped: stuck }, at: now() }]);
-        await chain;
+      const stopped = noProgress(print, earlierAttempts) ?? (await healBudgetStop(workspaceId, runId, spent.usd));
+      if (stopped) {
+        await write([{ kind: "heal", payload: { attempt: heals + 1, max: limits.autoHealAttempts, reasons: verdict.reasons, feedback, stopped }, at: now() }]);
         await close();
         return;
       }

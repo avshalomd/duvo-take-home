@@ -1,9 +1,9 @@
 import "server-only";
-import { and, count, eq, gte, inArray, sum } from "drizzle-orm";
+import { and, count, eq, gte, inArray, ne, sum } from "drizzle-orm";
 import { db } from "@/db";
 import { runs, workspaceSettings } from "@/db/schema";
 import { WorkspaceLimits, type CheckBudget, type GetLimits, type GetUsage, type UpdateLimits } from "@/contracts/usage";
-import { budgetBlockReason, nextUtcMidnight, startOfUtcDay } from "./budget-rule";
+import { budgetBlockReason, healBudgetReason, nextUtcMidnight, startOfUtcDay } from "./budget-rule";
 
 export const DEFAULT_LIMITS: WorkspaceLimits = {
   dailyBudgetUsd: 5,
@@ -71,3 +71,19 @@ export const checkBudget: CheckBudget = async (workspaceId) => {
   const [limits, usage] = await Promise.all([getLimits(workspaceId), getUsage(workspaceId)]);
   return budgetBlockReason(limits, usage);
 };
+
+/**
+ * null when a run may pay for another fix attempt; otherwise why healing stops. Each attempt may cost up to
+ * AgentLimits.maxBudgetUsd and the check at the start saw none of them. The run's own spend is handed in rather than
+ * read from its row, which may not carry the latest attempt yet, so the row's cost is left out of the sum.
+ */
+export async function healBudgetStop(workspaceId: string, runId: string, runSpentUsd: number): Promise<string | null> {
+  const [limits, [others]] = await Promise.all([
+    getLimits(workspaceId),
+    db
+      .select({ cost: sum(runs.costUsd) })
+      .from(runs)
+      .where(and(eq(runs.workspaceId, workspaceId), gte(runs.createdAt, startOfUtcDay(new Date())), ne(runs.id, runId))),
+  ]);
+  return healBudgetReason(limits, Number(others.cost ?? 0) + runSpentUsd); // sum() of a real arrives as a string
+}
