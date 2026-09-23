@@ -132,7 +132,7 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q93 | qa-ux | after picking a command the box shows `\news-digest ` with no hint of what to type | the input's label or hint shown after the command | minor | home | redesign |
 | Q94 | qa-ux | an automation run's title is its filled-in instructions | "<automation name>: <input>" | minor | home | redesign |
 | Q95 | qa-ux | example runs show the full prompt in the rail; "Example for an automation being tested" names no automation and stays after approval | the input as the title; "Example for <name>" linking to it | minor | home | redesign |
-| Q96 | qa-ux | tool names in plan step titles ("... using make_chart") | step titles in plain words | minor | guards (system prompt) | fixing |
+| Q96 | qa-ux | tool names in plan step titles ("... using make_chart") | step titles in plain words | minor | guards (system prompt) | fixed (560f6be: plain step titles, never a tool or file name) |
 | Q97 | qa-ux | markdown tables in the report render as raw pipes | rendered tables | minor | home | redesign |
 | Q98 | qa-ux | chart labels about 5 px, the x-axis title overlapping a tick label, a tiny pie legend | readable at 390 px | minor | outputs | fixing |
 | Q99 | qa-ux | "0.0 KB" for a small file | bytes under 1 KB | minor | home | redesign |
