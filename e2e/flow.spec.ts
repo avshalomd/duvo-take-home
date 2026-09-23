@@ -26,16 +26,17 @@ const composer = (page: Page) => page.getByRole("textbox", { name: /what should 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Runs" });
 
 test.describe("the frame", () => {
-  test("the top bar offers the three pages, marks Home as open, and carries a product mark that is not a second link called Automations", async ({ page }) => {
+  test("the top bar offers the three pages, marks Home as open, and carries the Handover mark as a glyph named by its label", async ({ page }) => {
     await page.goto("/");
     const header = page.getByTestId("app-header");
     const pages = header.getByRole("navigation", { name: "Pages" });
     for (const name of ["Home", "Automations", "Settings"]) await expect(pages.getByRole("link", { name })).toBeVisible();
     await expect(pages.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
-    // Q113: the mark is a glyph with the product's name as its label, not the word beside the Automations page
-    const mark = header.getByRole("link", { name: "Automations home" });
+    // Q113: the mark is a glyph with the product's name as its label, not a word beside the pages.
+    // His call, 2026-09-23: the product is called Handover; the Automations page keeps its name.
+    const mark = header.getByRole("link", { name: "Handover home" });
     await expect(mark).toBeVisible();
-    await expect(mark.getByText("Automations", { exact: true })).toBeHidden(); // the tile shows, its word does not
+    await expect(mark).toHaveText("", { useInnerText: true }); // the tile shows, no word does
   });
 
   test("with no run open, Home asks one question, with the composer under it", async ({ page }) => {
