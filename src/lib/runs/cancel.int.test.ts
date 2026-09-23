@@ -1,5 +1,5 @@
 // Stop, against the real tables. `npm run test:int`. Runs are "[int] ..." in workspace "int-engine-cancel", deleted after.
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, runs } from "@/db/schema";
@@ -53,6 +53,22 @@ describe.skipIf(!process.env.DATABASE_URL)("cancelRun", () => {
     const run = await runRow(id);
     expect(run.cancelRequestedAt).not.toBeNull();
     expect(run.status).toBe("evaluating");
+  });
+
+  // A run whose function Vercel ended never reads the request: Stop only set cancel_requested_at, and the run stayed
+  // "evaluating" in front of the person who pressed it.
+  it("closes a run that has outlived every runner as stopped, when Stop is pressed on it", async () => {
+    vi.stubEnv("RUNNER", "route");
+    const [row] = await db
+      .insert(runs)
+      .values({ prompt: "[int] stuck past its function", status: "evaluating", model: "test", workspaceId: WS, createdAt: new Date(Date.now() - 7 * 60_000) })
+      .returning({ id: runs.id });
+    await cancelRun(WS, row.id);
+    const run = await runRow(row.id);
+    expect(run.status).toBe("cancelled");
+    expect(run.error).toBe("Stopped by you");
+    expect(run.finishedAt).not.toBeNull();
+    vi.unstubAllEnvs();
   });
 
   it("keeps the first request time when Stop is pressed twice", async () => {
