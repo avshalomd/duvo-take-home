@@ -21,7 +21,17 @@ export default async function InvitePage({ params }: PageProps<"/invite/[id]">) 
   const [invitation, ctx] = await Promise.all([getInvitation(id), sessionFromHeaders(await headers())]);
   const here = `/invite/${id}`;
 
-  if (!invitation || !invitation.open) {
+  if (!invitation) {
+    return (
+      <AuthPanel title="We could not find this invitation" description="Check that the link is complete, or ask the person who invited you to send it again.">
+        <Link href="/" className={secondary}>
+          Go to your workspace
+        </Link>
+      </AuthPanel>
+    );
+  }
+
+  if (!invitation.open) {
     return (
       <AuthPanel title="This invitation is closed" description="It has expired or was already used. Ask the person who invited you for a new link.">
         <Link href="/" className={secondary}>

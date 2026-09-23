@@ -63,8 +63,8 @@ export function healPrompt(feedback: string): string {
   return [
     feedback,
     "",
-    "Your files are still in your working directory: write each one you change back under the same name. Mark the " +
-      "steps you redo with mcp__plan__update_step (running, then done with a note of what you fixed), and check the " +
-      "files yourself before you finish.",
+    "Your files are still in your working directory: write each one you change back under the same name. Keep your " +
+      "plan as it is and do not call mcp__plan__set_plan again: mark the steps you redo with mcp__plan__update_step " +
+      "(running, then done with a note of what you fixed), and check the files yourself before you finish.",
   ].join("\n");
 }

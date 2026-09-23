@@ -37,7 +37,8 @@ export function threadSteps(plan: Plan | null, runStatus: string, stepChecks: Ru
     }
 
     const check = stepChecks?.find((c) => c.stepIndex === step.index);
-    if (step.status === "done" && check && check.onTrack < OFF_TRACK) out.flag = `This step may not have done what it says. ${check.note}`;
+    // the checker has no reason of its own to add: its note repeats the step's note, which the thread already shows
+    if (step.status === "done" && check && check.onTrack < OFF_TRACK) out.flag = "This step may not have done what it says.";
     return out;
   });
 

@@ -51,7 +51,8 @@ const REPORT_TITLE = /^(the |final )?report:?$/i;
 export function reportBlocks(text: string): Block[] {
   const blocks = parseMarkdown(text);
   const first = blocks[0];
-  const repeatsTitle = first?.kind === "heading" && REPORT_TITLE.test(first.spans.map((s) => s.text).join("").trim());
+  // a heading, or a paragraph that is only the word in bold ("**Report:**"): the same title written another way
+  const repeatsTitle = (first?.kind === "heading" || first?.kind === "paragraph") && REPORT_TITLE.test(first.spans.map((s) => s.text).join("").trim());
   return repeatsTitle ? blocks.slice(1) : blocks;
 }
 
