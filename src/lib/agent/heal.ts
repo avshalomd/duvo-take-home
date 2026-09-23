@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { AgentLimits } from "@/contracts/agent";
 import type { Verdict } from "@/contracts/eval";
 
 // Auto-heal (his call, 2026-09-23): when the evaluator fails a run's result, the same agent session gets the findings
@@ -8,13 +7,22 @@ import type { Verdict } from "@/contracts/eval";
 
 export const MIN_HEAL_MS = 60_000; // a shorter attempt would be cut off half way by the wall clock
 
+// Inline or in the runner route, a run lives inside one function call, and Vercel ends that call at 300 s whatever it
+// is doing: a run still evaluating then stayed "evaluating" for ever. So everything that follows the agent's last
+// attempt is boxed in time, and the agent gets what is left of the 300 s:
+//   300 s (the function) - 50 s (the evaluation) - 10 s (step checks still out) - 10 s (files and closing writes) = 230 s
+export const FUNCTION_LIMIT_MS = 300_000; // the runner route's maxDuration
+export const EVAL_MAX_MS = 50_000; // the judge (up to 3 routes) and the reviewer; later, the run says "not checked"
+export const SETTLE_MAX_MS = 10_000; // a step check still waiting on Jev after this is dropped
+export const CLOSING_MS = 10_000; // storing the files, the SDK's totals for a run closed early, the closing update
+
 /**
- * How long a run may spend on the agent, all attempts together. Inline or in the runner route, the run lives inside
- * one function call (300 s on Vercel), so every attempt shares the one wall clock. In the worker there is no function limit, but a
- * job locked for 10 minutes is taken for dead (recover.ts): 6 minutes leaves room for the evaluations.
+ * How long a run may spend on the agent, all attempts together. Inline or in the runner route, every attempt shares
+ * the one function call's 230 s (above). In the worker there is no function limit, but a job locked for 10 minutes
+ * is taken for dead (recover.ts): 6 minutes leaves room for the evaluations.
  */
 export function runBudgetMs(mode: "inline" | "queue" | "route"): number {
-  return mode === "queue" ? 6 * 60_000 : AgentLimits.wallClockMs;
+  return mode === "queue" ? 6 * 60_000 : FUNCTION_LIMIT_MS - EVAL_MAX_MS - SETTLE_MAX_MS - CLOSING_MS;
 }
 
 /** Whether a run the evaluator failed gets another attempt. */

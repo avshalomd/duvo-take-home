@@ -29,10 +29,10 @@ import { watchCancel } from "./cancel-watch";
 import { childEnv, ISOLATION } from "./child-env";
 import { closeAsCancelled, updateUnlessCancelled } from "./close";
 import { statusUpdates } from "./connection-status";
-import { startDeadline } from "./deadline";
+import { startDeadline, within } from "./deadline";
 import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
-import { attemptFingerprint, healPrompt, noProgress, runBudgetMs, shouldHeal, type AttemptFingerprint } from "./heal";
+import { attemptFingerprint, EVAL_MAX_MS, healPrompt, noProgress, runBudgetMs, SETTLE_MAX_MS, shouldHeal, type AttemptFingerprint } from "./heal";
 import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
 import { tripwireReason, unexpectedServers } from "./mcp-tripwire";
@@ -48,6 +48,7 @@ import { removeRunDir } from "./workspace";
 export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const NATIVE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]; // everything else is removed below
 const CANCEL_POLL_MS = 2000; // Stop is felt within 2 s, at one tiny read per run every 2 s
+const EVAL_TOO_LONG = "the check took too long; press Re-evaluate to try again"; // read as "Not checked: ..."
 
 /** One working directory per run, gitignored; bypassPermissions lets the agent write anywhere under it.
  *  On Vercel the code directory is read-only, so the run lives under the function's temp dir instead. */
@@ -162,15 +163,21 @@ export const runAutomation: RunAutomation = async (runId) => {
   };
   const now = () => new Date().toISOString();
 
+  // settle() ends a round: a check begun in an earlier round that answers after it gave up waiting is dropped, so no
+  // event is ever written after the run has closed.
+  let round = 0;
+
   // The per-step check runs beside the agent, never in its way: a slow or failed Jev call records nothing, and
   // nothing in here may throw - an unhandled rejection would take the whole worker process down with it.
   const stepCheck = async (p: Plan, stepIndex: number) => {
+    const mine = round;
     try {
       const startedAt = recorded.findLastIndex((e) => e.kind === "plan" && e.payload.steps[stepIndex]?.status === "running");
       const calls = recorded
         .slice(Math.max(0, startedAt))
         .flatMap((e) => (e.kind === "tool_call" ? [{ name: e.payload.name, input: e.payload.input }] : []));
       const check = await checkStep({ prompt: instructions, plan: p, stepIndex, calls });
+      if (mine !== round) return; // too late: settle() stopped waiting for it, and the run may be closed by now
       await write([{ kind: "check", payload: check, at: now() }]);
     } catch {
       // no check event: the stepper shows the step without a mark
@@ -180,9 +187,11 @@ export const runAutomation: RunAutomation = async (runId) => {
     checks.add(p);
     void p.finally(() => checks.delete(p));
   };
-  // Before the run closes: the checks still in flight land, then every queued write is in.
+  // Before the run goes on: the checks still in flight land, for at most SETTLE_MAX_MS (a function's 300 s has no
+  // room to wait longer), then every queued write is in.
   const settle = async () => {
-    await Promise.allSettled([...checks]);
+    await within(Promise.allSettled([...checks]), SETTLE_MAX_MS, () => []);
+    round += 1;
     await chain;
   };
 
@@ -359,8 +368,9 @@ export const runAutomation: RunAutomation = async (runId) => {
       });
 
       // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
-      // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59).
-      const evaluation = evaluateRun({
+      // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59). So is an
+      // evaluation that takes longer than EVAL_MAX_MS: the function would be ended with the run left open.
+      const judged = evaluateRun({
         prompt: instructions,
         runStatus: end.is_error ? "failed" : "succeeded",
         report: end.result || null,
@@ -373,6 +383,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
         template,
       }).catch(unknownVerdict);
+      const evaluation = within(judged, EVAL_MAX_MS, () => unknownVerdict(new Error(EVAL_TOO_LONG)));
       // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
       const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);
       if (verdict === null || cancel.cancelled()) {
