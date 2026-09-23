@@ -225,6 +225,56 @@ test.describe("the composer", () => {
     await expect(composer(page)).toHaveValue("do it");
   });
 
+  // Q202: the reason stayed under the box after the text had changed; Q203: a square pink border was drawn inside the
+  // rounded capsule
+  test("a refusal is said in the capsule's own shape, and goes once the text changes", async ({ page }) => {
+    await page.goto("/");
+    await composer(page).fill("do it");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const reason = page.getByText(/say what the agent should do/i);
+    await expect(reason).toBeVisible();
+    await expect(composer(page)).toHaveCSS("box-shadow", "none"); // no ring of the box's own
+    await expect(composer(page)).toHaveCSS("border-top-width", "0px");
+    await expect(page.getByTestId("composer-capsule")).toHaveCSS("outline-style", "solid"); // the capsule says it
+    await composer(page).press("End");
+    await composer(page).pressSequentially(" now");
+    await expect(reason).toHaveCount(0);
+    await expect(page.getByTestId("composer-capsule")).not.toHaveCSS("outline-style", "solid");
+  });
+
+  // Q195: a double-click on Run started two identical paid runs half a second apart. The start is never let through
+  // to the server here (the request is aborted in the browser), so no run is created
+  test("one press, one start: a double-click or a second Ctrl/Cmd+Enter sends the brief once", async ({ page }) => {
+    let starts = 0;
+    await page.route("**/*", (route) => {
+      const request = route.request();
+      if (request.method() === "POST" && request.headers()["next-action"]) {
+        starts++;
+        return route.abort();
+      }
+      return route.continue();
+    });
+    await page.goto("/");
+    await composer(page).fill("[e2e] home double press: list three facts about Mars");
+    await page.getByRole("button", { name: "Run", exact: true }).dblclick();
+    await expect(page.getByText(/could not reach the app/i)).toBeVisible();
+    expect(starts).toBe(1);
+
+    // the lock lets go once the start is answered: the next press sends again, and only once
+    await composer(page).press("ControlOrMeta+Enter");
+    await composer(page).press("ControlOrMeta+Enter");
+    await expect.poll(() => starts).toBe(2);
+    await page.waitForTimeout(1_000);
+    expect(starts).toBe(2);
+  });
+
+  // Q209: Enter makes a new line and only Cmd/Ctrl+Enter runs, and nothing said so
+  test("the keyboard shortcut is named beside Run, in the platform's own words", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("run-shortcut")).toHaveText(/^(⌘|Ctrl) Enter$/);
+    await expect(page.getByRole("button", { name: "Run", exact: true })).toHaveAttribute("aria-keyshortcuts", /^(Meta|Control)\+Enter$/);
+  });
+
   test("Ctrl/Cmd+Enter submits the box", async ({ page }) => {
     await page.goto("/");
     await composer(page).fill("do it");
