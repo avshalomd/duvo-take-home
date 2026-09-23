@@ -1,6 +1,7 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { AutomationTemplate } from "@/contracts/automation";
 import type { EvaluateInput, ReevaluateRun, Verdict } from "@/contracts/eval";
-import { RunEvent, type Run } from "@/contracts/run";
+import { RunEvent, RunPurpose, type Run } from "@/contracts/run";
 import { db, schema } from "@/db";
 import { evaluateRun } from "./evaluate";
 
@@ -8,7 +9,12 @@ import { evaluateRun } from "./evaluate";
 // because a verdict can come back "unknown" when Jev's routes are down - the user presses Re-evaluate and the
 // judgment is made again, with no agent run and no cost beyond one model call.
 
-export type LoadedRun = { run: Run; events: RunEvent[]; files: { name: string; content: string }[] };
+export type LoadedRun = {
+  run: Run;
+  events: RunEvent[];
+  files: { name: string; content: string }[];
+  template?: AutomationTemplate | null; // the saved automation the run followed, while it still has the run's version
+};
 export type ReevaluateDeps = {
   load: (runId: string) => Promise<LoadedRun | null>;
   evaluate: (input: EvaluateInput) => Promise<Verdict>;
@@ -20,7 +26,7 @@ export const reevaluateRun: ReevaluateRun = async (runId) => reevaluate(runId, {
 export async function reevaluate(runId: string, deps: ReevaluateDeps): Promise<Verdict> {
   const loaded = await deps.load(runId);
   if (!loaded) throw new Error(`No run ${runId} to evaluate.`); // names the run: the caller is a route handler
-  const verdict = await deps.evaluate(toEvaluateInput(loaded.run, loaded.events, loaded.files));
+  const verdict = await deps.evaluate({ ...toEvaluateInput(loaded.run, loaded.events, loaded.files), template: loaded.template ?? null });
   await deps.save(runId, verdict);
   return verdict;
 }
@@ -63,10 +69,35 @@ export async function loadRun(runId: string): Promise<LoadedRun | null> {
       costUsd: row.costUsd,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt?.toISOString() ?? null,
+      workspaceId: row.workspaceId,
+      purpose: RunPurpose.catch("adhoc").parse(row.purpose), // the column is free text; an unknown value reads as adhoc
+      automationId: row.automationId,
+      automationVersion: row.automationVersion,
+      input: row.input,
     },
     events,
-    files: fileRows.map((f) => ({ name: f.name, content: f.content })),
+    // a binary file (.xlsx) is judged by its name and size, as the run loop does: base64 would tell the judge nothing
+    files: fileRows.map((f) => ({ name: f.name, content: f.encoding === "base64" ? `(${f.mime}, ${f.bytes} bytes)` : f.content })),
+    template: await templateFor(row),
   };
+}
+
+/**
+ * The template the run was held to when it ran, so a re-evaluation checks the same promises. Only while the
+ * automation still has the run's version: an edit since then changed the promises, and holding an old run to new
+ * steps would fail it for something it was never asked to do. Looked up by workspace as well as id (tenancy).
+ */
+async function templateFor(row: typeof schema.runs.$inferSelect): Promise<AutomationTemplate | null> {
+  if (!row.automationId || !row.workspaceId) return null;
+  const [automation] = await db
+    .select({ template: schema.automations.template, version: schema.automations.version })
+    .from(schema.automations)
+    .where(and(eq(schema.automations.id, row.automationId), eq(schema.automations.workspaceId, row.workspaceId)))
+    .limit(1);
+  if (!automation) return null;
+  if (row.automationVersion !== null && row.automationVersion !== automation.version) return null;
+  const parsed = AutomationTemplate.safeParse(automation.template);
+  return parsed.success ? parsed.data : null; // a template stored in an older shape is no reason to fail Re-evaluate
 }
 
 export async function saveVerdict(runId: string, verdict: Verdict): Promise<void> {
