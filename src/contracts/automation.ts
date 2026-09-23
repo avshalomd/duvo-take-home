@@ -125,6 +125,7 @@ export type GetActiveByCommand = (workspaceId: string, command: string) => Promi
 export type CreateAutomationDraft = (ctx: Ctx, draft: AutomationDraft, fromRunId: string | null) => Promise<Automation>;
 export type UpdateAutomation = (workspaceId: string, id: string, edit: AutomationEdit) => Promise<Automation>;
 export type ApproveAutomation = (workspaceId: string, id: string) => Promise<Automation>;
+export type DeleteAutomation = (workspaceId: string, id: string) => Promise<void>; // a bad draft needs a way out
 export type SetAutomationStatus = (workspaceId: string, id: string, status: AutomationStatus) => Promise<void>;
 export type SetSchedule = (workspaceId: string, id: string, schedule: string | null, input: string | null) => Promise<void>;
 export type ListTrials = (workspaceId: string, automationId: string) => Promise<Trial[]>;

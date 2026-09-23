@@ -1,7 +1,7 @@
 // The OAuth module's reads of the connections table, against the real table. `npm run test:int`.
 // Everything it creates is named "[int] ..." and deleted.
 import { afterAll, describe, expect, it } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { connections } from "@/db/schema";
 import { findByPendingState, findConnection, loadOAuth, markOAuth } from "./rows";
@@ -16,7 +16,8 @@ async function insert(name: string, workspaceId = WS, oauth: unknown = null) {
 }
 
 afterAll(async () => {
-  await db.delete(connections).where(like(connections.name, "[int]%"));
+  // only this file's workspaces: int files run in parallel, and a "[int]%" sweep wiped other files' rows mid-test
+  await db.delete(connections).where(inArray(connections.workspaceId, [WS, OTHER_WS]));
 });
 
 describe.skipIf(!process.env.DATABASE_URL)("oauth rows", () => {

@@ -1,9 +1,10 @@
 // "Ask for a change", against the real tables. `npm run test:int`. RUNNER=queue, so the follow-up becomes a jobs row
 // instead of an agent run. Runs are "[int] ..." in workspace "int-engine-followup", deleted after.
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { jobs, runs } from "@/db/schema";
+import { jobs, runs, workspaceSettings } from "@/db/schema";
+import { DEFAULT_LIMITS, updateLimits } from "@/lib/usage/budget";
 import { startFollowUp } from "./follow-up";
 
 const WS = "int-engine-followup";
@@ -15,6 +16,10 @@ async function makeRun(what: string, status: string, ws = WS) {
   return row.id;
 }
 
+// The tests leave several runs queued in this workspace; the real budget (3 in flight) would refuse the later ones.
+beforeAll(async () => {
+  await updateLimits(WS, { ...DEFAULT_LIMITS, maxInFlight: 10 });
+});
 beforeEach(() => {
   vi.stubEnv("RUNNER", "queue");
 });
@@ -23,6 +28,7 @@ afterAll(async () => {
   const mine = db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS, OTHER_WS]));
   await db.delete(jobs).where(inArray(jobs.runId, mine));
   await db.delete(runs).where(inArray(runs.workspaceId, [WS, OTHER_WS]));
+  await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OTHER_WS]));
 });
 
 describe.skipIf(!process.env.DATABASE_URL)("startFollowUp", () => {

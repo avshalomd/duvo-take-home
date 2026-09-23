@@ -1,4 +1,5 @@
 import { ZodError } from "zod";
+import { AutomationError } from "@/lib/automations/errors";
 import { LlmError } from "@/lib/llm/errors";
 import { CancelError } from "@/lib/runs/cancel";
 import { FollowUpError } from "@/lib/runs/follow-up";
@@ -15,6 +16,7 @@ export function readable(e: unknown): string {
   if (e instanceof LlmError) return e.message;
   if (e instanceof RunLimitError) return e.message; // "Three runs are already in progress - try again in a minute"
   if (e instanceof CancelError || e instanceof FollowUpError) return e.message; // the engine's refusals: "already finished", "not found"
+  if (e instanceof AutomationError) return e.message; // "Turn on DeepWiki in Settings to run \audit", "No saved automation called \x"
   if (e instanceof ZodError) return e.issues[0]?.message ?? FALLBACK;
   // a seam another part of the app has not filled yet throws "not implemented: <name>" (the stubs' convention)
   if (e instanceof Error && e.message.startsWith("not implemented")) return NOT_YET;

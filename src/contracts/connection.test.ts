@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 import { Connection, NewConnection, Transport } from "./connection";
 import connectionsFixture from "../../fixtures/connections.json";
 

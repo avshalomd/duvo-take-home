@@ -49,4 +49,9 @@ describe("readable", () => {
     expect(log).toHaveBeenCalledWith("action failed", leaky);
     log.mockRestore();
   });
+
+  it("passes on an automation's refusal as written (a command that needs a connection that is off)", async () => {
+    const { AutomationError } = await import("@/lib/automations/errors");
+    expect(readable(new AutomationError("Turn on DeepWiki in Settings to run \\audit"))).toBe("Turn on DeepWiki in Settings to run \\audit");
+  });
 });

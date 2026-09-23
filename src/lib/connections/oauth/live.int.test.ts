@@ -2,7 +2,7 @@
 // up to the authorization URL. No sign-in is completed (that needs a person's account). Network-bound, so it runs
 // only with LIVE_OAUTH=1: `LIVE_OAUTH=1 npm run test:int -- src/lib/connections/oauth/live`. Rows are "[int] ..." and deleted.
 import { afterAll, describe, expect, it, vi } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { connections } from "@/db/schema";
 import { findByPendingState } from "./rows";
@@ -31,7 +31,7 @@ async function connection(name: string, url: string) {
 }
 
 afterAll(async () => {
-  await db.delete(connections).where(like(connections.name, "[int]%"));
+  await db.delete(connections).where(eq(connections.workspaceId, WS)); // this file's workspace only
 });
 
 describe.skipIf(!process.env.DATABASE_URL || process.env.LIVE_OAUTH !== "1")("live OAuth discovery and registration", () => {
