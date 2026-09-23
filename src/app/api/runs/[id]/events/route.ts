@@ -38,30 +38,34 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   let after = parseAfter(new URL(req.url).searchParams.get("after"));
   const encoder = new TextEncoder();
-  const signal = req.signal; // aborted when the client disconnects
   const until = Date.now() + STREAM_MS;
+  // The client leaving arrives two ways: the request's signal, or the stream being cancelled. Either one stops the
+  // loop, and wakes it from its wait at once, so it never writes into a closed stream (QA Q131).
+  const gone = new AbortController();
+  if (req.signal.aborted) gone.abort();
+  req.signal.addEventListener("abort", () => gone.abort(), { once: true });
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        while (!signal.aborted && Date.now() < until) {
+        while (!gone.signal.aborted && Date.now() < until) {
           const found = await getRun(workspaceId, id);
+          if (gone.signal.aborted) break; // left during the read: there is nobody to send it to
           if (!found) break; // deleted while streaming
           const next = nextMessage(found, after);
           after = next.after;
           controller.enqueue(encoder.encode(sseFrame(next.message)));
           if (next.message.done) break; // that was the last message
-          await sleep(EVERY_MS, signal);
+          await sleep(EVERY_MS, gone.signal);
         }
       } catch (e) {
-        console.error(`events stream of run ${id} failed`, e); // the client falls back to polling
+        if (!gone.signal.aborted) console.error(`events stream of run ${id} failed`, e); // the client falls back to polling
       } finally {
-        try {
-          controller.close();
-        } catch {
-          // already closed because the client went away
-        }
+        if (!gone.signal.aborted) controller.close(); // a cancelled stream is closed already
       }
+    },
+    cancel() {
+      gone.abort();
     },
   });
 

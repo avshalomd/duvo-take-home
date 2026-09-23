@@ -9,7 +9,7 @@ import { enqueueRun } from "./enqueue";
 import { claimJob, finishJob } from "./jobs";
 import { closeAbandonedRuns, recoverStaleJobs } from "./recover";
 
-const WS = "int-engine-jobs";
+const WS = `int-engine-jobs-${process.pid}`; // per process: other worktrees run these tests against the same database
 const Y2K = Date.parse("2000-01-01T00:00:00Z");
 const t = (minutes: number) => new Date(Y2K + minutes * 60_000);
 const mine = db.select({ id: runs.id }).from(runs).where(eq(runs.workspaceId, WS));
@@ -167,7 +167,7 @@ describe.skipIf(!process.env.DATABASE_URL)("abandoned runs", () => {
 
   it("closes a run left running for over 10 minutes with no job (the inline server restarted)", async () => {
     const runId = await makeRun("abandoned", { status: "running", createdAt: t(30) }); // 15 minutes before now
-    expect(await closeAbandonedRuns(now)).toContain(runId);
+    expect(await closeAbandonedRuns(now, WS)).toContain(runId);
     const run = await runRow(runId);
     expect(run.status).toBe("failed");
     expect(run.error).toMatch(/stopped/i);
@@ -177,18 +177,18 @@ describe.skipIf(!process.env.DATABASE_URL)("abandoned runs", () => {
   it("leaves an old run alone while its job is still queued: the queue may just be long", async () => {
     const runId = await makeRun("backlog", { status: "queued", createdAt: t(0) });
     await makeJob(runId, { status: "queued" });
-    expect(await closeAbandonedRuns(now)).not.toContain(runId);
+    expect(await closeAbandonedRuns(now, WS)).not.toContain(runId);
     expect((await runRow(runId)).status).toBe("queued");
   });
 
   it("leaves a run started 5 minutes ago alone: its wall clock has not run out", async () => {
     const runId = await makeRun("recent", { status: "running", createdAt: t(40) });
-    expect(await closeAbandonedRuns(now)).not.toContain(runId);
+    expect(await closeAbandonedRuns(now, WS)).not.toContain(runId);
   });
 
   it("never touches a finished run", async () => {
     const runId = await makeRun("finished long ago", { status: "succeeded", createdAt: t(0) });
-    expect(await closeAbandonedRuns(now)).not.toContain(runId);
+    expect(await closeAbandonedRuns(now, WS)).not.toContain(runId);
     expect((await runRow(runId)).status).toBe("succeeded");
   });
 });

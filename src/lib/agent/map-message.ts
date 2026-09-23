@@ -1,5 +1,6 @@
 import type { MapMessage } from "@/contracts/agent";
 import type { Plan, RunEvent } from "@/contracts/run";
+import { apiErrorNotice, refusalNotice, systemNotice } from "./notices";
 import { applyPlanCall, isPlanTool } from "./plan-state";
 
 const PREVIEW_CHARS = 300; // the full tool output stays in the agent; the table keeps a readable head of it
@@ -34,7 +35,13 @@ export function createMapper(): MapMessage {
       events.push({ ...e, payload: { ...e.payload, turn }, seq: seq + events.length, at } as RunEvent);
 
     if (m.type === "system") {
-      if (m.subtype !== "init") return []; // thinking_tokens, post_turn_summary and friends are noise
+      if (m.subtype !== "init") {
+        // A refusal, a retry or a denied call is a line in the timeline; thinking_tokens, post_turn_summary and
+        // friends are noise. A system message is never a turn.
+        const notice = systemNotice(m);
+        if (notice) push({ kind: "text", payload: notice });
+        return events;
+      }
       const servers = Array.isArray(m.mcp_servers) ? m.mcp_servers : [];
       push({
         kind: "started",
@@ -64,6 +71,11 @@ export function createMapper(): MapMessage {
         }
         push({ kind: "tool_call", payload: { tool_use_id: str(b.id), name, input: b.input } });
       }
+      // A refused or failed turn may carry no block at all: without these it was an empty turn in the timeline (Q128).
+      const refusal = refusalNotice(rec(m.message));
+      if (refusal) push({ kind: "text", payload: refusal });
+      const failed = apiErrorNotice(m.error);
+      if (failed && !events.some((e) => e.kind === "text")) push({ kind: "text", payload: failed }); // its own words, when it sent any, say it better
       return events;
     }
 
