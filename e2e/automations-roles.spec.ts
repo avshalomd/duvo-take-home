@@ -135,10 +135,13 @@ test("a member judges an example; they read 'You said', and the owner reads the 
   const example = mine.getByTestId("example").filter({ hasText: "Acme Ltd" });
   await example.getByRole("button", { name: "Looks right" }).click();
   await expect(example).toContainText("You said it looks right");
+  await expect(example.getByRole("button", { name: "Change" })).toBeVisible(); // their own: changing it replaces no one's
   await expect(mine.getByTestId("approve-reason")).toHaveText("An owner or an admin approves it.");
 
   await page.goto(`/automations/${draftId}`);
-  await expect(page.getByTestId("example").filter({ hasText: "Acme Ltd" })).toContainText("e2e Mia Member said it looks right");
+  const theirs = page.getByTestId("example").filter({ hasText: "Acme Ltd" });
+  await expect(theirs).toContainText("e2e Mia Member said it looks right");
+  await expect(theirs.getByRole("button", { name: "Replace e2e Mia Member's judgment" })).toBeVisible(); // UX R2: whose it replaces
   await expect(page.getByText("You said it looks right")).toHaveCount(0);
 
   await page.goto(`/?run=${trialId}`);
