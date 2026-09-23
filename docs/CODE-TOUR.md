@@ -110,3 +110,17 @@ Per file: what it does and why it is built that way. Grows at every merge.
   before opening Home, or the top bar keeps naming the old workspace.
 - `src/app/(auth)/invite/[id]` - explains the invitation before asking anyone to sign in, pre-fills the email, and
   refuses a different signed-in account with "Sign in as ...".
+
+### engine
+- `src/lib/agent/close.ts` `updateUnlessCancelled` - every exit of the run loop writes through it, so a Stop that
+  lands during evaluation is never overwritten by "succeeded".
+- `src/lib/agent/run.ts` - a run is claimed with one `queued -> running` update (a second worker or a retried
+  after() does nothing); the user's MCP servers are spread first and ours last, so no connection can replace them.
+- `src/lib/runner/jobs.ts`, `recover.ts` - jobs claimed with `FOR UPDATE SKIP LOCKED` inside a real transaction; a
+  stale job is requeued while attempts < 2 (its run starts over clean), otherwise its run fails with the reason.
+  `closeAbandonedRuns` fails a run left unfinished for 30 minutes with no job (an inline server that restarted).
+- `src/lib/agent/session.ts` - a follow-up resumes the parent's SDK session with `forkSession` when it still exists
+  (checked with `getSessionInfo`), and always carries a preamble of what the parent did, because on Vercel /tmp is
+  per instance and the session is gone.
+- `src/app/api/runs/[id]/events/route.ts` - Server-Sent Events from the database once a second; ends itself after
+  280 s (under the function limit) and the client reconnects with `?after=<seq>`.
