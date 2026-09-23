@@ -274,7 +274,7 @@ UX review of the changed screens and a code review of `4327198..HEAD`. Productio
 
 | id | source | observed | expected | severity | owner | status |
 |---|---|---|---|---|---|---|
-| Q210 | reviewer | production's database has neither the `rate_limit` table nor `runs.human_verdict_by`; deployed first, every sign-in and every page reading runs fails | the two additive statements run on production before the deploy | blocker (deploy order) | main | open (at the deploy) |
+| Q210 | reviewer | production's database has neither the `rate_limit` table nor `runs.human_verdict_by`; deployed first, every sign-in and every page reading runs fails | the two additive statements run on production before the deploy | blocker (deploy order) | main | fixed (both statements run on production before the deploy of 589d372; sign-in routes answer 200 live) |
 | Q211 | reviewer, qa-func | two owners demoting or removing each other at once both pass (5 of 5): the workspace ends with no owner | one refused; one owner always stays | minor | auth | fixed locally (one change at a time per workspace under an advisory lock, owners re-counted; parallel int test) |
 | Q212 | reviewer | a member's command rename read the status before an admin's approval and landed on the approved automation | the rename refused once it is approved | minor | automations | fixed locally (the rename writes only onto a draft; store.int) |
 | Q213 | reviewer | a removed or demoted admin's pending invitations stay open, so they could rejoin through one | cancelled with the removal or demotion | minor | auth | fixed locally (their pending invitations cancelled in the same locked step; auth.int) |
