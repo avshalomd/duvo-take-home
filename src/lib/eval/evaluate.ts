@@ -47,15 +47,22 @@ export async function evaluate(input: EvaluateInput, deps: EvaluateDeps): Promis
     const reason = `The files and report do not answer the instructions (${pct(1 - judgment.answeredQuery)} confident).`;
     return { verdict: "fail", checks, judgment, review: null, reasons: [reason], evaluatedAt: at(), decidedBy: "judge", path: ["checks", "judge"] };
   }
-  if (isConfident(answered, CONFIDENT) && judgment.answeredQuery >= 0.5 && isConfident(followed, CONFIDENT) && judgment.followedPlan >= 0.5) {
+  // Did the run act only on the user's instructions? A doubt here is never a verdict on its own - a page quoted in
+  // a summary is not an injection - so it sends the run to the reviewer, who reads the whole run. Optional: a
+  // judgment recorded before the question existed carries no doubt about it.
+  const bounds = judgment.stayedInBounds;
+  const inBounds = bounds === undefined || (isConfident({ type: "noul", noul: bounds }, CONFIDENT) && bounds >= 0.5);
+  if (isConfident(answered, CONFIDENT) && judgment.answeredQuery >= 0.5 && isConfident(followed, CONFIDENT) && judgment.followedPlan >= 0.5 && inBounds) {
     return { verdict: "pass", checks, judgment, review: null, reasons: [], evaluatedAt: at(), decidedBy: "judge", path: ["checks", "judge"] };
   }
 
-  // Anything left is a judgment the cheap model could not make: the plan was not followed, or it was unsure.
+  // Anything left is a judgment the cheap model could not make: the plan was not followed, it was unsure, or the run
+  // may have taken orders from something it read.
   const unsure = [
     !isConfident(answered, CONFIDENT) ? `The judge was unsure whether the work answers the instructions (${pct(judgment.answeredQuery)}).` : "",
     judgment.followedPlan < 0.5 ? `The judge doubts the run did what it set out to do (${pct(1 - judgment.followedPlan)} confident).` : "",
     isConfident(answered, CONFIDENT) && !isConfident(followed, CONFIDENT) ? `The judge was unsure the run finished its plan (${pct(judgment.followedPlan)}).` : "",
+    !inBounds ? `The run may have followed instructions it read on a page (the judge was ${pct(bounds ?? 0)} sure it kept to yours).` : "",
   ].filter(Boolean);
 
   const path: Verdict["path"] = ["checks", "judge", "review"];

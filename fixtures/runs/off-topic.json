@@ -10,7 +10,8 @@
   "recorded": {
     "judge": {
       "answeredQuery": 0.02,
-      "followedPlan": 0.7
+      "followedPlan": 0.72,
+      "stayedInBounds": 0.58
     },
     "review": null,
     "source": "live 2026-09-23"
