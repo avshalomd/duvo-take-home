@@ -1,58 +1,58 @@
 import { describe, expect, it } from "vitest";
 import { applyCommand, commandHint, commandQuery, commandWord, describeOutput, emptyListLine, filterAutomations } from "./command-query";
 
+// Commands use a front slash only, "/audit Apple Inc.", as in coding agents (his call, 2026-09-23).
+
 describe("commandQuery - what the composer's automation list filters on", () => {
-  it("opens on a bare \\ or / at the start of the box", () => {
-    expect(commandQuery("\\")).toBe("");
+  it("opens on a bare / at the start of the box", () => {
     expect(commandQuery("/")).toBe("");
   });
 
   it("returns the partial command as it is typed, in lower case", () => {
-    expect(commandQuery("\\aud")).toBe("aud");
+    expect(commandQuery("/aud")).toBe("aud");
     expect(commandQuery("/Aud")).toBe("aud");
-    expect(commandQuery("\\weekly-ne")).toBe("weekly-ne");
+    expect(commandQuery("/weekly-ne")).toBe("weekly-ne");
   });
 
   it("closes once the command is followed by a space: the rest of the line is the input", () => {
-    expect(commandQuery("\\audit ")).toBeNull();
-    expect(commandQuery("\\audit Acme Ltd")).toBeNull();
-    expect(commandQuery("\\audit\nAcme")).toBeNull();
+    expect(commandQuery("/audit ")).toBeNull();
+    expect(commandQuery("/audit Acme Ltd")).toBeNull();
+    expect(commandQuery("/audit\nAcme")).toBeNull();
   });
 
-  it("stays closed for plain text, and for a \\ anywhere but the start", () => {
+  it("stays closed for plain text, for a / anywhere but the start, and for a backslash, which is plain text", () => {
     expect(commandQuery("")).toBeNull();
     expect(commandQuery("Fetch the latest AI news")).toBeNull();
-    expect(commandQuery("save it as a\\b")).toBeNull();
+    expect(commandQuery("save it as a/b")).toBeNull();
+    expect(commandQuery("\\")).toBeNull();
+    expect(commandQuery("\\aud")).toBeNull();
   });
 
   it("stays closed for a word that cannot be a command", () => {
-    expect(commandQuery("\\1st")).toBeNull();
-    expect(commandQuery("\\au!")).toBeNull();
+    expect(commandQuery("/1st")).toBeNull();
+    expect(commandQuery("/au!")).toBeNull();
     expect(commandQuery("//")).toBeNull();
   });
 });
 
 describe("applyCommand - choosing an automation from the list", () => {
   it("replaces the partial command with the full one and a space, ready for the input", () => {
-    expect(applyCommand("\\au", "audit")).toBe("\\audit ");
-    expect(applyCommand("\\", "audit")).toBe("\\audit ");
-  });
-
-  it("keeps the prefix the person typed", () => {
-    expect(applyCommand("/a", "audit")).toBe("/audit ");
+    expect(applyCommand("/au", "audit")).toBe("/audit ");
+    expect(applyCommand("/", "audit")).toBe("/audit ");
   });
 });
 
 describe("commandWord - the command a text asks for, before anything checks that it exists", () => {
-  it("reads the word after a leading \\ or /", () => {
-    expect(commandWord("\\audit Acme Ltd")).toBe("audit");
+  it("reads the word after a leading /", () => {
+    expect(commandWord("/audit Acme Ltd")).toBe("audit");
     expect(commandWord("/Audit Acme Ltd")).toBe("audit");
-    expect(commandWord("\\nope-e2e")).toBe("nope-e2e");
+    expect(commandWord("/nope-e2e")).toBe("nope-e2e");
   });
 
-  it("is null for plain text and for a word that does not start with a letter", () => {
+  it("is null for plain text, a backslash, and a word that does not start with a letter", () => {
     expect(commandWord("Fetch the news")).toBeNull();
-    expect(commandWord("\\ audit")).toBeNull();
+    expect(commandWord("\\audit Acme")).toBeNull();
+    expect(commandWord("/ audit")).toBeNull();
     expect(commandWord("/1st")).toBeNull();
   });
 });
@@ -78,19 +78,20 @@ describe("filterAutomations - the list under the box", () => {
   });
 });
 
-// Q93: after "\news-digest " the box gave no hint of what to type next
+// Q93: after "/news-digest " the box gave no hint of what to type next
 describe("commandHint - what to type after a chosen command", () => {
   const ready = [{ command: "audit", hint: "Company name, e.g. Apple Inc." }];
 
   it("shows the automation's input hint once the command and a space are typed", () => {
-    expect(commandHint("\\audit ", ready)).toBe("Company name, e.g. Apple Inc.");
+    expect(commandHint("/audit ", ready)).toBe("Company name, e.g. Apple Inc.");
     expect(commandHint("/Audit  ", ready)).toBe("Company name, e.g. Apple Inc.");
   });
 
-  it("goes away as soon as the input is typed, and is never shown for an unknown command or plain text", () => {
-    expect(commandHint("\\audit A", ready)).toBeNull();
-    expect(commandHint("\\audit", ready)).toBeNull(); // still choosing: the list is open
-    expect(commandHint("\\nope ", ready)).toBeNull();
+  it("goes away as soon as the input is typed, and is never shown for an unknown command, a backslash or plain text", () => {
+    expect(commandHint("/audit A", ready)).toBeNull();
+    expect(commandHint("/audit", ready)).toBeNull(); // still choosing: the list is open
+    expect(commandHint("/nope ", ready)).toBeNull();
+    expect(commandHint("\\audit ", ready)).toBeNull();
     expect(commandHint("Fetch the news ", ready)).toBeNull();
   });
 });
@@ -107,7 +108,7 @@ describe("emptyListLine - what the command list says when it has nothing to offe
   });
 
   it("names what was typed when ready ones exist but none matches", () => {
-    expect(emptyListLine({ ready: 3, notReady: 0, query: "zz" })).toBe("No ready automation starts with \\zz");
+    expect(emptyListLine({ ready: 3, notReady: 0, query: "zz" })).toBe("No ready automation starts with /zz");
   });
 });
 

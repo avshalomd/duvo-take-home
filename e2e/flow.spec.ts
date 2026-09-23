@@ -47,9 +47,9 @@ test.describe("the frame", () => {
 
   test("the saved automations under the question are tokens that fill the box", async ({ page }) => {
     await page.goto("/");
-    const token = page.getByTestId("automation-tokens").getByRole("button", { name: `\\${READY.command}` });
+    const token = page.getByTestId("automation-tokens").getByRole("button", { name: `/${READY.command}` });
     await token.click();
-    await expect(composer(page)).toHaveValue(`\\${READY.command} `);
+    await expect(composer(page)).toHaveValue(`/${READY.command} `);
   });
 
   test("the rail groups the runs by day and the open run is a sheet with the composer floating at its bottom", async ({ page }) => {
@@ -70,7 +70,7 @@ test.describe("the frame", () => {
     await expect(rail(page).getByRole("link")).toHaveCount(1);
     await expect(rail(page).getByRole("link")).toContainText("follow-up");
 
-    await search.fill(`\\${AUTOMATION.command}`); // Q133
+    await search.fill(`/${AUTOMATION.command}`); // Q133
     await expect(rail(page).locator(`a[href="/?run=${runs.audit}"]`)).toBeVisible();
 
     await search.fill("zzzz no run says this");
@@ -96,21 +96,28 @@ test.describe("the frame", () => {
 });
 
 test.describe("the composer", () => {
-  test("typing \\ lists the ready automations by command and name, and picking one shows what to type next", async ({ page }) => {
+  test("typing / lists the ready automations by command and name, and picking one shows what to type next", async ({ page }) => {
     await page.goto("/");
-    await composer(page).fill("\\e2e-home-re");
+    await composer(page).fill("/e2e-home-re");
     const list = page.getByRole("listbox", { name: /saved automations/i });
-    await expect(list.getByRole("option").first()).toContainText(`\\${READY.command}`);
+    await expect(list.getByRole("option").first()).toContainText(`/${READY.command}`);
     await expect(list.getByRole("option").first()).toContainText(READY.name);
     await composer(page).press("Enter");
-    await expect(composer(page)).toHaveValue(`\\${READY.command} `);
+    await expect(composer(page)).toHaveValue(`/${READY.command} `);
     await expect(page.getByTestId("command-hint")).toHaveText(READY.hint); // Q93
     await composer(page).press("Escape");
   });
 
-  test("Escape closes the list", async ({ page }) => {
+  // his call, 2026-09-23: commands are "/audit ..."; a backslash is plain text and opens nothing
+  test("a backslash does not open the list", async ({ page }) => {
     await page.goto("/");
     await composer(page).fill("\\");
+    await expect(page.getByRole("listbox", { name: /saved automations/i })).toHaveCount(0);
+  });
+
+  test("Escape closes the list", async ({ page }) => {
+    await page.goto("/");
+    await composer(page).fill("/");
     const list = page.getByRole("listbox", { name: /saved automations/i });
     await expect(list).toBeVisible();
     await composer(page).press("Escape");
@@ -134,15 +141,15 @@ test.describe("the composer", () => {
 
   test("a command that is not a saved automation is refused, naming it", async ({ page }) => {
     await page.goto("/");
-    await composer(page).fill("\\nope-e2e Acme Ltd");
+    await composer(page).fill("/nope-e2e Acme Ltd");
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "\\nope-e2e" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "/nope-e2e" })).toBeVisible();
   });
 
   // Q116: every refusal read "no saved automation called ..." even for one that exists but is a draft
   test("a command to an automation that is not approved yet says so", async ({ page }) => {
     await page.goto("/");
-    await composer(page).fill(`\\${AUTOMATION.command} Acme Ltd`);
+    await composer(page).fill(`/${AUTOMATION.command} Acme Ltd`);
     await page.getByRole("button", { name: "Run", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("is not approved yet");
   });

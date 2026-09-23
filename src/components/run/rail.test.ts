@@ -63,9 +63,9 @@ describe("matchesSearch - the rail's search box", () => {
 
   // Q133: an automation's run is found by what the person typed - its command, its name, its input
   it("also matches the title and the command a run was started with", () => {
-    const audit = { prompt: "Audit Acme Ltd: ownership, filings ...", title: "Company audit: Acme Ltd", tag: "\\audit" };
+    const audit = { prompt: "Audit Acme Ltd: ownership, filings ...", title: "Company audit: Acme Ltd", tag: "/audit" };
     expect(matchesSearch(audit, "audit")).toBe(true);
-    expect(matchesSearch(audit, "\\audit acme")).toBe(true);
+    expect(matchesSearch(audit, "/audit acme")).toBe(true);
     expect(matchesSearch(audit, "company")).toBe(true);
   });
 });
@@ -99,11 +99,11 @@ describe("runTag - the quiet label that says why a run exists", () => {
   const commands = { "auto-1": "audit" };
 
   it("names the command of a saved automation", () => {
-    expect(runTag({ purpose: "automation", automationId: "auto-1" }, commands)).toBe("\\audit");
+    expect(runTag({ purpose: "automation", automationId: "auto-1" }, commands)).toBe("/audit"); // a front slash only
   });
 
   it("says a scheduled run was started by the schedule", () => {
-    expect(runTag({ purpose: "schedule", automationId: "auto-1" }, commands)).toBe("\\audit, scheduled");
+    expect(runTag({ purpose: "schedule", automationId: "auto-1" }, commands)).toBe("/audit, scheduled");
   });
 
   it("still tags an automation run whose automation is gone", () => {
