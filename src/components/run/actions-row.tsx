@@ -33,7 +33,7 @@ export function ActionsRow({ run, verdict, headline }: { run: Run; verdict: Verd
           <MessageSquarePlus aria-hidden className="size-4 text-slate" />
           Ask for a change
         </button>
-        {run.status !== "failed" && <RunAgainButton prompt={run.prompt} />}
+        {run.status !== "failed" && <RunAgainButton runId={run.id} />}
       </div>
       {asking && (
         <div className="mt-4 max-w-[40rem]">

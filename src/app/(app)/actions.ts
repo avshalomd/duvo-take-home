@@ -12,6 +12,7 @@ import { reevaluateRun } from "@/lib/eval/reevaluate";
 import { cancelRun } from "@/lib/runs/cancel";
 import { startFollowUp } from "@/lib/runs/follow-up";
 import { getRun } from "@/lib/runs/queries";
+import { startRunAgain } from "@/lib/runs/run-again";
 import { startRun } from "@/lib/runs/start";
 import { readable } from "./readable";
 
@@ -55,6 +56,24 @@ export async function startRunAction(_prev: FormState, formData: FormData): Prom
     return { startedId: id };
   } catch (e) {
     return { error: readable(e), values }; // keeps what was typed, so the instructions are not lost
+  }
+}
+
+/**
+ * "Run again": only the run's id comes from the browser. The brief is read from the run in the caller's workspace,
+ * so a follow-up runs its whole thread again and a page cannot start a paid run of any text it likes.
+ */
+export async function runAgainAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const runId = RunId.safeParse(String(formData.get("runId") ?? ""));
+  if (!runId.success) return { error: "No run selected" };
+
+  const session = await requireSession();
+  try {
+    const started = await startRunAgain({ workspaceId: session.workspaceId, userId: session.userId }, runId.data);
+    if (!started) return { error: "That run no longer exists" };
+    return { startedId: started.id };
+  } catch (e) {
+    return { error: readable(e) }; // the day's limits, or a thread too long to run as one brief
   }
 }
 
