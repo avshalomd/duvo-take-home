@@ -30,6 +30,7 @@ import { buildGuardHooks } from "./guards";
 import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
 import { newlyDone } from "./plan-diff";
+import { PLAN_SERVER_KEY } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
 import { resumeOptions, sessionIdOf } from "./session";
 import { SYSTEM_PROMPT } from "./system.prompt";
@@ -208,8 +209,8 @@ export const runAutomation: RunAutomation = async (runId) => {
         tools: NATIVE_TOOLS, // the child's built-in tool set; MCP tools are added by mcpServers and are not in it
         allowedTools: [
           ...NATIVE_TOOLS,
-          "mcp__plan__*",
-          ...(outputs ? [`mcp__${OUTPUTS_SERVER_KEY}__*`] : []),
+          `mcp__${PLAN_SERVER_KEY}__*`,
+          `mcp__${OUTPUTS_SERVER_KEY}__*`,
           ...Object.keys(servers).map((k) => `mcp__${k}__*`),
         ],
         disallowedTools: ["Bash", "Edit", "Task", "Glob", "Grep", "NotebookEdit"], // allowedTools approves, only this restricts
@@ -228,7 +229,8 @@ export const runAutomation: RunAutomation = async (runId) => {
         maxBudgetUsd: AgentLimits.maxBudgetUsd,
         model: AGENT_MODEL,
         systemPrompt, // a plain string replaces Claude Code's large preset prompt
-        mcpServers: { plan: createPlanServer(), ...(outputs ? { [OUTPUTS_SERVER_KEY]: outputs } : {}), ...servers },
+        // The user's servers first and ours last: a connection keyed "plan" or "outputs" must never replace our own tools.
+        mcpServers: { ...servers, [PLAN_SERVER_KEY]: createPlanServer(), [OUTPUTS_SERVER_KEY]: outputs },
         env: { ...process.env }, // env REPLACES the child's environment: without the spread it has no API key
         ...resume, // a follow-up: { resume, forkSession } when the parent's session is still on this machine
       },
