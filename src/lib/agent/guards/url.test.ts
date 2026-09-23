@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Plan } from "@/contracts/run";
-import type { HostVerdict } from "@/lib/net/address";
+import type { HostVerdict, Reach } from "@/lib/net/address";
 import { JEV_TIMEOUT_MS, type AskExfiltration, type ExfiltrationState } from "./exfiltration";
 import { isDeniedHost, isPrivateHost, urlCheck as check } from "./url";
 
 // No DNS in unit tests: every name is public unless a test says where it leads.
 const allPublic = async (): Promise<HostVerdict> => ({ reach: "public" });
-const urlCheck = (c: Parameters<typeof check>[0], ask?: AskExfiltration, timeoutMs = JEV_TIMEOUT_MS, reach = allPublic) =>
+const urlCheck = (c: Parameters<typeof check>[0], ask?: AskExfiltration, timeoutMs = JEV_TIMEOUT_MS, reach: Reach = allPublic) =>
   check(c, ask, timeoutMs, reach);
 
 // The url guard stands between WebFetch and the network. Permissions are bypassed, so a page the agent reads

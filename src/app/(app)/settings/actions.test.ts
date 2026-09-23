@@ -18,7 +18,9 @@ vi.mock("@/lib/connections/store", () => ({
   ...store,
   ConnectionNotFoundError: class extends Error {},
   ConnectionNameTakenError: class extends Error {},
-  PrivateAddressError: class extends Error {},
+  PrivateAddressError: class extends Error {
+    message = "That address points at a private or local network, which a connection cannot reach";
+  },
 }));
 vi.mock("@/lib/auth/members", () => ({ inviteMember: vi.fn(), listMembers: vi.fn(async () => []) }));
 vi.mock("@/lib/usage/budget", () => ({ updateLimits: vi.fn() }));
@@ -89,8 +91,7 @@ describe("a connection address that resolves to a private network", () => {
   it.each(["add", "edit"] as const)("is shown beside the Address field, with what was typed kept (%s)", async (what) => {
     session.role = "owner";
     const { PrivateAddressError } = await import("@/lib/connections/store");
-    const refused = new PrivateAddressError("That address points at a private or local network, which a connection cannot reach");
-    (what === "add" ? store.addConnection : store.updateConnection).mockRejectedValueOnce(refused);
+    (what === "add" ? store.addConnection : store.updateConnection).mockRejectedValueOnce(new PrivateAddressError());
     const out = await writes[what]();
     expect(out.fieldErrors?.url).toEqual(["That address points at a private or local network, which a connection cannot reach"]);
     expect(out.values).toMatchObject({ url: "https://attacker.example/mcp" });
