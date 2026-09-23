@@ -126,3 +126,29 @@ plan, fra1) is connected to the Vercel project's development environment only, u
 | Q87 | reviewer | the budget is counted, then the run inserted, with no lock: parallel starts all pass | count and insert in one transaction under a per-workspace advisory lock | minor | engine | fixed (14b6996: check and insert under a per-workspace advisory lock; 5 parallel starts, 3 pass) |
 | Q88 | eval | `scripts/record-run.ts` records a follow-up with only its change as the prompt (it runs outside Next and cannot load `instructionsOf`) | a recorded follow-up case carries its full instructions | minor | eval | open (no follow-up case in the suite yet; label by hand until then) |
 | Q89 | settings | GET /api/connections/oauth/start checks the session but not the role: a member calling it directly can start a sign-in that writes OAuth credentials | owners and admins only, the same rule as the settings actions | minor | oauth | fixing |
+| Q90 | qa-ux | 5 of today's 8 demo runs read "did not pass" only because their checks were stored before .svg/.xlsx were allowed | re-checked or removed from the demo workspace | major | main (demo data) | open |
+| Q91 | qa-ux | older seeded runs say "looks good" while Why? says "not checked" and Details "not judged" (an older stored check format) | the three agree | minor | home | redesign |
+| Q92 | qa-ux | the `\` command list at 1280 squeezes the automation's name to nothing behind a long technical "makes ..." line | command and name first, the output line truncated | minor | home | redesign |
+| Q93 | qa-ux | after picking a command the box shows `\news-digest ` with no hint of what to type | the input's label or hint shown after the command | minor | home | redesign |
+| Q94 | qa-ux | an automation run's title is its filled-in instructions | "<automation name>: <input>" | minor | home | redesign |
+| Q95 | qa-ux | example runs show the full prompt in the rail; "Example for an automation being tested" names no automation and stays after approval | the input as the title; "Example for <name>" linking to it | minor | home | redesign |
+| Q96 | qa-ux | tool names in plan step titles ("... using make_chart") | step titles in plain words | minor | guards (system prompt) | open |
+| Q97 | qa-ux | markdown tables in the report render as raw pipes | rendered tables | minor | home | redesign |
+| Q98 | qa-ux | chart labels about 5 px, the x-axis title overlapping a tick label, a tiny pie legend | readable at 390 px | minor | outputs | open |
+| Q99 | qa-ux | "0.0 KB" for a small file | bytes under 1 KB | minor | home | redesign |
+| Q100 | qa-ux | "No files yet - this run writes its answer in the report below" on finished and failed runs, even with no report | wording per state | minor | home | redesign |
+| Q101 | qa-ux | a failed run says "You can run the same instructions again" but offers only an unlabelled icon | a labelled "Run again" | minor | home | redesign |
+| Q102 | qa-ux | a failed run's Why? repeats the banner | Why? adds information or is hidden | minor | home | redesign |
+| Q103 | qa-ux | Details lists the built-in chart tool as a connection, and its Files row misses the tool-made files | built-in tools kept out of Connections; every file listed | minor | home (state.ts) | redesign |
+| Q104 | qa-ux | the SEARCH badge in Details is unreadable in dark mode | readable in both themes | minor | home | redesign |
+| Q105 | qa-ux | rail rows with the same title cannot be told apart; red dots mean both "did not pass" and "went wrong", with no words | the outcome in words on hover and for screen readers | minor | home | redesign |
+| Q106 | qa-ux | the ready automation page: "Turn off" unexplained, two primary buttons, the Run input unlabelled | one primary action, labelled input, Turn off beside the status with a line | minor | automations | redesign |
+| Q107 | qa-ux | schedules offered in UTC only, a raw cron field up front, the scheduled input empty despite an example | local time, cron as an advanced option, the example prefilled | minor | automations | redesign |
+| Q108 | qa-ux | "New from a run" lists runs that did not pass first | good runs first, the others marked | minor | automations | redesign |
+| Q109 | qa-ux | a pending invitation disappears on reload: its link cannot be found again or revoked | a pending list with Copy link and Revoke | minor | auth (lib) + settings (page) | redesign |
+| Q110 | qa-ux | sign-up with a taken email says "Sign in instead." as plain text | a link to sign-in with the email filled in | minor | auth | redesign |
+| Q111 | qa-ux | the main button is green on Home and Automations, near-black elsewhere | one primary style | minor | main | fixed (d4992fa: the ink pill for every primary) |
+| Q112 | qa-ux | Settings repeats its tab name as a card title (Connections, Members) | no repeated heading | minor | settings | redesign |
+| Q113 | qa-ux | the product name "Automations" reads as a second nav link; on a phone the workspace name is hidden | a distinct product mark; the workspace named in the phone menu | minor | home + auth | redesign |
+| Q114 | qa-ux | "Stopped by you" also when another member stopped it; a skipped step counts toward "4 of 4" | "Stopped"; "3 of 4 done, 1 skipped" | minor | home | redesign |
+| Q115 | qa-ux | every page logs "Only plain objects can be passed to Client Components ... Set objects are not supported" in dev | no error | minor | home | open |
