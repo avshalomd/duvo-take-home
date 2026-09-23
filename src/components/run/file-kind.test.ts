@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvLine, fileKind, flagLine, formatBytes, noFilesLine, sheetsLine, sheetsOf } from "./file-kind";
+import { carriedSheets, csvLine, fileKind, flagLine, formatBytes, noFilesLine, sheetsLine, sheetsOf, tileSheets } from "./file-kind";
 
 describe("fileKind - how a file is shown on the run", () => {
   it("previews a chart, cards a spreadsheet and lists everything else as a document", () => {
@@ -107,5 +107,20 @@ describe("sheetsOf / sheetsLine - a spreadsheet tile names its sheets", () => {
     ).toBe("Sheets Summary (2 rows) and Data (1 row)");
     expect(sheetsLine([{ name: "Sheet1", rows: 40 }])).toBe("One sheet, Sheet1, with 40 rows");
     expect(sheetsLine([])).toBeNull();
+  });
+
+  // Q205: a follow-up carries its parent's files over without making them again, so its own events have no call and
+  // the tile lost "One sheet, Fruit, with 3 rows"
+  it("finds the sheets of a spreadsheet a follow-up carried over in the runs it follows up", () => {
+    const earlier = [call(1, "fruit.xlsx", [{ name: "Draft", rows: [] }]), call(2, "fruit.xlsx", [{ name: "Fruit", rows: [[1], [2], [3]] }])];
+    expect(carriedSheets(["fruit.xlsx", "fruit.csv", "gone.xlsx"], earlier)).toEqual({ "fruit.xlsx": [{ name: "Fruit", rows: 3 }] });
+  });
+
+  it("prefers the run's own call, and falls back to what was carried over", () => {
+    const own = [call(5, "fruit.xlsx", [{ name: "Totals", rows: [[1]] }])];
+    const carried = [{ name: "Fruit", rows: 3 }];
+    expect(tileSheets("fruit.xlsx", own, carried)).toEqual([{ name: "Totals", rows: 1 }]);
+    expect(tileSheets("fruit.xlsx", [], carried)).toEqual(carried);
+    expect(tileSheets("fruit.xlsx", [])).toEqual([]);
   });
 });

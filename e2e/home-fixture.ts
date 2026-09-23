@@ -17,13 +17,14 @@ function client() {
 
 export type HomeRuns = {
   parent: string; followUp: string; live: string; stopped: string; failed: string; legacy: string; audit: string; automation: string;
-  example: string; long: string; healing: string; healed: string; unfixed: string; stuck: string;
+  example: string; long: string; healing: string; healed: string; unfixed: string; stuck: string; carried: string;
 };
 export const AUTOMATION = { name: `${PREFIX} audit`, command: COMMAND, input: "Acme Ltd" }; // a draft
 export const READY = { name: `${PREFIX} ready check`, command: "e2e-home-ready", hint: "The registered name, e.g. Acme Ltd" };
 export const TITLES = {
   parent: `${PREFIX} parent: list three facts about the Moon`,
   followUp: `${PREFIX} follow-up: add the Moon's distance from Earth`,
+  carried: `${PREFIX} carried: write the report again, shorter`, // a follow-up of the follow-up that keeps its files
   live: `${PREFIX} live: count to three slowly`,
   stopped: `${PREFIX} stopped: summarise the week's AI news`,
   failed: `${PREFIX} failed: fetch a page that is not there`,
@@ -191,6 +192,12 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   });
   await file(followUp, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("not a real workbook").toString("base64"), { encoding: "base64" });
 
+  // Q205: a follow-up gets its parent's files back and keeps them without making them again, so its events have no
+  // spreadsheet call for table.xlsx: the tile must still say what the sheets are
+  const carried = await insert({ prompt: TITLES.carried, status: "succeeded", minutesAgo: 3, purpose: "followup", parent: followUp, verdict: V1_PASS, report: "Shorter now." });
+  await events(carried, [started, { kind: "plan", payload: PLAN(null) }, finished()]);
+  await file(carried, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("not a real workbook").toString("base64"), { encoding: "base64" });
+
   const stopped = await insert({ prompt: TITLES.stopped, status: "cancelled", minutesAgo: 2 });
   await events(stopped, [started, { kind: "plan", payload: PLAN(1) }]);
 
@@ -219,7 +226,7 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   const stuck = await insert({ prompt: TITLES.stuck, status: "succeeded", minutesAgo: 14, heals: 1, verdict: FAIL_ROWS, report: "Six sea stories.", cost: 0.15 });
   await events(stuck, [started, { kind: "plan", payload: PLAN(null) }, attempt(0.1, 0.1), heal(1, HEAL.reason), attempt(0.15, 0.05), { kind: "heal", payload: { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"], feedback: HEAL.feedback, stopped: HEAL.stopped } }]);
 
-  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck };
+  return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck, carried };
 }
 
 export async function deleteHomeRuns(): Promise<void> {

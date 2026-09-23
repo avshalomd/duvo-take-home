@@ -87,7 +87,7 @@ test.describe("the frame", () => {
   test("the search box filters the rail by the instructions, and by an automation's command and name", async ({ page }) => {
     await page.goto("/");
     const search = rail(page).getByRole("searchbox", { name: /search runs/i });
-    await search.fill("e2e home follow-up");
+    await search.fill("e2e home follow-up distance"); // every word, in any order: the tag and the title together
     await expect(rail(page).getByRole("link")).toHaveCount(1);
     await expect(rail(page).getByRole("link")).toContainText("follow-up");
 
@@ -463,6 +463,12 @@ test.describe("a finished run", () => {
       const panel = await openRun(page, runs.followUp);
       await expect(panel.getByTestId("files").getByRole("img", { name: /chart\.svg/ })).toHaveCSS("background-color", paper);
     }
+  });
+
+  // Q205: a follow-up's carried-over spreadsheet lost its "One sheet, ... with ... rows" line
+  test("a follow-up's carried-over spreadsheet says its sheets, as it did on the run that made it", async ({ page }) => {
+    const panel = await openRun(page, runs.carried);
+    await expect(panel.getByTestId("files")).toContainText("One sheet, Measures, with 2 rows");
   });
 
   test("the report renders its tables", async ({ page }) => {
