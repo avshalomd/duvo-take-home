@@ -1,0 +1,68 @@
+"use server";
+
+import { APIError } from "better-auth/api";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import type { WorkspaceSummary } from "@/contracts/auth";
+import { auth } from "./auth";
+import { listWorkspaces } from "./members";
+import { safeNext, withNext } from "./paths";
+import { requireSession } from "./session";
+import { workspaceSlug } from "./workspace-name";
+
+// The user menu's and the invitation page's writes. Each reads the session itself (never an id from the client
+// for who is asking); Better Auth checks membership before it switches or accepts anything.
+
+/** The workspaces for the user menu, loaded when it opens so the top bar needs no extra props. */
+export async function loadWorkspaces(): Promise<{ activeId: string; workspaces: WorkspaceSummary[] }> {
+  const ctx = await requireSession();
+  return { activeId: ctx.workspaceId, workspaces: await listWorkspaces(ctx.userId) };
+}
+
+/** Makes another of the user's workspaces the active one, then opens Home: a run open on screen belongs to the old one. */
+export async function switchWorkspace(workspaceId: string) {
+  await requireSession();
+  const id = z.string().min(1).max(100).parse(workspaceId);
+  await auth.api.setActiveOrganization({ headers: await headers(), body: { organizationId: id } });
+  redirect("/");
+}
+
+export type NewWorkspaceState = { error?: string; name?: string };
+
+const NewWorkspace = z.object({ name: z.string().trim().min(1, "Give the workspace a name").max(60, "Keep the name under 60 characters") });
+
+/** A new, empty workspace with the user as its owner; Better Auth makes it the active one. */
+export async function createWorkspace(_prev: NewWorkspaceState, form: FormData): Promise<NewWorkspaceState> {
+  await requireSession();
+  const parsed = NewWorkspace.safeParse({ name: form.get("name") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message, name: String(form.get("name") ?? "") };
+  const { name } = parsed.data;
+  await auth.api.createOrganization({
+    headers: await headers(),
+    body: { name, slug: workspaceSlug(name, crypto.randomUUID().slice(0, 6)) },
+  });
+  redirect("/");
+}
+
+/** Ends the session and opens the sign-in page, which returns to `next` (the invitation page uses it) after. */
+export async function signOut(next?: string) {
+  await auth.api.signOut({ headers: await headers() }); // nextCookies() clears the cookie on this action's response
+  redirect(withNext("/sign-in", safeNext(next)));
+}
+
+export type AcceptState = { error?: string };
+
+/** Accepts the invitation for the signed-in user and lands them in its workspace (Better Auth makes it active). */
+export async function acceptInvitation(invitationId: string): Promise<AcceptState> {
+  await requireSession();
+  try {
+    await auth.api.acceptInvitation({ headers: await headers(), body: { invitationId } });
+  } catch (e) {
+    const code = e instanceof APIError ? e.body?.code : undefined;
+    if (code === "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION") return { error: "This invitation was sent to another email address." };
+    if (code === "INVITATION_NOT_FOUND") return { error: "This invitation has expired or was already used. Ask for a new link." };
+    throw e; // anything else is a real failure: the error page, with the stack in the log
+  }
+  redirect("/");
+}

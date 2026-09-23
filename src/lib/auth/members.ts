@@ -3,7 +3,7 @@ import { APIError } from "better-auth/api";
 import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/db";
-import { member, organization, user } from "@/db/schema";
+import { invitation, member, organization, user } from "@/db/schema";
 import type { InviteMember, ListMembers, ListWorkspaces, Member, SessionCtx } from "@/contracts/auth";
 import { InviteInput } from "@/contracts/auth";
 import { auth } from "./auth";
@@ -30,6 +30,21 @@ export const listWorkspaces: ListWorkspaces = async (userId) => {
     .orderBy(asc(member.createdAt));
   return rows.map((r) => ({ ...r, role: toRole(r.role) }));
 };
+
+export type InvitationView = { id: string; email: string; workspaceName: string; inviterName: string; open: boolean };
+
+/** What the invitation page shows before anyone signs in: who invited whom to which workspace, and whether it is still open. */
+export async function getInvitation(id: string): Promise<InvitationView | null> {
+  const [row] = await db
+    .select({ id: invitation.id, email: invitation.email, status: invitation.status, expiresAt: invitation.expiresAt, workspaceName: organization.name, inviterName: user.name })
+    .from(invitation)
+    .innerJoin(organization, eq(invitation.organizationId, organization.id))
+    .innerJoin(user, eq(invitation.inviterId, user.id))
+    .where(eq(invitation.id, id));
+  if (!row) return null;
+  const open = row.status === "pending" && row.expiresAt > new Date(); // accepted, cancelled or past 48 hours: closed
+  return { id: row.id, email: row.email, workspaceName: row.workspaceName, inviterName: row.inviterName, open };
+}
 
 /** The link an invited person opens. No mail provider is configured, so the inviter copies and sends it. */
 export function inviteLink(invitationId: string): string {
