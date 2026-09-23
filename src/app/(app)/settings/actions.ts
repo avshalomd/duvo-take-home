@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { InviteInput } from "@/contracts/auth";
-import { inviteMember } from "@/lib/auth/members";
+import { inviteMember, listMembers } from "@/lib/auth/members";
 import { requireSession } from "@/lib/auth/session";
 import { addConnection, deleteConnection, setConnectionEnabled, updateConnection } from "@/lib/connections/store";
 import { updateLimits } from "@/lib/usage/budget";
@@ -103,6 +103,10 @@ export async function inviteMemberAction(_prev: InviteState, formData: FormData)
   // the form is only shown to owners and admins; the action checks again, because anyone can post to it
   if (session.role === "member") return { error: "Only an owner or an admin can invite people to this workspace.", values };
   try {
+    // Asked first, in our words: the auth package says it with a plain Error, which inviteError cannot tell from a crash
+    const members = await listMembers(session.workspaceId);
+    if (members.some((m) => m.email.toLowerCase() === parsed.data.email.toLowerCase()))
+      return { error: `${parsed.data.email} is already a member of this workspace.`, values };
     const { link } = await inviteMember(session, parsed.data);
     revalidatePath("/settings/members");
     return { link, email: parsed.data.email };

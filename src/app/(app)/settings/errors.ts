@@ -16,8 +16,6 @@ export function settingsError(e: unknown): string {
 }
 
 export function inviteError(e: unknown): string {
-  // until the auth package lands, inviteMember is a stub: say so plainly instead of "something went wrong"
-  if (e instanceof Error && e.message.startsWith("not implemented")) return "Invitations are not switched on yet. Try again later.";
-  if (isAPIError(e)) return e.message; // Better Auth's messages are written for users ("already a member", ...)
+  if (isAPIError(e)) return e.message; // Better Auth's own refusals are written for users ("You are not allowed to invite ...")
   return readable(e);
 }
