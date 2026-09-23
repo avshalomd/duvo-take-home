@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Connection } from "@/contracts/connection";
+import { submitKeepingValues } from "./submit-keeping-values";
 
 type AuthType = "none" | "bearer" | "oauth";
 
@@ -43,9 +44,12 @@ export function ConnectionDialog({
   );
 }
 
-function ConnectionForm({ connection, onDone }: { connection?: Connection; onDone: () => void }) {
+function ConnectionForm({ connection: current, onDone }: { connection?: Connection; onDone: () => void }) {
+  // The form starts from the connection as it was when the dialog opened: a save refreshes the list while the dialog
+  // is still fading out, and changing an input's default value after mount is what Base UI warns about.
+  const [connection] = useState(current);
   const [state, action, pending] = useActionState(connection ? updateConnectionAction : addConnectionAction, {});
-  const [authType, setAuthType] = useState<AuthType>((state.values?.authType as AuthType) ?? connection?.authType ?? "none");
+  const [authType, setAuthType] = useState<AuthType>(connection?.authType ?? "none");
   const submitted = useRef(false);
   const form = useRef<HTMLFormElement>(null);
 
@@ -65,24 +69,24 @@ function ConnectionForm({ connection, onDone }: { connection?: Connection; onDon
     }
   }, [state, pending, connection, authType, onDone]);
 
-  const values = state.values;
   return (
+    // submitted without React's reset: after a refused submit, the chosen sign-in and a pasted token stay as they were
     <form
       data-testid="connection-form"
       ref={form}
-      action={action}
-      onSubmit={() => {
+      onSubmit={(e) => {
         submitted.current = true;
+        submitKeepingValues(e, action);
       }}
       className="space-y-4"
     >
       {connection && <input type="hidden" name="id" value={connection.id} />}
-      <Field name="name" label="Name" placeholder="Linear" defaultValue={values?.name ?? connection?.name} error={state.fieldErrors?.name?.[0]} />
+      <Field name="name" label="Name" placeholder="Linear" defaultValue={connection?.name} error={state.fieldErrors?.name?.[0]} />
       <Field
         name="url"
         label="Address"
         placeholder="https://mcp.example.com/mcp"
-        defaultValue={values?.url ?? connection?.url}
+        defaultValue={connection?.url}
         error={state.fieldErrors?.url?.[0]}
       />
 
@@ -137,7 +141,7 @@ function ConnectionForm({ connection, onDone }: { connection?: Connection; onDon
           <select
             id="transport"
             name="transport"
-            defaultValue={values?.transport ?? connection?.transport ?? "http"}
+            defaultValue={connection?.transport ?? "http"}
             className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm text-foreground"
           >
             <option value="http">Streamable HTTP (most servers)</option>

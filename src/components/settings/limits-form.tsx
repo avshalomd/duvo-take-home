@@ -10,14 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceLimits } from "@/contracts/usage";
+import { submitKeepingValues } from "./submit-keeping-values";
 
-// The workspace's limits and guard switches. useActionState hands back what was typed with the errors, because React
-// resets a form after its action runs (CLAUDE.md, "Forms").
+// The workspace's limits and guard switches. Submitted without React's form reset, so a refused value stays as typed
+// next to its error; the form is keyed on the saved limits, so once a save lands its fields start from the saved values.
 export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEdit: boolean }) {
   const [state, action, pending] = useActionState(updateLimitsAction, {});
   const submitted = useRef(false);
   const form = useRef<HTMLFormElement>(null);
-  const v = state.values;
   const errors = state.fieldErrors;
 
   useEffect(() => {
@@ -34,10 +34,11 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
 
   return (
     <form
+      key={JSON.stringify(limits)}
       ref={form}
-      action={action}
-      onSubmit={() => {
+      onSubmit={(e) => {
         submitted.current = true;
+        submitKeepingValues(e, action);
       }}
       className="space-y-5 rounded-xl border bg-background p-4"
     >
@@ -49,7 +50,7 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
             hint="Runs stop starting once today's runs cost this much."
             step="0.01"
             min="0"
-            defaultValue={v?.dailyBudgetUsd ?? String(limits.dailyBudgetUsd)}
+            defaultValue={String(limits.dailyBudgetUsd)}
             error={errors?.dailyBudgetUsd?.[0]}
           />
           <NumberField
@@ -58,7 +59,7 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
             hint="How many runs can start in one day."
             step="1"
             min="1"
-            defaultValue={v?.dailyRunLimit ?? String(limits.dailyRunLimit)}
+            defaultValue={String(limits.dailyRunLimit)}
             error={errors?.dailyRunLimit?.[0]}
           />
           <NumberField
@@ -67,7 +68,7 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
             hint="More have to wait for one to finish."
             step="1"
             min="1"
-            defaultValue={v?.maxInFlight ?? String(limits.maxInFlight)}
+            defaultValue={String(limits.maxInFlight)}
             error={errors?.maxInFlight?.[0]}
           />
         </div>
@@ -77,13 +78,13 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
             name="stepChecks"
             label="Check each step as it finishes"
             hint="A quick automatic check after every step, so a run that drifts off track is flagged early."
-            defaultChecked={v ? v.stepChecks === "on" : limits.stepChecks}
+            defaultChecked={limits.stepChecks}
           />
           <SwitchField
             name="strictConnections"
             label="Block connections the plan did not name"
             hint="When off, the run only notes it. When on, the agent is stopped from using them."
-            defaultChecked={v ? v.strictConnections === "on" : limits.strictConnections}
+            defaultChecked={limits.strictConnections}
           />
         </div>
 
@@ -98,8 +99,8 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
             id="deniedDomains"
             name="deniedDomains"
             rows={4}
-            placeholder={"pastebin.com\nexample.com"}
-            defaultValue={v?.deniedDomains ?? limits.deniedDomains.join("\n")}
+            placeholder="None yet. For example: pastebin.com" // an example that reads as one, not as a saved value
+            defaultValue={limits.deniedDomains.join("\n")}
             aria-invalid={Boolean(errors?.deniedDomains)}
             aria-describedby={errors?.deniedDomains ? "deniedDomains-error" : "deniedDomains-hint"}
           />

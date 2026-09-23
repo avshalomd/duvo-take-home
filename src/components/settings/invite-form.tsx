@@ -7,6 +7,7 @@ import { inviteMemberAction, type InviteState } from "@/app/(app)/settings/actio
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { submitKeepingValues } from "./submit-keeping-values";
 
 // No mail is sent (no mail provider is configured), so an invitation is a link the inviter passes on themselves.
 export function InviteForm() {
@@ -17,6 +18,11 @@ export function InviteForm() {
   useEffect(() => {
     if (emailError) form.current?.querySelector<HTMLInputElement>("#invite-email")?.focus();
   }, [emailError]);
+
+  // once a link is made, the form empties for the next person; a refused address stays in the field to be corrected
+  useEffect(() => {
+    if (state.link) form.current?.reset();
+  }, [state.link]);
 
   async function copy(link: string) {
     try {
@@ -33,7 +39,7 @@ export function InviteForm() {
         <h2 className="text-sm font-semibold">Invite someone</h2>
         <p className="text-xs text-muted-foreground">You get a link to send them. It lets them join this workspace.</p>
       </div>
-      <form ref={form} action={action} className="flex flex-wrap items-end gap-2">
+      <form ref={form} onSubmit={(e) => submitKeepingValues(e, action)} className="flex flex-wrap items-end gap-2">
         <div className="min-w-56 flex-1 space-y-1">
           <Label htmlFor="invite-email" className="text-xs">
             Email
@@ -43,7 +49,6 @@ export function InviteForm() {
             name="email"
             type="email"
             placeholder="colleague@example.com"
-            defaultValue={state.link ? "" : state.values?.email}
             aria-invalid={Boolean(emailError)}
             aria-describedby={emailError ? "invite-email-error" : undefined}
           />
@@ -55,7 +60,7 @@ export function InviteForm() {
           <select
             id="invite-role"
             name="role"
-            defaultValue={state.values?.role ?? "member"}
+            defaultValue="member"
             className="h-8 rounded-lg border bg-transparent px-2 text-sm"
           >
             <option value="member">Member: runs and builds automations</option>
