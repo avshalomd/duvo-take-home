@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { DEMO_EMAIL, DEMO_PASSWORD, SIGNED_OUT, deleteUsers, e2eEmail, formError, signInThroughUi, signUpThroughUi } from "./auth-helpers";
+import {
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+  E2E_PASSWORD,
+  SIGNED_OUT,
+  deleteUsers,
+  e2eEmail,
+  formError,
+  inviteByRow,
+  signInThroughUi,
+  signUpThroughUi,
+} from "./auth-helpers";
 
 // Getting in and out. Local only (it creates accounts):
 // BASE_URL=http://localhost:3004 npx playwright test e2e/auth.spec.ts
@@ -59,6 +70,58 @@ test("signing out from the user menu ends the session", async ({ page }) => {
   await expect(page).toHaveURL((url) => url.pathname === "/sign-in");
   await page.goto("/");
   await expect(page).toHaveURL((url) => url.pathname === "/sign-in");
+});
+
+test("an invitation link lets a new person create an account and join the workspace", async ({ browser, page }) => {
+  const owner = e2eEmail("owner");
+  const invitee = e2eEmail("invitee");
+  created.push(owner, invitee);
+  await signUpThroughUi(page, "Olga Owner", owner);
+  const invitationId = await inviteByRow(owner, invitee);
+
+  const guest = await browser.newContext({ storageState: SIGNED_OUT });
+  try {
+    const guestPage = await guest.newPage();
+    await guestPage.goto(`/invite/${invitationId}`);
+    await expect(guestPage.getByRole("heading", { name: "Join Olga's workspace" })).toBeVisible();
+    await expect(guestPage.getByText(`Olga Owner invited ${invitee}`)).toBeVisible();
+
+    await guestPage.getByRole("link", { name: "Create an account" }).click();
+    await expect(guestPage.getByLabel("Email")).toHaveValue(invitee); // the address the invitation was sent to
+    await guestPage.getByLabel("Your name").fill("Ivan Invitee");
+    await guestPage.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
+    await guestPage.getByRole("button", { name: "Create account" }).click();
+
+    await expect(guestPage).toHaveURL((url) => url.pathname === `/invite/${invitationId}`);
+    await guestPage.getByRole("button", { name: "Join Olga's workspace" }).click();
+    await expect(guestPage).toHaveURL((url) => url.pathname === "/");
+    await expect(guestPage.getByTestId("app-header")).toContainText("Olga's workspace");
+  } finally {
+    await guest.close();
+  }
+});
+
+test("a used or unknown invitation link says it is closed", async ({ page }) => {
+  await page.goto("/invite/e2e-no-such-invitation");
+  await expect(page.getByRole("heading", { name: "This invitation is closed" })).toBeVisible();
+});
+
+test("a new workspace made from the user menu opens at once, and the menu switches back", async ({ page }) => {
+  const email = e2eEmail("switcher");
+  created.push(email);
+  await signUpThroughUi(page, "Sam Switcher", email);
+  const header = page.getByTestId("app-header");
+
+  await header.getByRole("button", { name: /Sam Switcher/ }).click();
+  await page.getByRole("menuitem", { name: "New workspace" }).click();
+  await page.getByLabel("Name").fill("E2e finance team");
+  await page.getByRole("button", { name: "Create workspace" }).click();
+  await expect(header).toContainText("E2e finance team");
+
+  await header.getByRole("button", { name: /Sam Switcher/ }).click();
+  await expect(page.getByRole("menuitemradio", { name: "E2e finance team" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitemradio", { name: "Sam's workspace" }).click();
+  await expect(header).toContainText("Sam's workspace");
 });
 
 test("the user menu lists the workspaces with the active one ticked", async ({ page }) => {

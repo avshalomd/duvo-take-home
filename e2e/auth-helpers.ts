@@ -37,21 +37,39 @@ export async function signInThroughUi(page: Page, email: string, password: strin
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
+function sql() {
+  if (!process.env.DATABASE_URL && existsSync(".env.local")) process.loadEnvFile(".env.local");
+  return neon(process.env.DATABASE_URL!);
+}
+
+/**
+ * An invitation into the owner's personal workspace, written straight to the table: inviting from the UI is the
+ * Members page's job (settings), and createInvite() has its own integration test. Deleted with the owner's workspace.
+ */
+export async function inviteByRow(ownerEmail: string, inviteeEmail: string): Promise<string> {
+  const id = `e2e-invite-${Date.now().toString(36)}`;
+  await sql()`
+    insert into invitation (id, organization_id, email, role, status, expires_at, inviter_id)
+    select ${id}, m.organization_id, ${inviteeEmail}, 'member', 'pending', now() + interval '1 day', u.id
+    from member m join "user" u on u.id = m.user_id
+    where u.email = ${ownerEmail} and m.role = 'owner'`;
+  return id;
+}
+
 /**
  * Deletes the given accounts and the workspaces they own (the demo workspace is owned by the demo user, so an
  * e2e user invited into it never takes it along). Members, sessions and accounts go by cascade.
  */
 export async function deleteUsers(emails: string[]) {
   if (emails.length === 0) return;
-  if (!process.env.DATABASE_URL && existsSync(".env.local")) process.loadEnvFile(".env.local");
-  const sql = neon(process.env.DATABASE_URL!);
-  const owned = await sql`
+  const db = sql();
+  const owned = await db`
     select m.organization_id as id from member m join "user" u on u.id = m.user_id
     where u.email = any(${emails}) and m.role = 'owner'`;
   const ids = owned.map((r) => r.id as string);
   if (ids.length) {
-    await sql`delete from workspace_settings where workspace_id = any(${ids})`;
-    await sql`delete from organization where id = any(${ids})`;
+    await db`delete from workspace_settings where workspace_id = any(${ids})`;
+    await db`delete from organization where id = any(${ids})`;
   }
-  await sql`delete from "user" where email = any(${emails})`;
+  await db`delete from "user" where email = any(${emails})`;
 }
