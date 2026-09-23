@@ -51,6 +51,11 @@ describe("toolKind - the timeline is scanned by what the agent was doing", () =>
     expect(toolKind("mcp__deepwiki__read_wiki_structure")).toBe("connection");
   });
 
+  it("marks the built-in chart and spreadsheet tools as writing a file, and the plan tool as a tool, never a connection", () => {
+    expect(toolKind("mcp__outputs__make_chart")).toBe("write");
+    expect(toolKind("mcp__plan__update_step")).toBe("tool");
+  });
+
   it("falls back to tool for anything else", () => {
     expect(toolKind("Bash")).toBe("tool");
   });
