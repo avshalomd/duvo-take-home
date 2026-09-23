@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, like, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, like, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { automations, runs } from "@/db/schema";
 import {
@@ -103,6 +103,24 @@ export const getActiveByCommand: GetActiveByCommand = async (workspaceId, comman
   const a = await getByCommand(workspaceId, command);
   return a?.status === "active" ? a : null;
 };
+
+/** A draft made from this run since `since`, if there is one: the same press seen twice (a reload while drafting, Q119). */
+export async function recentDraftFromRun(workspaceId: string, runId: string, since: Date): Promise<Automation | null> {
+  const [row] = await db
+    .select()
+    .from(automations)
+    .where(
+      and(
+        eq(automations.workspaceId, workspaceId),
+        eq(automations.createdFromRunId, runId),
+        eq(automations.status, "draft"),
+        gte(automations.createdAt, since),
+      ),
+    )
+    .orderBy(desc(automations.createdAt))
+    .limit(1);
+  return row ? toAutomation(row) : null;
+}
 
 /**
  * Stores the model's draft as an automation in status draft, version 1. The command is normalised and, when the

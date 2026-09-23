@@ -26,6 +26,8 @@ const lines = (text: string) =>
 /** The editor's FormData checked against AutomationEdit. Errors are keyed by field ("template.instructions"). */
 export function parseEditForm(formData: FormData): ParsedEdit {
   const text = (key: string) => String(formData.get(key) ?? "");
+  // a list arrives as one field per row (the editable lists) or as one text with a row per line: both read the same
+  const rows = (key: string) => formData.getAll(key).map((v) => String(v).trim()).join("\n");
   const values: EditValues = {
     name: text("name"),
     command: text("command"),
@@ -34,9 +36,9 @@ export function parseEditForm(formData: FormData): ParsedEdit {
     inputHint: text("inputHint"),
     inputExample: text("inputExample"),
     instructions: text("instructions"),
-    expectedOutputs: text("expectedOutputs"),
+    expectedOutputs: rows("expectedOutputs"),
     outputFormat: text("outputFormat"),
-    steps: text("steps"),
+    steps: rows("steps"),
     connections: formData.getAll("connections").map(String),
   };
 

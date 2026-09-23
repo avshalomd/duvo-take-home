@@ -2,5 +2,22 @@ import type { Trial } from "@/contracts/automation";
 
 export type Segment = "right" | "wrong" | "open";
 export type ApprovalProgress = { total: number; right: number; wrong: number; open: number; segments: Segment[] };
-export const approvalProgress = (_trials: Trial[], _version: number): ApprovalProgress => ({ total: 0, right: 0, wrong: 0, open: 0, segments: [] }); // STUB
-export const approvalLabel = (_p: ApprovalProgress): string => ""; // STUB
+
+/** The approval bar: one segment per example of the current version, filled by the person's judgment. */
+export function approvalProgress(trials: Trial[], version: number): ApprovalProgress {
+  const segments: Segment[] = trials
+    .filter((t) => t.version === version) // examples of an earlier version no longer count, so they are not drawn
+    .map((t) => (t.humanVerdict === "approved" ? "right" : t.humanVerdict === "rejected" ? "wrong" : "open"));
+  const count = (s: Segment) => segments.filter((x) => x === s).length;
+  return { total: segments.length, right: count("right"), wrong: count("wrong"), open: count("open"), segments };
+}
+
+/** The bar's words: "1 of 2 looks right, 1 not right". */
+export function approvalLabel(p: ApprovalProgress): string {
+  if (p.total === 0) return "No examples of this version yet";
+  // "0 of 1 look right" reads oddly: before anything looks right, say what is still to do instead
+  if (p.right === 0 && p.wrong === 0) return p.total === 1 ? "1 example to check" : `${p.total} examples to check`;
+  if (p.right === 0) return `${p.wrong} of ${p.total} not right`;
+  const verb = p.right === 1 ? "looks" : "look";
+  return `${p.right} of ${p.total} ${verb} right${p.wrong ? `, ${p.wrong} not right` : ""}`;
+}
