@@ -55,3 +55,7 @@ function parseDays(field: string): number[] {
   if (to === undefined) return [from];
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
 }
+
+export const choiceToCron = (_choice: ScheduleChoice): string => ""; // STUB
+export const cronToChoice = (_cron: string): ScheduleChoice | null => null; // STUB
+export const zoneName = (_tz: string): string => ""; // STUB

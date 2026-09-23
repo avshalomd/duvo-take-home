@@ -7,7 +7,7 @@ const TZ = "UTC";
 const MIN_GAP_MS = 60 * 60_000; // at most once an hour: every run is an agent run that costs money
 
 /** The first time the schedule fires after `from`. Refuses an expression that does not parse or fires too often. */
-export function nextRunAt(cron: string, from: Date): Date {
+export function nextRunAt(cron: string, from: Date, _tz?: string | null): Date { // STUB: the zone is not read yet
   let upcoming: Date[];
   try {
     upcoming = CronExpressionParser.parse(cron.trim(), { currentDate: from, tz: TZ })
