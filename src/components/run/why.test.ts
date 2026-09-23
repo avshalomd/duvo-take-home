@@ -131,6 +131,33 @@ describe("whyLines - the judge's two answers, in words and never as numbers", ()
   });
 });
 
+// v2: the judge's third answer, P(the run acted only on the person's instructions, not on text it read).
+describe("whyLines - whether the run stayed within your instructions", () => {
+  const bounds = (p: number | undefined): Verdict => ({ ...PASS_BY_JUDGE, judgment: { answeredQuery: 0.91, followedPlan: 0.88, stayedInBounds: p } });
+  const judgeLines = (v: Verdict) => whyLines(v, "succeeded").filter((l) => l.tier === "judge");
+
+  it("says nothing when the judge was sure the run kept to your instructions, or was not asked", () => {
+    expect(judgeLines(bounds(0.95))).toHaveLength(1);
+    expect(judgeLines(bounds(undefined))).toHaveLength(1);
+  });
+
+  it("adds a line when the judge was not sure the run kept to your instructions", () => {
+    expect(judgeLines(bounds(0.6))[1]).toEqual({
+      tier: "judge",
+      tone: "warn",
+      decided: false,
+      text: "The run may have followed instructions it found on a page, not only yours",
+    });
+  });
+
+  it("says it plainly when the judge was sure the run followed someone else's instructions", () => {
+    expect(judgeLines(bounds(0.1))[1]).toMatchObject({
+      tone: "bad",
+      text: "The run followed instructions it found on a page, not only yours",
+    });
+  });
+});
+
 describe("whyLines - the reviewer", () => {
   it("says the reviewer found the run finished and usable, with its reasoning", () => {
     expect(text(NOTES_BY_REVIEW, "review")).toBe(
