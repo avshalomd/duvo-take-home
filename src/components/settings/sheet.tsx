@@ -2,8 +2,11 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 // A dialog as a paper sheet (docs/DESIGN-V2.md): radius 22, the floating shadow, no ring; it scrolls inside itself
-// when a phone is shorter than the form. Passed to DialogContent, whose own padding and gap are replaced.
-export const SHEET = "gap-0 overflow-y-auto rounded-[22px] bg-paper p-0 shadow-float ring-0 max-h-[calc(100dvh-2rem)] sm:max-w-[440px]";
+// when a phone is shorter than the form. Passed to DialogContent, whose own padding and gap are replaced. Its edge is
+// the role menu's (member-actions.tsx): in dark mode the shadow alone left the sheet no edge on the dimmed page.
+export const SHEET =
+  "gap-0 overflow-y-auto rounded-[22px] bg-paper p-0 ring-0 max-h-[calc(100dvh-2rem)] sm:max-w-[440px] " +
+  "shadow-[inset_0_1px_0_var(--glass-edge),0_0_0_1px_var(--hairline),var(--shadow-float)]";
 export const SHEET_TITLE = "text-[20px] leading-tight font-semibold tracking-[-0.01em]";
 export const SHEET_DESCRIPTION = "text-[13px] tracking-[0.01em] text-slate";
 
