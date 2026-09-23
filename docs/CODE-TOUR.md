@@ -24,7 +24,7 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/eval/judge.ts` - Jev through `decide()`: two `noul()` questions, answeredQuery and followedPlan, answered in one request as probabilities.
 - `src/lib/eval/review.ts`, `review.prompt.ts` - tier two, `extract()` with the Review schema; runs only when Jev says the plan was not followed or is not confident.
 - `src/lib/eval/evaluate.ts` - the cascade. `evaluate(input, { judge, review })` takes its two model calls as arguments so the verdict logic is tested without a network; `evaluateRun` binds the real ones. `unknown` is returned when a judge fails, never `fail`: a broken judge must not mark good work bad.
-- `src/lib/eval/evaluate.eval.test.ts` - the evaluator over `fixtures/llm-cases.json` (EVAL=1), writing `docs/EVAL.md`. 9/10 at merge.
+- `src/lib/eval/suite.eval.test.ts` - the evaluator over `fixtures/llm-cases.json` (EVAL=1), writing `docs/EVAL.md`. 9/10 at merge.
 
 ## P1 - engine
 
@@ -124,3 +124,14 @@ Per file: what it does and why it is built that way. Grows at every merge.
   per instance and the session is gone.
 - `src/app/api/runs/[id]/events/route.ts` - Server-Sent Events from the database once a second; ends itself after
   280 s (under the function limit) and the client reconnects with `?after=<seq>`.
+
+### eval
+- `src/lib/eval/evaluate.ts` - every verdict records `decidedBy` and `path`, which is what "Why?" shows.
+- `src/lib/eval/template-checks.ts` - a run of a saved automation is also checked against its template: a plan step
+  keeps a template step when it holds 40% of its words (filler and `{input}` dropped), a skip with a note counts as
+  kept, and the promised files must exist.
+- `src/lib/eval/step-check.ts` - one `decide()` yes/no per finished step; the note is written by code, not by Jev.
+- `src/lib/eval/suite.test.ts`, `suite.eval.test.ts`, `fixtures/runs/` - the offline test of the evaluator (not a
+  product feature): 18 recorded runs, replayed with recorded judge answers in `npm run check`, live with `EVAL=1`
+  (`docs/EVAL.md`). The live run caught an injected advert passing at 0.80; the judge and review prompts now say that
+  what a run read is data, and it fails.

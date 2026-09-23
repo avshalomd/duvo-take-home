@@ -1,0 +1,296 @@
+{
+  "id": "connection-digest-pass",
+  "why": "A run that had to go through a connection and did: every row is grounded in a DeepWiki read. Pins that a required connection that WAS used costs nothing and the judge passes it.",
+  "source": "fixtures/runs.json run_01JQ8P7T5D (v1 seed), with plan events",
+  "expected": {
+    "verdict": "pass",
+    "decidedBy": "judge",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.9,
+      "followedPlan": 0.91
+    },
+    "review": null,
+    "source": "live 2026-09-23"
+  },
+  "run": {
+    "id": "case_connection_digest",
+    "prompt": "Using the connected DeepWiki server, read the structure of the repository modelcontextprotocol/servers and write a CSV called output.csv with the columns area, what_it_does, why_it_matters - one row per top-level area of the docs.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [
+      "conn_deepwiki"
+    ],
+    "report": "Wrote output.csv with the five top-level areas of the modelcontextprotocol/servers wiki.",
+    "error": null,
+    "numTurns": 6,
+    "durationMs": 57552,
+    "costUsd": 0.2011,
+    "createdAt": "2026-09-22T09:31:10.004Z",
+    "finishedAt": "2026-09-22T09:32:07.556Z"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T09:31:10.004Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step",
+          "mcp__deepwiki__read_wiki_structure",
+          "mcp__deepwiki__read_wiki_contents",
+          "mcp__deepwiki__ask_wiki_question"
+        ],
+        "mcp_servers": [
+          {
+            "name": "deepwiki",
+            "status": "connected"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T09:31:12.004Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Summarise the areas of the modelcontextprotocol/servers wiki into output.csv",
+        "expectedOutputs": [
+          "output.csv with area, what_it_does, why_it_matters"
+        ],
+        "sources": [
+          "DeepWiki"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Read the wiki structure through DeepWiki",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Read the pages that need more detail",
+            "status": "pending"
+          },
+          {
+            "index": 2,
+            "title": "Write output.csv, one row per area",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T09:31:14.004Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "name": "mcp__deepwiki__read_wiki_structure",
+        "input": {
+          "repoName": "modelcontextprotocol/servers"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T09:31:18.004Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "is_error": false,
+        "preview": "Pages: Overview; Reference servers; Transport; Authentication; Contributing"
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T09:31:20.004Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Summarise the areas of the modelcontextprotocol/servers wiki into output.csv",
+        "expectedOutputs": [
+          "output.csv with area, what_it_does, why_it_matters"
+        ],
+        "sources": [
+          "DeepWiki"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Read the wiki structure through DeepWiki",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Read the pages that need more detail",
+            "status": "running"
+          },
+          {
+            "index": 2,
+            "title": "Write output.csv, one row per area",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-22T09:31:22.004Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "name": "mcp__deepwiki__read_wiki_contents",
+        "input": {
+          "repoName": "modelcontextprotocol/servers",
+          "page": "Transport"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-22T09:31:26.004Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "is_error": false,
+        "preview": "stdio is the default for local servers; streamable HTTP replaces the deprecated SSE transport ..."
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-22T09:31:28.004Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "name": "mcp__deepwiki__read_wiki_contents",
+        "input": {
+          "repoName": "modelcontextprotocol/servers",
+          "page": "Authentication"
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-22T09:31:32.004Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_03",
+        "is_error": false,
+        "preview": "Remote servers use OAuth 2.1 with dynamic client registration; a bearer token is the fallback ..."
+      }
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-22T09:31:34.004Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Summarise the areas of the modelcontextprotocol/servers wiki into output.csv",
+        "expectedOutputs": [
+          "output.csv with area, what_it_does, why_it_matters"
+        ],
+        "sources": [
+          "DeepWiki"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Read the wiki structure through DeepWiki",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Read the pages that need more detail",
+            "status": "done"
+          },
+          {
+            "index": 2,
+            "title": "Write output.csv, one row per area",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 11,
+      "at": "2026-09-22T09:31:36.004Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_04",
+        "name": "Write",
+        "input": {
+          "file_path": "output.csv",
+          "content": "area,what_it_does,why_it_matters\nOverview,\"Explains what the servers repository collects and how to run one\",\"The entry  ..."
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "at": "2026-09-22T09:31:40.004Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_04",
+        "is_error": false,
+        "preview": "File created successfully at output.csv"
+      }
+    },
+    {
+      "seq": 13,
+      "at": "2026-09-22T09:31:42.004Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Summarise the areas of the modelcontextprotocol/servers wiki into output.csv",
+        "expectedOutputs": [
+          "output.csv with area, what_it_does, why_it_matters"
+        ],
+        "sources": [
+          "DeepWiki"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Read the wiki structure through DeepWiki",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Read the pages that need more detail",
+            "status": "done"
+          },
+          {
+            "index": 2,
+            "title": "Write output.csv, one row per area",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 14,
+      "at": "2026-09-22T09:31:44.004Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 6,
+        "duration_ms": 57552,
+        "total_cost_usd": 0.2011,
+        "result": "Wrote output.csv with the five top-level areas of the modelcontextprotocol/servers wiki."
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "output.csv",
+      "content": "area,what_it_does,why_it_matters\nOverview,\"Explains what the servers repository collects and how to run one\",\"The entry point a new integrator reads first\"\nReference servers,\"Filesystem, fetch, git and memory servers maintained in-repo\",\"These are the ones most clients ship against\"\nTransport,\"stdio and streamable HTTP transports with their handshakes\",\"Choosing the wrong transport is the most common setup failure\"\nAuthentication,\"OAuth and bearer-token patterns for remote servers\",\"Remote servers are useless without a credential story\"\nContributing,\"How a third-party server gets listed\",\"Explains why the registry is curated rather than open\"\n"
+    }
+  ],
+  "template": null
+}

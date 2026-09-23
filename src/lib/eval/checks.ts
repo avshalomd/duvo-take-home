@@ -1,14 +1,22 @@
 import { parse } from "csv-parse/sync";
+import { AgentLimits } from "@/contracts/agent";
 import type { Check, EvaluateInput } from "@/contracts/eval";
+import { templateChecks } from "./template-checks";
 
 // The half of the evaluator that costs nothing and cannot be talked round: everything that can be decided by
 // reading the instructions and the files. Any failure here ends the evaluation before a model is paid to look at
 // an empty file. Each check carries the detail a user needs to fix the run, not just a red tick.
 
-const ALLOWED_EXTENSIONS = [".txt", ".md", ".csv"]; // the agent is only allowed to write these (DESIGN, Model design)
+// What the Write tool may produce (.txt, .md, .csv) and what v2's output tools render (.svg, .xlsx): the same two
+// lists the run loop collects files by, so the evaluator can never reject a file the app itself made.
+const ALLOWED_EXTENSIONS: readonly string[] = [...AgentLimits.fileExtensions, ...AgentLimits.toolFileExtensions];
 const DEFAULT_FRESH_DAYS = 30; // "latest" with no window named: a month is the widest reading of "latest news"
 
 export function runChecks(input: EvaluateInput): Check[] {
+  return [...runChecksOnFiles(input), ...templateChecks(input)]; // a run of a saved automation is also held to its template
+}
+
+function runChecksOnFiles(input: EvaluateInput): Check[] {
   const checks: Check[] = [];
   const ok = (id: string, label: string, okay: boolean, detail: string) => checks.push({ id, label, ok: okay, detail });
 
@@ -29,7 +37,7 @@ export function runChecks(input: EvaluateInput): Check[] {
   const wrongType = input.files.filter((f) => !ALLOWED_EXTENSIONS.some((e) => f.name.toLowerCase().endsWith(e)));
   ok(
     "extension",
-    "Only .txt, .md and .csv were written",
+    "Only text, table, chart and spreadsheet files were written",
     wrongType.length === 0,
     wrongType.length ? `not allowed: ${names(wrongType)}` : names(input.files),
   );

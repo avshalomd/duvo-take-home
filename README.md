@@ -38,7 +38,7 @@ npm run dev
 ```
 
 `npm run check` runs typecheck, lint and the unit tests. `npm run test:int` runs the database tests.
-`EVAL=1 npx dotenv -e .env.local -- vitest run src/lib/eval/evaluate.eval.test.ts` runs the evaluator over the
+`EVAL=1 npx dotenv -e .env.local -- vitest run src/lib/eval/suite.eval.test.ts` runs the evaluator over the
 fixture cases and writes `docs/EVAL.md`.
 
 ## Architecture

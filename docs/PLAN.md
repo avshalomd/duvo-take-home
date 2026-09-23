@@ -42,7 +42,7 @@ through the stubs, `npm run check` green, pushed with the `scaffold` tag. No dep
 - tests first (`test(P3): ...`):
     - src/lib/eval/checks.test.ts: a CSV with header and rows passes; empty CSV fails "rows"; unterminated quote fails "parses"; duplicate rows fail "duplicates"; .md non-empty passes; a file asked for but missing fails "file_expected"; a .png is rejected
     - src/lib/eval/verdict.test.ts (decide/extract mocked): checks fail -> fail; both confident true -> pass; answeredQuery confident false -> fail; followedPlan false -> review called; review finished+suitable -> pass_with_notes; finished+not suitable -> fail with changeNeeded; judge throws -> unknown
-    - src/lib/eval/evaluate.eval.test.ts over fixtures/llm-cases.json (EVAL=1), writes docs/EVAL.md; bar 8/10
+    - src/lib/eval/suite.eval.test.ts over fixtures/llm-cases.json (EVAL=1), writes docs/EVAL.md; bar 8/10
 - then the code: checks.ts, judge.ts (decide() with noul answeredQuery/followedPlan), review.ts + review.prompt.ts (extract() with Review), evaluate.ts (the cascade)
 - phase A -> R2, T+38: unit tests green, the eval table in docs/EVAL.md
 - phase B: prompt tuning on the failing cases

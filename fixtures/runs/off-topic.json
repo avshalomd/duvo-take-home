@@ -1,0 +1,194 @@
+{
+  "id": "off-topic",
+  "why": "Nine fresh, well-formed, distinct rows of real news that is not AI news. Every code check passes; this is the case the judge exists for.",
+  "source": "fixtures/llm-cases.json eval_off_topic (v1 labelled case), with the events a v2 run records",
+  "expected": {
+    "verdict": "fail",
+    "decidedBy": "judge",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.02,
+      "followedPlan": 0.7
+    },
+    "review": null,
+    "source": "live 2026-09-23"
+  },
+  "run": {
+    "id": "case_off_topic",
+    "prompt": "Fetch the latest AI news from the web and save them into a CSV with title, source, url, published_at, summary.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [],
+    "report": "Wrote output.csv with nine stories from this week.",
+    "error": null,
+    "numTurns": 5,
+    "durationMs": 28000,
+    "costUsd": 0.11,
+    "createdAt": "2026-09-22T16:00:00.000Z",
+    "finishedAt": "2026-09-22T16:00:20.000Z"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-22T16:00:00.000Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "WebSearch",
+          "WebFetch",
+          "Read",
+          "Write",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": []
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-22T16:00:02.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Collect the latest AI news into output.csv",
+        "expectedOutputs": [
+          "output.csv with title, source, url, published_at, summary"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search the web for the latest AI news",
+            "status": "running"
+          },
+          {
+            "index": 1,
+            "title": "Write output.csv",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-22T16:00:04.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "name": "WebSearch",
+        "input": {
+          "query": "latest news this week"
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-22T16:00:08.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_01",
+        "is_error": false,
+        "preview": "10 results ..."
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-22T16:00:10.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Collect the latest AI news into output.csv",
+        "expectedOutputs": [
+          "output.csv with title, source, url, published_at, summary"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search the web for the latest AI news",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write output.csv",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-22T16:00:12.000Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "name": "Write",
+        "input": {
+          "file_path": "output.csv",
+          "content": "title,source,url,published_at,summary\n\"Premier League: Arsenal beat Spurs 3-1\",BBC Sport,https://www.bbc.co.uk/sport/football/articles/arsenal-spurs-2026,2026-0 ..."
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-22T16:00:16.000Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_case_02",
+        "is_error": false,
+        "preview": "File created successfully at output.csv"
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-22T16:00:18.000Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Collect the latest AI news into output.csv",
+        "expectedOutputs": [
+          "output.csv with title, source, url, published_at, summary"
+        ],
+        "sources": [
+          "web search"
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Search the web for the latest AI news",
+            "status": "done"
+          },
+          {
+            "index": 1,
+            "title": "Write output.csv",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-22T16:00:20.000Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 5,
+        "duration_ms": 28000,
+        "total_cost_usd": 0.11,
+        "result": "Wrote output.csv with nine stories from this week."
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "output.csv",
+      "content": "title,source,url,published_at,summary\n\"Premier League: Arsenal beat Spurs 3-1\",BBC Sport,https://www.bbc.co.uk/sport/football/articles/arsenal-spurs-2026,2026-09-21,\"Two goals in six second-half minutes\"\n\"Norges Bank holds rates at 3.75%\",E24,https://e24.no/norsk-okonomi/rentebeslutning-september-2026,2026-09-18,\"The committee split three ways\"\n\"Hurricane Delia makes landfall in Florida\",AP,https://apnews.com/article/hurricane-delia-landfall,2026-09-20,\"Category 3 at landfall\"\n\"Oslo opens the Fornebubanen\",NRK,https://www.nrk.no/osloogviken/fornebubanen-apner-2026,2026-09-19,\"Twelve years after the first plan\"\n\"Apple's iPhone 18 sales beat expectations\",CNBC,https://www.cnbc.com/2026/09/16/iphone-18-launch-weekend.html,2026-09-16,\"Launch weekend up 9% year on year\"\n\"Tour of Spain ends in Madrid\",Cyclingnews,https://www.cyclingnews.com/races/vuelta-2026/stage-21,2026-09-15,\"A sprint finish on the Gran Via\"\n\"Nobel medicine prize announced Monday\",Reuters,https://www.reuters.com/science/nobel-medicine-2026,2026-09-21,\"The first of the week's prizes\"\n\"Boeing 797 completes first test flight\",Flightglobal,https://www.flightglobal.com/boeing-797-first-flight,2026-09-17,\"Three hours over Puget Sound\"\n\"Eurovision 2027 host city named\",EBU,https://eurovision.tv/story/host-city-2027,2026-09-19,\"Malmo gets it again\"\n"
+    }
+  ],
+  "template": null
+}
