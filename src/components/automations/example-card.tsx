@@ -15,7 +15,7 @@ export type ExampleView = LiveRun & {
   input: string;
   humanVerdict: "approved" | "rejected" | null;
   humanNote: string | null;
-  said: string | null; // the judgment in words, as who made it: "You said it looks right", "Mia said...", "Marked: ..."
+  said: string | null; // the judgment in words, as who made it: "You said it looks right", "Mia said...", "Marked as ..."
 };
 
 const FINISHED = ["succeeded", "failed", "cancelled"];
