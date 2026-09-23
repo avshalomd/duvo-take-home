@@ -1,6 +1,8 @@
 import type { AutomationTemplate, CanApprove, FillTemplate, Trial } from "@/contracts/automation";
 
-const fill = (text: string, input: string) => text.replaceAll("{input}", input);
+// A replacer function, not the input as a string: in a replacement string $&, $$ and $' are patterns, and
+// "/audit Johnson $& Sons" put "{input}" back into the prompt.
+const fill = (text: string, input: string) => text.replaceAll("{input}", () => input);
 
 /**
  * The run's prompt with {input} filled, and the system-prompt lines that keep the agent to the template. The steps
