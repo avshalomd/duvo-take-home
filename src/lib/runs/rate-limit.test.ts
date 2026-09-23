@@ -27,6 +27,17 @@ describe("tokenBucket", () => {
     expect(bucket.take("1.2.3.4", 11 * MIN)).toBe(true); // the first one has expired
   });
 
+  // Q206: a refusal says when to try again, so the bucket says when its next token frees up.
+  it("says how long until an address may start again: when its oldest start leaves the window", () => {
+    const bucket = tokenBucket(2, 10 * MIN);
+    expect(bucket.retryAfter("1.2.3.4", 0)).toBe(0); // nothing taken: now
+    bucket.take("1.2.3.4", 1 * MIN);
+    expect(bucket.retryAfter("1.2.3.4", 2 * MIN)).toBe(0); // one token left: now
+    bucket.take("1.2.3.4", 3 * MIN);
+    expect(bucket.retryAfter("1.2.3.4", 4 * MIN)).toBe(7 * MIN); // the start at 1 min leaves at 11 min
+    expect(bucket.retryAfter("5.6.7.8", 4 * MIN)).toBe(0); // another address is not held back
+  });
+
   it("forgets an address that has gone quiet, so the map cannot grow for ever", () => {
     const bucket = tokenBucket(1, 10 * MIN);
     bucket.take("1.2.3.4", 0);
