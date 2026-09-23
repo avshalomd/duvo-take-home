@@ -219,3 +219,10 @@ Per file: what it does and why it is built that way. Grows at every merge.
   on in every environment: 3 sign-in or sign-up tries per 10 s per client address and path.
 - `src/app/api/health/cache.ts` - the deep check's model answer is kept 60 s per instance, so the open health route
   cannot be used to make paid calls; the database is asked every time.
+- `src/lib/auth/members.ts` - role changes and removals run one at a time per workspace, under an advisory lock
+  inside a transaction, with the owners re-counted under it: two owners demoting each other at once left none (Q211).
+  Removing or demoting an admin closes the invitations they sent, in the same step (Q213).
+- `src/lib/automations/permissions.ts` `hasBeenApproved` - the command of an automation approved once stays an owner's
+  or an admin's to change, even after an edit sends it back to draft; the save's SQL repeats the check (Q212, Q225).
+- `src/lib/auth/session.ts` - in a Server Action (Next's `next-action` header) a workspace the user has left is not
+  swapped for their own: writes that name no record are refused in words instead of landing elsewhere (Q226).

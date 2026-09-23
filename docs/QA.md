@@ -275,20 +275,20 @@ UX review of the changed screens and a code review of `4327198..HEAD`. Productio
 | id | source | observed | expected | severity | owner | status |
 |---|---|---|---|---|---|---|
 | Q210 | reviewer | production's database has neither the `rate_limit` table nor `runs.human_verdict_by`; deployed first, every sign-in and every page reading runs fails | the two additive statements run on production before the deploy | blocker (deploy order) | main | open (at the deploy) |
-| Q211 | reviewer, qa-func | two owners demoting or removing each other at once both pass (5 of 5): the workspace ends with no owner | one refused; one owner always stays | minor | auth | fixing |
-| Q212 | reviewer | a member's command rename read the status before an admin's approval and landed on the approved automation | the rename refused once it is approved | minor | automations | fixing |
-| Q213 | reviewer | a removed or demoted admin's pending invitations stay open, so they could rejoin through one | cancelled with the removal or demotion | minor | auth | fixing |
-| Q214 | qa-ux | a member's approval bar says "approves it once an example looks right" when one already does and another is marked not right | the real reason, then who approves | major | automations | fixing |
-| Q215 | qa-ux | the role menu's meanings do not mention approving automations | Admin: also approves automations | minor | settings | fixing |
-| Q216 | qa-ux | a member's Members page says only who invites | who invites, changes roles and removes | minor | settings | fixing |
-| Q217 | qa-ux | the read-only command looks like an empty editable field in dark mode | a clearly read-only field | minor | automations | fixing |
-| Q218 | qa-ux | that saving takes a Ready command out of use is small grey text under Save | said beside Save, naming the command | minor | automations | fixing |
-| Q219 | qa-ux | "Change" on a colleague's judgment replaces it without saying so | the control names whose judgment is replaced | minor | automations | fixing |
-| Q220 | qa-ux | an Off automation's empty history says "Run it above, or call it from Home" | "No runs yet." | minor | automations | fixing |
-| Q221 | qa-ux | automation Delete asks through the browser's confirm, on a grey button | the app's confirmation sheet, a red Delete | minor | automations | fixing |
-| Q222 | qa-ux, qa-func | the rate-limit message says "Wait a minute"; the block lifts after 10 s | matching words | minor | auth | fixing |
-| Q223 | qa-ux | "Marked: looks right" is a label-and-colon line | "Marked as looking right" | minor | home | fixing |
-| Q224 | qa-ux | the dialog sheet has almost no edge in dark mode | a hairline edge | minor | main | fixing |
-| Q225 | qa-func | a member renames an approved command in two saves (an edit sends it to draft, then the draft's command is free) | the command of a once-approved automation is for owners and admins | minor | automations | fixing |
-| Q226 | qa-func | a removed person's open tab: invite, connections, limits and a Home run land in their own workspace without a word | refused: "You are no longer in that workspace" | minor | auth | fixing |
-| Q227 | qa-func | a refused Remove leaves its dialog open behind the error | the dialog closes | minor | settings | fixing |
+| Q211 | reviewer, qa-func | two owners demoting or removing each other at once both pass (5 of 5): the workspace ends with no owner | one refused; one owner always stays | minor | auth | fixed locally (one change at a time per workspace under an advisory lock, owners re-counted; parallel int test) |
+| Q212 | reviewer | a member's command rename read the status before an admin's approval and landed on the approved automation | the rename refused once it is approved | minor | automations | fixed locally (the rename writes only onto a draft; store.int) |
+| Q213 | reviewer | a removed or demoted admin's pending invitations stay open, so they could rejoin through one | cancelled with the removal or demotion | minor | auth | fixed locally (their pending invitations cancelled in the same locked step; auth.int) |
+| Q214 | qa-ux | a member's approval bar says "approves it once an example looks right" when one already does and another is marked not right | the real reason, then who approves | major | automations | fixed locally (the member reads canApprove's reason, then who approves; approval.test, e2e) |
+| Q215 | qa-ux | the role menu's meanings do not mention approving automations | Admin: also approves automations | minor | settings | fixed locally (e2e) |
+| Q216 | qa-ux | a member's Members page says only who invites | who invites, changes roles and removes | minor | settings | fixed locally (e2e) |
+| Q217 | qa-ux | the read-only command looks like an empty editable field in dark mode | a clearly read-only field | minor | automations | fixed locally (e2e, screenshots) |
+| Q218 | qa-ux | that saving takes a Ready command out of use is small grey text under Save | said beside Save, naming the command | minor | automations | fixed locally (e2e) |
+| Q219 | qa-ux | "Change" on a colleague's judgment replaces it without saying so | the control names whose judgment is replaced | minor | automations | fixed locally ("Replace <name>'s judgment"; verdict-words.test, e2e) |
+| Q220 | qa-ux | an Off automation's empty history says "Run it above, or call it from Home" | "No runs yet." | minor | automations | fixed locally (e2e) |
+| Q221 | qa-ux | automation Delete asks through the browser's confirm, on a grey button | the app's confirmation sheet, a red Delete | minor | automations | fixed locally (the app's sheet with a red Delete; e2e) |
+| Q222 | qa-ux, qa-func | the rate-limit message says "Wait a minute"; the block lifts after 10 s | matching words | minor | auth | fixed locally ("Wait a few seconds"; errors.test, e2e) |
+| Q223 | qa-ux | "Marked: looks right" is a label-and-colon line | "Marked as looking right" | minor | home | fixed locally ("Marked as looking right"; verdict-words.test) |
+| Q224 | qa-ux | the dialog sheet has almost no edge in dark mode | a hairline edge | minor | main | fixed locally (screenshots) |
+| Q225 | qa-func | a member renames an approved command in two saves (an edit sends it to draft, then the draft's command is free) | the command of a once-approved automation is for owners and admins | minor | automations | fixed locally (a once-approved automation's command is for owners and admins in the check, the write and the editor; it also locks a draft whose earlier example looked right) |
+| Q226 | qa-func | a removed person's open tab: invite, connections, limits and a Home run land in their own workspace without a word | refused: "You are no longer in that workspace" | minor | auth | fixed locally for writes that name no record (a run, an invitation, a connection, the limits); one that names a record still answers "not found" |
+| Q227 | qa-func | a refused Remove leaves its dialog open behind the error | the dialog closes | minor | settings | fixed locally (e2e) |
