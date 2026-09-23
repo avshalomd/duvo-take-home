@@ -165,6 +165,23 @@ test.describe("the composer", () => {
     expect(hint!.y + hint!.height).toBeLessThanOrEqual(controls!.y);
   });
 
+  // the list opened over the composer's own Run button and connection chips, on the first visit and under a run
+  test("the command list leaves the Run button and the chips uncovered", async ({ page }) => {
+    const uncovered = (target: Locator) =>
+      target.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return Boolean(top && el.contains(top));
+      });
+    for (const url of ["/", `/?run=${runs.parent}`]) {
+      await page.goto(url);
+      await composer(page).fill("/");
+      await expect(page.getByRole("listbox", { name: /saved automations/i })).toBeVisible();
+      expect(await uncovered(page.getByRole("button", { name: "Run", exact: true }))).toBe(true);
+      expect(await uncovered(page.getByTestId("composer-connections"))).toBe(true);
+    }
+  });
+
   // his call, 2026-09-23: commands are "/audit ..."; a backslash is plain text and opens nothing
   test("a backslash does not open the list", async ({ page }) => {
     await page.goto("/");
