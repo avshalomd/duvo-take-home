@@ -85,8 +85,10 @@ test("a finished run becomes a draft automation that can be edited and cannot be
 
   // clean up through the page, which is also the proof that Delete works
   await page.goto(`/automations/${createdId}`);
-  page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Delete" }).click();
+  const sheet = page.getByRole("dialog"); // the Members page's paper sheet, not the browser's own confirm (UX R2)
+  await expect(sheet).toContainText(`Delete "${name}"?`);
+  await sheet.getByRole("button", { name: "Delete" }).click();
   await page.waitForURL(/\/automations$/);
   await expect(page.getByText(name)).toHaveCount(0);
 });
@@ -145,5 +147,30 @@ test.describe("a ready automation", () => {
     await expect(page.getByText(/Every weekday at 08:00/)).toBeVisible(); // shown in the schedule's zone, the viewer's own here
     const [stored] = await neon(process.env.DATABASE_URL!)`select schedule, schedule_input, schedule_tz from automations where id = ${readyId}`;
     expect(stored).toEqual({ schedule: "0 8 * * 1-5", schedule_input: "Acme Ltd", schedule_tz: "Europe/Prague" }); // 08:00 in the zone it was set in
+  });
+
+  // UX R2: an automation that is off has no Run above and cannot be called from Home, so its empty history says neither
+  test("once turned off, its empty history says only that there are no runs", async ({ page }) => {
+    await neon(process.env.DATABASE_URL!)`update automations set status = 'disabled' where id = ${readyId}`;
+    await page.goto(`/automations/${readyId}`);
+    await expect(page.getByText("No runs yet.", { exact: true })).toBeVisible();
+    await expect(page.getByText(/call it from Home/)).toHaveCount(0);
+  });
+
+  // UX R2: Delete asked with the browser's own confirm; now the same paper sheet as the Members page's Remove
+  test("Delete asks on a sheet naming the automation and that its command stops working, then opens the gallery", async ({ page }) => {
+    await page.goto(`/automations/${readyId}`);
+    await page.getByRole("button", { name: "Delete" }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toContainText('Delete "[e2e] Company facts"?');
+    await expect(sheet).toContainText(`/${command} stops working`);
+    await sheet.getByRole("button", { name: "Cancel" }).click(); // Cancel leaves it where it is
+    await expect(sheet).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Delete" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+    await page.waitForURL(/\/automations$/);
+    const [left] = await neon(process.env.DATABASE_URL!)`select count(*)::int as n from automations where id = ${readyId}`;
+    expect(left.n).toBe(0);
   });
 });

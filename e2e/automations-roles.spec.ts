@@ -113,8 +113,11 @@ test("a member can run a ready automation, and sees its switch, schedule and del
   await page.getByRole("button", { name: "Edit" }).click();
   await expect(page.getByLabel("Command", { exact: true })).not.toBeEditable();
   await expect(page.getByLabel("Command", { exact: true })).toHaveValue(`e2e-roles-r-${stamp}`);
+  await expect(page.getByLabel("Command", { exact: true })).toHaveCSS("cursor", "default"); // read, not typed into (UX R2)
   await expect(page.getByText("People call it by this command, so an owner or an admin changes it.")).toBeVisible();
   await expect(page.getByLabel("Name", { exact: true })).toBeEditable();
+  // beside Save, what a save of the brief does to the command people call (UX R2)
+  await expect(page.getByText(`Saving a change to the brief takes /e2e-roles-r-${stamp} out of use until an owner or an admin approves it.`)).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
 
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
@@ -160,6 +163,7 @@ test("the owner still gets Approve, Turn off, Delete and the schedule form on th
   await expect(page.getByText(/An owner or an admin/)).toHaveCount(0);
   await page.getByRole("button", { name: "Edit" }).click();
   await expect(page.getByLabel("Command", { exact: true })).toBeEditable(); // the owner may rename a ready one
+  await expect(page.getByText(/out of use until an owner or an admin/)).toHaveCount(0); // they approve it themselves
   await page.getByRole("button", { name: "Cancel" }).click();
   if (await schedulerOff(page)) return;
   await expect(page.getByRole("button", { name: "Save schedule" })).toBeVisible();
