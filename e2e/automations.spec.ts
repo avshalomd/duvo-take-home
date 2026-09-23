@@ -72,7 +72,7 @@ test("a finished run becomes a draft automation that can be edited and cannot be
 // A ready automation needs an approved example, which is a real agent run: this one is seeded straight into the
 // table instead ("[e2e]", deleted in afterAll), so the ready page can be checked without spending a run.
 test.describe("a ready automation", () => {
-  test.use({ timezoneId: "Europe/Prague" }); // 08:00 there is 06:00 UTC in September: the schedule's conversion is visible
+  test.use({ timezoneId: "Europe/Prague" }); // the browser's zone, which the schedule form sends with the cron
   let readyId: string | null = null;
   const command = `e2e-ready-${Date.now().toString(36)}`;
   const template = {
@@ -120,8 +120,8 @@ test.describe("a ready automation", () => {
     await expect(page.getByLabel("Company name for scheduled runs")).toHaveValue("Acme Ltd"); // Q107: the example prefilled
     await page.getByRole("button", { name: "Save schedule" }).click();
     await expect(page.getByText("Schedule saved.")).toBeVisible(); // Q120: the confirmation survives the save
-    await expect(page.getByText(/Every weekday at 08:00/)).toBeVisible(); // shown in the viewer's time
-    const [stored] = await neon(process.env.DATABASE_URL!)`select schedule, schedule_input from automations where id = ${readyId}`;
-    expect(stored).toEqual({ schedule: "0 6 * * 1-5", schedule_input: "Acme Ltd" }); // kept in UTC for the scheduler
+    await expect(page.getByText(/Every weekday at 08:00/)).toBeVisible(); // shown in the schedule's zone, the viewer's own here
+    const [stored] = await neon(process.env.DATABASE_URL!)`select schedule, schedule_input, schedule_tz from automations where id = ${readyId}`;
+    expect(stored).toEqual({ schedule: "0 8 * * 1-5", schedule_input: "Acme Ltd", schedule_tz: "Europe/Prague" }); // 08:00 in the zone it was set in
   });
 });

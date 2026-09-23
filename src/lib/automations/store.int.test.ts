@@ -197,6 +197,18 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect(await getAutomation(WS, a.id)).toMatchObject({ schedule: null, scheduleInput: null, nextRunAt: null });
   });
 
+  it("stores the schedule's time zone and computes the next run at the chosen local time in it", async () => {
+    const a = await createAutomationDraft(ctx, draftWith("int-schedule-tz"), null);
+    await setSchedule(WS, a.id, "0 8 * * 1-5", "Apple Inc.", "Europe/Prague");
+    const scheduled = await getAutomation(WS, a.id);
+    expect(scheduled).toMatchObject({ schedule: "0 8 * * 1-5", scheduleTz: "Europe/Prague" });
+    const hourInPrague = new Date(scheduled!.nextRunAt!).toLocaleString("en-GB", { timeZone: "Europe/Prague", hour: "2-digit", minute: "2-digit" });
+    expect(hourInPrague).toBe("08:00");
+
+    await setSchedule(WS, a.id, null, null, null);
+    expect(await getAutomation(WS, a.id)).toMatchObject({ schedule: null, scheduleTz: null, nextRunAt: null });
+  });
+
   it("runCommand refuses an unknown command, naming it", async () => {
     const err = await runCommand(ctx, { command: "int-nothing", input: "Apple" }).catch((e) => e);
     expect(err).toBeInstanceOf(Error);
