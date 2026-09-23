@@ -170,6 +170,7 @@ function Schedule({ automation: a }: { automation: Automation }) {
       inputExample={a.inputExample}
       schedule={a.schedule}
       scheduleInput={a.scheduleInput}
+      scheduleTz={a.scheduleTz ?? null}
       nextRunAt={a.status === "active" ? a.nextRunAt : null} // an automation that is off has no next run
     />
   );

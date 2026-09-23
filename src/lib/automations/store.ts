@@ -57,6 +57,7 @@ function toAutomation(row: Row): Automation {
     approvedAt: iso(row.approvedAt),
     schedule: row.schedule,
     scheduleInput: row.scheduleInput,
+    scheduleTz: row.scheduleTz,
     nextRunAt: iso(row.nextRunAt),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -206,8 +207,11 @@ export const setAutomationStatus: SetAutomationStatus = async (workspaceId, id, 
   await db.update(automations).set({ status, updatedAt: new Date() }).where(inWorkspace(workspaceId, id));
 };
 
-/** A cron (read in UTC) and the input each scheduled run gets; null clears it. next_run_at is computed here. */
-export const setSchedule: SetSchedule = async (workspaceId, id, schedule, input) => {
+/**
+ * A cron, the zone it is read in (the browser's IANA zone, so 08:00 stays 08:00 across a clock change) and the input
+ * each scheduled run gets; null clears all three. next_run_at is computed here, in that zone.
+ */
+export const setSchedule: SetSchedule = async (workspaceId, id, schedule, input, tz) => {
   await mustGet(workspaceId, id);
   const cron = schedule?.trim() || null;
   await db
@@ -215,7 +219,8 @@ export const setSchedule: SetSchedule = async (workspaceId, id, schedule, input)
     .set({
       schedule: cron,
       scheduleInput: cron ? input?.trim() || null : null,
-      nextRunAt: cron ? nextRunAt(cron, new Date()) : null, // throws a readable AutomationError for a bad or too frequent cron
+      scheduleTz: cron ? tz || null : null,
+      nextRunAt: cron ? nextRunAt(cron, new Date(), tz) : null, // throws a readable AutomationError for a bad zone or cron, or one too frequent
       updatedAt: new Date(),
     })
     .where(inWorkspace(workspaceId, id));
