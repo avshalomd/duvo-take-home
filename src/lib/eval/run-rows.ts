@@ -51,9 +51,12 @@ export function toEvents(rows: (typeof runEvents.$inferSelect)[]): RunEvent[] {
     .flatMap((r) => (r.success ? [r.data] : [])); // a row written by an older shape is skipped, not a 500
 }
 
-/** A binary file (.xlsx) is shown as its name and size, as the run loop does: base64 would tell the judge nothing. */
+/**
+ * Every file as stored, a spreadsheet as its base64: the checks read its zip signature from it (Q124), and the judge
+ * and the reviewer are shown only its size (file-view.ts), so the models never see the base64.
+ */
 export function toFiles(rows: (typeof files.$inferSelect)[]): { name: string; content: string }[] {
-  return rows.map((f) => ({ name: f.name, content: f.encoding === "base64" ? `(${f.mime}, ${f.bytes} bytes)` : f.content }));
+  return rows.map((f) => ({ name: f.name, content: f.content }));
 }
 
 /**
