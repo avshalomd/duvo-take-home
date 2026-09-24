@@ -127,6 +127,21 @@ describe("a member", () => {
     expect(store.setHumanVerdict).toHaveBeenCalledWith({ workspaceId: "ws-a", userId: "u1" }, { runId: RUN, verdict: "approved", note: undefined });
   });
 
+  // Review (frontend): the example's input reached the store unchecked; now the action holds the same limit as a command
+  it("is refused an example input over 2000 characters in plain words, keeping what they typed, and nothing starts", async () => {
+    const long = "x".repeat(2001);
+    const out = await startTrialAction({}, form({ id: ID, input: long }));
+    expect(out).toEqual({ error: "Keep the input under 2000 characters.", values: { input: long } });
+    expect(store.startTrial).not.toHaveBeenCalled();
+  });
+
+  it("is refused a Run input over 2000 characters in plain words, keeping what they typed, and nothing starts", async () => {
+    const long = "x".repeat(2001);
+    const out = await runNowAction({}, form({ id: ID, input: long }));
+    expect(out).toEqual({ error: "Keep the input under 2000 characters.", values: { input: long } });
+    expect(store.runCommand).not.toHaveBeenCalled();
+  });
+
   it("renames a draft's command, telling the store it may not rename an approved one", async () => {
     store.getAutomation.mockResolvedValueOnce({ command: "audit", status: "draft", version: 1 });
     expect(await saveAutomationAction({}, form({ ...edit, command: "audit-2" }))).toMatchObject({ ok: true });

@@ -17,6 +17,7 @@ import {
   setAutomationStatus,
   setHumanVerdict,
   setSchedule,
+  startTrial,
   updateAutomation,
 } from "./store";
 
@@ -292,6 +293,16 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     await approveAutomation(WS, a.id);
     const before = (await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length;
     const err = await runCommand(ctx, { command: "int-long", input: "x".repeat(2001) }).catch((e) => e);
+    expect(err).toBeInstanceOf(AutomationError);
+    expect(err.message).toBe("Keep the company name under 2000 characters.");
+    expect((await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length).toBe(before);
+  });
+
+  // Review (frontend): an example's input had no limit, so a 1 MB input became a paid run with a huge prompt
+  it("startTrial refuses an example input over 2000 characters in plain words, and starts nothing", async () => {
+    const a = await createAutomationDraft(ctx, draftWith("int-long-example"), null);
+    const before = (await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length;
+    const err = await startTrial(ctx, a.id, "x".repeat(2001)).catch((e) => e);
     expect(err).toBeInstanceOf(AutomationError);
     expect(err.message).toBe("Keep the company name under 2000 characters.");
     expect((await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length).toBe(before);
