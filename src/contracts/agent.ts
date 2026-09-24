@@ -38,7 +38,7 @@ export const UpdateStepInput = { index: z.number().int().min(0), status: PlanSte
 export type MapMessage = (message: unknown, seq: number, at: string) => RunEvent[];
 
 export const AgentLimits = {
-  maxTurns: 25,
+  maxTurns: 40, // /news-digest used 24 of 25 (qa-ai F12); maxBudgetUsd still caps the cost
   maxBudgetUsd: 1,
   wallClockMs: 240_000, // under the route's maxDuration of 300 s
   fileExtensions: [".txt", ".md", ".csv"], // what the Write tool may produce (his call, T+10)
