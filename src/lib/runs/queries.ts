@@ -1,4 +1,4 @@
-import { asc, desc, eq, and } from "drizzle-orm";
+import { asc, desc, eq, and, getTableColumns, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
 import { RunEvent, type GetFile, type GetRun, type ListRuns, type Run, type RunStatus } from "@/contracts/run";
@@ -9,7 +9,7 @@ const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 
 type RunRow = typeof runs.$inferSelect;
 
-function toRun(row: RunRow): Run {
+function toRun(row: Omit<RunRow, "verdict">, outcome: Run["outcome"]): Run {
   return {
     id: row.id,
     prompt: row.prompt,
@@ -23,7 +23,7 @@ function toRun(row: RunRow): Run {
     costUsd: row.costUsd,
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
-    outcome: outcomeOf(row.verdict),
+    outcome,
     workspaceId: row.workspaceId,
     purpose: (row.purpose ?? "adhoc") as Run["purpose"],
     automationId: row.automationId,
@@ -39,16 +39,25 @@ function toRun(row: RunRow): Run {
 }
 
 /** The stored verdict's headline, or null when the run was never judged or the stored shape is unknown. */
-function outcomeOf(verdict: unknown): Run["outcome"] {
-  const v = (verdict as { verdict?: unknown } | null)?.verdict;
-  return v === "pass" || v === "pass_with_notes" || v === "fail" || v === "unknown" ? v : null;
+function outcomeOf(headline: unknown): Run["outcome"] {
+  return headline === "pass" || headline === "pass_with_notes" || headline === "fail" || headline === "unknown" ? headline : null;
 }
+
+// The list needs only the verdict's headline, not the whole jsonb with its checks and review (engine review #8).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- the one column left out of the list
+const { verdict, ...listColumns } = getTableColumns(runs);
+const headline = sql<string | null>`${runs.verdict}->>'verdict'`;
 
 // Tenancy: every read filters on the workspace from the session. A run of another workspace reads as "not found",
 // never as "forbidden", so its existence does not leak either.
 export const listRuns: ListRuns = async (workspaceId) => {
-  const rows = await db.select().from(runs).where(eq(runs.workspaceId, workspaceId)).orderBy(desc(runs.createdAt)).limit(100);
-  return rows.map(toRun);
+  const rows = await db
+    .select({ ...listColumns, headline })
+    .from(runs)
+    .where(eq(runs.workspaceId, workspaceId))
+    .orderBy(desc(runs.createdAt))
+    .limit(100);
+  return rows.map((row) => toRun(row, outcomeOf(row.headline)));
 };
 
 export const getRun: GetRun = async (workspaceId, id) => {
@@ -56,7 +65,12 @@ export const getRun: GetRun = async (workspaceId, id) => {
   const [row] = await db.select().from(runs).where(and(eq(runs.id, id), eq(runs.workspaceId, workspaceId)));
   if (!row) return null;
   const eventRows = await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq));
-  const fileRows = await db.select().from(files).where(eq(files.runId, id)).orderBy(asc(files.name));
+  // metadata only: a file's content (a spreadsheet's base64 included) is read by getFile when it is opened
+  const fileRows = await db
+    .select({ name: files.name, mime: files.mime, bytes: files.bytes, encoding: files.encoding, flags: files.flags, quarantined: files.quarantined })
+    .from(files)
+    .where(eq(files.runId, id))
+    .orderBy(asc(files.name));
   // jsonb is only typed at compile time: parse each row against the contract and drop what does not fit,
   // so one odd row from an older shape cannot break the whole run page.
   const events = eventRows
@@ -66,7 +80,7 @@ export const getRun: GetRun = async (workspaceId, id) => {
   // The verdict is stored whole on the run so a pass or fail can be defended later; parsed here, not trusted raw.
   const verdict = Verdict.safeParse(row.verdict);
   return {
-    run: toRun(row),
+    run: toRun(row, outcomeOf((row.verdict as { verdict?: unknown } | null)?.verdict)),
     events,
     files: fileRows.map((f) => ({ name: f.name, mime: f.mime, bytes: f.bytes, encoding: f.encoding === "base64" ? "base64" : "utf8", flags: f.flags ?? [], quarantined: f.quarantined })),
     verdict: verdict.success ? verdict.data : null,
