@@ -100,7 +100,7 @@ export async function getRunSince(workspaceId: string, id: string, after: number
     .map((e) => RunEvent.safeParse({ seq: e.seq, at: e.at.toISOString(), kind: e.kind, payload: e.payload }))
     .filter((r) => r.success)
     .map((r) => r.data); // parsed against the contract, as getRun does
-  return { run: toRun(row), events };
+  return { run: toRun(row, outcomeOf((row.verdict as { verdict?: unknown } | null)?.verdict)), events };
 }
 
 export const getFile: GetFile = async (workspaceId, runId, name) => {
