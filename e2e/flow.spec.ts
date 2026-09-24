@@ -689,13 +689,17 @@ test.describe("a finished run", () => {
     const details = page.getByRole("dialog", { name: /details/i });
     await expect(details).toBeVisible();
     await expect(details).toHaveAttribute("aria-modal", "true");
-    const box = (await details.boundingBox())!;
-    expect(box.x).toBeLessThanOrEqual(0.5);
-    expect(box.width).toBeGreaterThanOrEqual(389);
+    // once it has slid in from the right, it covers the screen edge to edge
+    await expect.poll(async () => (await details.boundingBox())!.x).toBeLessThanOrEqual(0.5);
+    expect((await details.boundingBox())!.width).toBeGreaterThanOrEqual(389);
     await expect(details.getByRole("button", { name: /close details/i })).toBeFocused();
 
     // Tab and Shift+Tab never leave the sheet for the run hidden under it
-    const inside = () => page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')));
+    // Base UI's trap wraps focus through a hidden guard at each end, which hands it on at once: read where it lands
+    const inside = async () => {
+      await page.waitForFunction(() => !document.activeElement?.hasAttribute("data-base-ui-focus-guard"));
+      return page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')));
+    };
     for (let i = 0; i < 12; i++) {
       await page.keyboard.press("Tab");
       expect(await inside(), `Tab ${i + 1}`).toBe(true);
