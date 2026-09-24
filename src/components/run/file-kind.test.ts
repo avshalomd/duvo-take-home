@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { carriedSheets, csvLine, fileKind, flagLine, formatBytes, noFilesLine, sheetsLine, sheetsOf, tileSheets } from "./file-kind";
+import { carriedSheets, csvLine, fileKind, flagLine, formatBytes, isTextFile, linesLine, noFilesLine, sheetsLine, sheetsOf, tileSheets } from "./file-kind";
+
+// UX QA U21: bytes mean little to an office worker; a text file's tile says how many lines it has
+describe("linesLine - a text file's size in lines", () => {
+  it("says one line, several lines, or that the file is empty", () => {
+    expect(linesLine(1)).toBe("1 line");
+    expect(linesLine(3)).toBe("3 lines");
+    expect(linesLine(0)).toBe("Empty");
+  });
+
+  it("is used for .md and .txt files only", () => {
+    expect(isTextFile("notes.md")).toBe(true);
+    expect(isTextFile("Haiku.TXT")).toBe(true);
+    expect(isTextFile("data.csv")).toBe(false);
+    expect(isTextFile("chart.svg")).toBe(false);
+  });
+});
 
 describe("fileKind - how a file is shown on the run", () => {
   it("previews a chart, cards a spreadsheet and lists everything else as a document", () => {

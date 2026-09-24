@@ -332,16 +332,15 @@ test.describe("the composer", () => {
     await expect(chips.getByRole("link").first()).toHaveAttribute("href", "/settings/connections");
   });
 
-  // Q147: two names ran together into one ("DeepWiki e2e Settings moved")
-  test("each connection that is on is a chip of its own", async ({ page }) => {
+  // Q147: two names ran together into one ("DeepWiki e2e Settings moved"). UX QA U24: several are one chip, "DeepWiki
+  // and 3 more", and its list names each one on a row of its own (e2e/glance-calls.spec.ts)
+  test("the connections that are on are one chip, set apart from the words around it", async ({ page }) => {
     await page.goto("/");
-    const names = page.getByTestId("composer-connections").getByTestId("connection-chip");
-    const count = await names.count();
-    test.skip(count === 0, "the demo workspace has no connection switched on");
-    for (let i = 0; i < count; i++) {
-      const background = await names.nth(i).evaluate((el) => getComputedStyle(el).backgroundColor);
-      expect(background).not.toBe("rgba(0, 0, 0, 0)");
-    }
+    const chip = page.getByTestId("composer-connections").getByTestId("connection-chip");
+    test.skip((await chip.count()) === 0, "the demo workspace has no connection switched on");
+    await expect(chip).toHaveCount(1);
+    const background = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(background).not.toBe("rgba(0, 0, 0, 0)");
   });
 
   // Q135: shadcn's md:text-sm made the box 14 px on a desk, while its hint and the brief as it left were 19 px

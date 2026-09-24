@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { verdictChangeLabel, verdictWords } from "./verdict-words";
+import { judgeWho, verdictChangeLabel, verdictWords } from "./verdict-words";
 
 // A person's judgment of a run, said as who said it: the viewer, a named colleague, or nobody recorded (rows judged
 // before the judge was stored). "You said" is only ever true.
@@ -23,6 +23,16 @@ describe("the words for a person's judgment", () => {
 
   it("stays neutral when the judge's account is gone and has no name to show", () => {
     expect(verdictWords("approved", { id: "user-gone", name: null }, ME)).toBe("Marked as looking right");
+  });
+});
+
+// UX QA U30: the outcome line says who judged it, as the judgment itself does
+describe("who judged it, as the subject of a sentence", () => {
+  it("is You to the person who judged it, their name to everyone else, and nobody when none was recorded", () => {
+    expect(judgeWho({ id: ME, name: "Sam" }, ME)).toBe("You");
+    expect(judgeWho({ id: "user-mia", name: "Mia Member" }, ME)).toBe("Mia Member");
+    expect(judgeWho(null, ME)).toBeNull();
+    expect(judgeWho({ id: "user-gone", name: null }, ME)).toBeNull();
   });
 });
 
