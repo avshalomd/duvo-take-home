@@ -5,10 +5,13 @@ import { google } from "@ai-sdk/google";
 import type { LanguageModel } from "ai";
 
 /**
- * One place that decides which LLM the app talks to.
- * Order: an explicit provider key (the one the task hands over) wins,
- * then the Vercel AI Gateway (OIDC token from `vercel env pull`, or AI_GATEWAY_API_KEY).
- * Override the model with AI_MODEL (provider-native id, or "provider/model" for the gateway).
+ * One place that decides which LLM extract() talks to (the agent's own model is AGENT_MODEL, in agent/run.ts).
+ * Order: an explicit provider key wins, then the Vercel AI Gateway (OIDC token from `vercel env pull`, or
+ * AI_GATEWAY_API_KEY). Every environment that runs agents has ANTHROPIC_API_KEY (the agent's child needs it), so
+ * there the first model is Claude Sonnet on Anthropic, and the second - tried when the first fails - is on OpenRouter
+ * whenever OPENROUTER_API_KEY is set: another vendor, so one provider's outage is not the reviewer's (the owner's
+ * call, engine review #2). Override the first with AI_MODEL (in the chosen provider's own ids, or "provider/model"
+ * for the gateway) and the second with AI_MODEL_FALLBACK (an OpenRouter slug; set to nothing, no second model).
  * AI_SIMULATE_DOWN=1 makes every model call fail, so manual QA can walk the LLM-down path
  * (restart the dev server with it set; never set it on Vercel).
  */
@@ -18,8 +21,9 @@ import type { LanguageModel } from "ai";
 // Both are PAID slugs on purpose. A ":free" slug is retired without notice - deepseek's was, mid-morning that
 // day, and every production call 404'd while local work carried on - and the free pools 429 under load, which
 // reads as "the model is bad" when it is only busy. AI_MODEL / AI_MODEL_FALLBACK override either without a deploy.
-const PRIMARY_OPENROUTER_MODEL = "openai/gpt-5.6-luna";
-const FALLBACK_OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash";
+const PRIMARY_ANTHROPIC_MODEL = "claude-sonnet-5";
+const PRIMARY_OPENROUTER_MODEL = "openai/gpt-5.6-luna"; // the first model when OpenRouter is the only key
+const FALLBACK_OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash"; // the second model, whichever provider is first
 
 // OpenRouter speaks the OpenAI chat-completions API, so the installed OpenAI provider covers it: no new dependency.
 const openrouter = (slug: string) =>
@@ -42,7 +46,7 @@ export function getModel(): LanguageModel {
   const m = process.env.AI_MODEL || undefined;
   switch (aiProvider()) {
     case "anthropic":
-      return anthropic(m ?? "claude-sonnet-5");
+      return anthropic(m ?? PRIMARY_ANTHROPIC_MODEL);
     case "openai":
       return openai(m ?? "gpt-5.4-mini");
     case "google":
@@ -59,15 +63,18 @@ export function getModel(): LanguageModel {
 }
 
 /**
- * The second model to try when the first one fails, on the same key and the same API. Only OpenRouter has one
- * here: its pools throttle and its slugs come and go, and a second model is the cheapest answer to that.
- * Returns null for a single-model provider, so its one failure state stays honest.
- * AI_MODEL_FALLBACK="" switches it off; AI_SIMULATE_DOWN=1 does too, so QA still sees the failure path.
+ * The second model to try when the first one fails: on OpenRouter, whenever its key is set, whichever provider
+ * answers first - beside Anthropic it is another vendor, and on OpenRouter itself a second model is the cheapest
+ * answer to pools that throttle and slugs that come and go. null without that key, so a single model's one failure
+ * state stays honest. AI_MODEL_FALLBACK="" switches it off; AI_SIMULATE_DOWN=1 does too, so QA still sees the
+ * failure path.
  */
 export function getFallbackModel(): LanguageModel | null {
   if (process.env.AI_SIMULATE_DOWN === "1") return null;
-  if (aiProvider() !== "openrouter") return null;
+  if (!process.env.OPENROUTER_API_KEY) return null;
   const slug = process.env.AI_MODEL_FALLBACK ?? FALLBACK_OPENROUTER_MODEL;
-  if (!slug || slug === (process.env.AI_MODEL || PRIMARY_OPENROUTER_MODEL)) return null;
+  if (!slug) return null;
+  // on OpenRouter alone, the second model must not be the first one again
+  if (aiProvider() === "openrouter" && slug === (process.env.AI_MODEL || PRIMARY_OPENROUTER_MODEL)) return null;
   return openrouter(slug);
 }
