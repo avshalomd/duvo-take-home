@@ -658,6 +658,7 @@ test.describe("a finished run", () => {
     await opener.click();
     const details = page.getByRole("dialog", { name: /details/i });
     await expect(details.getByTestId("timeline")).toBeVisible();
+    await expect(details).toHaveAttribute("aria-modal", "false"); // on a desk a parallel panel; a phone's is modal (below)
     // Q198: a finished run says its total, not "turn 17 of 25" as if it were still counting
     await expect(details.getByTestId("state-card")).toContainText(/succeeded - \d+ turns?/);
     await expect(details.getByTestId("state-card")).not.toContainText(/turn \d+ of \d+/);
@@ -676,6 +677,43 @@ test.describe("a finished run", () => {
     await expect(details).toBeHidden();
     await expect(opener).toBeFocused();
     expect(keyWarnings).toEqual([]);
+  });
+
+  // Frontend review 5 (his call, 2026-09-24): on a phone Details covers the whole run, yet Tab walked out of it onto
+  // "Run again" and the composer hidden underneath. Below 640 px it is now a real full-screen sheet: focus stays in it.
+  test("on a phone Details is a full-screen sheet that keeps the keyboard inside, and Escape or Close hands it back to Details", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const panel = await openRun(page, runs.followUp);
+    const opener = panel.getByRole("button", { name: /details/i });
+    await opener.click();
+    const details = page.getByRole("dialog", { name: /details/i });
+    await expect(details).toBeVisible();
+    await expect(details).toHaveAttribute("aria-modal", "true");
+    const box = (await details.boundingBox())!;
+    expect(box.x).toBeLessThanOrEqual(0.5);
+    expect(box.width).toBeGreaterThanOrEqual(389);
+    await expect(details.getByRole("button", { name: /close details/i })).toBeFocused();
+
+    // Tab and Shift+Tab never leave the sheet for the run hidden under it
+    const inside = () => page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')));
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press("Tab");
+      expect(await inside(), `Tab ${i + 1}`).toBe(true);
+    }
+    await details.getByRole("button", { name: /close details/i }).focus();
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await inside(), `Shift+Tab ${i + 1}`).toBe(true);
+    }
+
+    await page.keyboard.press("Escape");
+    await expect(details).toBeHidden();
+    await expect(opener).toBeFocused();
+
+    await opener.click();
+    await details.getByRole("button", { name: /close details/i }).click();
+    await expect(details).toBeHidden();
+    await expect(opener).toBeFocused();
   });
 
   // Q208: with the model down the result was never checked, and the only way to check it again was inside Details.
