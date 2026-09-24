@@ -64,8 +64,11 @@ export const getRun: GetRun = async (workspaceId, id) => {
   if (!isUuid(id)) return null; // a non-uuid id would make Postgres throw, not return nothing
   const [row] = await db.select().from(runs).where(and(eq(runs.id, id), eq(runs.workspaceId, workspaceId)));
   if (!row) return null;
-  const eventRows = await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq));
-  const fileRows = await db.select().from(files).where(eq(files.runId, id)).orderBy(asc(files.name));
+  // the events and the files side by side, once the run is known to be this workspace's
+  const [eventRows, fileRows] = await Promise.all([
+    db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq)),
+    db.select().from(files).where(eq(files.runId, id)).orderBy(asc(files.name)),
+  ]);
   const events = parseEvents(eventRows);
   // The verdict is stored whole on the run so a pass or fail can be defended later; parsed here, not trusted raw.
   const verdict = Verdict.safeParse(row.verdict);

@@ -75,19 +75,23 @@ async function Rail({ workspaceId, selectedId }: { workspaceId: string; selected
 }
 
 async function MainColumn({ workspaceId, userId, selectedId }: { workspaceId: string; userId: string; selectedId?: string }) {
-  const composer = await composerProps(workspaceId);
+  // side by side, not one after another: each read is its own round trip to the database (readyAutomations and
+  // connectionsOf are cached per request, so the composer's reads of them are the same ones)
+  const [composer, data, automations, allConnections] = await Promise.all([
+    composerProps(workspaceId),
+    selectedId ? getRun(workspaceId, selectedId) : null,
+    readyAutomations(workspaceId),
+    connectionsOf(workspaceId),
+  ]);
   if (!selectedId) return <FirstVisit composer={composer} />;
-
-  const data = await getRun(workspaceId, selectedId);
   if (!data) return <NotFoundSheet />;
   const { run } = data;
-  const automations = await readyAutomations(workspaceId);
   const { names } = titles(automations.all);
-  // the parent is read only for a follow-up, and only for its title
+  // a follow-up's parent, read once: its title here, and the sheets it carried over in the file facts
   const parent = run.parentRunId ? await getRun(workspaceId, run.parentRunId) : null;
-  const connections = (await connectionsOf(workspaceId)).map((c) => ({ name: c.name })); // names only: no url, no token state
+  const connections = allConnections.map((c) => ({ name: c.name })); // names only: no url, no token state
   // the person's mark, as who made it: "You said" only to them (Q178)
-  const judges = await judgeNames([run.humanVerdictBy]);
+  const [judges, facts] = await Promise.all([judgeNames([run.humanVerdictBy]), fileFacts(workspaceId, run, data.files, parent)]);
   const verdictLine = run.humanVerdict ? verdictWords(run.humanVerdict, judgeOf(run.humanVerdictBy, judges), userId) : null;
 
   return (
@@ -98,7 +102,7 @@ async function MainColumn({ workspaceId, userId, selectedId }: { workspaceId: st
       parentTitle={parent ? runTitleOf(parent.run, names) : null}
       automationName={run.automationId ? (names[run.automationId] ?? null) : null}
       verdictLine={verdictLine}
-      facts={await fileFacts(workspaceId, run, data.files)}
+      facts={facts}
       connections={connections}
       composer={composer}
     />
