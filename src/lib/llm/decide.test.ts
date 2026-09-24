@@ -17,6 +17,8 @@ import {
   type ScoreAnswer,
 } from "./decide";
 import { LlmError } from "./errors";
+import { costOfCall } from "@/lib/usage/model-prices";
+import { metered } from "@/lib/usage/meter";
 
 // Both routes are faked, so the suite runs offline. What was SENT matters as much as what came back: "one request,
 // every question" is the design, and the gateway speaks a different dialect that this file has to translate.
@@ -131,6 +133,15 @@ describe("decide over HTTP", () => {
     const err = await decide({ state: "x", questions, route: httpRoute, timeoutMs: 50, fetchImpl: impl }).catch((e) => e);
     expect(err.kind).toBe("timeout");
     expect(err.message).toMatch(/0.05 s/);
+  });
+
+  // F18 / S10: a re-check's judge call counts toward the day's spend
+  it("reports what the decision model read to the metered work around it", async () => {
+    const { impl } = fakeFetch(httpOk);
+    const spent: number[] = [];
+    await metered(() => decide({ state: "x", questions, route: httpRoute, fetchImpl: impl }), async (usd) => void spent.push(usd));
+    expect(spent[0]).toBeCloseTo(costOfCall({ modelId: httpOk.model, inputTokens: 493, outputTokens: 0 }), 12);
+    expect(spent[0]).toBeGreaterThan(0);
   });
 });
 

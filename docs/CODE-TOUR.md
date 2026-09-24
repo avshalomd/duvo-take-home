@@ -379,3 +379,31 @@ Per file: what it does and why it is built that way. Grows at every merge.
   toward approval, whoever marked it right.
 - `fixtures/runs/` - four cases from the probes: `chart-wrong-value`, `invented-holidays` (both altered by hand from real
   runs), `refusal-cannot-do`, `ambiguous-needs-answer`. `AgentLimits.maxTurns` is 40 (F12); the $1 budget is unchanged.
+
+### The owner's last four calls (2026-09-24: U3, frontend review 5, security S7, F18/S10)
+
+- `src/components/run/home-data.ts` `composerProps` and `src/lib/usage/budget-rule.ts` `startRefusal` - Home reads the
+  workspace's limits and today's usage as Settings > Limits does, and hands the composer the start refusal the server
+  would give, if any. `src/components/run/composer.tsx` refuses Run in the box with that reason: no stand-in sheet, no
+  request. Only a start that would otherwise hand over (a title): a mistyped command or a short brief still gets its own
+  reason first. The server stays the authority: a refusal it alone knows (the deployment's caps, the address brake)
+  still arrives late, on today's path (U3).
+- `src/components/run/use-refresh-when-a-run-settles.ts` - while the refusal is one a run settling may lift, one GET of
+  `/api/runs` every five seconds; once fewer runs are working than the page was drawn with, `router.refresh()` reads the
+  limits again. The baseline is the server's own count, so a run that settles before the first look is not missed.
+- `src/components/run/details-panel.tsx` - below 640 px Details is Base UI's modal Dialog, full screen: focus stays in
+  it, the run under it is inert, and Escape or Close hand the keyboard back to the Details button (`finalFocus`). It
+  slides in from the right and leaves the same way on the iOS sheet curve, a CSS transition so a close mid-entry
+  reverses; reduced motion cross-fades. The desk keeps the parallel panel with no scrim (frontend review 5).
+- `src/lib/connections/for-viewer.ts` - a plain member's Connections page is sent only each server's origin (no path,
+  query or user and password), flagged `addressHidden`; the row shows the host and says who sees the whole address. The
+  server form says an address with a key in it is as secret as a password (security review S7).
+- `src/lib/usage/model-spend.ts` `payForModelCall` and the `model_spend` table - Check again and Make an automation are
+  paid model calls outside a run. Under a per-workspace advisory lock the day's money is checked (`spend-rule.ts`), then
+  the limit (one re-check a minute per run, three drafts per workspace in 10 minutes), and the press is recorded; the
+  work then runs metered and its row gets the cost. The row is both the limit's count and part of the day's spend:
+  `getUsage`, `healBudgetStop` and `deploymentSpentToday` add `spend-today.ts`'s sum (F18, S10).
+- `src/lib/usage/meter.ts` - an AsyncLocalStorage meter: `extract()` and `decide()` report each call's tokens, and the
+  meter around the work adds them up, so the evaluator's layers did not need a cost parameter each. Outside metered work
+  (a live run's own checks) a report does nothing. `model-prices.ts` prices tokens: Sonnet 5 at its list price, Jev at
+  a stated guess, and any other model at Sonnet 4.6's price, so the day never reads low.

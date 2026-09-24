@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { neon } from "@neondatabase/serverless";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { deleteUsers, e2eEmail, joinByRow, signedInAs } from "./auth-helpers";
+import { deleteUsers, e2eEmail, joinByRow, signedInAs, sql } from "./auth-helpers";
 
 // Settings in a browser: a connection added with a token, edited, switched off and deleted; a limit changed and
 // kept. Runs against a dev server on the demo workspace:
@@ -38,6 +38,20 @@ test.afterAll(async () => {
   const sql = neon(databaseUrl()!);
   await sql.query("delete from connections where name ilike 'e2e_settings%'"); // this spec's names only, any case or separator ("E2E-settings Twin")
   await sql.query("delete from invitation where email like 'e2e-invite-%@example.com'");
+});
+
+// Security review S7 (c): an address with a key in it must be treated as a secret by whoever types it
+test("the server form says in plain words that an address with a key in it is a secret", async ({ page }) => {
+  await open(page, "/settings/connections");
+  await page.getByRole("button", { name: "Add a server" }).click();
+  const form = page.getByTestId("connection-form");
+  await expect(form.getByTestId("address-secret-note")).toHaveText(
+    "If the service put a key in the address, keep the address as secret as a password. Members see only its host.",
+  );
+  // the note is how the Address field is described, so a screen reader hears it there
+  const note = await form.getByTestId("address-secret-note").getAttribute("id");
+  await expect(form.getByLabel("Address")).toHaveAttribute("aria-describedby", new RegExp(`\\b${note}\\b`));
+  await page.keyboard.press("Escape");
 });
 
 test("a connection is added with a token, edited, switched off and deleted", async ({ page }) => {
@@ -381,6 +395,41 @@ test.describe("changing roles and removing people", () => {
     } finally {
       await olga.context.close();
       await admin.context.close();
+      await plain.context.close();
+    }
+  });
+
+  // Security review S7: several services put the key in the server's address, and every member could read it here
+  test("a member sees only the host of a server's address and none of its key reaches their page; the owner sees it whole", async ({ playwright, browser, baseURL }) => {
+    const [owner, mia] = [e2eEmail("keyed-owner"), e2eEmail("keyed-mia")];
+    created.push(owner, mia);
+    const KEYED = "e2e Settings keyed";
+    const KEYED_URL = "https://mcp.e2e-keyed.example/s/sk-e2e-secret-4f9a/mcp";
+    const olga = await signedInAs(playwright.request, browser, baseURL!, "Olga Owner", owner);
+    const plain = await signedInAs(playwright.request, browser, baseURL!, "Mia Member", mia);
+    try {
+      await joinByRow(owner, mia, "member");
+      await sql()`
+        insert into connections (workspace_id, name, url)
+        select m.organization_id, ${KEYED}, ${KEYED_URL} from member m join "user" u on u.id = m.user_id
+        where u.email = ${owner} and m.role = 'owner'`; // the afterAll sweep removes it by its name
+
+      const page = plain.page;
+      const response = await page.goto("/settings/connections");
+      expect(await response!.text()).not.toContain("sk-e2e-secret"); // not in the HTML, nor in the payload it carries
+      const row = rowOf(page, KEYED);
+      await expect(row).toContainText("mcp.e2e-keyed.example");
+      await openRow(row);
+      await expect(row.getByTestId("address-hidden")).toHaveText("Only an owner or an admin sees the whole address.");
+      expect(await page.content()).not.toContain("sk-e2e-secret");
+
+      await olga.page.goto("/settings/connections");
+      const own = rowOf(olga.page, KEYED);
+      await openRow(own);
+      await expect(own).toContainText(KEYED_URL);
+      await expect(own.getByTestId("address-hidden")).toHaveCount(0);
+    } finally {
+      await olga.context.close();
       await plain.context.close();
     }
   });

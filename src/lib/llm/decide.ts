@@ -1,6 +1,7 @@
 import "server-only";
 import { experimental_evaluate as evaluate } from "ai";
 import { z } from "zod";
+import { reportModelUsage } from "@/lib/usage/meter";
 import { LlmError } from "./errors";
 
 // Template 3: a typed decision. Jev (TypeSafe AI) reads a state and answers a fixed set of CLOSED questions with
@@ -100,7 +101,10 @@ export async function decide<const Qs extends Record<string, Question>>(args: De
   let first: LlmError | undefined;
   for (const route of routes) {
     try {
-      return await decideOn(route, args);
+      const result = await decideOn(route, args);
+      // for the metered work around it (Check again: QA F18); Jev writes no text, so what it read is the whole bill
+      reportModelUsage({ modelId: result.modelId, inputTokens: result.usage.inputTokens, outputTokens: 0 });
+      return result;
     } catch (e) {
       first ??= e as LlmError; // decideOn throws nothing else
     }

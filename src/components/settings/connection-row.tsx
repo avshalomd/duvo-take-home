@@ -109,7 +109,15 @@ export function ConnectionRow({ connection, canEdit }: { connection: Connection;
               )}
             </div>
             <div className="space-y-0.5 text-[13px] tracking-[0.01em] text-slate">
-              <p className="break-all">{connection.url}</p>
+              {/* S7: a member's page carries only the server's origin (connectionsFor): shown as its host, with why */}
+              {connection.addressHidden ? (
+                <>
+                  <p className="break-all">{host(connection.url)}</p>
+                  <p data-testid="address-hidden">Only an owner or an admin sees the whole address.</p>
+                </>
+              ) : (
+                <p className="break-all">{connection.url}</p>
+              )}
               <p>{signInWords(connection)}</p>
             </div>
             {canEdit && (

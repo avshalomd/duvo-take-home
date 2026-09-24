@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { extract, fence, LlmError } from "./extract";
 import { apiError, failingModel, scriptedModel, slowModel } from "./test-models";
+import { costOfCall } from "@/lib/usage/model-prices";
+import { metered } from "@/lib/usage/meter";
 
 const Change = z.object({ product: z.string(), newCost: z.number().nullable() });
 const Changes = z.object({ changes: z.array(Change) });
@@ -123,6 +125,15 @@ describe("extract", () => {
     const err = await extract({ ...args, signal: AbortSignal.timeout(50), model: () => slowModel(2_000), fallback }).catch((e) => e);
     expect(err.kind).toBe("timeout");
     expect(fallbackAsked).toBe(false);
+  });
+
+  // F18 / S10: Check again and Make an automation count toward the day's spend, so every call says what it used
+  it("reports each call's tokens to the metered work around it", async () => {
+    const spent: number[] = [];
+    await metered(() => extract({ ...args, model: () => scriptedModel([reply], "claude-sonnet-5") }), async (usd) => void spent.push(usd));
+    // the mock model reads one token and writes one
+    expect(spent[0]).toBeCloseTo(costOfCall({ modelId: "claude-sonnet-5", inputTokens: 1, outputTokens: 1 }), 12);
+    expect(spent[0]).toBeGreaterThan(0);
   });
 
   it("fences the input so it cannot close the data block", () => {

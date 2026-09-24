@@ -8,6 +8,7 @@ import { flushSync } from "react-dom";
 import { startRunAction, type FormState } from "@/app/(app)/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { StartRefusal } from "@/lib/usage/budget-rule";
 import { cn } from "@/lib/utils";
 import { applyCommand, commandHint, commandQuery, filterAutomations } from "./command-query";
 import { COMMAND_LIST_ID, CommandList, optionId, type CommandOption } from "./command-list";
@@ -16,6 +17,7 @@ import { useHandover } from "./handover-host";
 import { handoverTitle } from "./handover-title";
 import { HANDOVER_NAME, TITLE_PX, TITLE_TYPE } from "./run-title";
 import { titleWidth } from "./sheet";
+import { useRefreshWhenARunSettles } from "./use-refresh-when-a-run-settles";
 import "./handover.css";
 
 const PLACEHOLDER = "Describe a task in plain words, or type / to run a saved automation";
@@ -50,11 +52,13 @@ export function Composer({
   automations,
   notReady,
   connections,
+  refusal,
 }: {
   variant: "hero" | "floating";
   automations: CommandOption[];
   notReady: number;
   connections: string[];
+  refusal: StartRefusal | null; // the workspace's limits refuse a start right now (UX QA U3), as the server read them
 }) {
   const router = useRouter();
   const handover = useHandover();
@@ -70,7 +74,13 @@ export function Composer({
   // waits for the handover's move (up to SHOWN_WITHIN_MS): a second press or Cmd+Enter in between started a second run
   const starting = useRef(false);
   const hero = variant === "hero";
-  const invalid = Boolean(state.error || state.fieldErrors?.prompt);
+  // Refused in the box, without asking the server (UX QA U3). Shown only while the page still says so: once a run
+  // settles and the fresh page lifts the refusal, the reason goes with it and the next Run goes to the server.
+  const [refusedHere, setRefusedHere] = useState(false);
+  const refused = refusedHere && refusal ? refusal.reason : null;
+  const error = state.error ?? refused;
+  const invalid = Boolean(error || state.fieldErrors?.prompt);
+  useRefreshWhenARunSettles(refusal?.waitsForRun ? refusal.inFlight : null);
 
   const query = commandQuery(text);
   const open = query !== null && dismissed !== text;
@@ -89,6 +99,7 @@ export function Composer({
     setText(next);
     setActive(0);
     if (invalid) setState({});
+    setRefusedHere(false);
   }
 
   function pick(command: string) {
@@ -100,10 +111,18 @@ export function Composer({
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (starting.current) return; // one press, one run: this brief is already on its way
-    starting.current = true;
-    const data = new FormData(e.currentTarget);
     // null when the server is going to refuse before any run exists: then nothing moves, the reason just appears
     const title = handover ? handoverTitle(text, automations) : null;
+    // UX QA U3: a start the workspace's limits refuse is refused here, in the box: no sheet flies up to snap back. Only a
+    // start that would otherwise go (a title): a mistyped command or a short brief still gets its own reason first.
+    if (refusal && title) {
+      setState({});
+      setRefusedHere(true);
+      box.current?.focus(); // the person goes on from the box: it keeps what they typed
+      return;
+    }
+    starting.current = true;
+    const data = new FormData(e.currentTarget);
     const sheet = e.currentTarget.closest<HTMLElement>("[data-sheet]");
     let shown: Promise<unknown> = Promise.resolve();
 
@@ -172,7 +191,8 @@ export function Composer({
   const { px: size, type, pad } = SIZES[variant];
 
   return (
-    <form onSubmit={onSubmit} className="w-full">
+    // data-start-refused: the page knows the limits refuse a start (e2e reads it; nothing styles it)
+    <form onSubmit={onSubmit} data-testid="composer-form" data-start-refused={refusal ? "" : undefined} className="w-full">
       <div
         data-testid="composer-capsule"
         data-invalid={invalid || undefined}
@@ -242,9 +262,9 @@ export function Composer({
             {state.fieldErrors.prompt[0]}
           </p>
         )}
-        {state.error && (
+        {error && (
           <p role="alert" className="mt-2 text-[14px] text-crimson">
-            {state.error}
+            {error}
           </p>
         )}
 

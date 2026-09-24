@@ -13,6 +13,7 @@ import { startFollowUp } from "@/lib/runs/follow-up";
 import { getRun } from "@/lib/runs/queries";
 import { startRunAgain } from "@/lib/runs/run-again";
 import { startRun } from "@/lib/runs/start";
+import { payForModelCall } from "@/lib/usage/model-spend";
 import { readable } from "./readable";
 
 // Every action returns its state instead of throwing: some of what they call is still being built, and a
@@ -124,7 +125,8 @@ export async function reevaluateAction(_prev: FormState, formData: FormData): Pr
     return { error: "Only a run that has finished can be checked again" };
 
   try {
-    await reevaluateRun(runId.data);
+    // a paid judge call, maybe a reviewer's too (QA F18): once a minute per run, and its cost counts in the day's spend
+    await payForModelCall({ workspaceId, runId: runId.data }, "recheck", () => reevaluateRun(runId.data));
   } catch (e) {
     return { error: readable(e) };
   }

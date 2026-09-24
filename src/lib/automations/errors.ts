@@ -1,6 +1,7 @@
 import { ZodError } from "zod";
 import { LlmError } from "@/lib/llm/errors";
 import { RunLimitError } from "@/lib/runs/limits";
+import { SpendLimitError } from "@/lib/usage/spend-error";
 
 /** A refusal written for the person using the app ("Turn on DeepWiki in Settings to run /audit"): shown as it is. */
 export class AutomationError extends Error {
@@ -18,7 +19,7 @@ const FALLBACK = "Something went wrong on our side - try again";
  * for us and answered with one sentence.
  */
 export function readError(e: unknown): string {
-  if (e instanceof AutomationError || e instanceof LlmError || e instanceof RunLimitError) return e.message;
+  if (e instanceof AutomationError || e instanceof LlmError || e instanceof RunLimitError || e instanceof SpendLimitError) return e.message;
   if (e instanceof ZodError) return e.issues[0]?.message ?? FALLBACK;
   console.error("automations action failed", e);
   return FALLBACK;

@@ -16,6 +16,7 @@ export const Connection = z.object({
   authType: z.enum(["none", "bearer", "oauth"]).optional(),
   signedIn: z.boolean().optional(), // oauth only: a token is stored and not expired beyond refresh
   tools: z.array(z.string()).optional(), // tool names seen in the last run's init message
+  addressHidden: z.boolean().optional(), // S7: set for a plain member's page, whose `url` is then the server's origin only
 });
 export type Connection = z.infer<typeof Connection>;
 

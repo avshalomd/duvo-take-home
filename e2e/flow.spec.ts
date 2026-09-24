@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { deleteUsers, e2eEmail, signedInAs, sql } from "./auth-helpers";
 import { AUTOMATION, createFreshRun, createHomeRuns, deleteHomeRuns, deleteRun, FAILED_ERROR, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
 
 // The Home page: the rail, the first-visit question, the run sheet with its thread, the floating composer and the
@@ -404,7 +405,9 @@ test.describe("the handover", () => {
     test(`the sheet that stands in for a new run is laid out as the run's own page, ${viewport.width} px wide`, async ({ page }) => {
       await page.setViewportSize(viewport);
       const brief = "fresh: write a three-line haiku about a quiet office on Monday";
-      const fresh = await createFreshRun(brief);
+      // the run to compare with is made after the press (UX QA U3): one more run working would fill the demo
+      // workspace's three, and Run would then be refused in the box instead of handing over
+      let fresh: string | undefined;
       try {
         let release!: () => void;
         const held = new Promise<void>((resolve) => (release = resolve));
@@ -427,14 +430,65 @@ test.describe("the handover", () => {
         await expect(pending).toHaveCount(0);
         await page.unroute("**/*");
 
+        fresh = await createFreshRun(brief);
         await openRun(page, fresh);
         const real = await skeleton(page.locator("article[data-sheet]"));
         for (const [part, y] of Object.entries(standIn)) expect(Math.abs(y - real[part as keyof typeof real]), part).toBeLessThanOrEqual(1);
       } finally {
-        await deleteRun(fresh);
+        if (fresh) await deleteRun(fresh);
       }
     });
   }
+
+  // UX QA U3 (his call, 2026-09-24): with the workspace's runs in flight at its limit, Run played the handover and the
+  // sheet snapped back half a second later with the reason. Home now knows the limit, so Run is refused in the box.
+  // A fresh "e2e-" account, so the shared demo workspace's limits are never changed.
+  test("a start the workspace's limits refuse is refused in the box with no handover, and Home reads the limit again once the run settles", async ({ playwright, browser, baseURL }) => {
+    const email = e2eEmail("refused-in-place");
+    const who = await signedInAs(playwright.request, browser, baseURL!, "Rhea Refused", email);
+    const db = sql();
+    let runId: string | undefined;
+    try {
+      const [ws] = await db`select m.organization_id as id from member m join "user" u on u.id = m.user_id where u.email = ${email} and m.role = 'owner'`;
+      await db`insert into workspace_settings (workspace_id, max_in_flight) values (${ws.id}, 1)
+        on conflict (workspace_id) do update set max_in_flight = 1`;
+      [{ id: runId }] = await db`insert into runs (workspace_id, prompt, status, model)
+        values (${ws.id}, '[e2e] home refused: still working', 'running', 'claude-sonnet-4-5') returning id`;
+
+      const page = who.page;
+      const starts: string[] = [];
+      page.on("request", (r) => {
+        if (r.method() === "POST" && r.headers()["next-action"]) starts.push(r.url());
+      });
+      await page.goto("/");
+      // any stand-in sheet, however briefly it is up, is caught
+      await page.evaluate(() => {
+        const w = window as unknown as { sawPending: boolean };
+        w.sawPending = false;
+        new MutationObserver(() => {
+          if (document.querySelector('[data-testid="run-pending"]')) w.sawPending = true;
+        }).observe(document.body, { childList: true, subtree: true });
+      });
+      const brief = "[e2e] home refused: list three facts about the Moon";
+      await composer(page).fill(brief);
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+
+      await expect(page.getByRole("alert").filter({ hasText: "1 run is already working. Wait for it to finish." })).toBeVisible();
+      await expect(composer(page)).toHaveValue(brief); // what was typed stays
+      await expect(composer(page)).toBeFocused();
+      expect(await page.evaluate(() => (window as unknown as { sawPending: boolean }).sawPending)).toBe(false);
+      expect(starts).toEqual([]); // nothing was asked of the server
+      expect(new URL(page.url()).search).toBe("");
+
+      // the run settles: Home reads the limit again, and the next Run goes to the server as usual
+      await db`update runs set status = 'succeeded', finished_at = now() where id = ${runId}`;
+      await expect(page.getByTestId("composer-form")).not.toHaveAttribute("data-start-refused", /.*/, { timeout: 20_000 });
+    } finally {
+      if (runId) await db`delete from runs where id = ${runId}`;
+      await who.context.close();
+      await deleteUsers([email]);
+    }
+  });
 
   test("a start the server would refuse does not move at all", async ({ page }) => {
     await page.goto("/");
@@ -604,6 +658,7 @@ test.describe("a finished run", () => {
     await opener.click();
     const details = page.getByRole("dialog", { name: /details/i });
     await expect(details.getByTestId("timeline")).toBeVisible();
+    await expect(details).toHaveAttribute("aria-modal", "false"); // on a desk a parallel panel; a phone's is modal (below)
     // Q198: a finished run says its total, not "turn 17 of 25" as if it were still counting
     await expect(details.getByTestId("state-card")).toContainText(/succeeded - \d+ turns?/);
     await expect(details.getByTestId("state-card")).not.toContainText(/turn \d+ of \d+/);
@@ -622,6 +677,47 @@ test.describe("a finished run", () => {
     await expect(details).toBeHidden();
     await expect(opener).toBeFocused();
     expect(keyWarnings).toEqual([]);
+  });
+
+  // Frontend review 5 (his call, 2026-09-24): on a phone Details covers the whole run, yet Tab walked out of it onto
+  // "Run again" and the composer hidden underneath. Below 640 px it is now a real full-screen sheet: focus stays in it.
+  test("on a phone Details is a full-screen sheet that keeps the keyboard inside, and Escape or Close hands it back to Details", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const panel = await openRun(page, runs.followUp);
+    const opener = panel.getByRole("button", { name: /details/i });
+    await opener.click();
+    const details = page.getByRole("dialog", { name: /details/i });
+    await expect(details).toBeVisible();
+    await expect(details).toHaveAttribute("aria-modal", "true");
+    // once it has slid in from the right, it covers the screen edge to edge
+    await expect.poll(async () => (await details.boundingBox())!.x).toBeLessThanOrEqual(0.5);
+    expect((await details.boundingBox())!.width).toBeGreaterThanOrEqual(389);
+    await expect(details.getByRole("button", { name: /close details/i })).toBeFocused();
+
+    // Tab and Shift+Tab never leave the sheet for the run hidden under it
+    // Base UI's trap wraps focus through a hidden guard at each end, which hands it on at once: read where it lands
+    const inside = async () => {
+      await page.waitForFunction(() => !document.activeElement?.hasAttribute("data-base-ui-focus-guard"));
+      return page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')));
+    };
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press("Tab");
+      expect(await inside(), `Tab ${i + 1}`).toBe(true);
+    }
+    await details.getByRole("button", { name: /close details/i }).focus();
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await inside(), `Shift+Tab ${i + 1}`).toBe(true);
+    }
+
+    await page.keyboard.press("Escape");
+    await expect(details).toBeHidden();
+    await expect(opener).toBeFocused();
+
+    await opener.click();
+    await details.getByRole("button", { name: /close details/i }).click();
+    await expect(details).toBeHidden();
+    await expect(opener).toBeFocused();
   });
 
   // Q208: with the model down the result was never checked, and the only way to check it again was inside Details.
