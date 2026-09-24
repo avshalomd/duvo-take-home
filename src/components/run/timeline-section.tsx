@@ -1,5 +1,6 @@
-import { CircleCheck, CircleDashed, CircleMinus, CircleStop, LoaderCircle } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleDot, CircleMinus, CircleStop, LoaderCircle } from "lucide-react";
 import type { RunEvent } from "@/contracts/run";
+import { plainCheckReason } from "@/lib/eval/check-words";
 import { cn } from "@/lib/utils";
 import { attemptCost, formatCost, formatDuration, relativeToRun, runFolders } from "./format";
 import { LocalTime } from "./local-time";
@@ -14,6 +15,7 @@ function GroupIcon({ status }: { status: EventGroup["status"] }) {
   if (status === "running") return <LoaderCircle className="size-3.5 animate-spin text-saffron" />;
   if (status === "skipped") return <CircleMinus className="size-3.5 text-slate" />;
   if (status === "stopped") return <CircleStop aria-label="Stopped here" className="size-3.5 text-slate" />;
+  if (status === "unmarked") return <CircleDot aria-label="Not marked" className="size-3.5 text-fern/60" />;
   return <CircleDashed className="size-3.5 text-slate/60" />;
 }
 
@@ -114,7 +116,10 @@ function renderEvents(events: RunEvent[], { connections, folders, over }: Contex
         // reader, the one who asks "what did it tell the agent?"
         return (
           <div key={event.seq} className="space-y-1 rounded-[10px] bg-saffron-wash/60 px-2.5 py-2 text-[12px]">
-            <p className="text-slate">The check found: {event.payload.reasons.join("; ") || "no reasons given"}</p>
+            <p className="text-slate">
+              {/* a failed check named by what failed, not by its pass label (qa-ux U10) */}
+              The check found: {event.payload.reasons.map((r) => plainCheckReason(r) ?? r).join("; ") || "no reasons given"}
+            </p>
             {event.payload.stopped ? (
               // the engine's own reason for not trying again (Q148); the feedback was never sent
               <p className="text-graphite">{event.payload.stopped}</p>

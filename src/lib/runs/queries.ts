@@ -2,7 +2,7 @@ import { asc, desc, eq, and, gt, getTableColumns, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
 import { RunEvent, type GetFile, type GetRun, type ListRuns, type Run, type RunStatus } from "@/contracts/run";
-import { Verdict } from "@/contracts/eval";
+import { Verdict, VerdictKind } from "@/contracts/eval";
 
 // A real uuid shape, not just 36 hex-or-dash characters: 36 dashes reached Postgres and threw (QA, round 2).
 const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -40,7 +40,8 @@ function toRun(row: Omit<RunRow, "verdict">, outcome: Run["outcome"]): Run {
 
 /** The stored verdict's headline, or null when the run was never judged or the stored shape is unknown. */
 function outcomeOf(headline: unknown): Run["outcome"] {
-  return headline === "pass" || headline === "pass_with_notes" || headline === "fail" || headline === "unknown" ? headline : null;
+  const parsed = VerdictKind.safeParse(headline); // "could not be done" and "needs your answer" too (qa-ai F3)
+  return parsed.success ? parsed.data : null;
 }
 
 // The list needs only the verdict's headline, not the whole jsonb with its checks and review (engine review #8).

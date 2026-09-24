@@ -11,7 +11,11 @@ export type RunPurpose = z.infer<typeof RunPurpose>;
 export type RunStatus = z.infer<typeof RunStatus>;
 
 // The agent's own plan, kept up to date through the plan tool. The key state of a run is read from here.
-export const PlanStepStatus = z.enum(["pending", "running", "done", "skipped"]);
+// What the agent may set a step to with the plan tool.
+export const AgentStepStatus = z.enum(["pending", "running", "done", "skipped"]);
+// A stored step can also be "unmarked" (qa-ai F8): the agent ended successfully without ticking it, so code marked it.
+// A quiet state of its own - not "not started", which a finished run's step is not - and never the agent's to claim.
+export const PlanStepStatus = z.enum(["pending", "running", "done", "skipped", "unmarked"]);
 export const PlanStep = z.object({
   index: z.number().int().min(0),
   title: z.string().min(1),
@@ -116,7 +120,7 @@ export const Run = z.object({
   createdAt: z.string(),
   finishedAt: z.string().nullable(),
   // The verdict's headline, so a run row can say "Done, with notes" like the panel; the full Verdict is on GetRun.
-  outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown"]).nullable().optional(),
+  outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown", "cannot_do", "needs_answer"]).nullable().optional(), // VerdictKind (eval.ts imports this file)
   // v2, optional so v1 rows and fixtures still parse
   workspaceId: z.string().nullable().optional(),
   purpose: RunPurpose.optional(),

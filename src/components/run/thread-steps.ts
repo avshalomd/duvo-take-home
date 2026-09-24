@@ -8,7 +8,7 @@ import { stoppedLine, type Heal } from "./heal";
 export type PlanThreadStep = {
   key: number | string;
   title: string;
-  status: "pending" | "running" | "done" | "skipped";
+  status: "pending" | "running" | "done" | "skipped" | "unmarked";
   note?: string;
   flag?: string;
 };
@@ -30,10 +30,13 @@ export function threadSteps(plan: Plan | null, runStatus: string, stepChecks: Ru
     if (step.note) out.note = step.note;
 
     // A run that ended cannot still be working: its bead would breathe for ever. A stopped or broken run says
-    // where it stopped; a finished one simply never marked the step done.
-    if (step.status === "running" && !live) {
+    // where it stopped; a finished one simply never ticked the step, which is "not marked", never "not started"
+    // (qa-ai F8; the engine marks such steps itself now, this covers the runs from before it did).
+    if (step.status === "running" && stoppedMidway) {
       out.status = "pending";
-      if (stoppedMidway) out.note = ["Stopped here", step.note].filter(Boolean).join(". ");
+      out.note = ["Stopped here", step.note].filter(Boolean).join(". ");
+    } else if ((step.status === "running" || step.status === "pending") && runStatus === "succeeded") {
+      out.status = "unmarked";
     }
 
     const check = stepChecks?.find((c) => c.stepIndex === step.index);

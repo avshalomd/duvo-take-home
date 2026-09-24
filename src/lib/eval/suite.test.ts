@@ -21,7 +21,14 @@ describe("the offline suite, replayed with the recorded answers", () => {
     const decidedBy = new Set(cases.map((c) => c.expected.decidedBy));
     const verdicts = new Set(cases.map((c) => c.expected.verdict));
     for (const tier of ["checks", "judge", "review"] as const) expect(decidedBy).toContain(tier);
-    for (const v of ["pass", "pass_with_notes", "fail"] as const) expect(verdicts).toContain(v);
+    for (const v of ["pass", "pass_with_notes", "fail", "cannot_do", "needs_answer"] as const) expect(verdicts).toContain(v);
+  });
+
+  // qa-ai: the 20/20 was measured on cases with none of F1-F3 in them, so the two false passes and two false fails
+  // the probes found never showed. Each has a case now.
+  it("includes a wrong chart value, an invented fact, a truthful refusal and a question for the person", () => {
+    const ids = cases.map((c) => c.id);
+    for (const id of ["chart-wrong-value", "invented-holidays", "refusal-cannot-do", "ambiguous-needs-answer"]) expect(ids).toContain(id);
   });
 
   it("includes runs of a saved automation, so the template checks are in the suite", () => {

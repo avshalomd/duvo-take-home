@@ -4,7 +4,7 @@ export type EventGroup = {
   key: string;
   title: string;
   // stopped: where a failed or stopped run ended; a finished run has no group left pending or running
-  status: "pending" | "running" | "done" | "skipped" | "stopped";
+  status: "pending" | "running" | "done" | "skipped" | "stopped" | "unmarked"; // unmarked: never ticked (qa-ai F8)
   events: RunEvent[];
 };
 

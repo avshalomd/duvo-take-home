@@ -33,7 +33,12 @@ export const canApprove: CanApprove = (trials, version) => {
   const current = trials.filter((t) => t.version === version); // an edit bumps the version, so older examples drop out here
   if (current.some((t) => t.humanVerdict === "rejected"))
     return { ok: false, reason: "An example of this version is marked not right. Change the automation, then run a new example." };
-  if (current.some((t) => t.humanVerdict === "approved")) return { ok: true };
+  // An example that could not be done, or asked a question, shows nothing about whether the automation works, whoever
+  // marked it right (qa-ai F3, the owner's call).
+  const didNoWork = (t: Trial) => t.outcome === "cannot_do" || t.outcome === "needs_answer";
+  if (current.some((t) => t.humanVerdict === "approved" && !didNoWork(t))) return { ok: true };
+  if (current.some((t) => t.humanVerdict === "approved"))
+    return { ok: false, reason: "The example could not be done, so it cannot show the automation works. Run an example with another input." };
   if (current.length === 0)
     return {
       ok: false,

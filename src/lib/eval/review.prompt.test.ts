@@ -50,6 +50,17 @@ describe("reviewInput", () => {
     expect(text).not.toContain(input.files[0].content);
   });
 
+  // qa-ai F1: the reviewer read a spreadsheet as its size, and a chart as the first 500 characters of one SVG line.
+  it("shows the reviewer a spreadsheet's sheets and rows, and a chart's values", () => {
+    const spreadsheets = [{ file: "data.xlsx", sheets: [{ name: "Prices", columns: ["app", "eur"], rows: [["Teams", 5.6]] }] }];
+    const chart = `<svg xmlns="http://www.w3.org/2000/svg">${"<g>".repeat(50)}<path aria-label="quarter: Q2; Sales: 9550" role="graphics-symbol" aria-roledescription="bar" d="M0Z"/>${"</g>".repeat(50)}</svg>`;
+    const withBoth = { ...input, files: [...input.files, { name: "sales.svg", content: chart }], spreadsheets };
+    const text = reviewInput(withBoth, runChecks(withBoth));
+    expect(text).toContain('Sheet "Prices"');
+    expect(text).toContain("Teams,5.6");
+    expect(text).toContain("quarter: Q2; Sales: 9550");
+  });
+
   it("shows a text file's own lines", () => {
     expect(reviewInput(input, runChecks(input))).toContain("Prices are list prices.");
   });
@@ -61,6 +72,52 @@ describe("reviewInput", () => {
     const text = reviewInput(csv, runChecks(csv));
     expect(text).toMatch(/CHECKS/);
     expect(text).toContain("The CSV parses: labs.csv: 2 columns");
+  });
+});
+
+// qa-ai F11 and F2: the reviewer leaned to "suitable" and was never asked to check numbers; it caught made-up links
+// and an obeyed injection on its own, by 0.01 and 0.02.
+describe("REVIEW_INSTRUCTIONS: numbers, facts and sources", () => {
+  it("tells it to recompute totals from data the instructions give, and check each given number appears unchanged", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/recompute[^.]*totals[^.]*from data the instructions give/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/each number the instructions give appears unchanged/i);
+  });
+
+  it("tells it a wrong number or fact, or a source that looks made up, is not suitable", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/made[- ]up/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/is NOT suitable/);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/what the run read/i);
+  });
+
+  it("no longer calls a thin summary suitable by rule", () => {
+    expect(REVIEW_INSTRUCTIONS).not.toMatch(/a summary that is thin/);
+  });
+
+  // The suite's mixed-topic case: one stray row in nine is a note, not a fail; the stricter prompt failed it.
+  it("still lets one borderline or off-topic row in a list pass, and says a wrong number or fact never does", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/one borderline or off-topic row in a list/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/never a small blemish/i);
+  });
+
+  it("says a truthful 'cannot be done here' or one question only the person can answer is finished and suitable", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/truthfully[^.]*cannot be done/i);
+  });
+});
+
+// qa-ai F8: a step the agent did not tick is not work left undone by itself
+describe("reviewInput: steps not marked", () => {
+  it("shows a step the agent did not tick as not marked, and the instructions say to judge it by the report", () => {
+    const plan = { intent: "x", expectedOutputs: [], sources: [], steps: [{ index: 0, title: "Answer", status: "unmarked" as const }] };
+    expect(reviewInput({ ...input, plan }, [])).toContain("1. [not marked] Answer");
+    expect(REVIEW_INSTRUCTIONS).toMatch(/not marked[^.]*report/i);
+  });
+});
+
+describe("reviewInput: what the run read", () => {
+  it("shows the start of each outside result the run read", () => {
+    const text = reviewInput({ ...input, read: [{ tool: "WebSearch", text: "Norway: no public holidays in October." }] }, []);
+    expect(text).toMatch(/WHAT THE RUN READ/);
+    expect(text).toContain("Norway: no public holidays in October.");
   });
 });
 

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { AutomationTemplate } from "@/contracts/automation";
-import { Judgment, Review, type EvaluateInput } from "@/contracts/eval";
+import { Judgment, Review, VerdictKind, type EvaluateInput } from "@/contracts/eval";
 import { Run, RunEvent } from "@/contracts/run";
 import type { EvaluateDeps } from "./evaluate";
 import { toEvaluateInput } from "./run-rows";
@@ -19,7 +19,7 @@ export const SuiteCase = z.object({
   why: z.string(), // what this case is here to catch, in one or two sentences
   source: z.string(), // where the recording came from: a seed run, a labelled v1 case, record-run.ts, or by hand
   expected: z.object({
-    verdict: z.enum(["pass", "pass_with_notes", "fail", "unknown"]),
+    verdict: VerdictKind,
     decidedBy: z.enum(["checks", "judge", "review", "nobody"]),
     failedChecks: z.array(z.string()).default([]), // the ids of the code checks that must fail, in any order
   }),

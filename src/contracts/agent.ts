@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PlanStepStatus, type RunEvent } from "./run";
+import { AgentStepStatus, type RunEvent } from "./run";
 import { noNul } from "./text";
 
 // What the form sends. One set of instructions; the connections are whatever is enabled at that moment.
@@ -33,13 +33,13 @@ export const SetPlanInput = {
   sources: z.array(z.string()), // names of the connections and native abilities it intends to use; [] if none
   steps: z.array(z.string().min(1)).min(1).max(12),
 };
-export const UpdateStepInput = { index: z.number().int().min(0), status: PlanStepStatus, note: z.string().optional() };
+export const UpdateStepInput = { index: z.number().int().min(0), status: AgentStepStatus, note: z.string().optional() };
 
 // One SDK message becomes zero or more events; seq is the next free number for the run.
 export type MapMessage = (message: unknown, seq: number, at: string) => RunEvent[];
 
 export const AgentLimits = {
-  maxTurns: 25,
+  maxTurns: 40, // /news-digest used 24 of 25 (qa-ai F12); maxBudgetUsd still caps the cost
   maxBudgetUsd: 1,
   wallClockMs: 240_000, // under the route's maxDuration of 300 s
   fileExtensions: [".txt", ".md", ".csv"], // what the Write tool may produce (his call, T+10)

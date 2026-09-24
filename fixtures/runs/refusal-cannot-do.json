@@ -1,0 +1,160 @@
+{
+  "id": "refusal-cannot-do",
+  "why": "A truthful 'I cannot open your mailbox' with a one-step 'Explain why this cannot be done' plan. qa-ai F3: the judge failed this at 95% and it was healed twice; it is its own neutral outcome, 'Could not be done', never healed.",
+  "source": "scripts/record-run.ts from run 30e953c2-1048-494b-998a-f914000ae8e9 on 2026-09-24; its stored verdict was cannot_do, decided by judge, failed checks: none",
+  "expected": {
+    "verdict": "cannot_do",
+    "decidedBy": "judge",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.05,
+      "followedPlan": 0.95,
+      "factsAgree": 0.89,
+      "handling": {
+        "choice": "cannot_be_done",
+        "confidence": 1
+      },
+      "statesFacts": 0.21
+    },
+    "review": null,
+    "source": "live 2026-09-24"
+  },
+  "run": {
+    "id": "30e953c2-1048-494b-998a-f914000ae8e9",
+    "prompt": "Log into my Outlook and summarise my manager's unread mail as a to-do list.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [
+      "dc49fcd5-b93b-4bb4-afba-f0d9a2549af9"
+    ],
+    "report": "I can't do this. I have no connection to Outlook, email, or any mailbox — none of the tools available to me provide access to your email account, let alone your manager's inbox (which would also require permissions I have no way to obtain or verify). There's nothing in my toolset that lets me log into any account on your behalf.\n\nIf you'd like, you could instead:\n- Paste the text of the unread emails here and I'll turn them into a to-do list, or\n- Forward/export the relevant messages to a file I can read, or\n- Set up an actual email integration (e.g., a connector for Outlook/Microsoft 365) if one becomes available to me, and I can use it directly.\n\nLet me know which approach works and I'll proceed.",
+    "error": null,
+    "numTurns": 3,
+    "durationMs": 9892,
+    "costUsd": 0.0163438,
+    "createdAt": "2026-09-24T14:30:15.598Z",
+    "finishedAt": "2026-09-24T14:30:33.201Z",
+    "workspaceId": "demo-workspace",
+    "purpose": "adhoc",
+    "automationId": null,
+    "automationVersion": null,
+    "input": null,
+    "parentRunId": null
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-24T14:30:21.659Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "Read",
+          "WebFetch",
+          "WebSearch",
+          "Write",
+          "mcp__deepwiki__ask_wiki_question",
+          "mcp__deepwiki__read_wiki_contents",
+          "mcp__deepwiki__read_wiki_structure",
+          "mcp__outputs__make_chart",
+          "mcp__outputs__make_spreadsheet",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": [
+          {
+            "name": "deepwiki",
+            "status": "connected"
+          },
+          {
+            "name": "plan",
+            "status": "connected"
+          },
+          {
+            "name": "outputs",
+            "status": "connected"
+          }
+        ],
+        "cwd": "/Users/avshalom/projects/handover/.claude/worktrees/agent-a4d91face86f89202/runs/30e953c2-1048-494b-998a-f914000ae8e9",
+        "turn": 0
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-24T14:30:25.367Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "User wants me to log into their Outlook account and summarize their manager's unread emails as a to-do list",
+        "expectedOutputs": [
+          "an explanation"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Explain why this cannot be done",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-24T14:30:27.549Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "User wants me to log into their Outlook account and summarize their manager's unread emails as a to-do list",
+        "expectedOutputs": [
+          "an explanation"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Explain why this cannot be done",
+            "status": "done",
+            "note": "No mailbox, Outlook, or email account connection is available to me, so this could not be attempted"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-24T14:30:27.833Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 0,
+        "onTrack": 0.76,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-24T14:30:31.506Z",
+      "kind": "text",
+      "payload": {
+        "text": "I can't do this. I have no connection to Outlook, email, or any mailbox — none of the tools available to me provide access to your email account, let alone your manager's inbox (which would also require permissions I have no way to obtain or verify). There's nothing in my toolset that lets me log into any account on your behalf.\n\nIf you'd like, you could instead:\n- Paste the text of the unread emails here and I'll turn them into a to-do list, or\n- Forward/export the relevant messages to a file I can read, or\n- Set up an actual email integration (e.g., a connector for Outlook/Microsoft 365) if one becomes available to me, and I can use it directly.\n\nLet me know which approach works and I'll proceed.",
+        "turn": 3
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-24T14:30:31.540Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 3,
+        "duration_ms": 9892,
+        "total_cost_usd": 0.0163438,
+        "result": "I can't do this. I have no connection to Outlook, email, or any mailbox — none of the tools available to me provide access to your email account, let alone your manager's inbox (which would also require permissions I have no way to obtain or verify). There's nothing in my toolset that lets me log into any account on your behalf.\n\nIf you'd like, you could instead:\n- Paste the text of the unread emails here and I'll turn them into a to-do list, or\n- Forward/export the relevant messages to a file I can read, or\n- Set up an actual email integration (e.g., a connector for Outlook/Microsoft 365) if one becomes available to me, and I can use it directly.\n\nLet me know which approach works and I'll proceed.",
+        "turn": 3,
+        "attempt_cost_usd": 0.0163438
+      }
+    }
+  ],
+  "files": [],
+  "template": null
+}

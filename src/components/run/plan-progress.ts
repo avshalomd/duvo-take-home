@@ -14,6 +14,8 @@ export function planProgress(
 
   const done = steps.filter((s) => s.status === "done").length;
   const skipped = steps.filter((s) => s.status === "skipped").length;
-  const label = `${done} of ${total} done${skipped ? `, ${skipped} skipped` : ""}`;
-  return { done, skipped, total, percent: Math.round(((done + skipped) / total) * 100), label };
+  // a step the finished run never ticked is settled too, and said apart: not done, not skipped (qa-ai F8)
+  const unmarked = steps.filter((s) => s.status === "unmarked").length;
+  const label = `${done} of ${total} done${skipped ? `, ${skipped} skipped` : ""}${unmarked ? `, ${unmarked} not marked` : ""}`;
+  return { done, skipped, total, percent: Math.round(((done + skipped + unmarked) / total) * 100), label };
 }

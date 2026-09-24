@@ -9,6 +9,13 @@ describe("changeSuggestion - the first words of a change to a result that did no
     );
   });
 
+  // qa-ai U10: "Please fix what did not pass: The CSV parses: countries.csv: ..." read as if the CSV parsed
+  it("names what failed, not the check's pass label", () => {
+    expect(changeSuggestion({ verdict: "fail", reasons: ["The CSV parses: countries.csv: row 5 has 6 fields, the header has 3"] })).toBe(
+      "Please fix what did not pass: countries.csv could not be read as a table (row 5 has 6 values, the header has 3)",
+    );
+  });
+
   it("suggests nothing for a result that passed, a verdict without reasons, or no verdict", () => {
     expect(changeSuggestion({ verdict: "pass_with_notes", reasons: ["miles only"] })).toBeNull();
     expect(changeSuggestion({ verdict: "fail", reasons: [] })).toBeNull();

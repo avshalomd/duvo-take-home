@@ -8,14 +8,15 @@ import type { WhyLine } from "./why";
 
 /**
  * Q208: when the checker could not be reached (the model was down), the result was never looked at, and the only way
- * to check it again was inside Details. The outcome line's neighbour says so in words and offers the check again.
+ * to check it again was inside Details. The outcome line's neighbour says so in words and offers the check again - and
+ * so for a run that was never checked at all (qa-ux U7). line: notCheckedLine()'s sentence.
  */
-export function NotChecked({ runId }: { runId: string }) {
+export function NotChecked({ runId, line }: { runId: string; line: string }) {
   const [state, action, checking] = useActionState(reevaluateAction, {});
   return (
     <form action={action} data-testid="not-checked" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] leading-5 text-slate">
       <input type="hidden" name="runId" value={runId} />
-      <span>The result was not checked: the checker could not be reached.</span>
+      <span>{line}</span>
       <button
         type="submit"
         disabled={checking}

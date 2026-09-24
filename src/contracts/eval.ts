@@ -13,6 +13,15 @@ export const Judgment = z.object({
   // v2: P(the run acted only on the user's instructions, not on text it read). Asked in the same decide() request at
   // no extra cost; a low answer sends the run to the reviewer and shows as its own line under "Why?".
   stayedInBounds: z.number().min(0).max(1).optional(),
+  // qa-ai F2 (the owner's call): P(the numbers and facts agree with the instructions and with what the run read). A
+  // doubt sends the run to the reviewer. Optional: older judgments were never asked.
+  factsAgree: z.number().min(0).max(1).optional(),
+  // qa-ai F3 (the owner's call): what the run did with the instructions - the work, a truthful "cannot be done here",
+  // or a question only the person can answer. A confident one of the last two is its own outcome, never a fail.
+  handling: z.object({ choice: z.enum(["did_work", "cannot_be_done", "needs_information"]), confidence: z.number().min(0).max(1) }).optional(),
+  // Asked only of a run that wrote no file: P(the answer rests on numbers or facts that can be checked). Such a plain
+  // question always gets the reviewer's reading (F2).
+  statesFacts: z.number().min(0).max(1).optional(),
 });
 export type Judgment = z.infer<typeof Judgment>;
 
@@ -26,8 +35,15 @@ export const Review = z.object({
 });
 export type Review = z.infer<typeof Review>;
 
+// The verdict's headline. unknown = the judge was unavailable, checks alone decide nothing. cannot_do and needs_answer
+// (qa-ai F3): the run truthfully said the task cannot be done here, or asked the person the one thing it needs - neutral
+// outcomes, not a failed result, never healed ("Could not be done", "Needs your answer"). Stored in the jsonb verdict,
+// so no schema change; every reader of the headline takes this list.
+export const VerdictKind = z.enum(["pass", "pass_with_notes", "fail", "unknown", "cannot_do", "needs_answer"]);
+export type VerdictKind = z.infer<typeof VerdictKind>;
+
 export const Verdict = z.object({
-  verdict: z.enum(["pass", "pass_with_notes", "fail", "unknown"]), // unknown = the judge was unavailable; checks alone decide nothing
+  verdict: VerdictKind,
   checks: z.array(Check), // the code checks, every one listed even when ok
   judgment: Judgment.nullable(),
   review: Review.nullable(), // null when Jev was confident the plan was followed: no escalation
@@ -49,6 +65,15 @@ export type CheckStep = (input: {
   calls: { name: string; input: unknown; preview?: string }[]; // the tool calls made while the step was running
 }) => Promise<StepCheck>;
 
+// A spreadsheet's content as the spreadsheet tool was given it: our code builds the .xlsx from exactly this, so it is
+// what the file holds, readable without opening the workbook (qa-ai F1).
+const Cell = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export const SheetFile = z.object({
+  file: z.string(),
+  sheets: z.array(z.object({ name: z.string(), columns: z.array(z.string()), rows: z.array(z.array(Cell)) })),
+});
+export type SheetFile = z.infer<typeof SheetFile>;
+
 export const EvaluateInput = z.object({
   prompt: z.string(),
   runStatus: z.string(),
@@ -61,6 +86,10 @@ export const EvaluateInput = z.object({
   // A follow-up resumes its parent's conversation, whatever that one read: the in-bounds question is asked of it even
   // when its own tools read nothing from outside (engine review #4).
   followUp: z.boolean().optional(),
+  spreadsheets: z.array(SheetFile).optional(), // what each .xlsx holds, from the spreadsheet tool's calls (from-events.ts)
+  // The start of each page, search result and connection answer the run read (from-events.ts), so its numbers and
+  // facts can be held to their sources (qa-ai F2).
+  read: z.array(z.object({ tool: z.string(), text: z.string() })).optional(),
 });
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
 // withinMs: the time box the caller holds the evaluation to (the run's 50 s); the model calls are budgeted inside it.

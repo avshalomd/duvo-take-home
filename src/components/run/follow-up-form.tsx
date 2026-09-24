@@ -85,7 +85,7 @@ export function FollowUpForm({
         </Button>
         {suggestion && text !== suggestion && (
           <Button type="button" variant="ghost" onClick={() => setText(suggestion)} className="h-9 px-3 text-slate max-[899px]:h-10" title={suggestion}>
-            Use the reviewer&apos;s suggestion
+            Use the suggested change
           </Button>
         )}
       </div>

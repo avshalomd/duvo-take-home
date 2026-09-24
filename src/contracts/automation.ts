@@ -91,7 +91,7 @@ export const Trial = z.object({
   input: z.string(),
   version: z.number().int(),
   status: RunStatus,
-  outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown"]).nullable(),
+  outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown", "cannot_do", "needs_answer"]).nullable(), // VerdictKind (eval.ts imports this file)
   humanVerdict: z.enum(["approved", "rejected"]).nullable(),
   humanVerdictBy: z.string().nullable(), // the user id of who judged it; null on rows judged before it was stored
   humanNote: z.string().nullable(),

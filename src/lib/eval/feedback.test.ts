@@ -168,9 +168,19 @@ describe("isHealable", () => {
     verdictOf([], { review: { taskFinished: true, responseSuitable: true, changeNeeded: null, reasoning: "", ...r }, decidedBy: "review", path: ["checks", "judge", "review"] });
 
   it("heals a failed file check when the agent finished", () => expect(isHealable(byChecks, true)).toBe(true));
-  it("heals a task the reviewer found unfinished", () => expect(isHealable(review({ taskFinished: false }), true)).toBe(true));
+  it("heals a task the reviewer found unfinished, when it says what to change", () =>
+    expect(isHealable(review({ taskFinished: false, changeNeeded: "Add the Q4 figures." }), true)).toBe(true));
   it("heals a result the reviewer found unusable", () => expect(isHealable(review({ responseSuitable: false, changeNeeded: "Drop the advert." }), true)).toBe(true));
-  it("heals a confident 'does not answer the instructions'", () => expect(isHealable(judgeNo, true)).toBe(true));
+  // qa-ai F4: "check the result against them and correct what differs" is all a judge-only fail can say, and two heals
+  // on it changed nothing but the report's words (+$0.26, +2.5 min). Only a finding the agent can act on is healed.
+  it("does not heal a fail the judge alone decided: it says nothing the agent can act on", () => expect(isHealable(judgeNo, true)).toBe(false));
+  it("does not heal a reviewer's fail with no change named", () => expect(isHealable(review({ taskFinished: false }), true)).toBe(false));
+  // qa-ai F3: a truthful "cannot be done" or a question for the person is not a result to fix (two heals on a refusal
+  // made the agent invent a topic).
+  it("does not heal a run that could not be done or needs the person's answer", () => {
+    expect(isHealable({ ...byChecks, verdict: "cannot_do" }, true)).toBe(false);
+    expect(isHealable({ ...byChecks, verdict: "needs_answer" }, true)).toBe(false);
+  });
   it("does not heal a run the agent did not finish: a limit, a provider error or a stop", () => expect(isHealable(byChecks, false)).toBe(false));
   it("does not heal a run whose failure is that it did not finish", () => expect(isHealable(verdictOf([EVERY_CHECK[0][1]()]), true)).toBe(false));
   it("does not heal a pass", () => expect(isHealable({ ...byChecks, verdict: "pass" }, true)).toBe(false));

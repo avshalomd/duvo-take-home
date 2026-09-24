@@ -1,0 +1,160 @@
+{
+  "id": "ambiguous-needs-answer",
+  "why": "'Make me a list of the best ones for our team' names no subject, and the run asks what is meant. qa-ai F3: the judge failed the question at 95% and a heal made the agent invent a topic; it is 'Needs your answer', answered through Ask for a change.",
+  "source": "scripts/record-run.ts from run f8e178c2-7159-4bb0-afb1-41ec745a6d4a on 2026-09-24; its stored verdict was needs_answer, decided by judge, failed checks: none",
+  "expected": {
+    "verdict": "needs_answer",
+    "decidedBy": "judge",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.05,
+      "followedPlan": 0.95,
+      "factsAgree": 0.9,
+      "handling": {
+        "choice": "needs_information",
+        "confidence": 1
+      },
+      "statesFacts": 0.08
+    },
+    "review": null,
+    "source": "live 2026-09-24"
+  },
+  "run": {
+    "id": "f8e178c2-7159-4bb0-afb1-41ec745a6d4a",
+    "prompt": "Make me a list of the best ones for our team.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [
+      "dc49fcd5-b93b-4bb4-afba-f0d9a2549af9"
+    ],
+    "report": "I'd like to help, but I need a bit more information first: \"the best ones\" of what?\n\nFor example, are you asking about:\n- Tools or software (e.g., project management apps, AI models, dev tools)?\n- Articles, papers, or resources on a specific topic?\n- Repositories or libraries for a specific purpose?\n- Candidates, vendors, or options from something discussed elsewhere?\n- Something else entirely?\n\nThere's no earlier context in this conversation for me to go on, so please tell me the category (and any criteria, like budget, use case, or number of items you want) and I'll put together the list right away.",
+    "error": null,
+    "numTurns": 3,
+    "durationMs": 10906,
+    "costUsd": 0.0297545,
+    "createdAt": "2026-09-24T14:30:16.198Z",
+    "finishedAt": "2026-09-24T14:30:33.119Z",
+    "workspaceId": "demo-workspace",
+    "purpose": "adhoc",
+    "automationId": null,
+    "automationVersion": null,
+    "input": null,
+    "parentRunId": null
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-24T14:30:20.193Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "Read",
+          "WebFetch",
+          "WebSearch",
+          "Write",
+          "mcp__deepwiki__ask_wiki_question",
+          "mcp__deepwiki__read_wiki_contents",
+          "mcp__deepwiki__read_wiki_structure",
+          "mcp__outputs__make_chart",
+          "mcp__outputs__make_spreadsheet",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": [
+          {
+            "name": "deepwiki",
+            "status": "connected"
+          },
+          {
+            "name": "plan",
+            "status": "connected"
+          },
+          {
+            "name": "outputs",
+            "status": "connected"
+          }
+        ],
+        "cwd": "/Users/avshalom/projects/handover/.claude/worktrees/agent-a4d91face86f89202/runs/f8e178c2-7159-4bb0-afb1-41ec745a6d4a",
+        "turn": 0
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-24T14:30:23.662Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "User wants a \"list of the best ones for our team\" but has not specified what category of items (e.g., tools, articles, restaurants, songs, repositories, candidates) they mean",
+        "expectedOutputs": [
+          "an explanation"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Ask what is needed",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-24T14:30:26.482Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "User wants a \"list of the best ones for our team\" but has not specified what category of items (e.g., tools, articles, restaurants, songs, repositories, candidates) they mean",
+        "expectedOutputs": [
+          "an explanation"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Ask what is needed",
+            "status": "done",
+            "note": "Request is too ambiguous to act on; asked the user for clarification instead of guessing"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-24T14:30:27.150Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 0,
+        "onTrack": 0.74,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-24T14:30:31.052Z",
+      "kind": "text",
+      "payload": {
+        "text": "I'd like to help, but I need a bit more information first: \"the best ones\" of what?\n\nFor example, are you asking about:\n- Tools or software (e.g., project management apps, AI models, dev tools)?\n- Articles, papers, or resources on a specific topic?\n- Repositories or libraries for a specific purpose?\n- Candidates, vendors, or options from something discussed elsewhere?\n- Something else entirely?\n\nThere's no earlier context in this conversation for me to go on, so please tell me the category (and any criteria, like budget, use case, or number of items you want) and I'll put together the list right away.",
+        "turn": 3
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-24T14:30:31.087Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 3,
+        "duration_ms": 10906,
+        "total_cost_usd": 0.029754499999999996,
+        "result": "I'd like to help, but I need a bit more information first: \"the best ones\" of what?\n\nFor example, are you asking about:\n- Tools or software (e.g., project management apps, AI models, dev tools)?\n- Articles, papers, or resources on a specific topic?\n- Repositories or libraries for a specific purpose?\n- Candidates, vendors, or options from something discussed elsewhere?\n- Something else entirely?\n\nThere's no earlier context in this conversation for me to go on, so please tell me the category (and any criteria, like budget, use case, or number of items you want) and I'll put together the list right away.",
+        "turn": 3,
+        "attempt_cost_usd": 0.029754499999999996
+      }
+    }
+  ],
+  "files": [],
+  "template": null
+}

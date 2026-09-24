@@ -338,3 +338,44 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/automations/form.ts` `changesWhatTheAgentIsTold` - the editor asks the save's own rule (`changesThePrompt`)
   of the form on every change, to tell an approver beside Save that saving takes the command out of use.
 - `src/components/thread/thread.tsx` `planOnly` - a plan nobody has run (the gallery) reads its steps with no state.
+
+### The AI-quality review (2026-09-24, qa-ai F1-F12) and the owner's calls on it
+- `src/lib/eval/file-view.ts` `forModel` - the judge and the reviewer read a chart by the labels vega writes on its marks,
+  title and axes ("quarter: Q2; Sales: 95500"), and a spreadsheet by the sheets the spreadsheet tool was given: the SVG
+  is one 11 KB line whose first 300 characters said nothing, and a wrong bar passed on the report's word (F1).
+- `src/lib/eval/from-events.ts` - what the evaluator reads from the events besides the files: each spreadsheet's sheets
+  (the last `make_spreadsheet` call per file) and the start of every outside result the run read, so the live run and
+  Re-evaluate read them the same way.
+- `src/lib/eval/judge.ts` - Jev answers three more questions in the same request, free: `factsAgree` (the numbers and
+  facts agree with the instructions and what the run read, F2), `handling` (a choice: did the work, truthfully cannot be
+  done here, needs the person's answer, F3) and, for a run with no file, `statesFacts`. `stayedInBounds` is also asked
+  when the instructions carry pasted text (`carriesPastedText`, F10). Steps left `unmarked` make the plan question "was
+  the work done end to end" (F8).
+- `src/lib/eval/evaluate.ts` - a sure refusal is its own verdict (`cannot_do`, `needs_answer`), neutral and never healed;
+  a missing file as the only failed check asks the judge first, since a refusal writes none. A plain answer resting on
+  facts always gets the reviewer, and its pass is a plain pass. A sure "does not answer" goes to the reviewer (F4).
+  `FACTS_BAR` 0.5: clean runs came back 0.65-0.77 on `factsAgree` (Jev sees only the start of what a run read), the
+  wrong chart 0.03, so only a lean to no is a doubt.
+- `src/lib/eval/feedback.ts` `isHealable` - a heal needs a failed check or the reviewer's named change: two heals on the
+  judge's "check the result against the instructions" changed only the report's words (F4).
+- `src/lib/eval/review.prompt.ts` - the reviewer recomputes totals from data the instructions give, holds numbers to what
+  the run read, treats a made-up source as unusable, and calls a truthful refusal finished and suitable (F11, F3).
+- `src/contracts/eval.ts` `VerdictKind` - the one list of headlines every reader parses the jsonb verdict with; the two
+  new ones needed no schema change.
+- `src/lib/agent/plan-state.ts` `untickedMarked` - when the agent ends well, code marks the steps it never ticked
+  `unmarked` ("not marked" on the thread, a faint hollow node); the agent's own `update_step` cannot set it (F8).
+- `src/lib/agent/system.prompt.ts`, `heal.ts`, `follow-up-prompt.ts` - the final message is the whole report and stands
+  alone (F9); a refusal says truthfully why, and a brief with nothing to work on gets one question instead of a guess
+  (F3); the heal and follow-up prompts give the agent no phrase to echo into the report (F5). A reply to "Needs your
+  answer" is sent to the agent as the answer, not as a change.
+- `src/lib/eval/check-words.ts` - a failed check said as what went wrong ("countries.csv could not be read as a table
+  (row 5 has 6 values, the header has 3)"), in Why?, Ask for a change and Details; stored reasons are read back through
+  the check's label (qa-ux U10).
+- `src/components/run/outcome.ts` - one style, "Done, ..." (U6); an unknown or missing verdict is "Done, not checked" with
+  a hollow ring everywhere and Check again beside it (U7); "Could not be done" (slate) and "Needs your answer" (a dashed
+  ink ring, like a draft that waits for a person) with a hint. Why? says "an automatic check" and "a closer check",
+  never judge or reviewer (U23).
+- `src/lib/automations/template.ts` `canApprove` - an example that could not be done or asked a question does not count
+  toward approval, whoever marked it right.
+- `fixtures/runs/` - four cases from the probes: `chart-wrong-value`, `invented-holidays` (both altered by hand from real
+  runs), `refusal-cannot-do`, `ambiguous-needs-answer`. `AgentLimits.maxTurns` is 40 (F12); the $1 budget is unchanged.

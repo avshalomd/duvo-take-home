@@ -48,7 +48,7 @@ async function main() {
       verdict ? `${verdict.verdict}${verdict.decidedBy ? `, decided by ${verdict.decidedBy}` : ""}, failed checks: ${failedIds(verdict) || "none"}` : "missing"
     }`,
     expected: {
-      verdict: "FILL IN: pass | pass_with_notes | fail | unknown",
+      verdict: "FILL IN: pass | pass_with_notes | fail | unknown | cannot_do | needs_answer",
       decidedBy: "FILL IN: checks | judge | review | nobody",
       failedChecks: [],
     },

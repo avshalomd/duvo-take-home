@@ -13,7 +13,7 @@ import { FilesSection } from "./files-section";
 import { GuardNotices } from "./guard-notices";
 import { fixesRun, healsOf } from "./heal";
 import type { FileFacts } from "./home-data";
-import { outcome } from "./outcome";
+import { notCheckedLine, outcome, outcomeHint } from "./outcome";
 import { planProgress } from "./plan-progress";
 import { isTerminal, shouldPoll } from "./poll";
 import { Report } from "./report";
@@ -68,6 +68,8 @@ export function RunPanel({
   const heals = healsOf(state.heals, events);
   const result = outcome(run.status, headline, run.cancelRequested, { attempts: fixesRun(heals), max: heals.at(-1)?.max });
   const why = whyLines(verdict, run.status, run.outcome, heals);
+  const notChecked = notCheckedLine(run.status, headline);
+  const hint = outcomeHint(run.status, headline);
   const steps = threadSteps(state.plan, run.status, state.stepChecks, heals);
   const progress = planProgress(state.plan, steps); // counts what the thread draws, fixes included
 
@@ -116,8 +118,15 @@ export function RunPanel({
             </p>
             {why.length > 0 && <WhyButton open={whyOpen} onToggle={() => setWhyOpen(!whyOpen)} />}
           </div>
-          {/* Q208: nobody could check the result (the checker was down): said here, with the way to check it again */}
-          {run.status === "succeeded" && headline === "unknown" && <NotChecked runId={run.id} />}
+          {/* Q208, qa-ux U7: nobody checked the result (the checker was down, or it never ran): said here, with the way
+              to check it again */}
+          {notChecked && <NotChecked runId={run.id} line={notChecked} />}
+          {/* qa-ai F3: a run that needs the person's answer says how to give it; one that could not be done, where why is */}
+          {hint && (
+            <p data-testid="outcome-hint" className="mt-2 text-[14px] leading-5 text-slate">
+              {hint}
+            </p>
+          )}
           {whyOpen && why.length > 0 && <WhyList lines={why} />}
         </header>
 

@@ -40,7 +40,18 @@ describe("threadSteps - the plan as the thread draws it", () => {
   });
 
   it("never leaves a finished run with a step still being worked on", () => {
-    expect(threadSteps(plan(["done", "running"]), "succeeded", [])[1].status).toBe("pending");
+    expect(threadSteps(plan(["done", "running"]), "succeeded", [])[1].status).not.toBe("running");
+  });
+
+  // qa-ai F8: a correct answer sat under "1 of 3 done" with two "Not started" steps, because the agent forgot to tick
+  // them. On a run that finished well, a step it did not tick is "not marked", a quiet state of its own.
+  it("draws the steps a finished run did not tick as not marked, never as not started", () => {
+    const steps = threadSteps(plan(["done", "running", "pending"]), "succeeded", []);
+    expect(steps.map((s) => s.status)).toEqual(["done", "unmarked", "unmarked"]);
+  });
+
+  it("keeps a live run's steps that have not started as not started", () => {
+    expect(threadSteps(plan(["done", "pending"]), "running", [])[1].status).toBe("pending");
   });
 });
 

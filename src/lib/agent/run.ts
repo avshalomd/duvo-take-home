@@ -19,6 +19,7 @@ import { connectionKey } from "@/lib/connections/key";
 import { authHeaders } from "@/lib/connections/oauth";
 import { evaluateRun } from "@/lib/eval/evaluate";
 import { feedbackForAgent, isHealable } from "@/lib/eval/feedback";
+import { spreadsheetsIn, whatItRead } from "@/lib/eval/from-events";
 import { forEvaluator } from "@/lib/eval/run-rows";
 import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
@@ -40,7 +41,7 @@ import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
 import { tripwireReason, unexpectedServers } from "./mcp-tripwire";
 import { newlyDone } from "./plan-diff";
-import { PLAN_SERVER_KEY } from "./plan-state";
+import { PLAN_SERVER_KEY, untickedMarked } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
 import { resumeOptions, sessionIdOf } from "./session";
 import { ownCost, readSdkTotals, runTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
@@ -381,6 +382,11 @@ export const runAutomation: RunAutomation = async (runId) => {
         costUsd: spent.usd, // every attempt of the run, each counted once
       });
 
+      // The agent ended well but left steps unticked: they are "not marked", not "not started" (qa-ai F8), in the trace
+      // the page and the evaluator both read. A fix attempt ticks them again with update_step like any other step.
+      const marked = end.is_error ? null : untickedMarked(plan);
+      if (marked) await write([{ kind: "plan", payload: marked, at: now() }]);
+
       // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
       // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59). So is an
       // evaluation that takes longer than EVAL_MAX_MS: the function would be ended with the run left open.
@@ -396,6 +402,8 @@ export const runAutomation: RunAutomation = async (runId) => {
         // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
         followUp: Boolean(run.parentRunId), // it resumed a conversation that may have read a page: the in-bounds question is asked
+        spreadsheets: spreadsheetsIn(recorded), // what each .xlsx holds, for the judge and the reviewer (qa-ai F1)
+        read: whatItRead(recorded), // what its numbers and facts can be held to (qa-ai F2)
         template,
         // the model calls are budgeted inside the box, and end a little before it: the verdict then names the model
         // that was slow instead of the box's "the check took too long"

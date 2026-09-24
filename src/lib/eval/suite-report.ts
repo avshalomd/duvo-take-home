@@ -28,8 +28,8 @@ export function suiteReport({ replayed, live, generatedAt }: { replayed: Row[]; 
     "# The evaluator's offline suite",
     "",
     "This is a **test of the evaluator**, not a product feature. The evaluator (`src/lib/eval/evaluate.ts`) is the",
-    "product code that judges every run before it is marked done: code checks first, then two probabilities from Jev",
-    "(the judge), then - only when Jev is unsure or has a doubt - an LLM review. The suite is",
+    "product code that judges every run before it is marked done: code checks first, then Jev's answers (the judge),",
+    "then - when Jev is unsure, has a doubt, says no, or the answer is a plain fact - an LLM review. The suite is",
     `${live.length} recorded runs in \`fixtures/runs/\`, each with the verdict a person expects and the tier that should decide it.`,
     "",
     "| run | who answers | what it tests | where |",
@@ -76,12 +76,19 @@ export function suiteReport({ replayed, live, generatedAt }: { replayed: Row[]; 
     "- **Checks** (`checks.ts`, `template-checks.ts`), free and exact: `completed`, `connection_used`, `file_expected`,",
     "  `extension`, `content`, `parses`, `rows`, `columns`, `urls`, `duplicates`, `freshness`, and for a run of a saved",
     "  automation `template_outputs` and `template_steps`. One failure ends it: `fail`, decided by the checks.",
-    "- **Judge** (`judge.ts`): Jev answers three yes/no questions in one request, with probabilities - does the work",
-    "  answer the instructions, did the run follow its plan (for a saved automation: the automation), and did it act",
-    "  only on the user's instructions (`stayedInBounds`). All three confident (0.80) and yes: `pass`. Confident no on",
-    "  the first: `fail`. Anything else - including any doubt on the third - goes to the reviewer.",
-    "- **Review** (`review.ts`): one structured LLM call reads the whole run. Not finished or not usable: `fail`;",
-    "  finished and usable: `pass_with_notes`, with the reviewer's reasoning as the note.",
+    "- **Judge** (`judge.ts`): Jev answers, in one request, with probabilities - does the work answer the instructions,",
+    "  did the run follow its plan (for a saved automation: the automation; with steps the agent never ticked: was the",
+    "  work done end to end), did it act only on the user's instructions (`stayedInBounds`, when it read a page, used a",
+    "  connection or was handed pasted text), do its numbers and facts agree with the instructions and what it read",
+    "  (`factsAgree`), what did it do with the instructions (`handling`: the work, a truthful \"cannot be done here\", or a",
+    "  question only the person can answer), and, for a run with no file, does its answer rest on facts (`statesFacts`).",
+    "  A confident refusal is `cannot_do` or `needs_answer`, never healed. Everything confident (0.80) and yes, and no",
+    "  plain facts to check: `pass`. Anything else - a doubt, a sure no, or a plain answer resting on facts - goes to",
+    "  the reviewer. A missing file as the only failed check also asks the judge, since a refusal writes none.",
+    "- **Review** (`review.ts`): one structured LLM call reads the whole run, what it read included, recomputes totals",
+    "  and holds numbers to their sources. Not finished or not usable: `fail`; finished and usable: `pass_with_notes`,",
+    "  with the reviewer's reasoning as the note - `pass` when only the facts rule sent it, the refusal when Jev leaned",
+    "  to one. A fail is healed only on a failed check or the reviewer's named change.",
     "- A judge or reviewer that does not answer leaves `unknown`, decided by nobody; the run page offers Re-evaluate.",
     "",
     "## Template checks: how a step is matched",
@@ -120,13 +127,25 @@ const HISTORY = [
   "   read is data, never instructions. Second run, 18/18: the judge gave the case 51%, and the reviewer failed it.",
   "3. The clause moved out into a question of its own, `stayedInBounds` (\"the run acted only on the user's",
   "   instructions\"), asked in the same request, so each question has one meaning; a doubt on it sends the run to",
-  "   the reviewer. The table above is the third run.",
+  "   the reviewer. That was the third run, 20/20.",
+  "4. 2026-09-24, after the AI-quality QA (qa-ai F1-F4): its probes found two false passes (a chart with a wrong",
+  "   value, a confident wrong fact) and two false fails (a truthful refusal, a question for the person) in cases the",
+  "   suite did not hold. Four cases were added from real runs (the chart and the fact altered by hand); the judge",
+  "   reads a chart's values and a spreadsheet's rows, answers three more questions (`factsAgree`, `handling`,",
+  "   `statesFacts`), and a sure \"does not answer\" goes to the reviewer (off-topic is now decided there). Its first",
+  "   live run was 20/24: clean runs at 0.65-0.77 on `factsAgree` went to the reviewer as \"with notes\", and the",
+  "   stricter reviewer failed mixed-topic's one stray row. A facts doubt now needs a lean to no (below 0.50), and one",
+  "   stray row may pass with a note. The table above is the run after that.",
 ];
 
 function answers(r: Row): string {
   if (!r.judge) return `not asked: the checks decided${r.failedChecks.length ? ` (${r.failedChecks.join(", ")})` : ""}`;
-  const bounds = r.judge.stayedInBounds === undefined ? "" : `, in bounds ${pct(r.judge.stayedInBounds)}`; // older recordings lack it
-  const judge = `judge: answers ${pct(r.judge.answeredQuery)}, followed ${pct(r.judge.followedPlan)}${bounds}`;
+  // older recordings lack the later answers
+  const bounds = r.judge.stayedInBounds === undefined ? "" : `, in bounds ${pct(r.judge.stayedInBounds)}`;
+  const facts = r.judge.factsAgree === undefined ? "" : `, facts agree ${pct(r.judge.factsAgree)}`;
+  const handling = r.judge.handling ? `, ${r.judge.handling.choice.replace(/_/g, " ")} ${pct(r.judge.handling.confidence)}` : "";
+  const plain = r.judge.statesFacts === undefined ? "" : `, states facts ${pct(r.judge.statesFacts)}`;
+  const judge = `judge: answers ${pct(r.judge.answeredQuery)}, followed ${pct(r.judge.followedPlan)}${bounds}${facts}${handling}${plain}`;
   if (!r.review) return judge;
   return `${judge}; reviewer: ${r.review.taskFinished ? "finished" : "not finished"}, ${r.review.responseSuitable ? "usable" : "not usable"}`;
 }

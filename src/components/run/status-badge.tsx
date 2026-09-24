@@ -13,6 +13,8 @@ const tone: Record<string, string> = {
   fail: "bg-crimson-wash text-crimson",
   queued: "bg-mist text-slate",
   unknown: "bg-mist text-slate",
+  cannot_do: "bg-mist text-graphite", // neutral, never red (qa-ai F3)
+  needs_answer: "bg-mist text-graphite",
   cancelled: "bg-mist text-slate",
 };
 

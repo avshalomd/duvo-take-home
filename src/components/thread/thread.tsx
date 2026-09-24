@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
 export type ThreadStep = {
   key: string | number;
   title: ReactNode;
-  status: "pending" | "running" | "done" | "skipped";
+  // unmarked: the run finished well but the agent never ticked the step (qa-ai F8) - settled, quiet, not "not started"
+  status: "pending" | "running" | "done" | "skipped" | "unmarked";
   note?: ReactNode; // what happened on this step, in the agent's words (full size only)
   flag?: ReactNode; // a doubt about a finished step, in plain words: drawn amber beside the note
 };
@@ -225,6 +226,15 @@ function Node({
       </motion.span>
     );
   }
+  if (status === "unmarked") {
+    // a ring in the done colour, faint and hollow: the work is over, but nobody ticked this step
+    return (
+      <span className={cn("flex items-center justify-center rounded-full border-2 border-fern/45 bg-paper", size)}>
+        {!mini && <span aria-hidden className="size-1.5 rounded-full bg-fern/45" />}
+        <span className="sr-only">Not marked</span>
+      </span>
+    );
+  }
   if (status === "skipped") {
     return (
       <span
@@ -245,13 +255,13 @@ function Node({
   );
 }
 
-/** The index the fill reaches: the running step, else the last finished or skipped one; -1 before any. */
+/** The index the fill reaches: the running step, else the last finished, skipped or unmarked one; -1 before any. */
 export function lastReached(steps: Pick<ThreadStep, "status">[]): number {
   const running = steps.findIndex((s) => s.status === "running");
   if (running >= 0) return running;
   let last = -1;
   steps.forEach((s, i) => {
-    if (s.status === "done" || s.status === "skipped") last = i;
+    if (s.status === "done" || s.status === "skipped" || s.status === "unmarked") last = i;
   });
   return last;
 }

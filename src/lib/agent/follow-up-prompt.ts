@@ -1,3 +1,4 @@
+import type { VerdictKind } from "@/contracts/eval";
 import type { Plan } from "@/contracts/run";
 
 /** The earlier run a follow-up continues, as much of it as the new prompt carries over. */
@@ -6,7 +7,7 @@ export type ParentRun = {
   report: string | null;
   files: { name: string; bytes: number }[];
   plan: Plan | null; // its final plan: each step with its status and note
-  verdict: "pass" | "pass_with_notes" | "fail" | "unknown" | null; // the automatic check's headline
+  verdict: VerdictKind | null; // the automatic check's headline
   feedback: string | null; // the check's findings as instructions (feedbackForAgent)
 };
 
@@ -48,6 +49,8 @@ export function carryOverPrompt(parent: ParentRun, change: string): string {
       : parent.report
     : "(it ended with no report)";
   const found = findings(parent);
+  // qa-ai F3: "Needs your answer" is answered with Ask for a change, so what the person sends is their answer
+  const asked = parent.verdict === "needs_answer";
 
   return [
     "This continues an earlier run. Its instructions were:",
@@ -67,10 +70,14 @@ export function carryOverPrompt(parent: ParentRun, change: string): string {
     ...(found.length ? ["Fix what it found as part of this change, and check the files yourself before you finish."] : []),
     // This run's report stands for the whole thread: it is judged against every instruction so far, and it is what
     // "Make an automation" and the next change read.
-    "End with your report for the person on the whole task as it now stands - the earlier report brought up to date, " +
-      "not only this change. At most one closing sentence may say what this change did.",
+    // qa-ai F5: "I re-checked the file against your original request" reached the person as the report.
+    "End with your report for the person: the answer to the whole task with this change made - the earlier report " +
+      "brought up to date, not only this change. It may say what changed in terms of the work, but never mention " +
+      "a check, an earlier run, a correction or re-checking.",
     "",
-    "The user now asks for this change:",
+    ...(asked
+      ? ["The earlier run asked the user for something it needed before it could do the task. Now do the task with their answer.", "Their answer:"]
+      : ["The user now asks for this change:"]),
     change,
   ].join("\n");
 }

@@ -114,6 +114,17 @@ describe("canApprove", () => {
     if (!r.ok) expect(r.reason).toMatch(/finish/i);
   });
 
+  // qa-ai F3 (the owner's call): an example that could not be done, or asked a question, shows nothing about whether
+  // the automation works, whoever marked it right
+  it("does not count an example that could not be done, or needs an answer, and says to try another input", () => {
+    for (const outcome of ["cannot_do", "needs_answer"] as const) {
+      const r = canApprove([trial({ outcome, humanVerdict: "approved" })], 2);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toMatch(/another input/i);
+    }
+    expect(canApprove([trial({ outcome: "cannot_do", humanVerdict: "approved" }), trial({ runId: "b", humanVerdict: "approved" })], 2)).toEqual({ ok: true });
+  });
+
   it("asks for a judgment when the example finished but nobody judged it", () => {
     const r = canApprove([trial({})], 2);
     expect(r.ok).toBe(false);

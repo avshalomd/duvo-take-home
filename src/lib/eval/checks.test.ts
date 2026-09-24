@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AgentLimits } from "@/contracts/agent";
 import type { EvaluateInput } from "@/contracts/eval";
-import { asksForFile, runChecks } from "./checks";
+import { asksForFile, columnsAskedFor, freshnessWindow, rowFloor, runChecks } from "./checks";
 
 // The code checks are the half of the evaluator that costs nothing and can never be talked round. Each test names
 // the failure a user would report ("it saved an empty file") rather than the function it happens to call.
@@ -369,5 +369,45 @@ describe("asksForFile", () => {
   it("fails no 'a file was written' check on a report-only run", () => {
     const checks = runChecks(input({ prompt: "Compare the two concepts. Write a short, plain-language answer.", report: "Here is the answer." }));
     expect(check(checks, "file_expected")).toBeUndefined();
+  });
+});
+
+// qa-ai F7: the phrasing of the approved /news-digest ("with the columns title, source, ...") and of an office CSV ask
+// ("with the columns category, total_eur and share_percent") ran no columns check; "the top 10 stories" set no floor;
+// "this month" and "yesterday" asked for nothing recent.
+describe("reading the instructions for the checks", () => {
+  it("reads the columns after 'with the columns', 'with columns:' and a list ending in 'and'", () => {
+    expect(columnsAskedFor("Save ecb.csv with the columns title, source, url, published_at, summary.")).toEqual(["title", "source", "url", "published_at", "summary"]);
+    expect(columnsAskedFor("a file totals.csv with the columns category, total_eur and share_percent")).toEqual(["category", "total_eur", "share_percent"]);
+    expect(columnsAskedFor("Write a CSV with columns: name, price, url")).toEqual(["name", "price", "url"]);
+    expect(columnsAskedFor("a CSV with title, source, url")).toEqual(["title", "source", "url"]);
+  });
+
+  it("reads no columns from a sentence that only mentions 'with the'", () => {
+    expect(columnsAskedFor("Compare them with the latest figures.")).toEqual([]);
+    expect(columnsAskedFor("Compare Teams with Slack and Google Chat for 50 people.")).toEqual([]);
+  });
+
+  it("reads 'the top 10 stories' and '12 articles' as a floor of rows", () => {
+    expect(rowFloor("Find the top 10 stories about wind power.")).toBe(10);
+    expect(rowFloor("List 12 articles on the ECB.")).toBe(12);
+    expect(rowFloor("at least 5 rows")).toBe(5);
+  });
+
+  it("does not read a number of days as a floor of rows", () => {
+    expect(rowFloor("news from the last 7 days")).toBe(1);
+  });
+
+  it("reads 'this month', 'last month', 'yesterday' and 'the past 24 hours' as windows", () => {
+    expect(freshnessWindow("ECB news from this month")).toBe(31);
+    expect(freshnessWindow("what happened last month")).toBe(31);
+    expect(freshnessWindow("the news from yesterday")).toBe(2);
+    expect(freshnessWindow("stories from the past 24 hours")).toBe(2);
+  });
+
+  it("the columns check runs for 'with the columns a, b and c'", () => {
+    const csv = "category,total_eur\nfood,10\n";
+    const checks = runChecks(input({ prompt: "Save totals.csv with the columns category, total_eur and share_percent", files: [{ name: "totals.csv", content: csv }] }));
+    expect(check(checks, "columns")).toMatchObject({ ok: false, detail: "totals.csv: missing columns: share_percent" });
   });
 });

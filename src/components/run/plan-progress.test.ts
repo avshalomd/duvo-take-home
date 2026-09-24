@@ -36,6 +36,13 @@ describe("planProgress", () => {
     expect(progress(plan(["done", "done"]))?.label).toBe("2 of 2 done");
   });
 
+  // qa-ai F8: "1 of 3 done" read as work not started above a correct answer
+  it("counts the steps a finished run did not tick apart, as not marked, and as settled", () => {
+    const p = progress(plan(["done", "unmarked", "unmarked"]));
+    expect(p?.label).toBe("1 of 3 done, 2 not marked");
+    expect(p?.percent).toBe(100);
+  });
+
   it("reaches 100% when every step is done", () => {
     expect(progress(plan(["done", "done"]))?.percent).toBe(100);
   });

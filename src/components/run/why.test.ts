@@ -69,7 +69,7 @@ describe("whyLines - the checks", () => {
   });
 
   it("names the checks that failed and what was wrong, the file said in words rather than as a label", () => {
-    expect(text(FAIL_BY_CHECKS, "checks")).toBe("1 of 2 checks failed: the CSV parses (in output.csv, row 4 has 3 columns)");
+    expect(text(FAIL_BY_CHECKS, "checks")).toBe("1 of 2 checks failed: output.csv could not be read as a table (row 4 has 3 columns)");
     expect(whyLines(FAIL_BY_CHECKS, "succeeded")[0].tone).toBe("bad");
   });
 
@@ -94,30 +94,30 @@ describe("whyLines - the checks", () => {
 
 describe("whyLines - the judge's two answers, in words and never as numbers", () => {
   it("says the judge was sure of both when both answers cleared the bar", () => {
-    expect(text(PASS_BY_JUDGE, "judge")).toBe("The judge was sure the result answers your instructions and that the plan was finished");
+    expect(text(PASS_BY_JUDGE, "judge")).toBe("An automatic check was sure the result answers your instructions and that the plan was finished");
   });
 
   it("says which of the two the judge could not tell", () => {
-    expect(text(NOTES_BY_REVIEW, "judge")).toBe("The judge was sure the result answers your instructions, but could not tell whether the plan was finished");
+    expect(text(NOTES_BY_REVIEW, "judge")).toBe("An automatic check was sure the result answers your instructions, but could not tell whether the plan was finished");
     const other: Verdict = { ...PASS_BY_JUDGE, judgment: { answeredQuery: 0.6, followedPlan: 0.9 } };
-    expect(text(other, "judge")).toBe("The judge was sure the plan was finished, but could not tell whether the result answers your instructions");
+    expect(text(other, "judge")).toBe("An automatic check was sure the plan was finished, but could not tell whether the result answers your instructions");
   });
 
   // run ba022140: "sure the result does not answer your instructions but not that the plan was finished" read as if
   // the judge were sure the plan was not finished
   it("keeps a sure no apart from what the judge could not tell", () => {
     const no: Verdict = { ...PASS_BY_JUDGE, verdict: "fail", judgment: { answeredQuery: 0.15, followedPlan: 0.68 } };
-    expect(text(no, "judge")).toBe("The judge was sure the result does not answer your instructions, but could not tell whether the plan was finished");
+    expect(text(no, "judge")).toBe("An automatic check was sure the result does not answer your instructions, but could not tell whether the plan was finished");
   });
 
   it("says when the judge could tell neither", () => {
     const unsure: Verdict = { ...PASS_BY_JUDGE, judgment: { answeredQuery: 0.55, followedPlan: 0.7 } };
-    expect(text(unsure, "judge")).toBe("The judge could not tell whether the result answers your instructions, or whether the plan was finished");
+    expect(text(unsure, "judge")).toBe("An automatic check could not tell whether the result answers your instructions, or whether the plan was finished");
   });
 
   it("says when the judge was sure the result does not answer the instructions", () => {
     const no: Verdict = { ...PASS_BY_JUDGE, verdict: "fail", judgment: { answeredQuery: 0.1, followedPlan: 0.9 } };
-    expect(text(no, "judge")).toBe("The judge was sure the result does not answer your instructions and that the plan was finished");
+    expect(text(no, "judge")).toBe("An automatic check was sure the result does not answer your instructions and that the plan was finished");
     expect(whyLines(no, "succeeded")[1].tone).toBe("bad");
   });
 
@@ -133,7 +133,7 @@ describe("whyLines - the judge's two answers, in words and never as numbers", ()
 
   it("says the judge could not be reached when it was asked and did not answer", () => {
     const down: Verdict = { ...PASS_BY_JUDGE, verdict: "unknown", judgment: null, decidedBy: "nobody", reasons: ["The judge was unavailable: 503"] };
-    expect(text(down, "judge")).toBe("The judge could not be reached, so nobody checked whether the result answers your instructions");
+    expect(text(down, "judge")).toBe("The automatic check could not be reached, so nobody checked whether the result answers your instructions");
     expect(whyLines(down, "succeeded")[1]).toMatchObject({ tone: "idle", decided: false });
   });
 });
@@ -168,29 +168,29 @@ describe("whyLines - whether the run stayed within your instructions", () => {
 describe("whyLines - the reviewer", () => {
   it("says the reviewer found the run finished and usable, with its reasoning", () => {
     expect(text(NOTES_BY_REVIEW, "review")).toBe(
-      'A reviewer read the whole run: finished and usable. "Step 3 was skipped because the RSS feed was down."',
+      'A closer check read the whole run: finished and usable. "Step 3 was skipped because the RSS feed was down."',
     );
     expect(whyLines(NOTES_BY_REVIEW, "succeeded")[2].tone).toBe("ok");
   });
 
   it("says when the reviewer found the task unfinished, or finished but not usable", () => {
     const unfinished: Verdict = { ...NOTES_BY_REVIEW, verdict: "fail", review: { taskFinished: false, responseSuitable: false, changeNeeded: null, reasoning: "Only 3 of 8 rows." } };
-    expect(text(unfinished, "review")).toBe('A reviewer read the whole run: not finished. "Only 3 of 8 rows."');
+    expect(text(unfinished, "review")).toBe('A closer check read the whole run: not finished. "Only 3 of 8 rows."');
     const unusable: Verdict = { ...NOTES_BY_REVIEW, verdict: "fail", review: { taskFinished: true, responseSuitable: false, changeNeeded: "Add the dates", reasoning: "No dates." } };
-    expect(text(unusable, "review")).toBe('A reviewer read the whole run: finished, but not usable as it is. "No dates."');
+    expect(text(unusable, "review")).toBe('A closer check read the whole run: finished, but not usable as it is. "No dates."');
     expect(whyLines(unusable, "succeeded")[2].tone).toBe("bad");
   });
 
   it("shortens a long reasoning to one readable line", () => {
     const long: Verdict = { ...NOTES_BY_REVIEW, review: { ...NOTES_BY_REVIEW.review!, reasoning: "word ".repeat(80).trim() } };
     const line = text(long, "review")!;
-    expect(line.length).toBeLessThan(260);
+    expect(line.length).toBeLessThan(270); // the quote is cut at 200; the lead is "A closer check read the whole run"
     expect(line).toMatch(/\.\.\."$/);
   });
 
   it("says when the reviewer was asked for a second reading and could not be reached", () => {
     const down: Verdict = { ...NOTES_BY_REVIEW, verdict: "unknown", review: null, decidedBy: "nobody" };
-    expect(text(down, "review")).toBe("A reviewer was asked for a second reading but could not be reached");
+    expect(text(down, "review")).toBe("A closer check was asked for a second reading but could not be reached");
   });
 });
 
@@ -248,16 +248,16 @@ describe("whyLines - a run that fixed what the check found", () => {
 
   it("while the run fixes it, lists what the check found, as work in progress and not as a failure", () => {
     expect(whyLines(null, "running", null, heals)).toEqual([
-      { tier: "heal", tone: "retry", decided: false, text: "The first result did not pass the check: at least 8 rows (3 rows) and the CSV parses (row 4 has 3 columns)" },
+      { tier: "heal", tone: "retry", decided: false, text: "The first result did not pass the check: at least 8 rows (3 rows) and the CSV file could not be read as a table (row 4 has 3 columns)" },
     ]);
   });
 
   // run 15f8b99d: "The first result did not pass the check: The CSV parses: countries.csv: row 5 has 6 fields..." -
   // a capital mid-sentence and three colons in a row
-  it("says what the check found as one readable sentence: lower case, the file in words, no chain of colons", () => {
+  it("says what the check found as one readable sentence, naming what failed, not the check's pass label (qa-ai U10)", () => {
     const csv = [{ attempt: 1, max: 2, reasons: ["The CSV parses: countries.csv: row 5 has 6 fields, the header has 3"] }];
     expect(whyLines(null, "running", null, csv)[0].text).toBe(
-      "The first result did not pass the check: the CSV parses (in countries.csv, row 5 has 6 fields, the header has 3)",
+      "The first result did not pass the check: countries.csv could not be read as a table (row 5 has 6 values, the header has 3)",
     );
   });
 
@@ -279,7 +279,7 @@ describe("whyLines - a run that fixed what the check found", () => {
     const two = [...heals, { attempt: 2, max: 2, reasons: ["At least 8 rows: 6 rows"] }];
     const lines = whyLines(FAIL_BY_CHECKS, "succeeded", "fail", two);
     expect(lines.map((l) => l.text)).toEqual([
-      "The first result did not pass the check: at least 8 rows (3 rows) and the CSV parses (row 4 has 3 columns)",
+      "The first result did not pass the check: at least 8 rows (3 rows) and the CSV file could not be read as a table (row 4 has 3 columns)",
       "The second result did not pass the check: at least 8 rows (6 rows)",
       expect.stringContaining("1 of 2 checks failed"),
     ]);
@@ -295,5 +295,51 @@ describe("whyLines - a run that fixed what the check found", () => {
 
   it("adds nothing for a run that never needed a fix", () => {
     expect(whyLines(PASS_BY_JUDGE, "succeeded", "pass", [])).toEqual(whyLines(PASS_BY_JUDGE, "succeeded", "pass"));
+  });
+});
+
+// qa-ai U23: "judge" and "reviewer" are our words; the person reads "an automatic check" and "a closer check"
+describe("whyLines - in the person's words", () => {
+  it("never says judge or reviewer", () => {
+    const verdicts = [PASS_BY_JUDGE, NOTES_BY_REVIEW, FAIL_BY_CHECKS, { ...NOTES_BY_REVIEW, verdict: "unknown" as const, review: null, decidedBy: "nobody" as const }];
+    for (const v of verdicts) for (const line of whyLines(v, "succeeded")) expect(line.text).not.toMatch(/judge|reviewer/i);
+  });
+});
+
+// qa-ai F3: the run truthfully could not do the task, or asked the person for what it needs
+describe("whyLines - could not be done, needs your answer", () => {
+  const refused = (verdict: "cannot_do" | "needs_answer", choice: "cannot_be_done" | "needs_information"): Verdict => ({
+    ...PASS_BY_JUDGE,
+    verdict,
+    judgment: { answeredQuery: 0.1, followedPlan: 0.9, handling: { choice, confidence: 0.93 } },
+    reasons: [],
+  });
+
+  it("says the check found the run explained why it cannot be done, calmly, as the deciding line", () => {
+    const judge = whyLines(refused("cannot_do", "cannot_be_done"), "succeeded").find((l) => l.tier === "judge");
+    expect(judge).toMatchObject({ decided: true, tone: "idle", text: "An automatic check found the run explained why the task cannot be done here" });
+  });
+
+  it("says the check found the run needs an answer from you", () => {
+    const judge = whyLines(refused("needs_answer", "needs_information"), "succeeded").find((l) => l.tier === "judge");
+    expect(judge?.text).toBe("An automatic check found the run needs an answer from you before it can do the task");
+  });
+
+  it("does not say the result 'does not answer your instructions' for a refusal", () => {
+    for (const line of whyLines(refused("cannot_do", "cannot_be_done"), "succeeded")) expect(line.text).not.toMatch(/does not answer/);
+  });
+});
+
+// qa-ai F2: the fourth answer, whether the numbers and facts agree, is a line when the check leaned to no - the bar
+// evaluate() sends a run on by, since Jev sees only the start of what a run read
+describe("whyLines - numbers and facts", () => {
+  it("adds a line when the check leaned to the numbers and facts not agreeing with your instructions or the sources", () => {
+    const v: Verdict = { ...NOTES_BY_REVIEW, judgment: { answeredQuery: 0.9, followedPlan: 0.9, factsAgree: 0.4 } };
+    expect(whyLines(v, "succeeded").map((l) => l.text)).toContain("Some numbers or facts may not agree with your instructions or the sources");
+  });
+
+  it("says nothing when it only fell short of sure", () => {
+    const v: Verdict = { ...NOTES_BY_REVIEW, judgment: { answeredQuery: 0.9, followedPlan: 0.9, factsAgree: 0.7 } };
+    expect(whyLines(v, "succeeded").map((l) => l.text).join(" ")).not.toMatch(/numbers or facts/);
   });
 });

@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { outcome } from "@/components/run/outcome";
 import { TimeAgo } from "@/components/run/time-ago";
 import type { StartingRun } from "@/lib/automations/runs";
 import { orderForPicker } from "@/lib/automations/picker";
 import { cn } from "@/lib/utils";
+import { DOT } from "./dot";
 import { LINK, SHEET, SMALL } from "./surfaces";
 
 // The runs an automation can be made from, the ones that did well first; the others say why they may be a weaker
@@ -31,7 +33,8 @@ export function RunPicker({ runs }: { runs: StartingRun[] }) {
             prefetch={false}
             className="flex items-start gap-3 px-5 py-4 outline-none hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
           >
-            <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", r.mark === null ? "bg-fern" : r.outcome === "fail" ? "bg-crimson" : "border-[1.5px] border-slate")} />
+            {/* the same mark as the rail and the run page give this outcome (qa-ux U7): these runs are all finished */}
+            <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", DOT[outcome("succeeded", r.outcome).tone])} />
             <span className="min-w-0 flex-1">
               <span className="line-clamp-2 text-[15px] leading-6 text-graphite">{r.prompt}</span>
               <span className={cn(SMALL, "mt-1 flex flex-wrap gap-x-3")}>
