@@ -41,6 +41,27 @@ describe("GET /api/runs/<id> (the polling fallback)", () => {
     expect(body.state.status).toBe("failed");
   });
 
+  // QA F20: the API answered the machine's own paths (/Users/..., /tmp/... on Vercel), which the page strips (Q187)
+  it("answers paths inside the run's folder as the page shows them, and never the machine's folder", async () => {
+    const folder = `/Users/someone/projects/handover/runs/${RUN_ID}`;
+    const events = [
+      { seq: 1, at: "2026-09-23T10:00:00.000Z", kind: "started", payload: { model: "m", tools: [], mcp_servers: [], cwd: folder } },
+      { seq: 2, at: "2026-09-23T10:00:01.000Z", kind: "tool_call", payload: { tool_use_id: "t1", name: "Write", input: { file_path: `${folder}/greeting.txt`, content: "Hi" } } },
+      { seq: 3, at: "2026-09-23T10:00:02.000Z", kind: "tool_result", payload: { tool_use_id: "t1", content: `The file ${folder}/greeting.txt has been updated`, is_error: false } },
+    ] as never;
+    vi.mocked(getRun).mockResolvedValue({ run: { ...run, report: `Saved to ${folder}/greeting.txt.` }, events, files: [], verdict: null });
+
+    const res = await call();
+    const text = await res.clone().text();
+    const body = await res.json();
+
+    expect(text).not.toContain("/Users/someone");
+    expect(body.events[1].payload.input.file_path).toBe("greeting.txt");
+    expect(body.events[2].payload.content).toBe("The file greeting.txt has been updated");
+    expect(body.run.report).toBe("Saved to greeting.txt.");
+    expect(body.events[0].payload).not.toHaveProperty("cwd");
+  });
+
   it("answers 404 for a run the workspace cannot see, and sweeps nothing", async () => {
     vi.mocked(getRun).mockResolvedValue(null);
     expect((await call()).status).toBe(404);
