@@ -60,3 +60,52 @@ describe("AI_MODEL and AI_MODEL_FALLBACK", () => {
     expect(getFallbackModel()).toBeNull();
   });
 });
+
+// Engine review #2, the owner's call: the agent needs ANTHROPIC_API_KEY, so every environment that runs agents also
+// sent extract() to Anthropic - and getFallbackModel() returned null there, leaving the reviewer one model. Anthropic
+// stays the first model; the second is on OpenRouter whenever its key is set.
+describe("the second model beside Anthropic", () => {
+  const vars = ["OPENROUTER_API_KEY", "AI_MODEL", "AI_MODEL_FALLBACK", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "AI_SIMULATE_DOWN"];
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const v of vars) {
+      saved[v] = process.env[v];
+      delete process.env[v];
+    }
+    process.env.ANTHROPIC_API_KEY = "test-key";
+  });
+  afterEach(() => {
+    for (const v of vars) {
+      if (saved[v] === undefined) delete process.env[v];
+      else process.env[v] = saved[v];
+    }
+  });
+
+  it("keeps Claude Sonnet on Anthropic as the first model", () => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+    expect(modelIdOf(getModel())).toBe("claude-sonnet-5");
+  });
+
+  it("falls back to the OpenRouter model when OpenRouter's key is set", () => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+    expect(modelIdOf(getFallbackModel()!)).toBe("deepseek/deepseek-v4.1-flash");
+  });
+
+  it("lets AI_MODEL_FALLBACK name the second model, and set to nothing switches it off", () => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+    process.env.AI_MODEL_FALLBACK = "openai/gpt-5.6-luna";
+    expect(modelIdOf(getFallbackModel()!)).toBe("openai/gpt-5.6-luna");
+    process.env.AI_MODEL_FALLBACK = "";
+    expect(getFallbackModel()).toBeNull();
+  });
+
+  it("has no second model without OpenRouter's key", () => {
+    expect(getFallbackModel()).toBeNull();
+  });
+
+  it("has none while AI_SIMULATE_DOWN walks the failure path", () => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+    process.env.AI_SIMULATE_DOWN = "1";
+    expect(getFallbackModel()).toBeNull();
+  });
+});

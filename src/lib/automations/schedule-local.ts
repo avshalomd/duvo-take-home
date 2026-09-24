@@ -29,6 +29,18 @@ export function describeChoice(choice: ScheduleChoice): string {
   return `${when} at ${choice.time}`;
 }
 
+/**
+ * The last scheduled slot that started no run, at its own local time, and why: "Skipped Tue 08:00: this workspace has
+ * spent its $5.00 budget for today." en-GB for the 24-hour clock the schedule form writes (engine review #6).
+ */
+export function skippedLine(atIso: string, reason: string, tz: string | null): string {
+  const timeZone = tz || "UTC"; // a schedule from before zones were stored reads in UTC
+  const d = new Date(atIso);
+  const day = d.toLocaleDateString("en-GB", { timeZone, weekday: "short" });
+  const time = d.toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" });
+  return `Skipped ${day} ${time}: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`;
+}
+
 /** A zone as people say it: "Europe/Prague" is "Prague time"; UTC stays UTC. */
 export function zoneName(tz: string): string {
   if (tz === "UTC") return "UTC";

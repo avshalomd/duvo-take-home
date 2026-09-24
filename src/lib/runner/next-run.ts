@@ -17,8 +17,12 @@ export function nextRunAfter(cron: string, after: Date, tz?: string | null): Dat
 }
 
 export type ScheduleAction =
-  | { fire: false; next: Date | null } // not due yet, or seen for the first time: only next_run_at may move
+  | { fire: false; next: Date | null; missed?: Date } // not due yet, first sight, or `missed`: a slot too late to run
   | { fire: true; next: Date | null };
+
+// A slot later than this is skipped, not run late (the owner's call, engine review #5): a digest meant for 08:00 is no
+// use in the afternoon, and a paid run the person did not expect then is worse than none.
+export const LATE_SLOT_MS = 60 * 60_000;
 
 /** What one tick does with one automation's schedule. */
 export function scheduleAction(a: { schedule: string; nextRunAt: Date | null; tz?: string | null }, now: Date): ScheduleAction {
@@ -27,6 +31,7 @@ export function scheduleAction(a: { schedule: string; nextRunAt: Date | null; tz
   // First sight (just saved, or the schedule changed): compute the slot, do not fire - a new schedule waits for its time.
   if (!a.nextRunAt) return { fire: false, next };
   if (a.nextRunAt.getTime() > now.getTime()) return { fire: false, next: a.nextRunAt };
-  // Due. The next slot is counted from now, not from the missed one, so a worker that was down fires once, not per slot.
+  // Due. The next slot is counted from now, not from the missed one, so a worker that was down never fires per slot.
+  if (now.getTime() - a.nextRunAt.getTime() > LATE_SLOT_MS) return { fire: false, next, missed: a.nextRunAt };
   return { fire: true, next };
 }

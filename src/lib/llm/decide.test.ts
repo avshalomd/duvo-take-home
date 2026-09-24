@@ -188,6 +188,34 @@ describe("decide failover", () => {
     expect(routesFor()).toEqual([{ kind: "http", url: TYPESAFE, key: "ts", model: "jev-1.12.0" }]);
   });
 
+  // Engine review #11: only the key was checked, so a noul answer with no number became `noul: undefined`, read as
+  // NaN: not confident, "(NaN%)" in the reasons, and a stored judgment missing the field Re-evaluate reads.
+  it("treats an answer of the wrong shape as off-schema, naming the question", async () => {
+    const shapeless = [
+      { ...httpAnswers, needs_human: { type: "noul" } }, // no probability
+      { ...httpAnswers, needs_human: { type: "noul", noul: 1.7 } }, // not a probability
+      { ...httpAnswers, kind: { ...httpAnswers.kind, choice: "refund" } }, // not one of the listed options
+      { ...httpAnswers, urgency: { ...httpAnswers.urgency, score: "high" } }, // not a position
+    ];
+    for (const answers of shapeless) {
+      const { impl } = fakeFetch({ ...httpOk, answers });
+      const err = await decide({ state: "x", questions, route: httpRoute, fetchImpl: impl }).catch((e) => e);
+      expect(err).toBeInstanceOf(LlmError);
+      expect(err.kind).toBe("off-schema");
+      expect(err.message).toMatch(/needs_human|kind|urgency/);
+    }
+  });
+
+  it("moves to the next route when the first one answers in the wrong shape", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "ts");
+    vi.stubEnv("OPENROUTER_API_KEY", "or");
+    const bad = { body: { ...httpOk, answers: { ...httpAnswers, needs_human: { type: "noul" } } } };
+    const { impl, urls } = fetchByUrl({ [TYPESAFE]: bad, [OPENROUTER]: { body: httpOk } });
+    const result = await decide({ state: "x", questions, fetchImpl: impl });
+    expect(urls).toEqual([TYPESAFE, OPENROUTER]);
+    expect(result.answers.needs_human.noul).toBe(0.97);
+  });
+
   it("treats a question that came back unanswered as off-schema, not as undefined", async () => {
     const partial = { ...httpOk, answers: { needs_human: httpAnswers.needs_human, kind: httpAnswers.kind } };
     const { impl } = fakeFetch(partial);
@@ -238,6 +266,14 @@ describe("decide through the AI Gateway", () => {
     expect(result.answers.urgency.legend).toEqual({ "0": "not urgent", "1": "this week", "2": "today" });
     expect(levelOf(result.answers.urgency)).toBe("this week");
     expect(result.answers.urgency.confidence).toBe(0.8);
+  });
+
+  it("treats a gateway yes/no answer without its probability as off-schema, not as a NaN", async () => {
+    const { impl } = fakeEvaluate({ ...gatewayResult, answers: { ...gatewayResult.answers, needs_human: { type: "boolean" } } });
+    const err = await decide({ state: "x", questions: asked, route: gatewayRoute, evaluateImpl: impl }).catch((e) => e);
+    expect(err).toBeInstanceOf(LlmError);
+    expect(err.kind).toBe("off-schema");
+    expect(err.message).toMatch(/needs_human/);
   });
 
   it("turns a gateway failure into an LlmError like any other", async () => {

@@ -18,9 +18,10 @@ const SESSION = "00000000-0000-4000-8000-00000000h3a1".replace("h", "0");
 const BROKEN = 'rank,model,why\n1,a,"fine"\n2,b,small, fast\n';
 const FIXED = 'rank,model,why\n1,a,"fine"\n2,b,"small, fast"\n';
 const calls: { prompt: string; resume?: string }[] = [];
-const hooks: { onAttempt?: (attempt: number) => Promise<void> } = {}; // lets a test look at the run while it heals
-// How an attempt ends: its result message, no result at all (the child died mid-stream), or working until aborted.
-type Ending = "result" | "no-result" | "hang";
+const hooks: { onAttempt?: (attempt: number) => Promise<void>; onResult?: () => Promise<void> } = {}; // lets a test look at the run while it heals
+// How an attempt ends: its result message, no result at all (the child died mid-stream), working until aborted, or
+// its result and then an abort while the child shuts down (Stop pressed just as the agent finished, qa-func F24).
+type Ending = "result" | "no-result" | "hang" | "result-then-abort";
 const script: { files: string[]; endings: Ending[]; plan: boolean } = { files: [BROKEN, FIXED], endings: [], plan: false }; // per attempt; "result" when unset; plan: a step marked done first
 // What the tests turn: the agent's time budget (to let the wall clock run out) and the SDK's totals for an attempt that
 // sent no result (its transcript's cost-state, which a fake session does not have).
@@ -47,7 +48,11 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
       const ending = script.endings[attempt] ?? "result";
       if (ending === "hang") await new Promise((_, reject) => options.abortController.signal.addEventListener("abort", () => reject(new Error("aborted"))));
       // the SDK's total for a resumed session continues from the saved one: 0.01, then 0.03 (0.02 of its own)
-      if (ending === "result") yield { type: "result", subtype: "success", is_error: false, num_turns: 2, duration_ms: 1000, total_cost_usd: 0.01 * (2 * attempt + 1), result: "Wrote output.csv." };
+      if (ending === "result" || ending === "result-then-abort") yield { type: "result", subtype: "success", is_error: false, num_turns: 2, duration_ms: 1000, total_cost_usd: 0.01 * (2 * attempt + 1), result: "Wrote output.csv." };
+      if (ending === "result-then-abort") {
+        await hooks.onResult?.();
+        await new Promise((_, reject) => options.abortController.signal.addEventListener("abort", () => reject(new Error("aborted"))));
+      }
     })();
   }),
 }));
@@ -87,6 +92,7 @@ const healEvents = async (runId: string) => (await db.select().from(runEvents).w
 beforeEach(async () => {
   calls.length = 0;
   hooks.onAttempt = undefined;
+  hooks.onResult = undefined;
   script.files = [BROKEN, FIXED];
   script.endings = [];
   script.plan = false;
@@ -268,9 +274,11 @@ describe.skipIf(!process.env.DATABASE_URL)("what a failed run spent", () => {
 });
 
 // A Stop that landed between a verdict and the next fix attempt aborted the last attempt's controller, already spent;
-// the fix attempt then ran to its end, paid for, before the run closed as cancelled.
-describe.skipIf(!process.env.DATABASE_URL)("Stop between attempts", () => {
-  it("closes as stopped without starting the fix attempt when Stop lands after the verdict", async () => {
+// the fix attempt then ran to its end, paid for, before the run closed as cancelled. And (qa-func F24, the owner's
+// call): a Stop that lands once the agent has finished must not throw its answer away - run 0d9f737e finished, was
+// stopped 65 ms later, and closed cancelled with no report. Stop ends work still in progress, nothing after.
+describe.skipIf(!process.env.DATABASE_URL)("Stop after the agent finished", () => {
+  it("keeps the answer and its verdict, and starts no fix attempt, when Stop lands during the check", async () => {
     const id = await queuedRun(WS, "stopped while the check failed it");
     vi.mocked(evaluateRun)
       .mockImplementationOnce(async () => {
@@ -283,13 +291,45 @@ describe.skipIf(!process.env.DATABASE_URL)("Stop between attempts", () => {
 
     const [run] = await db.select().from(runs).where(eq(runs.id, id));
     expect(calls).toHaveLength(1); // the fix attempt is never paid for
-    expect(run.status).toBe("cancelled");
-    expect(run.error).toBe("Stopped by you");
-    expect(run.verdict).toBeNull();
-    expect(run.costUsd).toBeCloseTo(0.01, 10); // the first attempt's cost is kept
+    expect(run.status).toBe("succeeded"); // the agent finished: its work is the run's result
+    expect(run.report).toBe("Wrote output.csv.");
+    expect((run.verdict as Verdict).verdict).toBe("fail"); // the check it finished, not thrown away
+    expect(run.costUsd).toBeCloseTo(0.01, 10);
     expect(run.numTurns).toBe(2);
     expect(run.healAttempts).toBe(0);
     expect(await healEvents(id)).toHaveLength(0);
+    expect((await db.select().from(files).where(eq(files.runId, id))).map((f) => f.name)).toEqual(["output.csv"]);
+  }, 30_000);
+
+  it("keeps the report and files and checks them when Stop lands just after the agent's result", async () => {
+    const id = await queuedRun(WS, "stopped as the agent finished");
+    script.endings = ["result-then-abort"];
+    hooks.onResult = async () => void (await cancelRun(WS, id)); // Stop, 65 ms after the result in the real run
+    vi.mocked(evaluateRun).mockResolvedValue(PASS);
+
+    await runAutomation(id);
+
+    const [run] = await db.select().from(runs).where(eq(runs.id, id));
+    expect(run.status).toBe("succeeded");
+    expect(run.error).toBeNull();
+    expect(run.report).toBe("Wrote output.csv.");
+    expect((run.verdict as Verdict).verdict).toBe("pass");
+    expect(vi.mocked(evaluateRun)).toHaveBeenCalledOnce();
+    expect((await db.select().from(files).where(eq(files.runId, id))).map((f) => f.name)).toEqual(["output.csv"]);
+  }, 30_000);
+
+  it("still closes as stopped, with no fix attempt, when Stop lands while a fix attempt works", async () => {
+    const id = await queuedRun(WS, "stopped during the fix");
+    script.endings = ["result", "hang"];
+    hooks.onAttempt = async (attempt) => void (attempt === 1 ? await cancelRun(WS, id) : undefined);
+    vi.mocked(evaluateRun).mockResolvedValue(FAIL);
+
+    await runAutomation(id);
+
+    const [run] = await db.select().from(runs).where(eq(runs.id, id));
+    expect(calls).toHaveLength(2);
+    expect(run.status).toBe("cancelled"); // the fix was work in progress: Stop ends it
+    expect(run.error).toBe("Stopped by you");
   }, 30_000);
 });
 

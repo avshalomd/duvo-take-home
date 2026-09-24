@@ -23,12 +23,17 @@ function resultText(content: unknown): string {
  */
 export function createMapper(): MapMessage {
   let plan: Plan | null = null;
-  let turn = 0; // an assistant message is a turn, which is what the SDK's num_turns and maxTurns count
+  let turn = 0; // one model response is a turn, which is what the SDK's num_turns and maxTurns count
   const planCallIds = new Set<string>();
+  const responseIds = new Set<string>(); // the SDK sends one assistant message per content block, all with one message.id
 
   return (message: unknown, seq: number, at: string): RunEvent[] => {
     const m = rec(message);
-    if (m.type === "assistant") turn += 1;
+    if (m.type === "assistant") {
+      const id = str(rec(m.message).id);
+      if (!id || !responseIds.has(id)) turn += 1; // a message with no id is taken as a turn of its own
+      if (id) responseIds.add(id);
+    }
     const events: RunEvent[] = [];
     // Every event carries the turn it happened in, so the state card can show "turn 3 of 25" in the SDK's own terms.
     const push = (e: Omit<RunEvent, "seq" | "at">) =>

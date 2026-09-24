@@ -15,6 +15,33 @@ const input: EvaluateInput = {
   today: "2026-09-23",
 };
 
+// Engine review #10: the reviewer got 60 lines of any length per file, every file, and the whole report: a single-line
+// 200 KB file went to it whole, slow and costly, eating the evaluation's 50 s.
+describe("reviewInput's size", () => {
+  const LIMIT = 100_000; // characters: far above a normal run's input, far below what the unbounded one sent
+
+  it("cuts a very long line, so one wide file cannot fill the reviewer's input", () => {
+    const wide = { ...input, files: [{ name: "data.csv", content: `a,b\n${"x".repeat(200_000)}` }] };
+    expect(reviewInput(wide, runChecks(wide)).length).toBeLessThan(LIMIT);
+  });
+
+  it("stays bounded with many files, and names the ones it does not show", () => {
+    const content = Array.from({ length: 60 }, () => "y".repeat(400)).join("\n");
+    const many = { ...input, files: Array.from({ length: 40 }, (_, i) => ({ name: `part-${i}.md`, content })) };
+    const text = reviewInput(many, runChecks(many));
+    expect(text.length).toBeLessThan(LIMIT);
+    expect(text).toContain("part-39.md");
+  });
+
+  it("keeps the start and the end of a very long report", () => {
+    const long = { ...input, report: `START ${"r".repeat(200_000)} END` };
+    const text = reviewInput(long, runChecks(long));
+    expect(text.length).toBeLessThan(LIMIT);
+    expect(text).toContain("START");
+    expect(text).toContain(" END");
+  });
+});
+
 describe("reviewInput", () => {
   it("shows the reviewer a spreadsheet as what it is and its size, never its base64", () => {
     const text = reviewInput(input, runChecks(input));

@@ -82,7 +82,8 @@ and why it is built that way; `docs/QA.md` is the log of every finding and its f
   the submitted values with the errors.
 - **Seed:** `scripts/seed.ts` builds its own client because `@/db` is server-only.
 - **Is the model working?** `/api/health?deep=1` makes one tiny model call (cached a minute). Believe its warning.
-  `AI_MODEL` and `AI_MODEL_FALLBACK` switch models in one variable; `AI_SIMULATE_DOWN=1` walks the model-down path.
+  `extract()` asks Claude Sonnet on Anthropic first and an OpenRouter model second (`.claude/docs/models.md`);
+  `AI_MODEL` and `AI_MODEL_FALLBACK` switch either in one variable; `AI_SIMULATE_DOWN=1` walks the model-down path.
 - **Next 16:** a `loading.tsx` streams the page before `notFound()` runs, so a missing record answers 200: use
   `<Suspense>` inside pages that can 404. `error.tsx` receives `{ error, retry }`.
 

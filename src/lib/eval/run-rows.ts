@@ -20,6 +20,7 @@ export function toEvaluateInput(run: Run, events: RunEvent[], files: { name: str
     // The run's own day, not today's: re-evaluating next week must not turn "the last 7 days" into a failure.
     today: (run.finishedAt ?? run.createdAt).slice(0, 10),
     toolsUsed: [...new Set(toolNames)],
+    followUp: Boolean(run.parentRunId), // as the live run was judged: its conversation holds what the parent read
   };
 }
 
@@ -42,6 +43,7 @@ export function toRun(row: typeof runs.$inferSelect): Run {
     automationId: row.automationId,
     automationVersion: row.automationVersion,
     input: row.input,
+    parentRunId: row.parentRunId,
   };
 }
 

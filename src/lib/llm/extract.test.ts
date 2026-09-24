@@ -52,6 +52,18 @@ describe("extract", () => {
     expect(data).toEqual(expected);
   });
 
+  // Engine review #16: in prompt mode a ZodError or a JSON SyntaxError became "unavailable" with the raw ZodError
+  // JSON as its message, which reached the run's "Why?" line and was retried as if the provider were down.
+  it("turns a prompt-mode answer that does not fit the schema into a plain off-schema error", async () => {
+    const refusal = apiError(400, { error: { message: "does not support feature: structured-outputs" } });
+    for (const [id, answer] of [["prompt-wrong-shape", '{"changes":[{"product":3}]}'], ["prompt-not-json", "{changes: oops}"]]) {
+      const err = await extract({ ...args, model: () => failingModel([refusal], [answer], id) }).catch((e) => e);
+      expect(err).toBeInstanceOf(LlmError);
+      expect(err.kind).toBe("off-schema");
+      expect(err.message).toBe("The model's answer did not fit the expected format. Retry.");
+    }
+  });
+
   it("remembers the refusal, so the next call goes straight to prompt mode", async () => {
     const refusal = apiError(400, { error: { message: "response_format is not supported" } });
     const first = failingModel([refusal], [reply], "remembers-model");
@@ -90,6 +102,27 @@ describe("extract", () => {
     expect(err.kind).toBe("unavailable");
     expect(err.message).toMatch(/shared_pool: overloaded/);
     expect(err.message).not.toMatch(/^The model call failed: Provider returned error$/);
+  });
+
+  // Engine review #1: inside the evaluation's box, the caller's clock covers every try: the retry, the prompt-mode
+  // retry and the fallback model, which could otherwise each take a full timeout.
+  it("stops at the caller's signal, however long each try is allowed", async () => {
+    const started = Date.now();
+    const err = await extract({ ...args, timeoutMs: 10_000, signal: AbortSignal.timeout(50), model: () => slowModel(2_000) }).catch((e) => e);
+    expect(err).toBeInstanceOf(LlmError);
+    expect(err.kind).toBe("timeout");
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it("does not try the fallback model once the caller's time is up", async () => {
+    let fallbackAsked = false;
+    const fallback = () => {
+      fallbackAsked = true;
+      return scriptedModel([reply], "fallback-model");
+    };
+    const err = await extract({ ...args, signal: AbortSignal.timeout(50), model: () => slowModel(2_000), fallback }).catch((e) => e);
+    expect(err.kind).toBe("timeout");
+    expect(fallbackAsked).toBe(false);
   });
 
   it("fences the input so it cannot close the data block", () => {

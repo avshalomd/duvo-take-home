@@ -34,8 +34,9 @@ export function shouldHeal(args: { healable: boolean; healsSoFar: number; limit:
 export type AttemptFingerprint = { reasons: string; checks: string; files: string };
 
 /**
- * Failures as the evaluator stated them (the failed code checks with their details, and the verdict's reasons), and
- * the files as a hash of their names and exact bytes, in name order so the same files always read the same.
+ * Failures as the evaluator stated them (the failed code checks with their details, and the verdict's reasons without
+ * their percentages), and the files as a hash of their names and exact bytes, in name order so the same files always
+ * read the same.
  */
 export function attemptFingerprint(verdict: Verdict, files: { name: string; content: string }[]): AttemptFingerprint {
   const checks = verdict.checks
@@ -45,7 +46,10 @@ export function attemptFingerprint(verdict: Verdict, files: { name: string; cont
     .join("\n");
   const hash = createHash("sha256");
   for (const f of [...files].sort((a, b) => a.name.localeCompare(b.name))) hash.update(`${f.name}\0${f.content}\0`);
-  return { reasons: [...verdict.reasons].sort().join("\n"), checks, files: hash.digest("hex") };
+  // The judge's reasons carry its probability ("(93% confident)"), which moves on every attempt: with the numbers left
+  // out, the same "no" from the judge reads as the same failure (engine review #17).
+  const reasons = verdict.reasons.map((r) => r.replace(/\d+(\.\d+)?%/g, "%")).sort();
+  return { reasons: reasons.join("\n"), checks, files: hash.digest("hex") };
 }
 
 /**

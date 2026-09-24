@@ -31,6 +31,7 @@ import { closeAsCancelled, updateUnlessCancelled } from "./close";
 import { reachableConnections } from "./connection-reach";
 import { statusUpdates } from "./connection-status";
 import { startDeadline, within } from "./deadline";
+import { createEventWriter } from "./event-writer";
 import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
 import { attemptFingerprint, EVAL_MAX_MS, healPrompt, noProgress, runBudgetMs, SETTLE_MAX_MS, shouldHeal, type AttemptFingerprint } from "./heal";
@@ -49,7 +50,8 @@ import { removeRunDir } from "./workspace";
 export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const NATIVE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]; // everything else is removed below
 const CANCEL_POLL_MS = 2000; // Stop is felt within 2 s, at one tiny read per run every 2 s
-const EVAL_TOO_LONG = "the check took too long; press Re-evaluate to try again"; // read as "Not checked: ..."
+const EVAL_MARGIN_MS = 2_000; // the models' own deadline fires this much before the evaluation's box
+const EVAL_TOO_LONG ="the check took too long; press Re-evaluate to try again"; // read as "Not checked: ..."
 
 /** One working directory per run, gitignored; bypassPermissions lets the agent write anywhere under it.
  *  On Vercel the code directory is read-only, so the run lives under the function's temp dir instead. */
@@ -135,37 +137,34 @@ export const runAutomation: RunAutomation = async (runId) => {
   }
 
   const map = createMapper(); // one mapper for every attempt: the plan and the turn count carry on across heals
-  let seq = 1;
   const recorded: RunEvent[] = []; // kept so the closing update reads the plan and the result from the same events
   let plan: Plan | null = null;
   const checks = new Set<Promise<void>>(); // the per-step checks still waiting on Jev
 
-  // One writer, in order: the agent's messages, the guards' decisions and the step checks all arrive here, from
-  // different callbacks, and each gets the next seq only when it is written.
-  let chain: Promise<void> = Promise.resolve();
-  const write = (events: Omit<RunEvent, "seq">[]) => {
-    chain = chain.then(async () => {
-      for (const raw of events) {
-        const e = { ...raw, seq: seq++ } as RunEvent;
-        await db.insert(runEvents).values({ runId, seq: e.seq, kind: e.kind, payload: e.payload, at: new Date(e.at) });
-        recorded.push(e);
-        if (e.kind === "started") {
-          // the init message is where a connection's real status shows up; write it back so the list stops guessing
-          for (const u of statusUpdates(e.payload.mcp_servers, enabled)) {
-            const key = connectionKey(enabled.find((c) => c.id === u.id)?.name ?? "");
-            const tools = e.payload.tools.filter((t) => t.startsWith(`mcp__${key}__`)).map((t) => t.slice(`mcp__${key}__`.length));
-            await recordConnectionSeen(u.id, { lastStatus: u.lastStatus, tools });
-          }
-        }
-        if (e.kind === "plan") {
-          const before = plan;
-          plan = e.payload;
-          if (limits.stepChecks) for (const i of newlyDone(before, e.payload)) track(stepCheck(e.payload, i));
+  // One writer, in order (event-writer.ts): a failed write fails its own caller only, never every write after it.
+  const writer = createEventWriter({
+    insert: async (e) => {
+      await db.insert(runEvents).values({ runId, seq: e.seq, kind: e.kind, payload: e.payload, at: new Date(e.at) });
+    },
+    written: (e) => {
+      recorded.push(e);
+      if (e.kind === "started") {
+        // the init message is where a connection's real status shows up; written back so the list stops guessing. Out
+        // of the chain and only logged when it fails: a connection's badge is not worth failing the run (review #12).
+        for (const u of statusUpdates(e.payload.mcp_servers, enabled)) {
+          const key = connectionKey(enabled.find((c) => c.id === u.id)?.name ?? "");
+          const tools = e.payload.tools.filter((t) => t.startsWith(`mcp__${key}__`)).map((t) => t.slice(`mcp__${key}__`.length));
+          void recordConnectionSeen(u.id, { lastStatus: u.lastStatus, tools }).catch((err) => console.error(`run ${runId}: connection status not recorded`, err));
         }
       }
-    });
-    return chain;
-  };
+      if (e.kind === "plan") {
+        const before = plan;
+        plan = e.payload;
+        if (limits.stepChecks) for (const i of newlyDone(before, e.payload)) track(stepCheck(e.payload, i));
+      }
+    },
+  });
+  const write = writer.write;
   const now = () => new Date().toISOString();
 
   // settle() ends a round: a check begun in an earlier round that answers after it gave up waiting is dropped, so no
@@ -197,7 +196,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   const settle = async () => {
     await within(Promise.allSettled([...checks]), SETTLE_MAX_MS, () => []);
     round += 1;
-    await chain;
+    await writer.drained();
   };
 
   const recordGuard = async (r: GuardRecord) => {
@@ -230,6 +229,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   let heals = 0;
   const spent = { usd: 0, ms: 0, turns: 0 }; // the attempts whose result is in
   let lastVerdict: Verdict | null = null; // written to runs.verdict once, when the run's tries are over
+  let closeFinished: (() => Promise<unknown>) | null = null; // closes the run on the last finished attempt and its verdict
   const earlierAttempts: AttemptFingerprint[] = []; // what each failed attempt left, to see an attempt go round again
   let attemptBase = costBase; // what this attempt's SDK total starts from (a resumed session carries the last total)
   let attemptStartedAt = startedAt;
@@ -246,7 +246,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   const totalsSoFar = async () => {
     if (counted) return runTotals(spent, null);
     const end = attemptResult();
-    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
+    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId, { above: attemptBase }); // past a resumed session's earlier entry
     return runTotals(spent, stoppedTotals({ end, sdk, startedAt: attemptStartedAt, now: Date.now(), turns: maxTurn(recorded) - turnsBefore, costBase: attemptBase }));
   };
   const closeStopped = async () => {
@@ -301,23 +301,29 @@ export const runAutomation: RunAutomation = async (runId) => {
       },
     });
 
-    for await (const message of q) {
-      const id = sessionIdOf(message);
-      if (id) {
-        sessionId = id;
-        await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up or a heal resumes
+    try {
+      for await (const message of q) {
+        const id = sessionIdOf(message);
+        if (id) {
+          sessionId = id;
+          await db.update(runs).set({ sessionId }).where(eq(runs.id, runId)); // what a follow-up or a heal resumes
+        }
+        const events = withAttemptCost(map(message, 0, now()), attemptBase); // each attempt's own cost, for Details
+        await write(events);
+        // The tripwire: a tool source in init that is neither ours nor the workspace's stops the run before the agent
+        // can call it, whatever let it in (QA Q134).
+        const started = events.find((e) => e.kind === "started");
+        const foreign = started ? unexpectedServers(started.payload.mcp_servers.map((s) => s.name), allowedServers) : [];
+        if (foreign.length) {
+          tripped = tripwireReason(foreign);
+          deadline.controller.abort();
+          break;
+        }
       }
-      const events = withAttemptCost(map(message, 0, now()), attemptBase); // each attempt's own cost, for Details
-      await write(events);
-      // The tripwire: a tool source in init that is neither ours nor the workspace's stops the run before the agent
-      // can call it, whatever let it in (QA Q134).
-      const started = events.find((e) => e.kind === "started");
-      const foreign = started ? unexpectedServers(started.payload.mcp_servers.map((s) => s.name), allowedServers) : [];
-      if (foreign.length) {
-        tripped = tripwireReason(foreign);
-        deadline.controller.abort();
-        break;
-      }
+    } catch (err) {
+      // The agent had finished: an abort landing while its child shuts down (Stop pressed just then: qa-func F24, run
+      // 0d9f737e, 65 ms after its result) ended nothing still in progress, so the result stands and is checked.
+      if (tripped || !attemptResult()) throw err;
     }
     deadline.clear(); // the stream is done; nothing left to abort
     if (tripped) throw new Error(tripped);
@@ -340,7 +346,8 @@ export const runAutomation: RunAutomation = async (runId) => {
       deadline.clear();
       deadline = startDeadline(attemptMs());
       if (cancel.cancelled() || (await cancelRequested(runId))) {
-        await closeStopped();
+        // Before a fix attempt, the last attempt's answer and its verdict stand (F24); before the first, nothing does.
+        await (closeFinished ? closeFinished() : closeStopped());
         return;
       }
       if (next.heal) {
@@ -351,12 +358,13 @@ export const runAutomation: RunAutomation = async (runId) => {
       await runAttempt(next.prompt, next.resume);
       const written = await storeFiles();
 
-      // An abort can end the stream quietly instead of throwing: Stop is then seen here.
-      if (cancel.cancelled()) {
+      const end = attemptResult();
+      // An abort can end the stream quietly instead of throwing: Stop is then seen here. Only work still in progress
+      // is stopped: an attempt that sent its result is the run's answer, and it is checked (the owner's call, F24).
+      if (cancel.cancelled() && !end) {
         await closeStopped();
         return;
       }
-      const end = attemptResult();
       // No result message means the child died mid-stream. That is a failure, not a success with no report.
       if (!end) throw new Error("the agent ended without a result");
       spent.usd += ownCost(end.total_cost_usd, attemptBase);
@@ -386,27 +394,31 @@ export const runAutomation: RunAutomation = async (runId) => {
         today: new Date().toISOString().slice(0, 10),
         // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
+        followUp: Boolean(run.parentRunId), // it resumed a conversation that may have read a page: the in-bounds question is asked
         template,
-      }).catch(unknownVerdict);
-      const evaluation = within(judged, EVAL_MAX_MS, () => unknownVerdict(new Error(EVAL_TOO_LONG)));
-      // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
-      const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);
-      if (verdict === null || cancel.cancelled()) {
-        await closeStopped(); // the attempts' cost, turns and duration; no verdict
-        return;
-      }
+        // the model calls are budgeted inside the box, and end a little before it: the verdict then names the model
+        // that was slow instead of the box's "the check took too long"
+      }, { withinMs: EVAL_MAX_MS - EVAL_MARGIN_MS }).catch(unknownVerdict);
+      // A Stop pressed now does not cut the check short: the agent's answer is in, and the check is boxed in time
+      // (the owner's call, F24: a stopped check used to throw the answer away).
+      const verdict = await within(judged, EVAL_MAX_MS, () => unknownVerdict(new Error(EVAL_TOO_LONG)));
       lastVerdict = verdict;
 
       // Auto-heal: a result the agent can fix goes back to the same session with the findings, inside this run. The
       // failing verdict lives only in the heal event; runs.verdict waits until the tries are over (his words: "the
-      // run should say pass or fail only if all the auto-heal tries are exhausted").
-      const heal = shouldHeal({
-        healable: isHealable(verdict, !end.is_error),
-        healsSoFar: heals,
-        limit: limits.autoHealAttempts,
-        remainingMs: budgetEndsAt - Date.now(),
-      });
+      // run should say pass or fail only if all the auto-heal tries are exhausted"). A Stop pressed by now ends the
+      // tries: the run closes with this answer and this verdict, and no fix attempt is paid for.
+      const stopRequested = cancel.cancelled() || (await cancelRequested(runId));
+      const heal =
+        !stopRequested &&
+        shouldHeal({
+          healable: isHealable(verdict, !end.is_error),
+          healsSoFar: heals,
+          limit: limits.autoHealAttempts,
+          remainingMs: budgetEndsAt - Date.now(),
+        });
       const close = () => updateUnlessCancelled(runId, { status: end.is_error ? "failed" : "succeeded", verdict, healAttempts: heals, finishedAt: new Date() });
+      closeFinished = close;
       if (!heal) {
         await close();
         return;

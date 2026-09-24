@@ -45,9 +45,22 @@ describe("scheduleAction", () => {
     expect(scheduleAction({ schedule: "*/15 * * * *", nextRunAt: now }, now).fire).toBe(true);
   });
 
-  it("fires once for slots missed days ago (the worker was down), not once per missed slot", () => {
+  // Engine review #5, the owner's call: a slot fired whenever the tick came back, so a digest meant for 08:00 arrived
+  // in the afternoon. A slot more than an hour late is skipped, named, and the schedule moves on.
+  it("skips a slot missed days ago (the worker was down): no run, the next slot after now, and the missed one named", () => {
     const a = scheduleAction({ schedule: "*/15 * * * *", nextRunAt: at("2026-09-20T10:00:00Z") }, now);
-    expect(a).toEqual({ fire: true, next: at("2026-09-23T10:15:00Z") });
+    expect(a).toEqual({ fire: false, next: at("2026-09-23T10:15:00Z"), missed: at("2026-09-20T10:00:00Z") });
+  });
+
+  it("still fires a slot up to an hour late", () => {
+    const a = scheduleAction({ schedule: "0 * * * *", nextRunAt: at("2026-09-23T09:07:00Z") }, now); // exactly an hour
+    expect(a).toEqual({ fire: true, next: at("2026-09-23T11:00:00Z") });
+  });
+
+  it("does not fire a weekday 08:00 schedule left due since Monday when the tick sees it on Friday at 15:00", () => {
+    const a = scheduleAction({ schedule: "0 8 * * 1-5", nextRunAt: at("2026-09-21T08:00:00Z"), tz: "UTC" }, at("2026-09-25T15:00:00Z"));
+    expect(a.fire).toBe(false);
+    expect(a.next).toEqual(at("2026-09-28T08:00:00Z"));
   });
 
   it("leaves a schedule that is not due yet alone", () => {

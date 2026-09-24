@@ -1,6 +1,7 @@
 import { parse } from "csv-parse/sync";
 import { AgentLimits } from "@/contracts/agent";
 import type { Check, EvaluateInput } from "@/contracts/eval";
+import { connectionKey } from "@/lib/connections/key";
 import { chartCheck, spreadsheetCheck } from "./output-checks";
 import { templateChecks } from "./template-checks";
 
@@ -191,8 +192,14 @@ function connectionCheck(input: EvaluateInput, ok: Push) {
   const named = connectionNamed(input.prompt);
   const tools = input.toolsUsed ?? [];
   if (!named || tools.length === 0) return; // no claim, or no tool names recorded: no evidence either way
-  const prefix = `mcp__${named.toLowerCase()}`;
-  const used = tools.filter((t) => t.toLowerCase().startsWith(prefix));
+  // The name as typed becomes the key the run gave the server ("Deep-Wiki" -> deep_wiki), and a tool counts when its
+  // server key is that key or starts with it as whole words: "GitHub" is github_read_only, "Git" is not github.
+  const key = connectionKey(named);
+  const prefix = `mcp__${key}__`;
+  const used = tools.filter((t) => {
+    const server = toolServerKey(t);
+    return server !== null && (server === key || server.startsWith(`${key}_`));
+  });
 
   // Q61: "use the connected DeepWiki server if it helps, otherwise search the web" leaves the route to the run, so
   // a web-only answer is not a broken promise. The check is recorded either way - it is evidence a reader wants -
@@ -210,8 +217,14 @@ function connectionCheck(input: EvaluateInput, ok: Push) {
     "connection_used",
     `The ${named} connection was used`,
     used.length > 0,
-    used.length ? used.join(", ") : `no ${prefix}__ tool call; tools used: ${tools.join(", ")}`,
+    used.length ? used.join(", ") : `no ${prefix} tool call; tools used: ${tools.join(", ")}`,
   );
+}
+
+/** The server key of an MCP tool name, "mcp__deep_wiki__ask_question" -> "deep_wiki"; null for a built-in tool. */
+function toolServerKey(tool: string): string | null {
+  const m = tool.match(/^mcp__(.+?)__/); // a key never holds "__": connectionKey folds every run of punctuation into one "_"
+  return m ? m[1].toLowerCase() : null;
 }
 
 // A requirement reads "must", "only", or "using/through/with the connected X"; an offer softens it in the same

@@ -17,7 +17,8 @@ export const abandonedAfterMs = (mode: ReturnType<typeof runnerMode>): number =>
 type Recovered = { requeued: string[]; failed: string[]; cancelled: string[]; done: string[] };
 
 /**
- * Jobs whose worker died (locked for over 10 minutes and still "running"). Each one, in its own transaction:
+ * Jobs whose worker died (still "running", with no heartbeat for over 10 minutes: a live worker moves locked_at every
+ * minute, jobs.ts). Each one, in its own transaction:
  * - its run already closed: only the job's last write was lost, so the job is marked done;
  * - the user had pressed Stop: the run closes as cancelled;
  * - tried fewer than 2 times: requeued, and its run starts over from a clean slate (events and files deleted,

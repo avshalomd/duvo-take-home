@@ -47,7 +47,7 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
           <StepperRow
             name="dailyBudgetUsd"
             label="Spend per day"
-            detail="In US dollars, for all runs together"
+            detail="In US dollars, for all runs together. Each run working holds back $1, so the day never goes over"
             prefix="$"
             step={1}
             min={0}

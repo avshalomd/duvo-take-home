@@ -190,6 +190,27 @@ describe("runChecks", () => {
     expect(failedIds(checks)).toEqual([]);
   });
 
+  // Engine review #3: the prefix was the name as typed, so "Deep-Wiki" looked for mcp__deep-wiki while its tools are
+  // mcp__deep_wiki__*, and "Git" matched the mcp__github__ tools of another connection.
+  const connectionFile = csv("area,what_it_does\nOverview,\"Servers\"\n");
+  it("passes 'connection_used' for a connection whose name has punctuation, read through its tool key", () => {
+    const prompt = "Using the connected Deep-Wiki server, write output.csv with area, what_it_does.";
+    const checks = runChecks(input({ prompt, files: connectionFile, toolsUsed: ["mcp__deep_wiki__ask_question", "Write"] }));
+    expect(failedIds(checks)).toEqual([]);
+  });
+
+  it("passes 'connection_used' when the named connection's key has more words after the name", () => {
+    const prompt = "Using the connected GitHub server, write output.csv with area, what_it_does.";
+    const checks = runChecks(input({ prompt, files: connectionFile, toolsUsed: ["mcp__github_read_only__list_issues", "Write"] }));
+    expect(failedIds(checks)).toEqual([]);
+  });
+
+  it("fails 'connection_used' when only another connection whose key starts with the same letters was used", () => {
+    const prompt = "Using the connected Git server, write output.csv with area, what_it_does.";
+    const checks = runChecks(input({ prompt, files: connectionFile, toolsUsed: ["mcp__github__list_issues", "Write"] }));
+    expect(failedIds(checks)).toContain("connection_used");
+  });
+
   it("says nothing about connections when no tool names were recorded", () => {
     const checks = runChecks(input({ prompt: "Using the connected DeepWiki server, write output.csv with area, what_it_does.", files: csv("area,what_it_does\nOverview,\"Servers\"\n") }));
     expect(check(checks, "connection_used")).toBeUndefined(); // no evidence either way is not a failure

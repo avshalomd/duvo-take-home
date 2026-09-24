@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { choiceToCron, cronToChoice, describeChoice, zoneName } from "./schedule-local";
+import { choiceToCron, cronToChoice, describeChoice, skippedLine, zoneName } from "./schedule-local";
+
+// Engine review #6: the last skipped scheduled run is shown beside the schedule, at the slot's own local time.
+describe("skippedLine", () => {
+  it("names the slot's day and time in the schedule's zone, then the reason", () => {
+    const reason = "This workspace has spent its $5.00 budget for today. More can start after 00:00 UTC.";
+    expect(skippedLine("2026-09-22T06:00:00.000Z", reason, "Europe/Prague")).toBe(
+      "Skipped Tue 08:00: this workspace has spent its $5.00 budget for today. More can start after 00:00 UTC.",
+    );
+  });
+
+  it("reads a schedule with no zone in UTC", () => {
+    expect(skippedLine("2026-09-22T06:00:00.000Z", "Schedules were not being checked at that time.", null)).toBe(
+      "Skipped Tue 06:00: schedules were not being checked at that time.",
+    );
+  });
+});
 
 // The cron is kept in the schedule's own zone (schedule_tz), so "08:00" is written as 08:00: no conversion to UTC,
 // and it stays 08:00 across a daylight-saving change.

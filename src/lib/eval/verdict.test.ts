@@ -219,3 +219,26 @@ describe("evaluate: which tier decided and which tiers ran", () => {
     expect(why(verdict)).toEqual({ decidedBy: "nobody", path: ["checks", "judge", "review"] });
   });
 });
+
+// Engine review #1: the run boxes its evaluation at 50 s, but the judge had 20 s per route (three on Vercel) and the
+// reviewer 45 s per try, so two slow routes spent the whole box on the judge and the run said "not checked".
+describe("evaluate inside a time box", () => {
+  it("gives the judge the box less the reviewer's share, and the reviewer the whole box", async () => {
+    const d = deps(judgment(0.96, 0.5)); // unsure about the plan: the reviewer is asked too
+    const before = Date.now();
+    await evaluate(input, d, { withinMs: 50_000 });
+    const judgeLeft = (d.judge.mock.calls[0] as unknown[])[1] as { endsAt: number };
+    const reviewLeft = (d.review.mock.calls[0] as unknown[])[2] as { endsAt: number };
+    expect(judgeLeft.endsAt - before).toBeGreaterThanOrEqual(30_000 - 50);
+    expect(judgeLeft.endsAt - before).toBeLessThanOrEqual(30_000 + 50);
+    expect(reviewLeft.endsAt - before).toBeLessThanOrEqual(50_000 + 50);
+    expect(reviewLeft.endsAt - judgeLeft.endsAt).toBe(20_000); // the reviewer's share is never spent by the judge
+  });
+
+  it("sets no deadline without a box, so Re-evaluate keeps each tier's own timeouts", async () => {
+    const d = deps(judgment(0.96, 0.5));
+    await evaluate(input, d);
+    expect((d.judge.mock.calls[0] as unknown[])[1]).toBeUndefined();
+    expect((d.review.mock.calls[0] as unknown[])[2]).toBeUndefined();
+  });
+});

@@ -47,6 +47,25 @@ describe("readSdkTotals (Q129)", () => {
     expect(await reading).toBeNull();
   });
 
+  // Engine review #13: in a resumed session (a heal attempt, a follow-up) the earlier attempt's entry is already there.
+  // Read before the CLI wrote the new one, it gave ownCost(total, base) = 0 and the attempt was missing from the budget.
+  it("waits past an earlier attempt's entry for one above the total this attempt started from", async () => {
+    vi.useFakeTimers();
+    const earlier = { ...costState, totalCostUSD: 0.2 };
+    const load = vi.fn().mockResolvedValueOnce([earlier]).mockResolvedValueOnce([earlier]).mockResolvedValue([earlier, { ...costState, totalCostUSD: 0.35 }]);
+    const reading = readSdkTotals("s", { load, waitMs: 3000, everyMs: 250, above: 0.2 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect((await reading)?.costUsd).toBe(0.35);
+  });
+
+  it("answers null rather than the earlier attempt's total when no newer entry comes in time", async () => {
+    vi.useFakeTimers();
+    const load = vi.fn().mockResolvedValue([{ ...costState, totalCostUSD: 0.2 }]);
+    const reading = readSdkTotals("s", { load, waitMs: 1000, everyMs: 250, above: 0.2 });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await reading).toBeNull();
+  });
+
   it("answers null when the transcript cannot be read at all (a session on another machine)", async () => {
     const load = vi.fn().mockRejectedValue(new Error("session not found"));
     expect(await readSdkTotals("s", { load, waitMs: 0 })).toBeNull();

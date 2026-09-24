@@ -1,4 +1,4 @@
-import type { Check, EvaluateInput, EvaluateRun, Judgment, Review, Verdict } from "@/contracts/eval";
+import type { Check, Deadline, EvaluateInput, EvaluateRun, Judgment, Review, Verdict } from "@/contracts/eval";
 import { isConfident } from "@/lib/llm/decide";
 import { runChecks } from "./checks";
 import { judgeRun } from "./judge";
@@ -11,17 +11,22 @@ import { reviewRun } from "./review";
 // run page explains itself one line per tier instead of re-deriving the cascade from the probabilities.
 
 export type EvaluateDeps = {
-  judge: (input: EvaluateInput) => Promise<Judgment>;
-  review: (input: EvaluateInput, checks: Check[]) => Promise<Review>; // the checks it passed: rules it must not undo (Q148)
+  judge: (input: EvaluateInput, deadline?: Deadline) => Promise<Judgment>;
+  review: (input: EvaluateInput, checks: Check[], deadline?: Deadline) => Promise<Review>; // the checks it passed: rules it must not undo (Q148)
 };
+
+// Inside a time box, the judge gets the box less this and the reviewer the whole box: the judge's routes can never
+// spend the reviewer's time (engine review #1). Of the run's 50 s that leaves the judge 30 s, 10 s per route on three.
+export const REVIEW_SHARE_MS = 20_000;
 
 // Jev's probabilities are calibrated, so the bar is set from the labelled runs, not by taste: the clean run comes
 // back 0.89/0.84 and the genuinely ambiguous one 0.74/0.75, so 0.80 is what separates "call it" from "look again".
 export const CONFIDENT = 0.8; // exported: the feedback to the agent names a doubt at the same bar (feedback.ts)
 
-export const evaluateRun: EvaluateRun = async (input) => evaluate(input, { judge: judgeRun, review: reviewRun });
+export const evaluateRun: EvaluateRun = async (input, opts) => evaluate(input, { judge: judgeRun, review: reviewRun }, opts);
 
-export async function evaluate(input: EvaluateInput, deps: EvaluateDeps): Promise<Verdict> {
+export async function evaluate(input: EvaluateInput, deps: EvaluateDeps, opts: { withinMs?: number } = {}): Promise<Verdict> {
+  const endsAt = opts.withinMs === undefined ? undefined : Date.now() + opts.withinMs; // no box: each tier's own timeouts
   const checks = runChecks(input);
   const failed = checks.filter((c) => !c.ok);
   const at = () => new Date().toISOString();
@@ -33,7 +38,7 @@ export async function evaluate(input: EvaluateInput, deps: EvaluateDeps): Promis
 
   let judgment: Judgment;
   try {
-    judgment = await deps.judge(input);
+    judgment = await deps.judge(input, endsAt === undefined ? undefined : { endsAt: endsAt - REVIEW_SHARE_MS });
   } catch (e) {
     // "unknown", not "fail": the checks passed and nobody looked at the content. The UI offers Re-evaluate.
     // The judge stays on the path because it was tried: "Why?" says it was unavailable, not that it was skipped.
@@ -68,7 +73,7 @@ export async function evaluate(input: EvaluateInput, deps: EvaluateDeps): Promis
   const path: Verdict["path"] = ["checks", "judge", "review"];
   let review: Review;
   try {
-    review = await deps.review(input, checks);
+    review = await deps.review(input, checks, endsAt === undefined ? undefined : { endsAt });
   } catch (e) {
     const reasons = [...unsure, `The reviewer was unavailable: ${message(e)}`];
     return { verdict: "unknown", checks, judgment, review: null, reasons, evaluatedAt: at(), decidedBy: "nobody", path };

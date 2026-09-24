@@ -1,17 +1,32 @@
-import type { EvaluateInput, Judgment } from "@/contracts/eval";
-import { decide, noul } from "@/lib/llm/decide";
+import type { Deadline, EvaluateInput, Judgment } from "@/contracts/eval";
+import { decide, noul, routesFor, stateTooLong } from "@/lib/llm/decide";
+import { clipMiddle, namesOf } from "./clip";
 import { forModel } from "./file-view";
 
 // Tier one of the judgment: three CLOSED questions answered by Jev in one request, with calibrated probabilities.
 // This is the judgment the app makes on every run, so it belongs in decide() and not in a prompt: it cannot
 // answer off-schema, it costs a fraction of an LLM call, and the probability is what the UI shows.
 
-const HEAD_LINES = 40; // Jev reads 32K tokens; the first 40 lines of a file show the shape and the first rows
+// Jev reads 32K tokens, and accuracy falls well before that, so the state is bounded (engine review #10): the first
+// 40 lines of a file show its shape and first rows, ten files are shown, a report is cut to its start and end. A
+// state still too long (many wide files) is built again smaller rather than refused by the provider.
+const HEAD_LINES = 40;
+const SHORT_HEAD_LINES = 10;
 const LINE_CHARS = 300;
-const TIMEOUT_MS = 20_000;
+const MAX_FILES = 10;
+const REPORT_CHARS = 8_000;
+const SHORT_REPORT_CHARS = 3_000;
+const TIMEOUT_MS = 20_000; // per route, when no deadline is set (Re-evaluate, the suite)
 
 export function judgeState(input: EvaluateInput) {
+  const state = stateWith(input, HEAD_LINES, REPORT_CHARS);
+  return stateTooLong(state) ? stateWith(input, SHORT_HEAD_LINES, SHORT_REPORT_CHARS) : state;
+}
+
+function stateWith(input: EvaluateInput, headLines: number, reportChars: number) {
   const t = input.template;
+  const shown = input.files.slice(0, MAX_FILES);
+  const rest = input.files.slice(MAX_FILES);
   return {
     instructions: input.prompt,
     today: input.today,
@@ -19,11 +34,12 @@ export function judgeState(input: EvaluateInput) {
     // A run of a saved automation is judged against what the person approved, not only against the plan the agent
     // wrote for itself: a run that planned less than the automation asks for could still "follow its own plan".
     ...(t ? { automation: { intent: t.intent, expectedOutputs: t.expectedOutputs, outputFormat: t.outputFormat, steps: t.steps } } : {}),
-    report: input.report ?? "(the run wrote no report)",
-    files: input.files.map((f) => {
+    report: clipMiddle(input.report ?? "(the run wrote no report)", reportChars),
+    files: shown.map((f) => {
       const text = forModel(f); // a spreadsheet is shown as what it is and its size, never as base64
-      return { name: f.name, head: text.split("\n").slice(0, HEAD_LINES).map((l) => l.slice(0, LINE_CHARS)).join("\n"), lines: text.split("\n").length };
+      return { name: f.name, head: text.split("\n").slice(0, headLines).map((l) => l.slice(0, LINE_CHARS)).join("\n"), lines: text.split("\n").length };
     }),
+    ...(rest.length ? { filesNotShown: namesOf(rest) } : {}), // named, so the judge knows they exist
   };
 }
 
@@ -35,13 +51,24 @@ const readsOutside = (tool: string) => tool === "WebFetch" || tool === "WebSearc
  * Whether the in-bounds question means anything for this run. A run that read no page, no search result and no
  * connection had nothing that could give it orders: code knows that, so the judge is not asked, and "Why?" shows
  * no warning a guess would have put there (production, 2026-09-23: a chart-only run read "66% sure"). Unknown
- * tools, as on older recordings: asked.
+ * tools, as on older recordings: asked. A follow-up: asked, because it carries on a conversation whose earlier
+ * turns may have read a page, and it gets that run's files back.
  */
 export function couldBeInstructedFromOutside(input: EvaluateInput): boolean {
-  return input.toolsUsed === undefined || input.toolsUsed.some(readsOutside);
+  return input.followUp === true || input.toolsUsed === undefined || input.toolsUsed.some(readsOutside);
 }
 
-export async function judgeRun(input: EvaluateInput): Promise<Judgment> {
+/**
+ * Each route's time. Without a deadline, 20 s. With one, the time left spread over every configured route, so a
+ * route that hangs to its timeout still leaves the next ones theirs, and the judge as a whole ends by the deadline.
+ */
+function routeTimeoutMs(deadline: Deadline | undefined): number {
+  if (!deadline) return TIMEOUT_MS;
+  const routes = Math.max(1, routesFor().length);
+  return Math.max(1_000, Math.min(TIMEOUT_MS, Math.floor((deadline.endsAt - Date.now()) / routes))); // 1 s: never 0, which would fail at once
+}
+
+export async function judgeRun(input: EvaluateInput, deadline?: Deadline): Promise<Judgment> {
   const outside = couldBeInstructedFromOutside(input);
   const { answers } = await decide({
     state: judgeState(input),
@@ -63,7 +90,7 @@ export async function judgeRun(input: EvaluateInput): Promise<Judgment> {
           }
         : {}),
     },
-    timeoutMs: TIMEOUT_MS,
+    timeoutMs: routeTimeoutMs(deadline),
   });
   const inBounds = outside ? (answers as Partial<Record<"stayedInBounds", { noul: number }>>).stayedInBounds : undefined; // only an answer to a question asked
   return { answeredQuery: answers.answeredQuery.noul, followedPlan: answers.followedPlan.noul, ...(inBounds ? { stayedInBounds: inBounds.noul } : {}) };

@@ -43,8 +43,26 @@ describe("budgetBlockReason", () => {
     expect(budgetBlockReason(limits, usage({ costTodayUsd: 5 }))).not.toBeNull();
   });
 
-  it("lets a run start just under the budget", () => {
-    expect(budgetBlockReason(limits, usage({ costTodayUsd: 4.99 }))).toBeNull();
+  // Engine review #7, the owner's call: a run's cost is known only when an attempt finishes, so the runs in flight
+  // counted $0 and the day could close several dollars over. Each run in flight, and the new one, now holds back the
+  // most an attempt may cost (AgentLimits.maxBudgetUsd, $1), so the day's limit is never passed.
+  it("lets a run start while its own dollar and one for each run working fit in the budget", () => {
+    expect(budgetBlockReason(limits, usage({ costTodayUsd: 3, inFlight: 1 }))).toBeNull(); // 3 + 1 working + 1 new = 5
+  });
+
+  it("refuses a run whose own worst case would pass the day's budget, saying what is left", () => {
+    expect(budgetBlockReason(limits, usage({ costTodayUsd: 4.2, inFlight: 0 }))).toBe(
+      "This workspace has $0.80 left of its $5.00 budget for today, and a run may cost up to $1.00. More can start after 00:00 UTC.",
+    );
+  });
+
+  it("asks to wait when the runs already working may use the rest of the budget", () => {
+    expect(budgetBlockReason(limits, usage({ costTodayUsd: 2.5, inFlight: 2 }))).toBe(
+      "The runs already working may use the rest of today's $5.00 budget. Wait for one to finish.",
+    );
+    expect(budgetBlockReason(limits, usage({ costTodayUsd: 3.5, inFlight: 1 }))).toBe(
+      "The run already working may use the rest of today's $5.00 budget. Wait for it to finish.",
+    );
   });
 
   it("treats a budget of zero as no spending at all today", () => {
@@ -94,12 +112,25 @@ describe("the day's boundaries, in UTC", () => {
 
 // Each fix attempt of a run may cost up to AgentLimits.maxBudgetUsd, and nothing checked the day's money before one.
 describe("healBudgetReason", () => {
-  it("lets a fix attempt start while the day's money has room", () => {
-    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 4.99)).toBeNull();
+  it("lets a fix attempt start while its dollar and one for each other run working fit in the budget", () => {
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 3, 1)).toBeNull(); // 3 + 1 working + 1 fix = 5
   });
 
   it("stops healing once the day's budget is spent, and says so in plain words", () => {
-    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 5)).toBe("The workspace's $5.00 budget for today is spent, so healing stopped here.");
-    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 7.2)).toBe("The workspace's $5.00 budget for today is spent, so healing stopped here.");
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 5, 0)).toBe("The workspace's $5.00 budget for today is spent, so healing stopped here.");
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 7.2, 0)).toBe("The workspace's $5.00 budget for today is spent, so healing stopped here.");
+  });
+
+  // Engine review #7: a fix attempt may cost up to $1, and the runs in flight had counted $0.
+  it("stops healing when a fix attempt's worst case would pass the budget", () => {
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 4.6, 0)).toBe(
+      "The workspace has $0.40 left of its $5.00 budget for today, less than a fix may cost ($1.00), so healing stopped here.",
+    );
+  });
+
+  it("stops healing when the other runs working may use the rest of the budget", () => {
+    expect(healBudgetReason({ dailyBudgetUsd: 5 }, 2.5, 2)).toBe(
+      "The other runs working may use the rest of today's $5.00 budget, so healing stopped here.",
+    );
   });
 });

@@ -149,6 +149,19 @@ describe("mapMessage", () => {
     expect((second[0].payload as unknown as { turn: number }).turn).toBe(2);
   });
 
+  // Engine review #9: the SDK sends one assistant message per content block, all with the same message.id, so a turn
+  // with thinking, text and a tool call counted three (csv-ragged-row: 27 against the SDK's num_turns of 18).
+  it("counts one turn per model response: the assistant messages that share a message id are one turn", () => {
+    const map = createMapper();
+    const block = (id: string, content: unknown[]) => ({ type: "assistant", message: { id, content } });
+    const turnOf = (events: ReturnType<typeof map>) => (events[0].payload as unknown as { turn: number }).turn;
+    map(block("msg_1", [{ type: "thinking", thinking: "..." }]), 1, "t");
+    expect(turnOf(map(block("msg_1", [{ type: "text", text: "Searching." }]), 2, "t"))).toBe(1);
+    expect(turnOf(map(block("msg_1", [{ type: "tool_use", id: "t1", name: "WebSearch", input: {} }]), 3, "t"))).toBe(1);
+    map(userResult({ tool_use_id: "t1", content: "ok" }), 4, "t");
+    expect(turnOf(map(block("msg_2", [{ type: "text", text: "Done." }]), 5, "t"))).toBe(2);
+  });
+
   // Q7: the SDK's error result carries `errors: string[]` and no `result`, so the provider's own words - the only
   // thing that tells a user why the run died - were dropped on the floor and the run showed a bare subtype.
   it("keeps the provider's words from an error result, which arrive in errors[] and not in result", () => {

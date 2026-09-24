@@ -58,9 +58,15 @@ export const EvaluateInput = z.object({
   today: z.string(), // ISO date, so "last 7 days" checks are testable
   toolsUsed: z.array(z.string()).optional(), // tool names the run called: "a connection claimed but never used" is one line of code, not a judge call
   template: AutomationTemplate.nullable().optional(), // v2: a run of a saved automation is also checked against its template
+  // A follow-up resumes its parent's conversation, whatever that one read: the in-bounds question is asked of it even
+  // when its own tools read nothing from outside (engine review #4).
+  followUp: z.boolean().optional(),
 });
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
-export type EvaluateRun = (input: EvaluateInput) => Promise<Verdict>;
+// withinMs: the time box the caller holds the evaluation to (the run's 50 s); the model calls are budgeted inside it.
+export type EvaluateRun = (input: EvaluateInput, opts?: { withinMs?: number }) => Promise<Verdict>;
+/** When a tier's model calls must have answered, as epoch ms: every try, route and fallback included. */
+export type Deadline = { endsAt: number };
 
 // Feedback from the evaluator to the agent (his call, 2026-09-23): the same findings drive auto-heal and are carried
 // into "Ask for a change", so the agent is told exactly what failed and what to change, in its own terms.

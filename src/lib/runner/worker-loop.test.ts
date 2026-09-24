@@ -24,6 +24,7 @@ function setup(queue: ClaimedJob[], overrides: Partial<WorkerDeps> = {}) {
       return d.promise;
     }),
     finish: vi.fn(async () => {}),
+    heartbeat: vi.fn<(jobIds: string[]) => Promise<void>>(async () => {}),
     recover: vi.fn(async () => {}),
     tick: vi.fn(async () => {}),
     now: () => new Date("2026-09-23T10:00:00Z"),
@@ -151,5 +152,31 @@ describe("the worker loop", () => {
     expect(stopped).toBe(true);
     expect(deps.finish).toHaveBeenCalledWith("job-0", "done");
     expect(deps.claim).toHaveBeenCalledTimes(1); // the freed slot is not refilled once stopping
+  });
+
+  // Engine review #15: a stale job was found by locked_at alone, set once at the claim, so a live run past 10 minutes
+  // was requeued while it still wrote. The worker now refreshes the lock of every job it is running.
+  it("start() refreshes the locks of the jobs in flight every heartbeatMs, and only theirs", async () => {
+    vi.useFakeTimers();
+    const { deps, runs } = setup(jobs(2));
+    const w = createWorker(deps, { concurrency: 2, pollMs: 1000, tickMs: 30_000, heartbeatMs: 60_000 });
+    w.start();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(deps.heartbeat).toHaveBeenCalledWith(["job-0", "job-1"]);
+    runs.get("run-0")!.resolve();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(deps.heartbeat).toHaveBeenLastCalledWith(["job-1"]);
+    runs.get("run-1")!.resolve();
+    await w.stop();
+  });
+
+  it("logs a heartbeat that throws and keeps the runs going", async () => {
+    vi.useFakeTimers();
+    const { deps, log } = setup(jobs(1), { heartbeat: vi.fn(async () => Promise.reject(new Error("lock not refreshed"))) });
+    const w = createWorker(deps, { concurrency: 1, pollMs: 1000, tickMs: 30_000, heartbeatMs: 60_000 });
+    w.start();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(log.join("\n")).toContain("lock not refreshed");
+    expect(w.inFlight()).toBe(1);
   });
 });
