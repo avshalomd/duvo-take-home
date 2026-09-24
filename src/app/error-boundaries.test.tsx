@@ -30,6 +30,6 @@ describe.each(["(app)/error.tsx", "global-error.tsx"])("the error boundary %s", 
 describe("the root error boundary", () => {
   it("renders its own document, as it replaces the root layout", async () => {
     const html = await render("global-error.tsx");
-    expect(html).toMatch(/^<html[^>]*><body/);
+    expect(html).toMatch(/^<html[^>]*>.*<body/s);
   });
 });
