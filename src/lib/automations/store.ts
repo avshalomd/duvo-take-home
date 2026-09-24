@@ -347,8 +347,12 @@ export const runCommand: RunCommand = async (ctx, parsed) => {
   });
 };
 
-/** Removes the automation. Its runs stay in the history; their automation id then points at nothing, which reads as a plain run. */
-export async function deleteAutomation(workspaceId: string, id: string): Promise<void> {
-  if (!isUuid(id)) return;
-  await db.delete(automations).where(inWorkspace(workspaceId, id));
+/**
+ * Removes the automation, and says whether there was one to remove (F11: another workspace's id or one already gone).
+ * Its runs stay in the history; their automation id then points at nothing, which reads as a plain run.
+ */
+export async function deleteAutomation(workspaceId: string, id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+  const deleted = await db.delete(automations).where(inWorkspace(workspaceId, id)).returning({ id: automations.id });
+  return deleted.length > 0;
 }

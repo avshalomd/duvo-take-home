@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { noNul } from "@/contracts/text";
 import { requireSession } from "@/lib/auth/session";
+import { MAX_COMMAND_INPUT } from "@/lib/automations/command";
 import { readError } from "@/lib/automations/errors";
 import type { EditValues } from "@/lib/automations/form";
 import { parseEditForm } from "@/lib/automations/form";
@@ -165,7 +167,8 @@ const Schedule = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time of day"),
   tz: z.string().refine(isTimeZone, "Your browser sent a time zone we do not know. Reload the page and try again."), // the browser's IANA zone
   cron: z.string().trim().max(100),
-  input: z.string().trim().max(2000),
+  // what /command takes after the name, in the same words (F13); no NUL character (F1)
+  input: noNul(z.string().trim().max(MAX_COMMAND_INPUT, `Keep the input under ${MAX_COMMAND_INPUT} characters.`)),
 });
 
 /** The schedule as chosen, in the viewer's own time and zone (Q107): the cron keeps the local time, the zone goes beside it. */
@@ -213,7 +216,8 @@ export async function deleteAutomationAction(_prev: ActionState, formData: FormD
   const refused = refusalFor(await role(), "delete");
   if (refused) return { error: refused };
   const id = Id.safeParse(field(formData, "id"));
-  if (id.success) await deleteAutomation((await ctx()).workspaceId, id.data);
+  const deleted = id.success && (await deleteAutomation((await ctx()).workspaceId, id.data));
+  if (!deleted) return { error: "That automation no longer exists." }; // not this workspace's, or gone already (F11)
   refresh();
   redirect("/automations");
 }
