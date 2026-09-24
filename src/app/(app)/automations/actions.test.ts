@@ -3,12 +3,13 @@
 // or on, deletes it or sets its schedule. The pages hide those controls from members, but anyone can post to an action.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionCtx } from "@/contracts/auth";
+import { NUL_REFUSED } from "@/contracts/text";
 import { AutomationError } from "@/lib/automations/errors";
 
 const session = vi.hoisted(() => ({ role: "member" as SessionCtx["role"] }));
 const store = vi.hoisted(() => ({
   approveAutomation: vi.fn(async () => ({})),
-  deleteAutomation: vi.fn(async () => {}),
+  deleteAutomation: vi.fn(async () => true), // true: it was there and is gone
   getAutomation: vi.fn(async () => ({ command: "audit", status: "draft", version: 1 })),
   listTrials: vi.fn(async (): Promise<{ version: number; humanVerdict: string | null }[]> => []),
   runCommand: vi.fn(async () => ({ id: "run-1" })),
@@ -196,6 +197,23 @@ describe.each(["owner", "admin"] as const)("an %s", (role) => {
   it("deletes it and goes back to the gallery", async () => {
     await expect(governed.delete()).rejects.toThrow("NEXT_REDIRECT /automations");
     expect(store.deleteAutomation).toHaveBeenCalledWith("ws-a", ID);
+  });
+
+  // QA F11: deleting an id that is not in the workspace went to the gallery as if it had worked
+  it("is told an automation that is not there no longer exists, and stays on the page", async () => {
+    store.deleteAutomation.mockResolvedValueOnce(false);
+    expect(await governed.delete()).toEqual({ error: "That automation no longer exists." });
+    expect(await deleteAutomationAction({}, form({ id: "not-an-id" }))).toEqual({ error: "That automation no longer exists." });
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  // QA F13: Zod's own "Too big: expected string to have <=2000 characters" reached the page
+  it("is told in plain words when the scheduled runs' input is too long or has a hidden character", async () => {
+    const tooLong = await setScheduleAction({}, form({ ...schedule, input: "x".repeat(2001) }));
+    expect(tooLong.error).toBe("Keep the input under 2000 characters.");
+    const hidden = await setScheduleAction({}, form({ ...schedule, input: "Acme\u0000 Ltd" }));
+    expect(hidden.error).toBe(NUL_REFUSED);
+    expect(store.setSchedule).not.toHaveBeenCalled();
   });
 
   it("renames an approved automation's command", async () => {

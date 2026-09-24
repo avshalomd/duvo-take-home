@@ -9,6 +9,7 @@ import { AutomationError } from "./errors";
 import {
   approveAutomation,
   createAutomationDraft,
+  deleteAutomation,
   getActiveByCommand,
   getAutomation,
   listAutomations,
@@ -260,6 +261,16 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     }
     const judged = await db.select({ humanVerdict: runs.humanVerdict }).from(runs).where(inArray(runs.id, [plain, othersExample, aCall]));
     expect(judged.map((r) => r.humanVerdict)).toEqual([null, null, null]);
+  });
+
+  // QA F11: the delete's answer tells the page whether anything was deleted
+  it("deletes an automation of the workspace and says so, and deletes nothing for another workspace's id", async () => {
+    const a = await createAutomationDraft(ctx, draftWith("int-delete"), null);
+    expect(await deleteAutomation(OTHER_WS, a.id)).toBe(false);
+    expect(await getAutomation(WS, a.id)).not.toBeNull();
+    expect(await deleteAutomation(WS, a.id)).toBe(true);
+    expect(await deleteAutomation(WS, a.id)).toBe(false); // already gone
+    expect(await deleteAutomation(WS, "not-a-uuid")).toBe(false);
   });
 
   it("keeps each workspace's automations and runs to itself", async () => {
