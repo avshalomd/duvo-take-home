@@ -212,7 +212,11 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `src/lib/runs/limits.ts` - a deployment-wide cap of six runs in flight under a second advisory lock, beside each
   workspace's own limits: every account can make workspaces, and they all spend one key (Q175).
 - `next.config.ts` headers - no framing (`X-Frame-Options`, `frame-ancestors 'none'`), `nosniff`, a referrer policy
-  and no `X-Powered-By` on every route (Q173).
+  and no `X-Powered-By` on every route (Q173). The content policy also says `object-src 'none'; base-uri 'none';
+  script-src 'self' 'unsafe-inline'` (S13): static, so pages stay cacheable; inline because Next's hydration data is
+  inline script. It is left off `/api/runs/<id>/files/*` by a negative lookahead in its `source`: a config header
+  replaces a route's header of the same name, which had stripped the inline chart's sandbox policy (F8);
+  `e2e/headers.spec.ts` checks both on real responses.
 
 ### Roles and limits (his decisions after the deep QA: Q169, Q176-Q178)
 - `src/lib/auth/member-rules.ts` - who may change whose role or remove whom, as plain functions the page and the
