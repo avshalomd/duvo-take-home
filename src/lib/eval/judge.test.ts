@@ -168,6 +168,15 @@ describe("judgeRun", () => {
     expect(sent().questions.followedPlan.instructions).toMatch(/automation/i);
   });
 
+  // qa-ai F8: a correct answer whose last steps the agent forgot to tick came back "with notes"; the ticks are no
+  // evidence either way, so the judge is asked whether the work was done, with the plan still in front of it.
+  it("asks whether the work was done end to end when the agent left steps not marked", async () => {
+    const plan = { ...input.plan!, steps: [{ index: 0, title: "Search", status: "done" as const }, { index: 1, title: "Answer", status: "unmarked" as const }] };
+    await judgeRun({ ...input, plan });
+    expect(sent().questions.followedPlan.instructions).toMatch(/end to end/);
+    expect(sent().state.plan).toEqual(plan);
+  });
+
   it("asks about the run's own plan and shows no automation for a free-text run", async () => {
     await judgeRun(input);
     expect(sent().state).not.toHaveProperty("automation");

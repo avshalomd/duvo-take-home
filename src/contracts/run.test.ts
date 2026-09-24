@@ -188,7 +188,7 @@ describe("Plan", () => {
   });
 
   it("accepts every status a step can be in", () => {
-    for (const status of ["pending", "running", "done", "skipped"]) {
+    for (const status of ["pending", "running", "done", "skipped", "unmarked"]) { // unmarked: qa-ai F8, written by code
       expect(PlanStepStatus.parse(status)).toBe(status);
     }
   });

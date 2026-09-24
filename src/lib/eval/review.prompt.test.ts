@@ -98,6 +98,15 @@ describe("REVIEW_INSTRUCTIONS: numbers, facts and sources", () => {
   });
 });
 
+// qa-ai F8: a step the agent did not tick is not work left undone by itself
+describe("reviewInput: steps not marked", () => {
+  it("shows a step the agent did not tick as not marked, and the instructions say to judge it by the report", () => {
+    const plan = { intent: "x", expectedOutputs: [], sources: [], steps: [{ index: 0, title: "Answer", status: "unmarked" as const }] };
+    expect(reviewInput({ ...input, plan }, [])).toContain("1. [not marked] Answer");
+    expect(REVIEW_INSTRUCTIONS).toMatch(/not marked[^.]*report/i);
+  });
+});
+
 describe("reviewInput: what the run read", () => {
   it("shows the start of each outside result the run read", () => {
     const text = reviewInput({ ...input, read: [{ tool: "WebSearch", text: "Norway: no public holidays in October." }] }, []);

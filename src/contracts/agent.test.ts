@@ -130,6 +130,11 @@ describe("UpdateStepInput", () => {
     expect(UpdateStep.safeParse({ index: -1, status: "done" }).success).toBe(false);
   });
 
+  // qa-ai F8: "not marked" is written by code when the agent ends without ticking a step; the agent cannot claim it.
+  it("does not let the agent set a step to 'unmarked'", () => {
+    expect(UpdateStep.safeParse({ index: 1, status: "unmarked" }).success).toBe(false);
+  });
+
   it("rejects an update without an index", () => {
     expect(UpdateStep.safeParse({ status: "done" }).success).toBe(false);
   });

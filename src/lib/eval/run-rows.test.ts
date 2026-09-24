@@ -29,6 +29,22 @@ describe("toEvaluateInput", () => {
     ];
     expect(toEvaluateInput(run, events, []).spreadsheets).toEqual([{ file: "prices.xlsx", sheets: [{ name: "P", columns: ["a"], rows: [[1]] }] }]);
   });
+
+  // qa-ai F8: a run from before the engine marked unticked steps is re-evaluated the way a new one is judged
+  const planned: RunEvent = {
+    seq: 1,
+    at: run.createdAt,
+    kind: "plan",
+    payload: { intent: "x", expectedOutputs: [], sources: [], steps: [{ index: 0, title: "Look it up", status: "done" }, { index: 1, title: "Answer", status: "pending" }] },
+  };
+
+  it("marks the steps a finished run did not tick as not marked", () => {
+    expect(toEvaluateInput(run, [planned], []).plan?.steps.map((s) => s.status)).toEqual(["done", "unmarked"]);
+  });
+
+  it("leaves a failed run's steps as they were: it did not finish", () => {
+    expect(toEvaluateInput({ ...run, status: "failed" }, [planned], []).plan?.steps.map((s) => s.status)).toEqual(["done", "pending"]);
+  });
 });
 
 describe("toFiles", () => {

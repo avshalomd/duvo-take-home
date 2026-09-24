@@ -8,6 +8,9 @@ describe("the thread's fill", () => {
   it("reaches the last finished or skipped step when nothing is running", () => {
     expect(lastReached([{ status: "done" }, { status: "skipped" }, { status: "pending" }])).toBe(1);
   });
+  it("reaches a step the finished run did not tick: it is settled, not waiting", () => {
+    expect(lastReached([{ status: "done" }, { status: "unmarked" }, { status: "unmarked" }])).toBe(2);
+  });
   it("reaches nothing before the first step starts", () => {
     expect(lastReached([{ status: "pending" }, { status: "pending" }])).toBe(-1);
   });
