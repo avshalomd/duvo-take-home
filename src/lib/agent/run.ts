@@ -49,7 +49,8 @@ import { removeRunDir } from "./workspace";
 export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const NATIVE_TOOLS = ["WebSearch", "WebFetch", "Read", "Write"]; // everything else is removed below
 const CANCEL_POLL_MS = 2000; // Stop is felt within 2 s, at one tiny read per run every 2 s
-const EVAL_TOO_LONG = "the check took too long; press Re-evaluate to try again"; // read as "Not checked: ..."
+const EVAL_MARGIN_MS = 2_000; // the models' own deadline fires this much before the evaluation's box
+const EVAL_TOO_LONG ="the check took too long; press Re-evaluate to try again"; // read as "Not checked: ..."
 
 /** One working directory per run, gitignored; bypassPermissions lets the agent write anywhere under it.
  *  On Vercel the code directory is read-only, so the run lives under the function's temp dir instead. */
@@ -388,7 +389,9 @@ export const runAutomation: RunAutomation = async (runId) => {
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
         followUp: Boolean(run.parentRunId), // it resumed a conversation that may have read a page: the in-bounds question is asked
         template,
-      }).catch(unknownVerdict);
+        // the model calls are budgeted inside the box, and end a little before it: the verdict then names the model
+        // that was slow instead of the box's "the check took too long"
+      }, { withinMs: EVAL_MAX_MS - EVAL_MARGIN_MS }).catch(unknownVerdict);
       const evaluation = within(judged, EVAL_MAX_MS, () => unknownVerdict(new Error(EVAL_TOO_LONG)));
       // Stop during the evaluation wins the race: the judge cannot be aborted, so its answer is simply dropped.
       const verdict = await Promise.race([evaluation, cancel.whenCancelled.then(() => null)]);

@@ -1,5 +1,5 @@
-import type { EvaluateInput, Judgment } from "@/contracts/eval";
-import { decide, noul, stateTooLong } from "@/lib/llm/decide";
+import type { Deadline, EvaluateInput, Judgment } from "@/contracts/eval";
+import { decide, noul, routesFor, stateTooLong } from "@/lib/llm/decide";
 import { clipMiddle, namesOf } from "./clip";
 import { forModel } from "./file-view";
 
@@ -16,7 +16,7 @@ const LINE_CHARS = 300;
 const MAX_FILES = 10;
 const REPORT_CHARS = 8_000;
 const SHORT_REPORT_CHARS = 3_000;
-const TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = 20_000; // per route, when no deadline is set (Re-evaluate, the suite)
 
 export function judgeState(input: EvaluateInput) {
   const state = stateWith(input, HEAD_LINES, REPORT_CHARS);
@@ -58,7 +58,17 @@ export function couldBeInstructedFromOutside(input: EvaluateInput): boolean {
   return input.followUp === true || input.toolsUsed === undefined || input.toolsUsed.some(readsOutside);
 }
 
-export async function judgeRun(input: EvaluateInput): Promise<Judgment> {
+/**
+ * Each route's time. Without a deadline, 20 s. With one, the time left spread over every configured route, so a
+ * route that hangs to its timeout still leaves the next ones theirs, and the judge as a whole ends by the deadline.
+ */
+function routeTimeoutMs(deadline: Deadline | undefined): number {
+  if (!deadline) return TIMEOUT_MS;
+  const routes = Math.max(1, routesFor().length);
+  return Math.max(1_000, Math.min(TIMEOUT_MS, Math.floor((deadline.endsAt - Date.now()) / routes))); // 1 s: never 0, which would fail at once
+}
+
+export async function judgeRun(input: EvaluateInput, deadline?: Deadline): Promise<Judgment> {
   const outside = couldBeInstructedFromOutside(input);
   const { answers } = await decide({
     state: judgeState(input),
@@ -80,7 +90,7 @@ export async function judgeRun(input: EvaluateInput): Promise<Judgment> {
           }
         : {}),
     },
-    timeoutMs: TIMEOUT_MS,
+    timeoutMs: routeTimeoutMs(deadline),
   });
   const inBounds = outside ? (answers as Partial<Record<"stayedInBounds", { noul: number }>>).stayedInBounds : undefined; // only an answer to a question asked
   return { answeredQuery: answers.answeredQuery.noul, followedPlan: answers.followedPlan.noul, ...(inBounds ? { stayedInBounds: inBounds.noul } : {}) };

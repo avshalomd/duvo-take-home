@@ -63,7 +63,10 @@ export const EvaluateInput = z.object({
   followUp: z.boolean().optional(),
 });
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
-export type EvaluateRun = (input: EvaluateInput) => Promise<Verdict>;
+// withinMs: the time box the caller holds the evaluation to (the run's 50 s); the model calls are budgeted inside it.
+export type EvaluateRun = (input: EvaluateInput, opts?: { withinMs?: number }) => Promise<Verdict>;
+/** When a tier's model calls must have answered, as epoch ms: every try, route and fallback included. */
+export type Deadline = { endsAt: number };
 
 // Feedback from the evaluator to the agent (his call, 2026-09-23): the same findings drive auto-heal and are carried
 // into "Ask for a change", so the agent is told exactly what failed and what to change, in its own terms.
