@@ -12,6 +12,7 @@ test.afterAll(async () => {
   const db = sql();
   if (runIds.length) {
     await db`delete from files where run_id = any(${runIds})`;
+    await db`delete from model_spend where run_id = any(${runIds})`;
     await db`delete from runs where id = any(${runIds})`;
   }
   await deleteUsers(created);

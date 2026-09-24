@@ -31,6 +31,7 @@ async function cleanUp() {
   const runs = `select id from runs where prompt like '${PREFIX}%'`; // the prefix is a constant, never user input
   await db.query(`delete from run_events where run_id in (${runs})`);
   await db.query(`delete from files where run_id in (${runs})`);
+  await db.query(`delete from model_spend where run_id in (select id from runs where prompt like '${PREFIX}%')`);
   await db.query(`delete from runs where prompt like '${PREFIX}%'`);
   await db.query("delete from automations where workspace_id = $1 and command = $2", [WORKSPACE, COMMAND]);
   await db.query("delete from connections where workspace_id = $1 and name like 'e2e calls %'", [WORKSPACE]);

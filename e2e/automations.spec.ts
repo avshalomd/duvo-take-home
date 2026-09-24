@@ -30,6 +30,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (createdId) await sql()`delete from automations where id = ${createdId}`;
+  if (sourceId) await sql()`delete from model_spend where run_id = ${sourceId}`; // the paid draft is metered against its source run
   if (sourceId) await sql()`delete from runs where id = ${sourceId}`;
 });
 
@@ -127,6 +128,7 @@ test.describe("editing and judging a ready automation", () => {
   });
 
   test.afterAll(async () => {
+    if (automationId) await sql()`delete from model_spend where run_id in (select id from runs where automation_id = ${automationId})`;
     if (automationId) await sql()`delete from runs where automation_id = ${automationId}`;
     if (automationId) await sql()`delete from automations where id = ${automationId}`;
     if (connectionId) await sql()`delete from connections where id = ${connectionId}`;

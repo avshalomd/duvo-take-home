@@ -72,6 +72,7 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async () => {
   await member?.close();
+  if (trialId) await sql()`delete from model_spend where run_id = ${trialId}`;
   if (trialId) await sql()`delete from runs where id = ${trialId}`;
   await sql()`delete from automations where id = any(${[draftId, readyId].filter(Boolean)})`;
   await deleteUsers([memberEmail]);

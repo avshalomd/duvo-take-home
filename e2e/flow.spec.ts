@@ -483,6 +483,7 @@ test.describe("the handover", () => {
       await db`update runs set status = 'succeeded', finished_at = now() where id = ${runId}`;
       await expect(page.getByTestId("composer-form")).not.toHaveAttribute("data-start-refused", /.*/, { timeout: 20_000 });
     } finally {
+      if (runId) await db`delete from model_spend where run_id = ${runId}`;
       if (runId) await db`delete from runs where id = ${runId}`;
       await who.context.close();
       await deleteUsers([email]);

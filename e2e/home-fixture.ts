@@ -262,6 +262,7 @@ export async function createFreshRun(prompt: string): Promise<string> {
 export async function deleteRun(id: string): Promise<void> {
   const sql = client();
   await sql.query("delete from run_events where run_id = $1", [id]);
+  await sql.query("delete from model_spend where run_id = $1", [id]); // a Check again or a draft is metered against its run
   await sql.query("delete from runs where id = $1", [id]);
 }
 
@@ -270,6 +271,7 @@ export async function deleteHomeRuns(): Promise<void> {
   const ids = `select id from runs where prompt like '${PREFIX}%'`; // the prefix is a constant, never user input
   await sql.query(`delete from run_events where run_id in (${ids})`);
   await sql.query(`delete from files where run_id in (${ids})`);
+  await sql.query(`delete from model_spend where run_id in (select id from runs where prompt like '${PREFIX}%')`);
   await sql.query(`delete from runs where prompt like '${PREFIX}%'`);
   await sql.query("delete from automations where workspace_id = $1 and command in ($2, $3)", [WORKSPACE, COMMAND, READY.command]);
 }
