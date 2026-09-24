@@ -8,6 +8,15 @@ export function personalWorkspaceName(name: string): string {
 }
 
 /**
+ * True for the workspace an account gets at sign-up (security review S11). Nothing else marks it: its slug ends with
+ * the first six characters of its own id (createPersonalWorkspace), while the new-workspace form gives a random
+ * suffix, and Better Auth, not the form, makes that workspace's id - so a made workspace matches by chance only.
+ */
+export function isPersonalWorkspace(workspace: { id: string; slug: string }): boolean {
+  return workspace.slug.endsWith(`-${workspace.id.slice(0, 6)}`);
+}
+
+/**
  * A slug for the organization row, which Better Auth requires to be unique: the name made URL-safe plus a random
  * suffix the caller passes in (random here would make the function untestable).
  */

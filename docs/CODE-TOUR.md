@@ -211,7 +211,10 @@ Per file: what it does and why it is built that way. Grows at every merge.
   is the proof of holding the link, so these hooks keep it for owners and admins (Q167).
 - `src/lib/auth/invitation-cookie.ts`, `src/proxy.ts` - in invite mode an account needs the invitation's link, not
   just its email: the invitation page's visit leaves the id in an httpOnly cookie on `/api/auth`, which reaches the
-  email sign-up and Google's callback alike, and `assertMayCreateAccount` checks it belongs to that email.
+  email sign-up and Google's callback alike, and `assertMayCreateAccount` checks it belongs to that email. An
+  invitation to a personal workspace opens no account (S11, his call): every account owns one, so it let any account
+  mint accounts or take an address first. Nothing marks a personal workspace but its slug, whose suffix is the start
+  of its own id (`isPersonalWorkspace`, workspace-name.ts); the invitation and sign-up pages say so in words.
 - `src/lib/runs/limits.ts` - a deployment-wide cap of six runs in flight under a second advisory lock, beside each
   workspace's own limits: every account can make workspaces, and they all spend one key (Q175).
 - `next.config.ts` headers - no framing (`X-Frame-Options`, `frame-ancestors 'none'`), `nosniff`, a referrer policy

@@ -143,6 +143,7 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
       workspaceName: "Ivy's workspace",
       inviterName: "Ivy Inviter",
       open: true,
+      personal: true, // Ivy's own workspace: in invite-only mode it opens no new account (S11)
     });
 
     const guest = await signUp("Ian Invitee", guestEmail);
