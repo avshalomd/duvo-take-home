@@ -1,4 +1,4 @@
-import { asc, desc, eq, and } from "drizzle-orm";
+import { asc, desc, eq, and, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
 import { RunEvent, type GetFile, type GetRun, type ListRuns, type Run, type RunStatus } from "@/contracts/run";
@@ -72,6 +72,22 @@ export const getRun: GetRun = async (workspaceId, id) => {
     verdict: verdict.success ? verdict.data : null,
   };
 };
+
+/**
+ * The run as it is now and only its events after `after` (a seq): what the event stream sends each second. No files
+ * and no verdict: the client reads the full run once the stream says it is done. Scoped like getRun.
+ */
+export async function getRunSince(workspaceId: string, id: string, after: number): Promise<{ run: Run; events: RunEvent[] } | null> {
+  if (!isUuid(id)) return null;
+  const [row] = await db.select().from(runs).where(and(eq(runs.id, id), eq(runs.workspaceId, workspaceId)));
+  if (!row) return null;
+  const eventRows = await db.select().from(runEvents).where(and(eq(runEvents.runId, id), gt(runEvents.seq, after))).orderBy(asc(runEvents.seq));
+  const events = eventRows
+    .map((e) => RunEvent.safeParse({ seq: e.seq, at: e.at.toISOString(), kind: e.kind, payload: e.payload }))
+    .filter((r) => r.success)
+    .map((r) => r.data); // parsed against the contract, as getRun does
+  return { run: toRun(row), events };
+}
 
 export const getFile: GetFile = async (workspaceId, runId, name) => {
   if (!isUuid(runId)) return null;

@@ -122,8 +122,3 @@ export function formatCost(usd: number | null): string {
   if (usd === null || usd === undefined) return "-";
   return `$${usd.toFixed(3)}`; // three decimals: a run costs cents, and two would round most of them to $0.16
 }
-
-// UTC clock, not the locale's: the server and the client must render the same string or React reports a mismatch.
-export function formatClock(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 19);
-}

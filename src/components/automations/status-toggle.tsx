@@ -19,7 +19,8 @@ export function StatusToggle({ automationId, command, active }: { automationId: 
         {pending && <LoaderCircle className="size-3.5 animate-spin" />}
         {active ? "Turn off" : "Turn on"}
       </Button>
-      <p className={cn(SMALL, "basis-full sm:basis-auto", state.error && "text-crimson")}>
+      {/* polite: a refusal replaces this line, and a screen reader reads it out (as on the approval bar) */}
+      <p aria-live="polite" className={cn(SMALL, "basis-full sm:basis-auto", state.error && "text-crimson")}>
         {state.error ??
           (active
             ? `Turning it off stops /${command} from starting, by hand or on its schedule. Nothing is deleted.`

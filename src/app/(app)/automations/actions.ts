@@ -7,6 +7,7 @@ import { requireSession } from "@/lib/auth/session";
 import { readError } from "@/lib/automations/errors";
 import type { EditValues } from "@/lib/automations/form";
 import { parseEditForm } from "@/lib/automations/form";
+import { MAX_COMMAND_INPUT } from "@/lib/automations/command";
 import { draftFromRun } from "@/lib/automations/from-run";
 import { canGovernAutomations, commandRefusal, hasBeenApproved, refusalFor } from "@/lib/automations/permissions";
 import { choiceToCron } from "@/lib/automations/schedule-local";
@@ -89,16 +90,29 @@ export async function saveAutomationAction(_prev: EditState, formData: FormData)
   }
 }
 
+// An example's input and a Run's input: the same limit as a command's (Q197). An empty one is the store's to refuse,
+// in words that name what the input is.
+const RunInput = z.object({ id: Id, input: z.string().trim().max(MAX_COMMAND_INPUT, `Keep the input under ${MAX_COMMAND_INPUT} characters.`) });
+
+function parseRunInput(formData: FormData): { ok: true; id: string; input: string } | { ok: false; state: ActionState } {
+  const typed = field(formData, "input");
+  const parsed = RunInput.safeParse({ id: field(formData, "id"), input: typed });
+  if (parsed.success) return { ok: true, ...parsed.data };
+  const issue = parsed.error.issues[0];
+  if (issue?.path[0] === "id") return { ok: false, state: { error: "That automation no longer exists." } };
+  return { ok: false, state: { error: issue?.message ?? "Check the input.", values: { input: typed } } };
+}
+
 export async function startTrialAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const id = Id.safeParse(field(formData, "id"));
-  if (!id.success) return { error: "That automation no longer exists." };
-  const input = field(formData, "input");
+  const parsed = parseRunInput(formData);
+  if (!parsed.ok) return parsed.state;
+  const { id, input } = parsed;
   try {
-    await startTrial(await ctx(), id.data, input);
+    await startTrial(await ctx(), id, input);
   } catch (e) {
     return { error: readError(e), values: { input } };
   }
-  refresh(id.data);
+  refresh(id);
   return { ok: true };
 }
 
@@ -193,13 +207,13 @@ export async function setScheduleAction(_prev: ActionState, formData: FormData):
 
 /** "Run" on the automation's page: the same path as typing \command input on Home. */
 export async function runNowAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const id = Id.safeParse(field(formData, "id"));
-  if (!id.success) return { error: "That automation no longer exists." };
-  const input = field(formData, "input");
+  const parsed = parseRunInput(formData);
+  if (!parsed.ok) return parsed.state;
+  const { id, input } = parsed;
   const session = await ctx();
   let runId: string;
   try {
-    const a = await getAutomation(session.workspaceId, id.data);
+    const a = await getAutomation(session.workspaceId, id);
     if (!a) return { error: "That automation no longer exists." };
     ({ id: runId } = await runCommand(session, { command: a.command, input }));
   } catch (e) {

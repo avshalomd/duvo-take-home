@@ -301,6 +301,8 @@ export const startTrial: StartTrial = async (ctx, automationId, rawInput) => {
   const a = await mustGet(ctx.workspaceId, automationId);
   const input = rawInput.trim();
   if (!input) throw new AutomationError(`Type an example ${a.inputLabel.toLowerCase()} first.`);
+  // the store holds the action's limit too: an example is a real run, and its input goes into the brief (Q197)
+  if (input.length > MAX_COMMAND_INPUT) throw new AutomationError(`Keep the ${a.inputLabel.toLowerCase()} under ${MAX_COMMAND_INPUT} characters.`);
   await refuseMissingConnections(ctx.workspaceId, a, "this example");
   return startRun(ctx, {
     prompt: fillTemplate(a, input).prompt,

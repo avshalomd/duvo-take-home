@@ -62,8 +62,9 @@ export function ToolCard({
           {preview.length > 120 && (
             <button
               type="button"
+              aria-expanded={open}
               onClick={() => setOpen(!open)}
-              className="mt-0.5 text-[11px] text-slate underline underline-offset-2"
+              className="mt-0.5 rounded-[4px] text-[11px] text-slate underline underline-offset-2 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
             >
               {open ? "less" : "more"}
             </button>

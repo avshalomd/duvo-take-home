@@ -93,6 +93,87 @@ test("a finished run becomes a draft automation that can be edited and cannot be
   await expect(page.getByText(name)).toHaveCount(0);
 });
 
+// Review (frontend): judging an example again, saving an edit of a Ready automation, and cancelling a refused edit, on
+// an automation seeded ready with one finished example ("[e2e]", deleted in afterAll with its run and a connection).
+// The tests run in order: the judgment is of version 1, the save makes version 2, the cancel is on that draft.
+test.describe("editing and judging a ready automation", () => {
+  const stamp = Date.now().toString(36);
+  const command = `e2e-edit-${stamp}`;
+  const hiddenHost = `e2e-hidden-${stamp}.example.com`; // a connection's address, which the page never needs to send
+  let automationId: string | null = null;
+  let connectionId: string | null = null;
+  const template = {
+    instructions: "Write facts.md with three facts about {input}.",
+    intent: "Writes three facts about a company.",
+    expectedOutputs: ["facts.md with three facts about {input}"],
+    outputFormat: "",
+    steps: ["Find three facts about {input}", "Write facts.md"],
+    connections: [],
+  };
+
+  test.beforeAll(async () => {
+    const [a] = await sql()`
+      insert into automations (workspace_id, name, command, description, input_label, input_hint, input_example, template, status, version, approved_at)
+      values ('demo-workspace', '[e2e] Edited facts', ${command}, 'Writes three facts about a company.', 'Company name', 'e.g. Apple Inc.',
+              'Acme Ltd', ${JSON.stringify(template)}::jsonb, 'active', 1, now())
+      returning id`;
+    automationId = a.id as string;
+    await sql()`insert into runs (workspace_id, prompt, status, model, purpose, automation_id, automation_version, input, report, created_at, finished_at)
+      values ('demo-workspace', '[e2e] Write facts.md with three facts about Acme Ltd.', 'succeeded', 'e2e', 'trial', ${automationId}, 1, 'Acme Ltd',
+              'Three facts about Acme Ltd.', now(), now())`;
+    // off, so no run is given it while it exists
+    const [c] = await sql()`insert into connections (workspace_id, name, url, enabled) values ('demo-workspace', 'e2e automations hidden', ${`https://${hiddenHost}/mcp`}, false) returning id`;
+    connectionId = c.id as string;
+  });
+
+  test.afterAll(async () => {
+    if (automationId) await sql()`delete from runs where automation_id = ${automationId}`;
+    if (automationId) await sql()`delete from automations where id = ${automationId}`;
+    if (connectionId) await sql()`delete from connections where id = ${connectionId}`;
+  });
+
+  test("judging an example the same way again closes the form and says the judgment", async ({ page }) => {
+    await page.goto(`/automations/${automationId}`);
+    const card = page.getByTestId("example");
+    await card.getByRole("button", { name: "Looks right" }).click();
+    await expect(card.getByText("You said it looks right")).toBeVisible();
+
+    await card.getByRole("button", { name: "Change" }).click();
+    await card.getByRole("button", { name: "Looks right" }).click();
+    await expect(card.getByText("You said it looks right")).toBeVisible();
+    await expect(card.getByRole("button", { name: "Looks right" })).toHaveCount(0);
+  });
+
+  test("saving a new brief says it is a new version, where the document now stands, and sends it back to draft", async ({ page }) => {
+    await page.goto(`/automations/${automationId}`);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByLabel("The brief").fill("Write facts.md with four facts about {input}.");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Saved. This is version 2 now: run an example of it before you approve.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Approve and save" })).toBeVisible(); // the draft's page
+  });
+
+  test("an edit refused and then cancelled opens again with the saved automation, not what was typed", async ({ page }) => {
+    await page.goto(`/automations/${automationId}`);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByLabel("Name", { exact: true }).fill("");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Some fields need a change, see above.")).toBeVisible();
+
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("[e2e] Edited facts");
+    await expect(page.getByText("Some fields need a change, see above.")).toHaveCount(0);
+  });
+
+  test("the page names the workspace's connections without sending their addresses", async ({ page }) => {
+    await page.goto(`/automations/${automationId}`);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByText("e2e automations hidden")).toBeVisible(); // offered in the editor, so the page has it
+    expect(await page.content()).not.toContain(hiddenHost);
+  });
+});
+
 // A ready automation needs an approved example, which is a real agent run: this one is seeded straight into the
 // table instead ("[e2e]", deleted in afterAll), so the ready page can be checked without spending a run.
 test.describe("a ready automation", () => {

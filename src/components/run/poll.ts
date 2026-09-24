@@ -29,6 +29,18 @@ export function isTerminal(status: string): boolean {
   return status === "succeeded" || status === "failed" || status === "cancelled";
 }
 
+const RECONNECT_MS = [1000, 2000, 5000];
+
+/** How long to wait before opening a broken stream again, by how many times in a row it has broken: 1 s, 2 s, then 5 s. */
+export function reconnectDelay(breaks: number): number {
+  return RECONNECT_MS[Math.min(breaks, RECONNECT_MS.length - 1)];
+}
+
+/** A poll's answer that no later poll will change: the run is gone (404), or the session ended or lost access (401, 403). */
+export function pollGivesUp(status: number): boolean {
+  return status === 401 || status === 403 || status === 404;
+}
+
 export function parseRunPayload(json: unknown): RunView | null {
   const parsed = Payload.safeParse(json);
   if (!parsed.success) return null; // a 404 or a changed payload keeps the last good view instead of blanking it

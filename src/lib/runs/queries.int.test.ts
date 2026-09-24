@@ -4,8 +4,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { files, runs } from "@/db/schema";
-import { getFile, getRun, listRuns } from "./queries";
+import { files, runEvents, runs } from "@/db/schema";
+import { getFile, getRun, getRunSince, listRuns } from "./queries";
 
 const WS_A = "int-a";
 const WS_B = "int-b";
@@ -24,6 +24,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (created.length === 0) return;
   await db.delete(files).where(inArray(files.runId, created));
+  await db.delete(runEvents).where(inArray(runEvents.runId, created));
   await db.delete(runs).where(inArray(runs.id, created));
 });
 
@@ -63,6 +64,19 @@ describe.skipIf(!process.env.DATABASE_URL)("run reads are scoped to the workspac
     expect((await listRuns(WS_A)).map((r) => r.id)).not.toContain(orphan.id);
     const [row] = await db.select({ id: runs.id }).from(runs).where(eq(runs.id, orphan.id));
     expect(row.id).toBe(orphan.id); // the row is there: it is the filter that hides it
+  });
+
+  // Review (frontend): the event stream read the whole run (every event, every file) once a second, to send the new ones
+  it("getRunSince reads the run and only the events after the cursor, and nothing for another workspace", async () => {
+    const [id] = created;
+    const at = new Date("2026-09-24T10:00:00.000Z");
+    await db.insert(runEvents).values([1, 2, 3].map((seq) => ({ runId: id, seq, kind: "text", payload: { text: `[int] step ${seq}` }, at })));
+    const since = await getRunSince(WS_A, id, 1);
+    expect(since?.run.id).toBe(id);
+    expect(since?.events.map((e) => e.seq)).toEqual([2, 3]);
+    expect((await getRunSince(WS_A, id, 3))?.events).toEqual([]);
+    await expect(getRunSince(WS_B, id, 0)).resolves.toBeNull();
+    await expect(getRunSince(WS_A, "not-a-uuid", 0)).resolves.toBeNull();
   });
 
   it("a malformed run id answers null instead of a database error", async () => {
