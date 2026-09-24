@@ -38,7 +38,7 @@ describe("fileResponse", () => {
     const res = fileResponse(svg, q("inline=1"));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
-    expect(res.headers.get("Content-Security-Policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    expect(res.headers.get("Content-Security-Policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'");
     expect(await res.text()).toBe("<svg></svg>");
   });
 

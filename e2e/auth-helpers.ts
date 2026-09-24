@@ -48,7 +48,8 @@ export async function signInThroughUi(page: Page, email: string, password: strin
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
-function sql() {
+/** The local database, for a spec that sets up rows no page can make (a run's file) and deletes them after. */
+export function sql() {
   if (!process.env.DATABASE_URL && existsSync(".env.local")) process.loadEnvFile(".env.local");
   return neon(process.env.DATABASE_URL!);
 }

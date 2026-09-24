@@ -49,7 +49,7 @@ describe("inlineSvgHeaders", () => {
 
   it("forbids scripts and outside loads, so even an SVG opened on its own cannot run anything", () => {
     const h = inlineSvgHeaders("chart.svg");
-    expect(h["Content-Security-Policy"]).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    expect(h["Content-Security-Policy"]).toBe("default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'"); // F8: its own framing rule, now the app's does not reach it
     expect(h["X-Content-Type-Options"]).toBe("nosniff");
   });
 });
