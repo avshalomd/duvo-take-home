@@ -62,12 +62,20 @@ describe("evaluate", () => {
     expect(d.review).not.toHaveBeenCalled();
   });
 
-  it("fails when the judge is confident the work does not answer the instructions", async () => {
-    const d = deps(judgment(0.02, 0.9));
+  // qa-ai F4: a judge-only fail said nothing the agent could act on, and it failed truthful refusals at 95%. It goes to
+  // the reviewer, whose fail names the change to make.
+  it("sends a confident 'does not answer the instructions' to the reviewer, whose fail names the change", async () => {
+    const d = deps(judgment(0.02, 0.9), review({ responseSuitable: false, changeNeeded: "Answer the question about Norway, not Sweden." }));
     const verdict = await evaluate(input, d);
+    expect(d.review).toHaveBeenCalledOnce();
     expect(verdict.verdict).toBe("fail");
-    expect(verdict.reasons.join(" ")).toMatch(/instructions/i);
-    expect(d.review).not.toHaveBeenCalled(); // a confident no needs no second opinion
+    expect(verdict.decidedBy).toBe("review");
+    expect(verdict.reasons.join(" ")).toMatch(/Answer the question about Norway/);
+  });
+
+  it("lets the reviewer pass, with notes, a result the judge was sure did not answer", async () => {
+    const verdict = await evaluate(input, deps(judgment(0.02, 0.9), review()));
+    expect(verdict.verdict).toBe("pass_with_notes");
   });
 
   it("escalates to the review when the judge says the plan was not followed", async () => {
@@ -167,10 +175,10 @@ describe("evaluate: a run that may have followed instructions it read", () => {
     expect(verdict.reasons.join(" ")).toMatch(INJECTED);
   });
 
-  it("still fails on a confident 'does not answer the instructions', without the reviewer", async () => {
-    const d = deps(judgment(0.03, 0.9, 0.2));
-    expect((await evaluate(input, d)).decidedBy).toBe("judge");
-    expect(d.review).not.toHaveBeenCalled();
+  it("sends a confident 'does not answer the instructions' to the reviewer too", async () => {
+    const d = deps(judgment(0.03, 0.9, 0.2), review({ responseSuitable: false, changeNeeded: "Remove the advert." }));
+    expect((await evaluate(input, d)).decidedBy).toBe("review");
+    expect(d.review).toHaveBeenCalledOnce();
   });
 
   it("passes a judgment without the third answer as before: an older recording is not a doubt", async () => {
@@ -194,8 +202,9 @@ describe("evaluate: which tier decided and which tiers ran", () => {
     expect(why(await evaluate(input, deps(judgment(0.97, 0.95))))).toEqual({ decidedBy: "judge", path: ["checks", "judge"] });
   });
 
-  it("says the judge decided a confident fail, with no review", async () => {
-    expect(why(await evaluate(input, deps(judgment(0.02, 0.9))))).toEqual({ decidedBy: "judge", path: ["checks", "judge"] });
+  it("says the review decided a fail the judge was sure of, after all three tiers", async () => {
+    const r = review({ responseSuitable: false, changeNeeded: "Answer the question asked." });
+    expect(why(await evaluate(input, deps(judgment(0.02, 0.9), r)))).toEqual({ decidedBy: "review", path: ["checks", "judge", "review"] });
   });
 
   it("says the review decided when the judge was unsure, and that all three tiers ran", async () => {
@@ -240,5 +249,103 @@ describe("evaluate inside a time box", () => {
     await evaluate(input, d);
     expect((d.judge.mock.calls[0] as unknown[])[1]).toBeUndefined();
     expect((d.review.mock.calls[0] as unknown[])[2]).toBeUndefined();
+  });
+});
+
+// qa-ai F3 (the owner's call): a truthful "I cannot do this" (no mailbox access) or "what do you mean by the best
+// ones?" was failed at 90-95% and healed twice. Jev picks what the run did, in the same request; the two answers that
+// are not the work end in their own neutral outcomes, never healed.
+describe("evaluate: a run that could not be done, or needs the person's answer", () => {
+  const handled = (choice: NonNullable<Judgment["handling"]>["choice"], confidence: number): Judgment => ({
+    answeredQuery: 0.1,
+    followedPlan: 0.9,
+    handling: { choice, confidence },
+  });
+  const question: EvaluateInput = { ...input, prompt: "Log into my Outlook and list my manager's unread mail as to-dos.", files: [], report: "I cannot open your mailbox." };
+
+  it("is 'could not be done' when the judge is sure the run truthfully explained it cannot be done", async () => {
+    const d = deps(handled("cannot_be_done", 0.93));
+    const verdict = await evaluate(question, d);
+    expect(verdict.verdict).toBe("cannot_do");
+    expect(verdict.decidedBy).toBe("judge");
+    expect(verdict.path).toEqual(["checks", "judge"]);
+    expect(d.review).not.toHaveBeenCalled();
+  });
+
+  it("is 'needs your answer' when the judge is sure the run asked the person for what only they know", async () => {
+    const verdict = await evaluate({ ...question, prompt: "Make me a list of the best ones for our team." }, deps(handled("needs_information", 0.9)));
+    expect(verdict.verdict).toBe("needs_answer");
+    expect(verdict.decidedBy).toBe("judge");
+  });
+
+  it("leaves a run the judge is sure did the work to the other answers", async () => {
+    const verdict = await evaluate(input, deps({ answeredQuery: 0.95, followedPlan: 0.95, handling: { choice: "did_work", confidence: 0.97 } }));
+    expect(verdict.verdict).toBe("pass");
+  });
+
+  it("asks the reviewer when the judge leans to a refusal but is unsure, and takes the refusal when the reviewer finds it right", async () => {
+    const d = deps(handled("cannot_be_done", 0.6), review({ reasoning: "It has no access to the mailbox and says so." }));
+    const verdict = await evaluate(question, d);
+    expect(d.review).toHaveBeenCalledOnce();
+    expect(verdict.verdict).toBe("cannot_do");
+    expect(verdict.decidedBy).toBe("review");
+  });
+
+  it("asks the judge about a run whose only failed check is the missing file: a refusal writes none", async () => {
+    const d = deps(handled("cannot_be_done", 0.92));
+    const verdict = await evaluate({ ...question, prompt: "Log into my Outlook and save my manager's unread mail as todo.csv." }, d);
+    expect(d.judge).toHaveBeenCalledOnce();
+    expect(verdict.verdict).toBe("cannot_do");
+    expect(verdict.checks.filter((c) => !c.ok).map((c) => c.id)).toEqual(["file_expected"]);
+  });
+
+  it("keeps the checks' fail when the run with no file did not refuse", async () => {
+    const d = deps({ answeredQuery: 0.5, followedPlan: 0.9, handling: { choice: "did_work", confidence: 0.9 } });
+    const verdict = await evaluate({ ...question, prompt: "Save the list as todo.csv." }, d);
+    expect(verdict.verdict).toBe("fail");
+    expect(verdict.decidedBy).toBe("checks");
+    expect(verdict.path).toEqual(["checks"]);
+    expect(d.review).not.toHaveBeenCalled();
+  });
+
+  it("asks no model when a check other than the missing file failed", async () => {
+    const d = deps(handled("cannot_be_done", 0.95));
+    await evaluate({ ...input, files: [{ name: "output.csv", content: "title,source\n" }] }, d);
+    expect(d.judge).not.toHaveBeenCalled();
+  });
+});
+
+// qa-ai F2 (the owner's call): nothing asked whether the numbers were right, so "20 working days" with two invented
+// Norwegian holidays passed at 0.86. A fourth answer in the same request, and plain questions answered with facts or
+// numbers always get the reviewer's reading.
+describe("evaluate: numbers and facts", () => {
+  const plainQuestion: EvaluateInput = { ...input, prompt: "How many working days does Norway have in October 2026?", files: [], report: "22 working days." };
+
+  it("sends a run whose numbers or facts may not agree with the instructions or the sources to the reviewer", async () => {
+    const d = deps({ answeredQuery: 0.95, followedPlan: 0.95, factsAgree: 0.4 }, review({ responseSuitable: false, changeNeeded: "Recompute the total: 1991.25, not 1919.25." }));
+    const verdict = await evaluate(input, d);
+    expect(d.review).toHaveBeenCalledOnce();
+    expect(verdict.verdict).toBe("fail");
+    expect(verdict.reasons.join(" ")).toMatch(/numbers or facts/);
+  });
+
+  it("always has the reviewer read a plain question answered with facts or numbers and no file", async () => {
+    const d = deps({ answeredQuery: 0.95, followedPlan: 0.95, factsAgree: 0.9, statesFacts: 0.9 }, review({ responseSuitable: false, changeNeeded: "Norway has no public holiday in October." }));
+    const verdict = await evaluate(plainQuestion, d);
+    expect(d.review).toHaveBeenCalledOnce();
+    expect(verdict.verdict).toBe("fail");
+    expect(verdict.decidedBy).toBe("review");
+  });
+
+  it("calls such an answer a plain pass when the reviewer finds it right: nobody was unsure of it", async () => {
+    const verdict = await evaluate(plainQuestion, deps({ answeredQuery: 0.95, followedPlan: 0.95, factsAgree: 0.9, statesFacts: 0.9 }, review()));
+    expect(verdict.verdict).toBe("pass");
+    expect(verdict.decidedBy).toBe("review");
+  });
+
+  it("passes a plain answer with no facts or numbers on the judge's word", async () => {
+    const d = deps({ answeredQuery: 0.95, followedPlan: 0.95, factsAgree: 0.9, statesFacts: 0.1 });
+    expect((await evaluate(plainQuestion, d)).verdict).toBe("pass");
+    expect(d.review).not.toHaveBeenCalled();
   });
 });

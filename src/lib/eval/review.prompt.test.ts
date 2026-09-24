@@ -75,6 +75,37 @@ describe("reviewInput", () => {
   });
 });
 
+// qa-ai F11 and F2: the reviewer leaned to "suitable" and was never asked to check numbers; it caught made-up links
+// and an obeyed injection on its own, by 0.01 and 0.02.
+describe("REVIEW_INSTRUCTIONS: numbers, facts and sources", () => {
+  it("tells it to recompute totals from data the instructions give, and check each given number appears unchanged", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/recompute[^.]*totals[^.]*from data the instructions give/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/each number the instructions give appears unchanged/i);
+  });
+
+  it("tells it a wrong number or fact, or a source that looks made up, is not suitable", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/made[- ]up/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/is NOT suitable/);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/what the run read/i);
+  });
+
+  it("no longer calls a thin summary suitable by rule", () => {
+    expect(REVIEW_INSTRUCTIONS).not.toMatch(/a summary that is thin/);
+  });
+
+  it("says a truthful 'cannot be done here' or one question only the person can answer is finished and suitable", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/truthfully[^.]*cannot be done/i);
+  });
+});
+
+describe("reviewInput: what the run read", () => {
+  it("shows the start of each outside result the run read", () => {
+    const text = reviewInput({ ...input, read: [{ tool: "WebSearch", text: "Norway: no public holidays in October." }] }, []);
+    expect(text).toMatch(/WHAT THE RUN READ/);
+    expect(text).toContain("Norway: no public holidays in October.");
+  });
+});
+
 describe("REVIEW_INSTRUCTIONS", () => {
   it("says the checks' rules are fixed, and never to ask for a change that would fail one", () => {
     expect(REVIEW_INSTRUCTIONS).toMatch(/never ask for a change that would (break|fail)/i);
