@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { connections } from "@/db/schema";
+import { CONNECTIONS_WS_KEY, connections } from "@/db/schema";
+import { isUniqueViolation } from "@/db/unique-violation";
 import type {
   AddConnection,
   ConnectionSecret,
@@ -62,6 +63,16 @@ async function ensureNameFree(workspaceId: string, name: string, self?: string):
   if (clash) throw new ConnectionNameTakenError(clash.name);
 }
 
+/**
+ * A write the unique index refused because a connection with the name's key was written meanwhile (F6): the same
+ * words as the check before it, naming the one that won. Any other error is passed on as it was.
+ */
+async function nameTakenMeanwhile(e: unknown, workspaceId: string, name: string, self?: string): Promise<never> {
+  if (!isUniqueViolation(e, CONNECTIONS_WS_KEY)) throw e;
+  await ensureNameFree(workspaceId, name, self); // throws ConnectionNameTakenError with the winner's name
+  throw new ConnectionNameTakenError(name); // the winner was deleted since: still taken a moment ago
+}
+
 // Every query below names the workspace: the id alone is never enough to read or change a row.
 const mine = (workspaceId: string, id: string) => and(eq(connections.id, id), eq(connections.workspaceId, workspaceId));
 
@@ -99,7 +110,8 @@ export const addConnection: AddConnection = async (workspaceId, input) => {
       authType,
       ...(authType === "bearer" && token ? sealed(token) : noToken),
     })
-    .returning();
+    .returning()
+    .catch((e) => nameTakenMeanwhile(e, workspaceId, input.name));
   return toConnection(row);
 };
 
@@ -133,7 +145,8 @@ export const updateConnection: UpdateConnection = async (workspaceId, id, input)
       updatedAt: new Date(),
     })
     .where(mine(workspaceId, id))
-    .returning();
+    .returning()
+    .catch((e) => nameTakenMeanwhile(e, workspaceId, edit.name, id));
   if (!row) throw new ConnectionNotFoundError(); // deleted between the read and the write
   return toConnection(row);
 };
