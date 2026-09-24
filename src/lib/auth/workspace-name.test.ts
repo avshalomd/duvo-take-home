@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { personalWorkspaceName, workspaceSlug } from "./workspace-name";
+import { isPersonalWorkspace, personalWorkspaceName, workspaceSlug } from "./workspace-name";
 
 describe("personalWorkspaceName", () => {
   it("names the personal workspace after the first name", () => {
@@ -10,6 +10,21 @@ describe("personalWorkspaceName", () => {
   it("says 'My workspace' when there is no name", () => {
     expect(personalWorkspaceName("")).toBe("My workspace");
     expect(personalWorkspaceName("   ")).toBe("My workspace");
+  });
+});
+
+// S11: nothing marks a personal workspace but its slug, whose suffix is the start of its own id (createPersonalWorkspace);
+// the new-workspace form's suffix is random, and the seeded demo workspace's slug is "demo"
+describe("isPersonalWorkspace", () => {
+  it("is true for the workspace an account gets at sign-up", () => {
+    const id = "b39d54e1-7edb-4fec-9caf-7e5b8f99deee";
+    expect(isPersonalWorkspace({ id, slug: workspaceSlug("Abshalom", id.slice(0, 6)) })).toBe(true);
+    expect(isPersonalWorkspace({ id, slug: workspaceSlug("", id.slice(0, 6)) })).toBe(true); // "workspace-b39d54"
+  });
+
+  it("is false for a workspace made from the menu, and for the demo workspace", () => {
+    expect(isPersonalWorkspace({ id: "Xk2mP9qLr7Tz", slug: workspaceSlug("Finance", "a1b2c3") })).toBe(false);
+    expect(isPersonalWorkspace({ id: "demo-workspace", slug: "demo" })).toBe(false);
   });
 });
 
