@@ -29,7 +29,7 @@ export function RunPicker({ runs }: { runs: StartingRun[] }) {
           <Link
             href={`/automations/new?run=${r.id}`}
             prefetch={false}
-            className="flex items-start gap-3 px-5 py-4 outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
+            className="flex items-start gap-3 px-5 py-4 outline-none hover:bg-muted/50 focus-visible:bg-muted/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
           >
             <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", r.mark === null ? "bg-fern" : r.outcome === "fail" ? "bg-crimson" : "border-[1.5px] border-slate")} />
             <span className="min-w-0 flex-1">

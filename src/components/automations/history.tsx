@@ -16,7 +16,7 @@ export function History({ runs, callable }: { runs: AutomationRun[]; callable: b
         const o = outcome(r.status, r.outcome);
         return (
           <li key={r.id}>
-            <Link href={`/?run=${r.id}`} className="flex items-center gap-3 rounded-[12px] px-2 py-2.5 outline-none hover:bg-muted/60 focus-visible:bg-muted/70">
+            <Link href={`/?run=${r.id}`} className="flex items-center gap-3 rounded-[12px] px-2 py-2.5 outline-none hover:bg-muted/60 focus-visible:bg-muted/70 focus-visible:ring-[3px] focus-visible:ring-ring/50">
               <span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[o.tone])} />
               <span className="min-w-0 flex-1 truncate text-[15px] text-graphite">{r.input || "No input"}</span>
               <span className={cn(SMALL, "hidden sm:inline")}>

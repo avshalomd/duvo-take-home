@@ -48,7 +48,7 @@ export function InviteRow() {
         aria-expanded={open}
         aria-controls={levelId}
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left font-medium transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60 active:bg-muted"
+        className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left font-medium transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset active:bg-muted"
       >
         <RowGlyph className="bg-graphite text-paper">
           <UserPlus strokeWidth={2.25} />
