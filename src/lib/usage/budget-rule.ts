@@ -30,6 +30,19 @@ export function budgetBlockReason(limits: DayLimits, usage: Usage): string | nul
   return null;
 }
 
+/** Why the workspace's limits refuse a start right now, whether a run settling may lift it, and how many are working. */
+export type StartRefusal = { reason: string; waitsForRun: boolean; inFlight: number };
+
+/**
+ * The workspace's refusal as Home shows it before the press (UX QA U3): the same reason the start gives, and whether
+ * it is the runs in flight that refuse it - then Home reads it again when one settles; a day used up waits for midnight.
+ */
+export function startRefusal(limits: DayLimits, usage: Usage): StartRefusal | null {
+  const reason = budgetBlockReason(limits, usage);
+  if (!reason) return null;
+  return { reason, waitsForRun: budgetBlockReason(limits, { ...usage, inFlight: 0 }) === null, inFlight: usage.inFlight };
+}
+
 /**
  * May a run pay for another fix attempt today? null when it may; otherwise why healing stopped, in plain words. The
  * day's money counts, with the fix's own worst case and one attempt's for every other run in flight held back (engine

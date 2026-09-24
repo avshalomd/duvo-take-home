@@ -5,6 +5,8 @@ import type { FileMeta, Run, RunEvent } from "@/contracts/run";
 import { listAutomations } from "@/lib/automations/store";
 import { listConnections } from "@/lib/connections/store";
 import { getFile, getRun } from "@/lib/runs/queries";
+import { getLimits, getUsage } from "@/lib/usage/budget";
+import { startRefusal, type StartRefusal } from "@/lib/usage/budget-rule";
 import type { CommandOption } from "./command-list";
 import { describeOutput } from "./command-query";
 import { csvSummary } from "./csv-summary";
@@ -33,11 +35,21 @@ export function titles(all: Automation[]): { names: Record<string, string>; comm
 /** The workspace's connections, read once per request: the composer shows the ones on, Details names them all. */
 export const connectionsOf = cache(listConnections);
 
-export type ComposerData = { automations: CommandOption[]; notReady: number; connections: string[] };
+export type ComposerData = { automations: CommandOption[]; notReady: number; connections: string[]; refusal: StartRefusal | null };
 
-/** What the composer offers: the ready automations, how many are not ready, and the connections that are on. */
+/**
+ * What the composer offers: the ready automations, how many are not ready, the connections that are on, and whether
+ * the workspace's limits refuse a start right now (UX QA U3), read as Settings > Limits reads them, so Run can be
+ * refused in the box instead of handing the brief over to a sheet that snaps back. The start checks again: this is
+ * what the page knew when it was drawn, and the server stays the authority.
+ */
 export async function composerProps(workspaceId: string): Promise<ComposerData> {
-  const [{ all, ready }, connections] = await Promise.all([readyAutomations(workspaceId), connectionsOf(workspaceId)]);
+  const [{ all, ready }, connections, limits, usage] = await Promise.all([
+    readyAutomations(workspaceId),
+    connectionsOf(workspaceId),
+    getLimits(workspaceId),
+    getUsage(workspaceId),
+  ]);
   return {
     automations: ready.map((a) => ({
       command: a.command,
@@ -47,6 +59,7 @@ export async function composerProps(workspaceId: string): Promise<ComposerData> 
     })),
     notReady: all.length - ready.length,
     connections: connections.filter((c) => c.enabled).map((c) => c.name),
+    refusal: startRefusal(limits, usage),
   };
 }
 
