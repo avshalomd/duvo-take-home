@@ -61,7 +61,39 @@ describe("SYSTEM_PROMPT: output files", () => {
   });
 
   it("stays short, because it is paid for on every turn", () => {
-    expect(SYSTEM_PROMPT.length).toBeLessThan(3200);
+    expect(SYSTEM_PROMPT.length).toBeLessThan(3800); // 3200 until the report and the question rules (qa-ai F3, F9)
+  });
+});
+
+// qa-ai F9: the report is the final message alone, and run #4's opened mid-thought: "Confirmed: no Norwegian public
+// holidays fall in October...".
+describe("SYSTEM_PROMPT: the report stands on its own", () => {
+  it("says the final message is the whole report and must make sense without anything before it", () => {
+    expect(SYSTEM_PROMPT).toMatch(/final message is the whole report[^.]*make sense on its own/i);
+  });
+
+  it("asks it to open with the answer, not a continuation", () => {
+    expect(SYSTEM_PROMPT).toMatch(/never with a continuation/i);
+  });
+});
+
+// qa-ai F3 (the owner's call): "never ask the user a question" left no honest outcome for "Make me a list of the best
+// ones", and a heal then pushed the agent into a guess with invented context. Now a run that truly needs the person
+// ends as "Needs your answer", and a truthful "cannot be done" as "Could not be done".
+describe("SYSTEM_PROMPT: when the task cannot be done or needs the person", () => {
+  it("still has it choose the most useful reading of an ambiguous request", () => {
+    expect(SYSTEM_PROMPT).toMatch(/ambiguous, choose the most useful reading/i);
+  });
+
+  it("lets it ask one question, in the report, only when there is nothing to work on without the person", () => {
+    expect(SYSTEM_PROMPT).toMatch(/do not guess/i);
+    expect(SYSTEM_PROMPT).toContain('"Ask what is needed"');
+    expect(SYSTEM_PROMPT).toMatch(/asks the one question/i);
+  });
+
+  it("asks for a truthful reason when it refuses, never a pretence of the work", () => {
+    expect(SYSTEM_PROMPT).toMatch(/truthfully/i);
+    expect(SYSTEM_PROMPT).toMatch(/never pretend/i);
   });
 });
 

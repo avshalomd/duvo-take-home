@@ -92,14 +92,24 @@ describe("healPrompt", () => {
 
   // The run's report is the fix attempt's last message: a healed run's report read "**What I changed:** Only Spain's
   // languages field..." (run 15f8b99d), and that note was judged, followed up and made into an automation.
-  it("asks for the report on the whole task as it now stands, for the person, not a note of the fix", () => {
+  it("asks for the report as the answer to the whole task, for the person, not a note of the fix", () => {
     const p = healPrompt(feedback);
-    expect(p).toMatch(/report for the person on the whole task as it now stands/i);
+    expect(p).toMatch(/as your answer to the whole task/i);
     expect(p).toMatch(/not a note of the fix/i);
   });
 
-  it("allows at most one closing sentence on what the check made it fix", () => {
-    expect(healPrompt(feedback)).toMatch(/at most one closing sentence may say what the check made you fix/i);
+  // qa-ai F5: the prompt's own words came back in what the person read: "Report on the whole task as it now stands:"
+  // as a heading, "This pass, I re-verified the file...", "One correction from the automatic check: ...".
+  it("says the report never mentions the check, a pass, a correction or an earlier attempt, and has no heading of its own", () => {
+    const p = healPrompt(feedback);
+    expect(p).toMatch(/never mention the check, this pass, a correction, re-checking or an earlier attempt/i);
+    expect(p).toMatch(/no heading/i);
+  });
+
+  it("gives the agent no phrase to echo: no 'as it now stands', no closing sentence about the fix", () => {
+    const p = healPrompt(feedback);
+    expect(p).not.toMatch(/as it now stands/i);
+    expect(p).not.toMatch(/closing sentence/i);
   });
 });
 

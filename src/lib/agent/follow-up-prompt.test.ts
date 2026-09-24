@@ -82,11 +82,20 @@ describe("carryOverPrompt", () => {
   });
 
   // The follow-up's report is its run's report: judged against the whole thread, and what "Make an automation" reads.
-  it("asks for the report on the whole task as it now stands, with at most one sentence on the change", () => {
+  it("asks for the report as the answer to the whole task with the change made, not only the change", () => {
     for (const p of [carryOverPrompt(parent, change), carryOverPrompt(hisParent, "fix the table")]) {
-      expect(p).toMatch(/report for the person on the whole task as it now stands/i);
-      expect(p).toMatch(/at most one closing sentence may say what this change did/i);
+      expect(p).toMatch(/answer to the whole task with this change made/i);
+      expect(p).toMatch(/not only this change/i);
     }
+  });
+
+  // qa-ai F5: "I re-checked the file against your original request" and "One correction from the automatic check"
+  // reached the person as the report.
+  it("says the report never mentions the check, earlier runs or corrections, and gives no phrase to echo", () => {
+    const p = carryOverPrompt(hisParent, "fix the table");
+    expect(p).toMatch(/never mention the automatic check, an earlier run, a correction or re-checking/i);
+    expect(p).not.toMatch(/as it now stands/i);
+    expect(p).not.toMatch(/closing sentence/i);
   });
 });
 
