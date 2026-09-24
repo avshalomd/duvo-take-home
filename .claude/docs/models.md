@@ -14,16 +14,26 @@ text, so there is nothing to parse and no off-schema failure: the answer is alwa
 listed. `src/lib/llm/decide.ts` is the client, and the section at the bottom of this file says when it fits.
 
 The LLM is set in one place, `src/lib/ai.ts`, and overridden by two env vars without a deploy:
-`AI_MODEL` (primary) and `AI_MODEL_FALLBACK` (the second model `extract()` tries when the first fails;
-`AI_MODEL_FALLBACK=""` switches it off). Everything below was measured on 2026-09-20 with his OpenRouter key,
-on a 10-case extraction eval of a real task, each model run through the app's own code path.
+`AI_MODEL` (the first model) and `AI_MODEL_FALLBACK` (the second model `extract()` tries when the first fails;
+`AI_MODEL_FALLBACK=""` switches it off).
+
+**What actually runs.** Every environment that runs agents has `ANTHROPIC_API_KEY` (the agent's child needs it), and
+an explicit key wins in `aiProvider()`. So locally and in production `extract()` - the reviewer, the automation
+draft - asks **`claude-sonnet-5` on Anthropic** first, and **`deepseek/deepseek-v4.1-flash` on OpenRouter** second,
+because the second model is on OpenRouter whenever `OPENROUTER_API_KEY` is set, whatever the first provider (the
+owner's call, 2026-09-24: another vendor, so one provider's outage is not the reviewer's). There `AI_MODEL` takes an
+Anthropic id and `AI_MODEL_FALLBACK` an OpenRouter slug. `openai/gpt-5.6-luna` is the first model only where
+OpenRouter is the only key. `/api/health` names the first provider as `provider`.
+
+Everything below was measured on 2026-09-20 with his OpenRouter key, on a 10-case extraction eval of a real task,
+each model run through the app's own code path.
 
 ## The shortlist
 
 | id | eval | median / max | $ per 1000 calls | ctx | JSON mode | note |
 |---|---|---|---|---|---|---|
-| **`openai/gpt-5.6-luna`** (primary) | 10/10 | **2.3 s** / 2.7 s | $0.28 | 1.05M | schema | fastest of the accurate ones |
-| **`deepseek/deepseek-v4.1-flash`** (fallback) | 10/10 | 4.1 s / 19.5 s | $0.36 | 1.05M | schema | different vendor to the primary |
+| **`openai/gpt-5.6-luna`** (first, OpenRouter alone) | 10/10 | **2.3 s** / 2.7 s | $0.28 | 1.05M | schema | fastest of the accurate ones |
+| **`deepseek/deepseek-v4.1-flash`** (second, always) | 10/10 | 4.1 s / 19.5 s | $0.36 | 1.05M | schema | different vendor to the primary |
 | `deepseek/deepseek-v4-flash-0731` | 10/10 | 12.8 s / 67.3 s | **$0.10** | 1.31M | schema | cheapest; slow tail |
 | `inclusionai/ling-3.0-flash-fin:free` | 10/10 ×3 | **2.3 s** / 3.4 s | free | 262K | **prompt only** | fastest overall, free pool |
 | `dots-studio/dots-3-note-preview:free` | 10/10 ×3 | 10.6 s / 18.0 s | free | 512K | schema | free pool |
