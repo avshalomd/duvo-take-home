@@ -10,6 +10,7 @@ import { auth } from "./auth";
 import { ASKER_GONE, MEMBER_NOT_FOUND, MemberChangeError, removalRefusal, roleChangeRefusal } from "./member-rules";
 import { canChangeSettings } from "./roles";
 import { toRole } from "./session-ctx";
+import { isPersonalWorkspace } from "./workspace-name";
 
 /** Who belongs to the workspace, earliest first, so the owner who made it leads the list. */
 export const listMembers: ListMembers = async (workspaceId) => {
@@ -33,19 +34,30 @@ export const listWorkspaces: ListWorkspaces = async (userId) => {
   return rows.map((r) => ({ ...r, role: toRole(r.role) }));
 };
 
-export type InvitationView = { id: string; email: string; workspaceName: string; inviterName: string; open: boolean };
+// personal: to the inviter's own workspace, which does not open a new account in invite-only mode (S11, signup.ts)
+export type InvitationView = { id: string; email: string; workspaceName: string; inviterName: string; open: boolean; personal: boolean };
 
 /** What the invitation page shows before anyone signs in: who invited whom to which workspace, and whether it is still open. */
 export async function getInvitation(id: string): Promise<InvitationView | null> {
   const [row] = await db
-    .select({ id: invitation.id, email: invitation.email, status: invitation.status, expiresAt: invitation.expiresAt, workspaceName: organization.name, inviterName: user.name })
+    .select({
+      id: invitation.id,
+      email: invitation.email,
+      status: invitation.status,
+      expiresAt: invitation.expiresAt,
+      workspaceId: organization.id,
+      slug: organization.slug,
+      workspaceName: organization.name,
+      inviterName: user.name,
+    })
     .from(invitation)
     .innerJoin(organization, eq(invitation.organizationId, organization.id))
     .innerJoin(user, eq(invitation.inviterId, user.id))
     .where(eq(invitation.id, id));
   if (!row) return null;
   const open = row.status === "pending" && row.expiresAt > new Date(); // accepted, cancelled or past 48 hours: closed
-  return { id: row.id, email: row.email, workspaceName: row.workspaceName, inviterName: row.inviterName, open };
+  const personal = isPersonalWorkspace({ id: row.workspaceId, slug: row.slug });
+  return { id: row.id, email: row.email, workspaceName: row.workspaceName, inviterName: row.inviterName, open, personal };
 }
 
 /** The link an invited person opens. No mail provider is configured, so the inviter copies and sends it. */
@@ -62,6 +74,16 @@ export function inviteLink(invitationId: string): string {
 export async function createInvite(requestHeaders: Headers, ctx: SessionCtx, input: InviteInput): Promise<{ link: string }> {
   const { email, role } = InviteInput.parse(input);
   if (!canChangeSettings(ctx.role)) throw new Error("Only an owner or an admin can invite people to this workspace.");
+  // One invitation at a time per workspace (QA F5): three sent at once all read "none pending" and all made one, and
+  // accepting two gave the person two memberships. Better Auth writes through its own connection and commits at once,
+  // so the next invitation in line, reading after our commit, finds this one and renews it.
+  return transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('handover:invitations'), hashtext(${ctx.workspaceId}))`);
+    return inviteNow(requestHeaders, ctx, email, role);
+  });
+}
+
+async function inviteNow(requestHeaders: Headers, ctx: SessionCtx, email: string, role: InviteInput["role"]): Promise<{ link: string }> {
   try {
     // Better Auth's resend only renews a pending invitation, role and all: one with another role is revoked first,
     // so the new invitation (and its new link) carries the role asked for now, and the old link stops working.

@@ -2,6 +2,7 @@ import { sessionFromHeaders } from "@/lib/auth/session";
 import { sweepIfOverdue } from "@/lib/runner/recover";
 import { getRun } from "@/lib/runs/queries";
 import { deriveState } from "@/lib/runs/state";
+import { withoutMachinePaths } from "@/lib/runs/without-machine-paths";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // a polled run must never be answered from a cache
@@ -15,5 +16,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!found) return Response.json({ error: "not found" }, { status: 404 });
   // A run that has outlived every runner is closed now, while someone watches it, and answered closed.
   if (await sweepIfOverdue(session.workspaceId, found.run)) found = (await getRun(session.workspaceId, id)) ?? found;
-  return Response.json({ ...found, state: deriveState(found.run, found.events) });
+  const answer = withoutMachinePaths(found); // paths as the page shows them, not the machine's folder (F20)
+  return Response.json({ ...answer, state: deriveState(answer.run, answer.events) });
 }

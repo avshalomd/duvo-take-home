@@ -1,10 +1,12 @@
 // startRun against the real tables. `npm run test:int`. RUNNER=queue, so a start becomes a jobs row and never an
 // agent run. Runs are "[int] ..." in workspaces "int-engine-start*", deleted after with their jobs and settings.
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, gte, inArray, notInArray, sum } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, runs, workspaceSettings } from "@/db/schema";
+import { AgentLimits } from "@/contracts/agent";
 import { holdsASlot } from "@/lib/runner/recover";
+import { startOfUtcDay } from "@/lib/usage/budget-rule";
 import { IN_FLIGHT_MESSAGE, MAX_IN_FLIGHT, RunLimitError } from "./limits";
 import { startRun } from "./start";
 
@@ -52,6 +54,9 @@ const statusOf = async (id: string) => (await db.select({ status: runs.status, e
 
 beforeEach(() => {
   vi.stubEnv("RUNNER", "queue");
+});
+afterEach(() => {
+  vi.unstubAllEnvs(); // a test's own DEPLOYMENT_DAILY_BUDGET_USD ends with it
 });
 afterAll(async () => {
   vi.unstubAllEnvs();
@@ -115,6 +120,28 @@ describe.skipIf(!process.env.DATABASE_URL)("startRun", () => {
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
       const refused = results.flatMap((r) => (r.status === "rejected" ? [r.reason as Error] : []));
       expect(refused.map((e) => e.message)).toEqual([IN_FLIGHT_MESSAGE, IN_FLIGHT_MESSAGE]);
+    });
+
+    // Security review S1, his call: a day's spend across every workspace is capped too (DEPLOYMENT_DAILY_BUDGET_USD)
+    it("refuses any start in plain words once the deployment's money for today is spent, and makes no run", async () => {
+      vi.stubEnv("DEPLOYMENT_DAILY_BUDGET_USD", "0"); // today's spend, whatever it is in this shared database, has reached $0
+      await expect(startRun({ workspaceId: CAP_WS[2], userId: "int-user" }, { prompt: "[int] a start past the day's money" }, nextIp())).rejects.toThrow(
+        "Handover has reached today's spending limit. Try again tomorrow.",
+      );
+      expect(await db.select().from(runs).where(eq(runs.workspaceId, CAP_WS[2]))).toHaveLength(0);
+    });
+
+    it("counts today's finished runs of every workspace, and reserves each run in flight at its most", async () => {
+      const [spent] = await db.insert(runs).values({ prompt: "[int] another workspace's finished run", status: "succeeded", model: "test", workspaceId: FILL_WS, costUsd: 3 }).returning({ id: runs.id });
+      expect(spent.id).toBeTruthy();
+      const live = await inFlightEverywhere();
+      const [today] = await db.select({ usd: sum(runs.costUsd) }).from(runs).where(and(gte(runs.createdAt, startOfUtcDay(new Date())), notInArray(runs.status, ["queued", "running", "evaluating"])));
+      const committed = Number(today.usd ?? 0) + live * AgentLimits.maxBudgetUsd;
+
+      vi.stubEnv("DEPLOYMENT_DAILY_BUDGET_USD", String(committed)); // exactly what is spent and reserved: no room
+      await expect(startRun({ workspaceId: CAP_WS[2], userId: "int-user" }, { prompt: "[int] one start past the reserve" }, nextIp())).rejects.toThrow(RunLimitError);
+      vi.stubEnv("DEPLOYMENT_DAILY_BUDGET_USD", String(committed + 1)); // a dollar of room: the start goes ahead
+      expect((await startRun({ workspaceId: CAP_WS[2], userId: "int-user" }, { prompt: "[int] a start with a dollar of room" }, nextIp())).id).toBeTruthy();
     });
 
     it("does not count a run stranded in another workspace against the deployment's cap", async (t) => {

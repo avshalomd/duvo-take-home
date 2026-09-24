@@ -1,10 +1,10 @@
 // The schedule tick against the real automations table. `npm run test:int`. startRun is replaced, so no run and no
 // agent ever starts here; what is pinned is the tick's own bookkeeping. Rows live in "int-engine-schedules-<pid>",
 // with slots in 2000 and `now` in 2000, so the tick only ever sees this file's automations; deleted after.
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { automations } from "@/db/schema";
+import { automations, organization } from "@/db/schema";
 import { RunLimitError } from "@/lib/runs/limits";
 
 vi.mock("@/lib/runs/start", () => ({ startRun: vi.fn() }));
@@ -25,11 +25,16 @@ async function scheduled(what: string, over: Partial<typeof automations.$inferIn
 }
 const row = async (id: string) => (await db.select().from(automations).where(eq(automations.id, id)))[0];
 
+// The tick fires only automations whose workspace exists (security review S4), so this file's workspace is real.
+beforeAll(async () => {
+  if (process.env.DATABASE_URL) await db.insert(organization).values({ id: WS, name: "[int] schedules", slug: WS, createdAt: new Date() }).onConflictDoNothing();
+});
 beforeEach(() => {
   vi.mocked(startRun).mockReset(); // in braces: a function returned from beforeEach is run after the test as its teardown
 });
 afterAll(async () => {
   await db.delete(automations).where(eq(automations.workspaceId, WS));
+  await db.delete(organization).where(eq(organization.id, WS));
 });
 
 // Engine review #6, the owner's call: a scheduled start refused by a limit was only logged; the slot was gone and the

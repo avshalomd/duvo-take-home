@@ -10,7 +10,7 @@ type DayLimits = Pick<WorkspaceLimits, "dailyBudgetUsd" | "dailyRunLimit" | "max
  */
 export function budgetBlockReason(limits: DayLimits, usage: Usage): string | null {
   const after = `More can start after ${utcClock(usage.resetsAt)} UTC.`;
-  const budget = usd(limits.dailyBudgetUsd);
+  const budget = `$${dollars(limits.dailyBudgetUsd)}`;
   if (usage.runsToday >= limits.dailyRunLimit)
     return `This workspace has used its ${plural(limits.dailyRunLimit, "run")} for today. ${after}`;
   // >=: a budget of $0 means no spending at all, and a run costs something the moment it starts
@@ -36,7 +36,7 @@ export function budgetBlockReason(limits: DayLimits, usage: Usage): string | nul
  * review #7); the run already holds its slot and is counted once among the day's runs.
  */
 export function healBudgetReason(limits: Pick<WorkspaceLimits, "dailyBudgetUsd">, spentTodayUsd: number, othersInFlight: number): string | null {
-  const budget = usd(limits.dailyBudgetUsd);
+  const budget = `$${dollars(limits.dailyBudgetUsd)}`;
   if (spentTodayUsd >= limits.dailyBudgetUsd) return `The workspace's ${budget} budget for today is spent, so healing stopped here.`;
   if (over(spentTodayUsd + ATTEMPT_MAX_USD, limits.dailyBudgetUsd))
     return `The workspace has ${usd(limits.dailyBudgetUsd - spentTodayUsd)} left of its ${budget} budget for today, less than a fix may cost (${usd(ATTEMPT_MAX_USD)}), so healing stopped here.`;
@@ -48,6 +48,15 @@ export function healBudgetReason(limits: Pick<WorkspaceLimits, "dailyBudgetUsd">
 const ATTEMPT_MAX_USD = AgentLimits.maxBudgetUsd; // the SDK ends an attempt at this; a run is one attempt, a fix another
 const over = (usd: number, budget: number) => usd > budget + 1e-9; // reaching the budget exactly is within it; floats add up unevenly
 const usd = (n: number) => `$${n.toFixed(2)}`;
+
+/**
+ * A budget as it was set (F17): whole cents with two decimals ($2.50; a real column reads 0.07 back as 0.0700000003),
+ * and a fraction of a cent saved before the form took whole cents only as it is ($0.001), never rounded to "$0.00".
+ */
+function dollars(n: number): string {
+  const cents = Math.round(n * 100);
+  return Math.abs(n * 100 - cents) < 1e-6 ? (cents / 100).toFixed(2) : String(n);
+}
 
 // Usage is counted per UTC day, so every workspace resets at the same instant whatever the viewer's time zone.
 export function startOfUtcDay(now: Date): Date {

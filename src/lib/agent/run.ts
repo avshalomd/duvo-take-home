@@ -19,6 +19,7 @@ import { connectionKey } from "@/lib/connections/key";
 import { authHeaders } from "@/lib/connections/oauth";
 import { evaluateRun } from "@/lib/eval/evaluate";
 import { feedbackForAgent, isHealable } from "@/lib/eval/feedback";
+import { forEvaluator } from "@/lib/eval/run-rows";
 import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
@@ -215,14 +216,14 @@ export const runAutomation: RunAutomation = async (runId) => {
 
   // The run's files are what is in its directory now: stored after every attempt, replacing the rows before, so an
   // auto-heal's fixed file is never listed beside the broken one. One transaction, so a reader never sees none.
-  const storeFiles = async (): Promise<OutputFile[]> => {
+  const storeFiles = async (): Promise<(OutputFile & { quarantined: boolean })[]> => {
     const found = await collectFiles(dir);
     const rows = found.map((f) => ({ runId, ...f, ...scanOutput(f) }));
     await transaction(async (tx) => {
       await tx.delete(filesTable).where(eq(filesTable.runId, runId));
       if (rows.length) await tx.insert(filesTable).values(rows);
     });
-    return found;
+    return rows;
   };
 
   // Auto-heal (his call, 2026-09-23): the attempts of this one run, and what the finished ones cost together.
@@ -389,8 +390,8 @@ export const runAutomation: RunAutomation = async (runId) => {
         report: end.result || null,
         plan: (recorded.filter((e) => e.kind === "plan").at(-1)?.payload ?? null) as Plan | null,
         // every file as stored, base64 included: the evaluator decides what the judge sees (eval/file-view.ts), and its
-        // spreadsheet check needs the bytes to confirm the .xlsx header
-        files: written.map((f) => ({ name: f.name, content: f.content })),
+        // spreadsheet check needs the bytes to confirm the .xlsx header. A held-back file goes as a placeholder (S8).
+        files: written.map(forEvaluator),
         today: new Date().toISOString().slice(0, 10),
         // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],

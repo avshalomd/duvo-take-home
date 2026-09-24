@@ -10,6 +10,7 @@ import type { SessionCtx } from "@/contracts/auth";
 import { MemberChangeError } from "./member-rules";
 import { changeMemberRole, createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, removeFromWorkspace, revokeInvite } from "./members";
 import { resolveSession, sessionFromHeaders } from "./session";
+import { workspaceSlug } from "./workspace-name";
 
 const created: string[] = []; // emails, so afterAll deletes only what this file made
 const PASSWORD = "int-password-123";
@@ -142,6 +143,7 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
       workspaceName: "Ivy's workspace",
       inviterName: "Ivy Inviter",
       open: true,
+      personal: true, // Ivy's own workspace: in invite-only mode it opens no new account (S11)
     });
 
     const guest = await signUp("Ian Invitee", guestEmail);
@@ -170,6 +172,28 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
     expect(asAdmin.link).not.toBe(asMember.link);
     expect((await getInvitation(asMember.link.split("/invite/")[1]))?.open).toBe(false);
     expect((await listInvitations(ownerCtx)).map((i) => [i.email, i.role, i.link])).toEqual([[guestEmail, "admin", asAdmin.link]]);
+  });
+
+  // QA F5: three invitations to one address sent at once all stayed pending, and accepting two made two memberships
+  it("inviting one address three times at once leaves one pending invitation", async () => {
+    const owner = await signUp("Tria Thrice", email("thrice"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+    const guestEmail = email("thrice-guest");
+
+    const links = await Promise.all([1, 2, 3].map(() => createInvite(owner.headers, ownerCtx, { email: guestEmail, role: "member" })));
+
+    expect(new Set(links.map((l) => l.link)).size).toBe(1);
+    expect((await listInvitations(ownerCtx)).map((i) => i.email)).toEqual([guestEmail]);
+  });
+
+  it("a person is in a workspace once: a second membership row is refused by the database", async () => {
+    const owner = await signUp("Una Once", email("once"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+
+    const again = db.insert(member).values({ id: crypto.randomUUID(), organizationId: ownerCtx.workspaceId, userId: owner.userId, role: "member", createdAt: new Date() });
+
+    await expect(again).rejects.toThrow();
+    expect((await listMembers(ownerCtx.workspaceId)).map((m) => m.role)).toEqual(["owner"]);
   });
 
   it("a plain member cannot invite, and is told so in plain words", async () => {
@@ -496,6 +520,28 @@ describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
     }
   }
 
+  /** An owner and a shared workspace of theirs (made as the new-workspace form makes one), open on their session. */
+  async function ownerOfShared(name: string, address: string) {
+    const owner = await signUp(name, address);
+    const made = await auth.api.createOrganization({ headers: owner.headers, body: { name: "[int] Shared", slug: workspaceSlug("[int] Shared", crypto.randomUUID().slice(0, 6)) } });
+    const ctx = (await sessionFromHeaders(owner.headers))!;
+    expect(ctx.workspaceId).toBe(made!.id); // Better Auth opens the new workspace on the session
+    return { owner, ctx };
+  }
+
+  // Security review S11, his call (2026-09-24): anyone owns a personal workspace, so an invitation to one was a way for
+  // any account to mint accounts, and to take an address before its real invitation came. Only a shared one opens sign-up.
+  it("does not open sign-up for an invitation to someone's personal workspace, even from its link", async () => {
+    const owner = await signUp("Pia Personal", email("io-personal"));
+    const personal = (await sessionFromHeaders(owner.headers))!;
+    expect(personal.workspaceName).toBe("Pia's workspace");
+    const squatted = email("io-squatted");
+    const { link } = await createInvite(owner.headers, personal, { email: squatted, role: "member" });
+
+    await expect(inInviteMode(() => signUp("Jane Squatted", squatted, idOf(link)))).rejects.toMatchObject(inviteOnly);
+    expect(await accountFor(squatted)).toBe(0);
+  });
+
   it("refuses a sign-up without an invitation, and makes no account", async () => {
     const address = email("uninvited");
     await expect(inInviteMode(() => signUp("Una Invited", address))).rejects.toMatchObject(inviteOnly);
@@ -503,8 +549,7 @@ describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
   });
 
   it("lets the invited person sign up from the invitation's link, whatever the case the email is typed in", async () => {
-    const owner = await signUp("Ingrid Inviter", email("io-owner"));
-    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const { owner, ctx } = await ownerOfShared("Ingrid Inviter", email("io-owner"));
     const guestEmail = email("io-guest");
     const { link } = await createInvite(owner.headers, ctx, { email: guestEmail, role: "member" });
 
@@ -515,8 +560,7 @@ describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
 
   // Security QA: knowing an invited address was enough to make its account first, and then to take the invitation.
   it("refuses an invited email when the sign-up does not come from the invitation's link, and makes no account", async () => {
-    const owner = await signUp("Ines Inviter", email("io-owner3"));
-    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const { owner, ctx } = await ownerOfShared("Ines Inviter", email("io-owner3"));
     const guestEmail = email("io-nolink");
     await createInvite(owner.headers, ctx, { email: guestEmail, role: "admin" });
 
@@ -525,8 +569,7 @@ describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
   });
 
   it("refuses the link of an invitation sent to another email, and a link to no invitation at all", async () => {
-    const owner = await signUp("Ivo Inviter", email("io-owner4"));
-    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const { owner, ctx } = await ownerOfShared("Ivo Inviter", email("io-owner4"));
     const mine = await createInvite(owner.headers, ctx, { email: email("io-mine"), role: "member" });
     const otherEmail = email("io-theirs");
     await createInvite(owner.headers, ctx, { email: otherEmail, role: "member" });
@@ -537,8 +580,7 @@ describe.skipIf(!process.env.DATABASE_URL)("invite-only sign-up", () => {
   });
 
   it("does not open sign-up for a revoked or an expired invitation, even from its link", async () => {
-    const owner = await signUp("Otto Owner", email("io-owner2"));
-    const ctx = (await sessionFromHeaders(owner.headers))!;
+    const { owner, ctx } = await ownerOfShared("Otto Owner", email("io-owner2"));
     const revokedEmail = email("io-revoked");
     const revoked = await createInvite(owner.headers, ctx, { email: revokedEmail, role: "member" });
     await revokeInvite(owner.headers, ctx, idOf(revoked.link));

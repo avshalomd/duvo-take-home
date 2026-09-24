@@ -31,6 +31,7 @@ export function inlineSvgHeaders(name: string): Record<string, string> {
     "Content-Type": "image/svg+xml",
     "Content-Disposition": disposition("inline", name), // "Save image as" keeps the chart's name
     "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    // frame-ancestors here too: the app's own policy is left off this route so it cannot replace this one (F8)
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'",
   };
 }

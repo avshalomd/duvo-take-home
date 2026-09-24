@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { getInvitation } from "@/lib/auth/members";
 import { withNext } from "@/lib/auth/paths";
 import { sessionFromHeaders } from "@/lib/auth/session";
+import { signupMode } from "@/lib/auth/signup-mode";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Invitation - Handover" };
@@ -51,13 +52,20 @@ export default async function InvitePage({ params }: PageProps<"/invite/[id]">) 
   const description = `${invitation.inviterName} invited ${invitation.email} to work together in ${invitation.workspaceName} on Handover.`;
 
   if (!ctx) {
+    // Invite-only: an invitation to someone's own workspace does not make a new account (S11, lib/auth/signup.ts)
+    const noNewAccount = invitation.personal && signupMode() === "invite";
     return (
-      <AuthPanel title={title} description={description}>
+      <AuthPanel
+        title={title}
+        description={noNewAccount ? `${description} It is ${invitation.inviterName}'s own workspace, which a new account cannot join: sign in if you have an account, or ask to be invited to a shared workspace.` : description}
+      >
         <div className="flex flex-col gap-3">
-          <Link href={withNext("/sign-up", here, invitation.email)} className={primary}>
-            Create an account
-          </Link>
-          <Link href={withNext("/sign-in", here, invitation.email)} className={secondary}>
+          {!noNewAccount && (
+            <Link href={withNext("/sign-up", here, invitation.email)} className={primary}>
+              Create an account
+            </Link>
+          )}
+          <Link href={withNext("/sign-in", here, invitation.email)} className={noNewAccount ? primary : secondary}>
             I already have an account
           </Link>
         </div>

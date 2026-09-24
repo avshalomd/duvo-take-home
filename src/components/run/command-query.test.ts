@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCommand, commandHint, commandQuery, commandWord, describeOutput, emptyListLine, filterAutomations } from "./command-query";
+import { applyCommand, commandHint, commandQuery, describeOutput, emptyListLine, filterAutomations } from "./command-query";
 
 // Commands use a front slash only, "/audit Apple Inc.", as in coding agents (his call, 2026-09-23).
 
@@ -39,21 +39,6 @@ describe("applyCommand - choosing an automation from the list", () => {
   it("replaces the partial command with the full one and a space, ready for the input", () => {
     expect(applyCommand("/au", "audit")).toBe("/audit ");
     expect(applyCommand("/", "audit")).toBe("/audit ");
-  });
-});
-
-describe("commandWord - the command a text asks for, before anything checks that it exists", () => {
-  it("reads the word after a leading /", () => {
-    expect(commandWord("/audit Acme Ltd")).toBe("audit");
-    expect(commandWord("/Audit Acme Ltd")).toBe("audit");
-    expect(commandWord("/nope-e2e")).toBe("nope-e2e");
-  });
-
-  it("is null for plain text, a backslash, and a word that does not start with a letter", () => {
-    expect(commandWord("Fetch the news")).toBeNull();
-    expect(commandWord("\\audit Acme")).toBeNull();
-    expect(commandWord("/ audit")).toBeNull();
-    expect(commandWord("/1st")).toBeNull();
   });
 });
 

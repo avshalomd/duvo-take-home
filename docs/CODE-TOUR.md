@@ -95,7 +95,9 @@ Per file: what it does and why it is built that way. Grows at every merge.
   wins. Only decisions that are not "allowed" are recorded, so the timeline stays quiet.
 - `src/lib/agent/guards/url.ts` - code decides first (private hosts, denied domains); Jev is asked only when a query
   string is long enough to carry data out (CSV rows in a query scored 0.94, a long search 0.17). Jev down or slow
-  lets the fetch through, recorded as "unchecked": a guard must not stop honest work.
+  lets the fetch through, recorded as "unchecked": a guard must not stop honest work. `carried.ts` also runs the
+  output scan's personal-data detectors over the decoded path and query (security review S2): `/leak/jane@corp.com`
+  is short, yet it is exactly what must not leave, so it is asked about too.
 - `src/lib/agent/guards/scan.ts` - credentials quarantine a file; personal data (emails, phones, Luhn-checked cards,
   mod-97-checked IBANs) is only counted, because a contact list is often the task.
 - `src/contracts/connection.ts` `isPrivateHost` - one rule for "private or local" shared by the connection form and
@@ -110,6 +112,12 @@ Per file: what it does and why it is built that way. Grows at every merge.
   before opening Home, or the top bar keeps naming the old workspace.
 - `src/app/(auth)/invite/[id]` - explains the invitation before asking anyone to sign in, pre-fills the email, and
   refuses a different signed-in account with "Sign in as ...".
+- `src/lib/auth/organization-writes.ts` - Better Auth's organization writes (create, rename, invite, role, remove,
+  leave, delete) are refused over HTTP by a tiny plugin: the app makes them only through its actions with
+  `auth.api`, where its own rules sit (the member-change lock, name limits, one pending invitation). A request
+  carries `ctx.request`; an `auth.api` call does not, which is how the two are told apart. Deleting a workspace is
+  off altogether (`disableOrganizationDeletion`), and `dueAutomations` joins `organization`, so a schedule whose
+  workspace is gone never fires.
 
 ### engine
 - `src/lib/agent/close.ts` `updateUnlessCancelled` - every exit of the run loop writes through it, so a Stop that
@@ -126,6 +134,10 @@ Per file: what it does and why it is built that way. Grows at every merge.
   be reached, `fail-start.ts` closes the run as failed so it never waits forever.
 - `src/lib/runner/token.ts` - the runner's token is an HMAC of the run id under the sign-in secret, with its own
   label: no new secret to set, and a token seen once starts no other run (the run's own claim stops a replay).
+  `src/app/api/cron/tick/route.ts` compares `CRON_SECRET` the same way, in constant time (S12), and without a secret
+  answers a plain 404 that names no setting (F23).
+- `src/lib/runs/without-machine-paths.ts` - `GET /api/runs/<id>` takes the machine's folder off every path in its
+  answer, as the page does (F20), and drops the started event's own `cwd`.
 - `src/lib/agent/session.ts` - a follow-up resumes the parent's SDK session with `forkSession` when it still exists
   (checked with `getSessionInfo`), and always carries a preamble of what the parent did, because on Vercel /tmp is
   per instance and the session is gone.
@@ -134,6 +146,8 @@ Per file: what it does and why it is built that way. Grows at every merge.
 
 ### eval
 - `src/lib/eval/evaluate.ts` - every verdict records `decidedBy` and `path`, which is what "Why?" shows.
+- `src/lib/eval/run-rows.ts` `forEvaluator` - a file the output scan held back for a credential reaches the judges
+  (third-party services) as `(held back: contains a credential)`, never its content, live and on Check again (S8).
 - `src/lib/eval/template-checks.ts` - a run of a saved automation is also checked against its template: a plan step
   keeps a template step when it holds 40% of its words (filler and `{input}` dropped), a skip with a note counts as
   kept, and the promised files must exist.
@@ -156,8 +170,11 @@ Per file: what it does and why it is built that way. Grows at every merge.
   Details); a v1 verdict without `path` still gets a sensible answer.
 - `src/components/run/use-run-poll.ts` - the event stream first, resumed with `?after=<seq>` when it ends at 280 s;
   a stream that never delivers falls back to polling every 2 s.
-- `src/components/run/command-query.ts` - text starting with `/` is always a command: a mistyped command
-  names itself in an error instead of becoming a paid free-text run.
+- `src/lib/automations/command.ts` `parseCommand` - text starting with `/` and a character that is not a space is
+  always a command, whatever the word (his call, F14): `/über test`, `/2024-report x` and `/audit, Apple` had become
+  paid free-text runs. `runCommand` refuses a name no automation can have ("There's no /über command.") before any
+  lookup, and an unknown valid one in its own words, on Home and on `POST /api/runs` (400) alike.
+  `command-query.ts` only drives the list under the box, which opens for names an automation can have.
 
 ### automations
 - `src/lib/automations/template.ts` `changesThePrompt` - which edits need a new approved example: the template, the
@@ -200,11 +217,30 @@ Per file: what it does and why it is built that way. Grows at every merge.
   is the proof of holding the link, so these hooks keep it for owners and admins (Q167).
 - `src/lib/auth/invitation-cookie.ts`, `src/proxy.ts` - in invite mode an account needs the invitation's link, not
   just its email: the invitation page's visit leaves the id in an httpOnly cookie on `/api/auth`, which reaches the
-  email sign-up and Google's callback alike, and `assertMayCreateAccount` checks it belongs to that email.
+  email sign-up and Google's callback alike, and `assertMayCreateAccount` checks it belongs to that email. An
+  invitation to a personal workspace opens no account (S11, his call): every account owns one, so it let any account
+  mint accounts or take an address first. Nothing marks a personal workspace but its slug, whose suffix is the start
+  of its own id (`isPersonalWorkspace`, workspace-name.ts); the invitation and sign-up pages say so in words.
 - `src/lib/runs/limits.ts` - a deployment-wide cap of six runs in flight under a second advisory lock, beside each
   workspace's own limits: every account can make workspaces, and they all spend one key (Q175).
+- `src/lib/usage/deployment-budget.ts` - and a deployment-wide cap on a day's money (S1, his call): today's finished
+  runs of every workspace plus each run in flight at its most ($1), read under that same global lock, against
+  `DEPLOYMENT_DAILY_BUDGET_USD` (default $50; a value that is not an amount keeps the default). A file of its own,
+  apart from the workspace's budget. `src/lib/auth/workspace-limit.ts` - a person owns at most five workspaces, the
+  personal one included: asked in the action for the words, and held for every caller by `organizationLimit`.
 - `next.config.ts` headers - no framing (`X-Frame-Options`, `frame-ancestors 'none'`), `nosniff`, a referrer policy
-  and no `X-Powered-By` on every route (Q173).
+  and no `X-Powered-By` on every route (Q173). The content policy also says `object-src 'none'; base-uri 'none';
+  script-src 'self' 'unsafe-inline'` (S13): static, so pages stay cacheable; inline because Next's hydration data is
+  inline script. It is left off `/api/runs/<id>/files/*` by a negative lookahead in its `source`: a config header
+  replaces a route's header of the same name, which had stripped the inline chart's sandbox policy (F8);
+  `e2e/headers.spec.ts` checks both on real responses.
+- `src/db/unique-violation.ts` - a check before a write cannot see a write racing it, so the unique index decides and
+  the store answers its refusal (Postgres 23505, looked for through Drizzle's wrapped cause) in its own words: a
+  connection's name key per workspace (`connections_ws_key`, an expression index on the key `connectionKey` makes,
+  F6) and an automation's command (`automations_ws_command`, F7).
+- `src/contracts/text.ts` `noNul` - one Zod rule for a NUL character, which Postgres refuses in text and which had
+  surfaced as an empty 500 (F1); the run, follow-up, automation, judgment, connection and workspace schemas use it,
+  and Better Auth's names are checked in its hooks (`src/lib/auth/names.ts`).
 
 ### Roles and limits (his decisions after the deep QA: Q169, Q176-Q178)
 - `src/lib/auth/member-rules.ts` - who may change whose role or remove whom, as plain functions the page and the
@@ -221,7 +257,9 @@ Per file: what it does and why it is built that way. Grows at every merge.
   cannot be used to make paid calls; the database is asked every time.
 - `src/lib/auth/members.ts` - role changes and removals run one at a time per workspace, under an advisory lock
   inside a transaction, with the owners re-counted under it: two owners demoting each other at once left none (Q211).
-  Removing or demoting an admin closes the invitations they sent, in the same step (Q213).
+  Removing or demoting an admin closes the invitations they sent, in the same step (Q213). `createInvite` runs under
+  a lock of its own per workspace, so three invitations to one address sent at once leave one pending, and
+  `member_org_user_uidx` (auth-schema.ts, ours) keeps a person in a workspace once (F5).
 - `src/lib/automations/permissions.ts` `hasBeenApproved` - the command of an automation approved once stays an owner's
   or an admin's to change, even after an edit sends it back to draft; the save's SQL repeats the check (Q212, Q225).
 - `src/lib/auth/session.ts` - in a Server Action (Next's `next-action` header) a workspace the user has left is not

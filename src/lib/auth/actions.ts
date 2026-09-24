@@ -6,10 +6,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { WorkspaceSummary } from "@/contracts/auth";
+import { noNul } from "@/contracts/text";
 import { auth } from "./auth";
 import { listWorkspaces, revokeInvitation } from "./members";
 import { safeNext, withNext } from "./paths";
 import { requireSession } from "./session";
+import { workspaceLimitRefusal } from "./workspace-limit";
 import { workspaceSlug } from "./workspace-name";
 
 /**
@@ -48,14 +50,17 @@ export async function trySwitchWorkspace(workspaceId: string): Promise<SwitchSta
 
 export type NewWorkspaceState = { error?: string; name?: string };
 
-const NewWorkspace = z.object({ name: z.string().trim().min(1, "Give the workspace a name").max(60, "Keep the name under 60 characters") });
+const NewWorkspace = z.object({ name: noNul(z.string().trim().min(1, "Give the workspace a name").max(60, "Keep the name under 60 characters")) });
 
 /** A new, empty workspace with the user as its owner; Better Auth makes it the active one. */
 export async function createWorkspace(_prev: NewWorkspaceState, form: FormData): Promise<NewWorkspaceState> {
-  await requireSession();
+  const ctx = await requireSession();
   const parsed = NewWorkspace.safeParse({ name: form.get("name") });
   if (!parsed.success) return { error: parsed.error.issues[0].message, name: String(form.get("name") ?? "") };
   const { name } = parsed.data;
+  // asked here for the words; Better Auth's organizationLimit (auth.ts) holds the same rule for any other caller
+  const tooMany = await workspaceLimitRefusal(ctx.userId);
+  if (tooMany) return { error: tooMany, name };
   await auth.api.createOrganization({
     headers: await headers(),
     body: { name, slug: workspaceSlug(name, crypto.randomUUID().slice(0, 6)) },
@@ -69,12 +74,17 @@ export async function signOut(next?: string) {
   redirect(withNext("/sign-in", safeNext(next)));
 }
 
+// An invitation's id as Better Auth makes it; anything else (a forged call's) matches no invitation.
+const InvitationId = z.string().min(1).max(100);
+const INVITATION_GONE = "This invitation has expired or was already used. Ask for a new link.";
+
 /** Revokes a pending invitation of the active workspace; the Members page re-renders without it. */
 export async function revokeInvitationAction(invitationId: string): Promise<{ error?: string }> {
   const ctx = await requireSession();
-  const id = z.string().min(1).max(100).parse(invitationId);
+  const id = InvitationId.safeParse(invitationId); // a forged call's id: refused in words, not thrown (F16)
+  if (!id.success) return { error: "That invitation is no longer pending." };
   try {
-    await revokeInvitation(ctx, id);
+    await revokeInvitation(ctx, id.data);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "That invitation could not be revoked." }; // our own plain sentences
   }
@@ -87,12 +97,14 @@ export type AcceptState = { error?: string };
 /** Accepts the invitation for the signed-in user and lands them in its workspace (Better Auth makes it active). */
 export async function acceptInvitation(invitationId: string): Promise<AcceptState> {
   await requireSession();
+  const id = InvitationId.safeParse(invitationId); // not a string, or no id's length: no invitation has it (F16)
+  if (!id.success) return { error: INVITATION_GONE };
   try {
-    await auth.api.acceptInvitation({ headers: await headers(), body: { invitationId } });
+    await auth.api.acceptInvitation({ headers: await headers(), body: { invitationId: id.data } });
   } catch (e) {
     const code = e instanceof APIError ? e.body?.code : undefined;
     if (code === "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION") return { error: "This invitation was sent to another email address." };
-    if (code === "INVITATION_NOT_FOUND") return { error: "This invitation has expired or was already used. Ask for a new link." };
+    if (code === "INVITATION_NOT_FOUND") return { error: INVITATION_GONE };
     throw e; // anything else is a real failure: the error page, with the stack in the log
   }
   openWorkspaceHome();

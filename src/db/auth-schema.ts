@@ -110,6 +110,8 @@ export const member = pgTable(
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
     index("member_userId_idx").on(table.userId),
+    // Ours, not generated (keep it on a regenerate): a person is in a workspace once (QA F5)
+    uniqueIndex("member_org_user_uidx").on(table.organizationId, table.userId),
   ],
 );
 

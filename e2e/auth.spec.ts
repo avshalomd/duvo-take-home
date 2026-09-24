@@ -133,7 +133,7 @@ test("pages and the API tell the browser they may not be framed, and do not name
   const apiHeaders = (await request.get("/api/runs", { maxRedirects: 0 })).headers();
   for (const h of [pageHeaders, apiHeaders]) {
     expect(h["x-frame-options"]).toBe("DENY");
-    expect(h["content-security-policy"]).toBe("frame-ancestors 'none'");
+    expect(h["content-security-policy"]).toContain("frame-ancestors 'none'"); // the rest of the policy: headers.spec.ts (S13)
     expect(h["x-content-type-options"]).toBe("nosniff");
     expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
     expect(h["x-powered-by"]).toBeUndefined();

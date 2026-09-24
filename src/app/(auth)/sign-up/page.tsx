@@ -42,5 +42,6 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
 
 async function fromOpenInvitation(next: string): Promise<boolean> {
   const id = invitationIdFrom(next);
-  return id ? Boolean((await getInvitation(id))?.open) : false;
+  const invitation = id ? await getInvitation(id) : null;
+  return Boolean(invitation?.open && !invitation.personal); // one to a personal workspace opens no account (S11)
 }

@@ -42,6 +42,15 @@ describe("parseLimitsForm", () => {
     expect(!out.ok && out.fieldErrors.dailyBudgetUsd?.[0]).toMatch(/amount in dollars/);
   });
 
+  // QA F17: $0.001 was saved, and the refusal it caused read "its $0.00 budget"
+  it("refuses a budget with a fraction of a cent, in a sentence", () => {
+    const out = parseLimitsForm(form({ ...valid, dailyBudgetUsd: "0.001" }));
+    expect(out.ok).toBe(false);
+    expect(!out.ok && out.fieldErrors.dailyBudgetUsd?.[0]).toBe("Give an amount in dollars and whole cents between 0 and 1000, for example 5 or 2.50.");
+    expect(parseLimitsForm(form({ ...valid, dailyBudgetUsd: "0.07" })).ok).toBe(true);
+    expect(parseLimitsForm(form({ ...valid, dailyBudgetUsd: "19.99" })).ok).toBe(true);
+  });
+
   it("refuses a negative budget or one over 1000 dollars", () => {
     expect(parseLimitsForm(form({ ...valid, dailyBudgetUsd: "-1" })).ok).toBe(false);
     expect(parseLimitsForm(form({ ...valid, dailyBudgetUsd: "1001" })).ok).toBe(false);

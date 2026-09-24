@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isPrivateHost } from "@/lib/net/address";
+import { noNul } from "./text";
 
 // A connection is one of the user's MCP servers over http. The token never leaves the server: the UI gets hasToken.
 export const Transport = z.enum(["http", "sse"]);
@@ -26,6 +27,7 @@ export { isPrivateHost }; // the rule, re-exported beside the schema that uses i
 export const PRIVATE_ADDRESS = "That address points at a private or local network, which a connection cannot reach";
 export const publicHttpUrl = z
   .url("Give the server's full address, starting with https://")
+  .max(2000, "Keep the address under 2000 characters") // longer is no server's address, only a way to fill the table (F21)
   .refine((u) => /^https?:\/\//i.test(u), "Only http:// or https:// addresses can be connected")
   .refine((u) => { try { return !isPrivateHost(new URL(u).hostname); } catch { return false; } }, PRIVATE_ADDRESS);
 
@@ -42,7 +44,7 @@ export const NewConnection = z.object({
     .refine((n) => !RESERVED_KEYS.includes(n.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")), "That name is taken by a built-in tool; choose another"),
   url: publicHttpUrl,
   transport: Transport.default("http"),
-  token: z.string().trim().optional(), // sent as Authorization: Bearer <token>
+  token: noNul(z.string().trim()).optional(), // sent as Authorization: Bearer <token>
   authType: z.enum(["none", "bearer", "oauth"]).optional(), // oauth: signed in through the server's own sign-in page
 });
 export type NewConnection = z.infer<typeof NewConnection>;

@@ -8,8 +8,9 @@ import { AGENT_MODEL } from "@/lib/agent/run";
 import { enqueueRun } from "@/lib/runner/enqueue";
 import { closeAbandonedRuns, holdsASlot } from "@/lib/runner/recover";
 import { checkBudget } from "@/lib/usage/budget";
+import { deploymentBudgetReason, deploymentDailyBudget, deploymentSpentToday } from "@/lib/usage/deployment-budget";
 import { clientIp } from "./client-ip";
-import { RunLimitError, startBlockReason, startsByIp } from "./limits";
+import { MAX_IN_FLIGHT, RunLimitError, startBlockReason, startsByIp } from "./limits";
 
 /** The route hands its own request headers in; the Server Action has none to hand, so it reads the request's. */
 async function callerIp(given?: string | null): Promise<string> {
@@ -51,6 +52,12 @@ export const startRun: StartRun = async (ctx, req, ip) => {
     // own key space in Postgres: it can never be the same lock as a workspace's one-key hashtext lock.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('handover:run-starts'), 0)`);
     const [live] = await tx.select({ n: count() }).from(runs).where(holdsASlot(new Date()));
+    // The deployment's money for today, under the same lock (S1): today's spend plus each run in flight at its most.
+    // Asked after the runs-in-flight cap (limits.ts) and before the per-address bucket, so a refused visitor keeps a token.
+    if (live.n < MAX_IN_FLIGHT) {
+      const money = deploymentBudgetReason({ spentTodayUsd: await deploymentSpentToday(tx, new Date()), inFlight: live.n, budgetUsd: deploymentDailyBudget() });
+      if (money) throw new RunLimitError(money);
+    }
     // Then the per-address brake from v1, which stops one client flooding starts (a schedule has no address).
     const reason = startBlockReason({ inFlight: live.n, ip: address, now: Date.now(), bucket: startsByIp });
     if (reason) throw new RunLimitError(reason);

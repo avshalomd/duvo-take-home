@@ -5,15 +5,21 @@ import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { APIError } from "better-auth/api";
 import { invitationIdFromCookies } from "./invitation-cookie";
+import { userNameRefusal, workspaceNameRefusal } from "./names";
 import { refuseInvitationLists, stripInvitationsForMembers } from "./invitation-privacy";
+import { organizationWritesGuard } from "./organization-writes";
+import { trustedOrigins } from "./origins";
+import { MAX_OWNED_WORKSPACES, ownedWorkspaceCount } from "./workspace-limit";
 import { googleConfigured } from "./providers";
 import { assertMayCreateAccount } from "./signup";
 import { createPersonalWorkspace, firstWorkspaceId } from "./workspaces";
 
-// Local dev servers: main on 3000, each worktree on 3001+. Better Auth refuses a sign-in whose Origin it does not
-// trust, and BETTER_AUTH_URL names only one of them.
-const LOCAL_ORIGINS = Array.from({ length: 11 }, (_, i) => `http://localhost:${3000 + i}`);
+/** A name rule's refusal as Better Auth's 400, whose code the forms turn into a sentence (errors.ts). */
+function refuseName(refusal: ReturnType<typeof userNameRefusal>): void {
+  if (refusal) throw new APIError("BAD_REQUEST", { code: refusal.code, message: refusal.message });
+}
 
 /**
  * Sign-in and workspaces. Better Auth keeps users, sessions and accounts in our Postgres through Drizzle; its
@@ -28,7 +34,7 @@ export const auth = betterAuth({
   socialProviders: googleConfigured()
     ? { google: { clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! } }
     : {},
-  trustedOrigins: LOCAL_ORIGINS,
+  trustedOrigins: trustedOrigins(), // the local dev servers, outside production only (origins.ts)
   // Tries per client address and path (Q176). Better Auth turns this on only when NODE_ENV is production and counts in
   // each server's memory, so on Vercel every function instance kept a count of its own. On everywhere (development and
   // the tests meet what production does), counted in the rate_limit table (db/schema.ts) that every instance shares.
@@ -48,12 +54,18 @@ export const auth = betterAuth({
         // SIGNUP_MODE=invite: no account without the invitation's link, however it is asked for (form, API, Google).
         // The form's request and Google's callback both carry the cookie the invitation page left.
         before: async (user, ctx) => {
+          refuseName(userNameRefusal(user.name)); // capped, and no NUL character, however the name arrives (F1, F21)
           const cookies = (ctx?.headers ?? ctx?.request?.headers)?.get("cookie");
           await assertMayCreateAccount(user.email, invitationIdFromCookies(cookies));
         },
         // Every new account, by password or by Google, gets its own workspace with the user as owner.
         after: async (user) => {
           await createPersonalWorkspace(user);
+        },
+      },
+      update: {
+        before: async (data) => {
+          if (typeof data.name === "string") refuseName(userNameRefusal(data.name));
         },
       },
     },
@@ -70,7 +82,23 @@ export const auth = betterAuth({
   },
   // Invitation ids go to owners and admins only (lib/auth/invitation-privacy.ts): the plugin would give them to any member.
   hooks: { before: refuseInvitationLists, after: stripInvitationsForMembers },
-  plugins: [organization(), nextCookies()], // nextCookies last: it sets cookies from Server Actions
+  plugins: [
+    // No screen deletes a workspace: its runs, connections and schedules have no foreign key to it and would outlive it (S4)
+    organization({
+      disableOrganizationDeletion: true,
+      // at most five owned, the personal one included (S1): true refuses the new one (workspace-limit.ts)
+      organizationLimit: async (user) => (await ownedWorkspaceCount(user.id)) >= MAX_OWNED_WORKSPACES,
+      organizationHooks: {
+        // the new-workspace form's limit, held for every caller of Better Auth (F21); no NUL character (F1)
+        beforeCreateOrganization: async ({ organization: o }) => refuseName(workspaceNameRefusal(o.name ?? "")),
+        beforeUpdateOrganization: async ({ organization: o }) => {
+          if (typeof o.name === "string") refuseName(workspaceNameRefusal(o.name));
+        },
+      },
+    }),
+    organizationWritesGuard(), // the org writes only through our actions, never over HTTP (organization-writes.ts)
+    nextCookies(), // last: it sets cookies from Server Actions
+  ],
 });
 
 export type Auth = typeof auth;

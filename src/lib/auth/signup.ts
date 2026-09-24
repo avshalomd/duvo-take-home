@@ -2,15 +2,21 @@ import "server-only";
 import { APIError } from "better-auth/api";
 import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { invitation } from "@/db/schema";
+import { invitation, organization } from "@/db/schema";
 import { INVITE_ONLY, INVITE_ONLY_CODE } from "./errors";
 import { signupMode } from "./signup-mode";
+import { isPersonalWorkspace } from "./workspace-name";
 
-/** True when this invitation is for this email and nobody has used, revoked or let it expire. */
+/**
+ * True when this invitation is for this email, nobody has used, revoked or let it expire, and it is to a shared
+ * workspace. An invitation to a personal one does not open sign-up (security review S11, his call): every account owns
+ * one, so it let any account mint new ones, or take an address before its real invitation came.
+ */
 export async function invitationOpensSignUp(invitationId: string, email: string): Promise<boolean> {
   const [row] = await db
-    .select({ id: invitation.id })
+    .select({ workspaceId: organization.id, slug: organization.slug })
     .from(invitation)
+    .innerJoin(organization, eq(organization.id, invitation.organizationId))
     .where(
       and(
         eq(invitation.id, invitationId),
@@ -21,7 +27,7 @@ export async function invitationOpensSignUp(invitationId: string, email: string)
       ),
     )
     .limit(1);
-  return Boolean(row);
+  return Boolean(row) && !isPersonalWorkspace({ id: row.workspaceId, slug: row.slug });
 }
 
 /**

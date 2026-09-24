@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db";
-import { automations } from "@/db/schema";
+import { automations, organization } from "@/db/schema";
 import { AutomationTemplate } from "@/contracts/automation";
 import type { TickSchedules } from "@/contracts/runner";
 import { fillTemplate } from "@/lib/automations/template";
@@ -18,10 +18,15 @@ const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * A slot that starts no run - refused by a limit, or over an hour late - is recorded on the automation with the reason,
  * shown beside its schedule; the next scheduled start clears it (engine review #6).
  */
-export const tickSchedules: TickSchedules = async (now) => {
-  const candidates = await db
-    .select()
+/**
+ * The active schedules that are due, of workspaces that still exist: automations have no foreign key to their
+ * workspace, and one whose workspace is gone must never start paid runs nobody can see or stop (security review S4).
+ */
+export async function dueAutomations(now: Date) {
+  const rows = await db
+    .select({ automation: automations })
     .from(automations)
+    .innerJoin(organization, eq(organization.id, automations.workspaceId))
     .where(
       and(
         eq(automations.status, "active"),
@@ -29,6 +34,11 @@ export const tickSchedules: TickSchedules = async (now) => {
         or(isNull(automations.nextRunAt), lte(automations.nextRunAt, now)), // null: just scheduled, compute its first slot
       ),
     );
+  return rows.map((r) => r.automation);
+}
+
+export const tickSchedules: TickSchedules = async (now) => {
+  const candidates = await dueAutomations(now);
 
   const started: string[] = [];
   for (const a of candidates) {

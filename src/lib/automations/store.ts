@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, gte, like, lt, ne, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { automations, runs } from "@/db/schema";
+import { isUniqueViolation } from "@/db/unique-violation";
 import {
   AutomationStatus,
   AutomationTemplate,
@@ -26,7 +27,7 @@ import { RunStatus } from "@/contracts/run";
 import { listConnections } from "@/lib/connections/store";
 import { nextRunAfter } from "@/lib/runner/next-run";
 import { startRun } from "@/lib/runs/start";
-import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName } from "./command";
+import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName, unknownCommandRefusal } from "./command";
 import { missingConnections } from "./connections";
 import { AutomationError } from "./errors";
 import { APPROVED_COMMAND_LOCKED } from "./permissions";
@@ -171,13 +172,14 @@ export const createAutomationDraft: CreateAutomationDraft = async (ctx, draft, f
 export const updateAutomation = (async (workspaceId: string, id: string, edit: AutomationEdit, { mayRenameApproved = false } = {}) => {
   const current = await mustGet(workspaceId, id);
   const renames = edit.command !== current.command;
-  if (renames) {
+  const refuseClash = async () => {
     const [clash] = await db
       .select({ name: automations.name })
       .from(automations)
       .where(and(eq(automations.workspaceId, workspaceId), eq(automations.command, edit.command), ne(automations.id, id)));
     if (clash) throw new AutomationError(`/${edit.command} is already used by "${clash.name}". Pick another command.`);
-  }
+  };
+  if (renames) await refuseClash();
   const neverApproved = and(
     eq(automations.status, "draft"),
     // hasBeenApproved in SQL: no example of an earlier version marked looks right, which an approval would have needed
@@ -204,7 +206,13 @@ export const updateAutomation = (async (workspaceId: string, id: string, edit: A
     })
     // read as the row is before this write: an edit that sends it back to draft in the same save does not open the rename
     .where(and(inWorkspace(workspaceId, id), renames && !mayRenameApproved ? neverApproved : undefined))
-    .returning();
+    .returning()
+    .catch(async (e) => {
+      // another rename to this command landed after the check above (F7): the index decides, the words stay ours
+      if (!isUniqueViolation(e, "automations_ws_command")) throw e;
+      await refuseClash();
+      throw new AutomationError(`/${edit.command} was just taken. Pick another command.`); // the winner was deleted since
+    });
   if (!row) {
     await mustGet(workspaceId, id); // deleted meanwhile: say that, not the rename rule
     throw new AutomationError(APPROVED_COMMAND_LOCKED);
@@ -294,9 +302,14 @@ const FINISHED = ["succeeded", "failed", "cancelled"];
  * needs a run that succeeded; "not right" fits any ending. A second judgment replaces the first, judge included.
  */
 export const setHumanVerdict: SetHumanVerdict = async ({ workspaceId, userId }, input) => {
-  const { runId, verdict, note } = HumanVerdictInput.parse(input);
-  const [run] = await db.select({ status: runs.status }).from(runs).where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
+  const { automationId, runId, verdict, note } = HumanVerdictInput.parse(input);
+  const [run] = await db
+    .select({ status: runs.status, purpose: runs.purpose, automationId: runs.automationId })
+    .from(runs)
+    .where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
   if (!run) throw new AutomationError("That run was not found.");
+  // QA F10: the judgment is an example's, on its automation's page; a plain run or another automation's is not one
+  if (run.purpose !== "trial" || run.automationId !== automationId) throw new AutomationError("That run is not an example of this automation.");
   if (!FINISHED.includes(run.status)) throw new AutomationError("This example is still running. Judge it when it has finished.");
   if (verdict === "approved" && run.status !== "succeeded") throw new AutomationError("This example failed, so it cannot be marked as looks right.");
   await db
@@ -331,6 +344,8 @@ export const startTrial: StartTrial = async (ctx, automationId, rawInput) => {
 /** "/audit Apple Inc." from the Home box or the Run box: only an approved, switched-on automation runs. */
 export const runCommand: RunCommand = async (ctx, parsed) => {
   const command = parsed.command.toLowerCase();
+  const impossible = unknownCommandRefusal(command); // "/über": no automation can be called that (F14)
+  if (impossible) throw new AutomationError(impossible);
   const a = await getActiveByCommand(ctx.workspaceId, command);
   if (!a) {
     const any = await getByCommand(ctx.workspaceId, command);
@@ -351,8 +366,12 @@ export const runCommand: RunCommand = async (ctx, parsed) => {
   });
 };
 
-/** Removes the automation. Its runs stay in the history; their automation id then points at nothing, which reads as a plain run. */
-export async function deleteAutomation(workspaceId: string, id: string): Promise<void> {
-  if (!isUuid(id)) return;
-  await db.delete(automations).where(inWorkspace(workspaceId, id));
+/**
+ * Removes the automation, and says whether there was one to remove (F11: another workspace's id or one already gone).
+ * Its runs stay in the history; their automation id then points at nothing, which reads as a plain run.
+ */
+export async function deleteAutomation(workspaceId: string, id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+  const deleted = await db.delete(automations).where(inWorkspace(workspaceId, id)).returning({ id: automations.id });
+  return deleted.length > 0;
 }

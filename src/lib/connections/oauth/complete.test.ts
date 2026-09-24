@@ -135,4 +135,35 @@ describe("completeOAuth", () => {
     expect(stored().pending).toBeNull();
     expect(stored().tokens).toBeNull();
   });
+
+  // Security review S3: the tokens were written over whatever the row held after the exchange, so an admin moving the
+  // connection to another server during the exchange had the owner's fresh tokens sent there by the next run.
+  it("stores no tokens on a connection moved to another server during the exchange, and says the sign-in expired", async () => {
+    waitingConnection();
+    network.current = tokenServer(() => {
+      const row = rows.get(CONNECTION_ID)!;
+      row.url = "https://attacker.example/mcp"; // what updateConnection does to a moved connection
+      row.oauth = null;
+      return json({ access_token: "at-1", refresh_token: "rt-1", expires_in: 3600, token_type: "Bearer" });
+    });
+
+    const failed = completeOAuth({ code: "code-1", state: STATE, redirectUri: REDIRECT });
+
+    await expect(failed).rejects.toMatchObject({ code: "expired" });
+    expect(rows.get(CONNECTION_ID)!.oauth).toBeNull();
+    expect(rows.get(CONNECTION_ID)!.authType).toBe("none");
+  });
+
+  it("stores no tokens when a new sign-in was started during the exchange, and leaves that one waiting", async () => {
+    waitingConnection();
+    const newer = { state: "N".repeat(43), verifierEnc: seal("verifier-2"), createdAt: minutesAgo(0) };
+    network.current = tokenServer(() => {
+      rows.get(CONNECTION_ID)!.oauth = blob({ pending: newer });
+      return json({ access_token: "at-1", refresh_token: "rt-1", expires_in: 3600, token_type: "Bearer" });
+    });
+
+    await expect(completeOAuth({ code: "code-1", state: STATE, redirectUri: REDIRECT })).rejects.toMatchObject({ code: "expired" });
+    expect(stored().pending).toEqual(newer);
+    expect(stored().tokens).toBeNull();
+  });
 });

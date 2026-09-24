@@ -8,6 +8,7 @@ export const notes = pgTable("notes", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+import { sql } from "drizzle-orm";
 import { bigint, boolean, index, integer, jsonb, real, uniqueIndex } from "drizzle-orm/pg-core";
 
 // Users, sessions and workspaces (Better Auth; its "organization" is our workspace). Generated: `npx @better-auth/cli generate`.
@@ -80,6 +81,7 @@ export const files = pgTable("files", {
 });
 
 // The user's MCP servers. Only http/sse: a stdio server needs a command on the host.
+export const CONNECTIONS_WS_KEY = "connections_ws_key";
 export const connections = pgTable("connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: text("workspace_id"),
@@ -95,7 +97,11 @@ export const connections = pgTable("connections", {
   enabled: boolean("enabled").notNull().default(true),
   lastStatus: text("last_status"), // from the last run's init message
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  // A name's key (lib/connections/key.ts, written in SQL) once per workspace (F6): the store's check before a write
+  // cannot see a write racing it, and a run registers each server under that key, so one would replace the other.
+  uniqueIndex(CONNECTIONS_WS_KEY).on(t.workspaceId, sql`trim(both '_' from regexp_replace(lower(name), '[^a-z0-9]+', '_', 'g'))`),
+]);
 
 // A saved automation: a template the user drafted from a run, tested on examples, approved, and now calls as
 // "/<command> <input>". An edit bumps the version and sends it back to draft until an example is approved again.

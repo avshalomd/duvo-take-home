@@ -66,5 +66,8 @@ export async function leftWorkspaceRefusal(): Promise<string | null> {
 /** Route handlers: the session, or null so the route answers 401 instead of redirecting a fetch. */
 export const sessionFromHeaders: SessionFromHeaders = async (requestHeaders) => (await resolve(requestHeaders))?.ctx ?? null;
 
-/** The lookup with its headers passed in, as a request would carry them: for the integration test. */
+/**
+ * The lookup with its headers passed in, with `left`: for a route handler that writes without naming a record
+ * (POST /api/runs, F15), and for the integration test.
+ */
 export const resolveSession = resolve;

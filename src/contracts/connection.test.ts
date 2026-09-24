@@ -82,6 +82,14 @@ describe("NewConnection", () => {
     expect(parsed.transport).toBe("http");
   });
 
+  // QA F21: a 5,020-character address was saved
+  it("takes an address of up to 2000 characters and refuses a longer one in plain words", () => {
+    const at = (length: number) => `https://example.com/${"a".repeat(length - "https://example.com/".length)}`;
+    expect(NewConnection.safeParse({ name: "Long", url: at(2000) }).success).toBe(true);
+    const parsed = NewConnection.safeParse({ name: "Long", url: at(2001) });
+    expect(parsed.error?.issues[0].message).toBe("Keep the address under 2000 characters");
+  });
+
   it("defaults the transport to http when the form does not send one", () => {
     const parsed = NewConnection.parse({ name: "DeepWiki", url: "https://mcp.deepwiki.com/mcp" });
     expect(parsed.transport).toBe("http");
