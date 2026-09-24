@@ -281,3 +281,22 @@ Per file: what it does and why it is built that way. Grows at every merge.
 - `automations.last_skipped_at` / `last_skipped_reason`, `src/lib/runner/skip-reason.ts` - a slot that started no run
   (a limit refused it, or it was late) is kept with its reason in plain words and shown beside the schedule; the next
   scheduled start clears it.
+
+### UX QA round (2026-09-24, U1-U19)
+- `src/components/run/run-sheet.tsx` `STEPS_ASIDE`, `actions-row.tsx` `data-asking` - while Ask for a change is open
+  the floating composer sinks and fades (CSS `:has()` on the sheet, no state passed between them) and turns invisible,
+  so there is one box and Send is never under the capsule; `follow-up-form.tsx` scrolls itself into view and has Cancel
+  and Escape.
+- `src/components/run/pending-sheet.tsx`, `composer.tsx` `ComposerStandIn` - the sheet shown at the press of Run is the
+  live page's skeleton (inert Stop and Details, the plan, What it made, the composer's capsule from the same constants),
+  so the real page replaces it with only words changing; `e2e/flow.spec.ts` measures both at 1280 and 390.
+- `src/components/run/relative-time.ts` - past today a run's time counts calendar days in the reader's zone with the
+  rail's own `dayKey`/`dayLabel`, so the header and the rail agree; `fullDate` is the tooltip, built from parts in a
+  fixed order. `time-ago.tsx` reads the reader's clock through `useSyncExternalStore` (UTC on the server).
+- `src/components/run/markdown.ts` - a paragraph keeps its single line breaks as `br` spans, each line parsed on its own.
+- `src/app/layout.tsx`, `settings/layout.tsx` title templates, `src/app/(app)/tab-title.ts` - every page names itself
+  in the tab; Home and an automation read their record through React `cache`, once for the title and once for the page.
+- `src/components/settings/role-words.ts` - one set of words for the roles, in the role menu and the invite's helper.
+- `src/lib/automations/form.ts` `changesWhatTheAgentIsTold` - the editor asks the save's own rule (`changesThePrompt`)
+  of the form on every change, to tell an approver beside Save that saving takes the command out of use.
+- `src/components/thread/thread.tsx` `planOnly` - a plan nobody has run (the gallery) reads its steps with no state.
