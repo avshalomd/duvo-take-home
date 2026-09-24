@@ -19,10 +19,16 @@ vi.mock("@/lib/runs/queries", () => ({ getRun: vi.fn() }));
 vi.mock("@/lib/runs/run-again", () => ({ startRunAgain: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+// the spend limit's double runs the work, as the real one does when the limit lets it through
+vi.mock("@/lib/usage/model-spend", () => ({
+  payForModelCall: vi.fn(async (_ctx: unknown, _kind: string, work: () => Promise<unknown>) => work()),
+}));
 
 import { AutomationError } from "@/lib/automations/errors";
 import { reevaluateRun } from "@/lib/eval/reevaluate";
 import { getRun } from "@/lib/runs/queries";
+import { payForModelCall } from "@/lib/usage/model-spend";
+import { SpendLimitError } from "@/lib/usage/spend-error";
 import { reevaluateAction, startRunAction } from "./actions";
 
 function form(prompt: string): FormData {
@@ -78,6 +84,21 @@ describe("Check again", () => {
   it("on a run still working says to wait for it to finish", async () => {
     vi.mocked(getRun).mockResolvedValue({ run: { status: "running" } } as Awaited<ReturnType<typeof getRun>>);
     expect(await pressed()).toEqual({ error: "Only a run that has finished can be checked again" });
+    expect(reevaluateRun).not.toHaveBeenCalled();
+  });
+
+  // QA F18 / security S10: each press is a paid judge call, so it is limited and counted in the day's spend
+  it("on a finished run is paid for as this workspace's re-check of this run", async () => {
+    vi.mocked(getRun).mockResolvedValue({ run: { status: "succeeded" } } as Awaited<ReturnType<typeof getRun>>);
+    expect(await pressed()).toEqual({});
+    expect(payForModelCall).toHaveBeenCalledWith({ workspaceId: "ws-own", runId: RUN }, "recheck", expect.any(Function));
+    expect(reevaluateRun).toHaveBeenCalledWith(RUN);
+  });
+
+  it("pressed again within the minute says when to try again, in plain words", async () => {
+    vi.mocked(getRun).mockResolvedValue({ run: { status: "succeeded" } } as Awaited<ReturnType<typeof getRun>>);
+    vi.mocked(payForModelCall).mockRejectedValueOnce(new SpendLimitError("This result was checked a moment ago. Try again in 40 seconds."));
+    expect(await pressed()).toEqual({ error: "This result was checked a moment ago. Try again in 40 seconds." });
     expect(reevaluateRun).not.toHaveBeenCalled();
   });
 });

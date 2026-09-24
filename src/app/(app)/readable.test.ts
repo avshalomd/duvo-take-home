@@ -4,6 +4,7 @@ import { LlmError } from "@/lib/llm/errors";
 import { CancelError } from "@/lib/runs/cancel";
 import { FollowUpError } from "@/lib/runs/follow-up";
 import { RunLimitError } from "@/lib/runs/limits";
+import { SpendLimitError } from "@/lib/usage/spend-error";
 import { readable } from "./readable";
 
 // Q60: an action's catch block used to hand the browser any Error.message, which is where a Postgres error puts
@@ -12,6 +13,13 @@ describe("readable", () => {
   it("forwards a model failure, which is already written for the user", () => {
     expect(readable(new LlmError("The model took too long (60 s). Retry.", "timeout"))).toBe(
       "The model took too long (60 s). Retry.",
+    );
+  });
+
+  // F18 / S10: Check again's limit and the day's money, written for the person
+  it("forwards a spend limit's refusal, which says when to try again", () => {
+    expect(readable(new SpendLimitError("This result was checked a moment ago. Try again in 40 seconds."))).toBe(
+      "This result was checked a moment ago. Try again in 40 seconds.",
     );
   });
 
