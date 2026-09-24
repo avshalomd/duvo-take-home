@@ -35,10 +35,11 @@ const readsOutside = (tool: string) => tool === "WebFetch" || tool === "WebSearc
  * Whether the in-bounds question means anything for this run. A run that read no page, no search result and no
  * connection had nothing that could give it orders: code knows that, so the judge is not asked, and "Why?" shows
  * no warning a guess would have put there (production, 2026-09-23: a chart-only run read "66% sure"). Unknown
- * tools, as on older recordings: asked.
+ * tools, as on older recordings: asked. A follow-up: asked, because it carries on a conversation whose earlier
+ * turns may have read a page, and it gets that run's files back.
  */
 export function couldBeInstructedFromOutside(input: EvaluateInput): boolean {
-  return input.toolsUsed === undefined || input.toolsUsed.some(readsOutside);
+  return input.followUp === true || input.toolsUsed === undefined || input.toolsUsed.some(readsOutside);
 }
 
 export async function judgeRun(input: EvaluateInput): Promise<Judgment> {

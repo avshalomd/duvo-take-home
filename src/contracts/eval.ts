@@ -58,6 +58,9 @@ export const EvaluateInput = z.object({
   today: z.string(), // ISO date, so "last 7 days" checks are testable
   toolsUsed: z.array(z.string()).optional(), // tool names the run called: "a connection claimed but never used" is one line of code, not a judge call
   template: AutomationTemplate.nullable().optional(), // v2: a run of a saved automation is also checked against its template
+  // A follow-up resumes its parent's conversation, whatever that one read: the in-bounds question is asked of it even
+  // when its own tools read nothing from outside (engine review #4).
+  followUp: z.boolean().optional(),
 });
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
 export type EvaluateRun = (input: EvaluateInput) => Promise<Verdict>;

@@ -386,6 +386,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         today: new Date().toISOString().slice(0, 10),
         // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
+        followUp: Boolean(run.parentRunId), // it resumed a conversation that may have read a page: the in-bounds question is asked
         template,
       }).catch(unknownVerdict);
       const evaluation = within(judged, EVAL_MAX_MS, () => unknownVerdict(new Error(EVAL_TOO_LONG)));
