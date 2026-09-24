@@ -226,3 +226,36 @@ Per file: what it does and why it is built that way. Grows at every merge.
   or an admin's to change, even after an edit sends it back to draft; the save's SQL repeats the check (Q212, Q225).
 - `src/lib/auth/session.ts` - in a Server Action (Next's `next-action` header) a workspace the user has left is not
   swapped for their own: writes that name no record are refused in words instead of landing elsewhere (Q226).
+
+### The engine review (2026-09-24) and the owner's calls on it
+- `src/lib/eval/evaluate.ts` `REVIEW_SHARE_MS` - inside the run's 50 s box the judge gets the box less 20 s, spread
+  over its routes (`judge.ts`), and the reviewer the rest, one clock over every try (`extract()`'s `signal`), with no
+  fallback once it is spent. Re-evaluate and the suite set no box and keep 20 s per route and 45 s per try.
+- `src/lib/eval/clip.ts` - what the judge and the reviewer read is bounded: ten files and a report cut to its start and
+  end for Jev (built again smaller when `stateTooLong()` says so); long lines cut and 60,000 characters of files, the
+  rest named, for the reviewer.
+- `src/lib/llm/decide.ts` `answerShape` - each answer is checked against its question (a number in [0, 1], a listed
+  option, a position on the scale); a malformed one is `off-schema` and the next route is asked, never a NaN.
+- `src/lib/eval/checks.ts` `connection_used` - the name in the instructions goes through `connectionKey()`, and a tool
+  counts when its server key is that key or starts with it as whole words ("GitHub" is `github_read_only`).
+- `src/lib/eval/judge.ts` `couldBeInstructedFromOutside` - a follow-up counts as having read outside text: it resumes
+  its parent's conversation, pages included.
+- `src/lib/agent/event-writer.ts` - the run's one ordered writer; an insert is tried twice and a failure goes to its
+  own caller only, so one database blink no longer fails every later write. The connection badge update is fired and
+  logged outside it.
+- `src/lib/agent/map-message.ts` - a turn is one model response: the SDK sends an assistant message per content block,
+  all with one `message.id`.
+- `src/lib/agent/run.ts` and Stop (the owner's call on qa-func F24) - Stop ends work still in progress, nothing after:
+  once an attempt has sent its result, an abort while the child shuts down is ignored, the check is not raced against
+  Stop, and a Stop by then closes the run with that answer and verdict instead of starting a fix attempt.
+- `src/lib/runner/worker-loop.ts`, `jobs.ts` - the worker moves `locked_at` every minute for its jobs in flight, so only
+  a dead worker's job is recovered, and `finishJob` matches `locked_by`, so a late finish never closes another's job.
+- `src/lib/usage/budget-rule.ts` - the day's limit is never passed (the owner's call): a start needs room for its own
+  $1 (`AgentLimits.maxBudgetUsd`) and $1 for each run in flight, and a fix attempt the same.
+- `src/lib/ai.ts` `getFallbackModel` - beside Anthropic (every environment that runs agents) the second model is on
+  OpenRouter whenever its key is set (the owner's call), so one provider's outage is not the reviewer's.
+- `src/lib/runner/next-run.ts` `LATE_SLOT_MS`, `src/lib/automations/store.ts` `nextRunFromNow` - a slot over an hour
+  late is skipped, not run at the wrong hour; turning an automation on or approving it counts its next run from now.
+- `automations.last_skipped_at` / `last_skipped_reason`, `src/lib/runner/skip-reason.ts` - a slot that started no run
+  (a limit refused it, or it was late) is kept with its reason in plain words and shown beside the schedule; the next
+  scheduled start clears it.
