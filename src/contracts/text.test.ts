@@ -57,7 +57,8 @@ describe("the automation editor, the judgment and the connection form refuse a N
   });
 
   it("a judgment's note", () => {
-    expect(HumanVerdictInput.safeParse({ runId: crypto.randomUUID(), verdict: "approved", note: `ok${NUL}` }).error?.issues[0].message).toBe(NUL_REFUSED);
+    const judged = { automationId: crypto.randomUUID(), runId: crypto.randomUUID(), verdict: "approved", note: `ok${NUL}` };
+    expect(HumanVerdictInput.safeParse(judged).error?.issues[0].message).toBe(NUL_REFUSED);
   });
 
   it("a connection's token", () => {

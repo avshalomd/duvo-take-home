@@ -124,7 +124,8 @@ describe("a member", () => {
     expect(store.startTrial).toHaveBeenCalledWith({ workspaceId: "ws-a", userId: "u1" }, ID, "Acme Ltd");
     expect(await setVerdictAction({}, form({ automationId: ID, runId: RUN, verdict: "approved" }))).toEqual({ ok: true });
     // who judged comes from the session, never from the form
-    expect(store.setHumanVerdict).toHaveBeenCalledWith({ workspaceId: "ws-a", userId: "u1" }, { runId: RUN, verdict: "approved", note: undefined });
+    // and the automation whose page it was: only an example of it may be judged there (F10)
+    expect(store.setHumanVerdict).toHaveBeenCalledWith({ workspaceId: "ws-a", userId: "u1" }, { automationId: ID, runId: RUN, verdict: "approved", note: undefined });
   });
 
   it("renames a draft's command, telling the store it may not rename an approved one", async () => {

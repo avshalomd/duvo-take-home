@@ -59,7 +59,7 @@ function editOf(a: { name: string; command: string; description: string; inputLa
 // A trial as startTrial would insert it, already finished, then judged by the person.
 async function approvedTrial(automationId: string, version: number): Promise<string> {
   const runId = await insertRun({ purpose: "trial", automationId, automationVersion: version, input: "Acme Ltd" });
-  await setHumanVerdict(ctx, { runId, verdict: "approved" });
+  await setHumanVerdict(ctx, { automationId, runId, verdict: "approved" });
   return runId;
 }
 
@@ -214,18 +214,18 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
   it("records a note with the verdict, and lets the person change their mind", async () => {
     const a = await createAutomationDraft(ctx, draftWith("int-verdict"), null);
     const runId = await insertRun({ purpose: "trial", automationId: a.id, automationVersion: 1 });
-    await setHumanVerdict(ctx, { runId, verdict: "rejected", note: "The News section is missing" });
+    await setHumanVerdict(ctx, { automationId: a.id, runId, verdict: "rejected", note: "The News section is missing" });
     expect((await listTrials(WS, a.id))[0]).toMatchObject({ humanVerdict: "rejected", humanNote: "The News section is missing" });
-    await setHumanVerdict(ctx, { runId, verdict: "approved" });
+    await setHumanVerdict(ctx, { automationId: a.id, runId, verdict: "approved" });
     expect((await listTrials(WS, a.id))[0].humanVerdict).toBe("approved");
   });
 
   it("records who judged an example, and the next person to judge it replaces them", async () => {
     const a = await createAutomationDraft(ctx, draftWith("int-judge"), null);
     const runId = await insertRun({ purpose: "trial", automationId: a.id, automationVersion: 1 });
-    await setHumanVerdict(ctx, { runId, verdict: "approved" });
+    await setHumanVerdict(ctx, { automationId: a.id, runId, verdict: "approved" });
     expect((await listTrials(WS, a.id))[0]).toMatchObject({ humanVerdict: "approved", humanVerdictBy: "int-user" });
-    await setHumanVerdict({ ...ctx, userId: "int-user-2" }, { runId, verdict: "rejected" });
+    await setHumanVerdict({ ...ctx, userId: "int-user-2" }, { automationId: a.id, runId, verdict: "rejected" });
     expect((await listTrials(WS, a.id))[0]).toMatchObject({ humanVerdict: "rejected", humanVerdictBy: "int-user-2" });
   });
 
@@ -236,11 +236,30 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
   });
 
   it("refuses a verdict on a run that is still going, and 'looks right' on a run that failed", async () => {
-    const running = await insertRun({ purpose: "trial", status: "running" });
-    expect((await setHumanVerdict(ctx, { runId: running, verdict: "approved" }).catch((e) => e)).message).toMatch(/still/i);
-    const failed = await insertRun({ purpose: "trial", status: "failed" });
-    expect((await setHumanVerdict(ctx, { runId: failed, verdict: "approved" }).catch((e) => e)).message).toMatch(/failed/i);
-    await setHumanVerdict(ctx, { runId: failed, verdict: "rejected" }); // "not right" on a failed example is fine
+    const a = await createAutomationDraft(ctx, draftWith("int-still"), null);
+    const example = { purpose: "trial", automationId: a.id, automationVersion: 1 };
+    const running = await insertRun({ ...example, status: "running" });
+    expect((await setHumanVerdict(ctx, { automationId: a.id, runId: running, verdict: "approved" }).catch((e) => e)).message).toMatch(/still/i);
+    const failed = await insertRun({ ...example, status: "failed" });
+    expect((await setHumanVerdict(ctx, { automationId: a.id, runId: failed, verdict: "approved" }).catch((e) => e)).message).toMatch(/failed/i);
+    await setHumanVerdict(ctx, { automationId: a.id, runId: failed, verdict: "rejected" }); // "not right" on a failed example is fine
+  });
+
+  // QA F10: the form's automation id was never checked, so any run of the workspace could be marked from any page
+  it("judges only an example of the automation named: a plain run or another automation's example is refused", async () => {
+    const a = await createAutomationDraft(ctx, draftWith("int-only-trials"), null);
+    const b = await createAutomationDraft(ctx, draftWith("int-others-trials"), null);
+    const plain = await insertRun();
+    const othersExample = await insertRun({ purpose: "trial", automationId: b.id, automationVersion: 1 });
+    const aCall = await insertRun({ purpose: "automation", automationId: a.id, automationVersion: 1 }); // a real call, not an example
+
+    for (const runId of [plain, othersExample, aCall]) {
+      const refused = await setHumanVerdict(ctx, { automationId: a.id, runId, verdict: "approved" }).catch((e) => e);
+      expect(refused).toBeInstanceOf(AutomationError);
+      expect(refused.message).toBe("That run is not an example of this automation.");
+    }
+    const judged = await db.select({ humanVerdict: runs.humanVerdict }).from(runs).where(inArray(runs.id, [plain, othersExample, aCall]));
+    expect(judged.map((r) => r.humanVerdict)).toEqual([null, null, null]);
   });
 
   it("keeps each workspace's automations and runs to itself", async () => {
@@ -248,8 +267,9 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect(await getAutomation(OTHER_WS, a.id)).toBeNull();
     expect((await listAutomations(OTHER_WS)).map((x) => x.id)).not.toContain(a.id);
     expect((await listAutomations(WS)).map((x) => x.id)).toContain(a.id);
-    const runId = await insertRun();
-    expect((await setHumanVerdict({ ...ctx, workspaceId: OTHER_WS }, { runId, verdict: "approved" }).catch((e) => e)).message).toMatch(/not found/i);
+    const runId = await insertRun({ purpose: "trial", automationId: a.id, automationVersion: 1 });
+    const refused = await setHumanVerdict({ ...ctx, workspaceId: OTHER_WS }, { automationId: a.id, runId, verdict: "approved" }).catch((e) => e);
+    expect(refused.message).toMatch(/not found/i);
   });
 
   it("refuses to turn on an automation that was never approved, and turns an approved one off", async () => {
