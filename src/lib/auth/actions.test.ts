@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   setActive: vi.fn(async () => ({})),
+  createOrganization: vi.fn(async () => ({ id: "ws-new" })),
   redirect: vi.fn((to: string) => {
     throw new Error(`NEXT_REDIRECT ${to}`); // Next's redirect() throws to end the action; so does this stand-in
   }),
@@ -12,7 +13,7 @@ const h = vi.hoisted(() => ({
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: h.redirect }));
-vi.mock("./auth", () => ({ auth: { api: { setActiveOrganization: h.setActive } } }));
+vi.mock("./auth", () => ({ auth: { api: { setActiveOrganization: h.setActive, createOrganization: h.createOrganization } } }));
 vi.mock("./session", () => ({
   requireSession: async () => ({ userId: "u1", userName: "Sam", email: "sam@example.com", workspaceId: "ws-a", workspaceName: "A", role: "owner" }),
 }));
@@ -24,7 +25,7 @@ vi.mock("./members", () => ({
   revokeInvitation: vi.fn(),
 }));
 
-import { trySwitchWorkspace } from "./actions";
+import { createWorkspace, trySwitchWorkspace } from "./actions";
 
 const NOT_YOURS = "You are not a member of that workspace, so it cannot be opened.";
 
@@ -44,5 +45,16 @@ describe("switching to one of the user's workspaces", () => {
   it("makes it the active one and opens Home", async () => {
     await expect(trySwitchWorkspace("ws-b")).rejects.toThrow("NEXT_REDIRECT /");
     expect(h.setActive).toHaveBeenCalledWith({ headers: expect.any(Headers), body: { organizationId: "ws-b" } });
+  });
+});
+
+// QA F1: a NUL byte in the name reached Postgres, which refused it with a 500
+describe("making a workspace", () => {
+  it("refuses a name with a hidden NUL character in plain words, and Better Auth is never asked", async () => {
+    const form = new FormData();
+    form.set("name", "[e2e] nul \u0000 ws");
+    const state = await createWorkspace({}, form);
+    expect(state.error).toMatch(/hidden character/);
+    expect(h.createOrganization).not.toHaveBeenCalled();
   });
 });

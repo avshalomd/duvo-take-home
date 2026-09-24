@@ -40,6 +40,14 @@ describe("POST /api/runs (Q132)", () => {
     }
   });
 
+  // QA F1: an empty 500 before
+  it("refuses a prompt with a NUL byte with 400 and plain words, and starts nothing", async () => {
+    const res = await json({ prompt: "Say hello \u0000 world please now" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/hidden character/);
+    expect(startRun).not.toHaveBeenCalled();
+  });
+
   it("refuses a short free text with the form's own words", async () => {
     const res = await json({ prompt: "news" });
     expect(res.status).toBe(400);
