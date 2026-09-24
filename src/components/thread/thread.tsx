@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Minus, TriangleAlert, X } from "lucide-react";
+import { Check, Minus, TriangleAlert } from "lucide-react";
 import { MotionConfig, motion } from "motion/react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
@@ -270,6 +270,3 @@ export function threadTone(status: string, outcome?: string | null): ThreadTone 
   if (status === "succeeded") return "done";
   return "live";
 }
-
-// Kept for the failed-step marker a caller may want to draw beside a title.
-export const FailedMark = () => <X aria-hidden className="size-3 text-crimson" />;
