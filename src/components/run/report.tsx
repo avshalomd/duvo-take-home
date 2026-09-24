@@ -74,6 +74,7 @@ function Spans({ spans }: { spans: Inline[] }) {
   return (
     <>
       {spans.map((span, i) => {
+        if (span.br) return <br key={i} />;
         if (span.href)
           return (
             // the agent's sources are worth following, but never in this tab: a report is read, then its links opened

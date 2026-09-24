@@ -1,7 +1,8 @@
 // The agent's report is markdown-ish prose. This parses the four things it actually writes - headings, blank-line
 // paragraphs, bullet/number lists, and bold / `code` / [links] inside them - into blocks the renderer maps over.
 // A parser, not a renderer, so the rules are testable without a DOM; no library for four rules.
-export type Inline = { text: string; bold?: boolean; code?: boolean; href?: string };
+// br: a single line break inside a paragraph, kept as one (UX QA U2: a haiku, an address, a signature)
+export type Inline = { text: string; bold?: boolean; code?: boolean; href?: string; br?: boolean };
 export type Block =
   | { kind: "heading"; level: number; spans: Inline[] }
   | { kind: "paragraph"; spans: Inline[] }
@@ -61,9 +62,11 @@ export function parseMarkdown(text: string): Block[] {
   let paragraph: string[] = [];
   const lines = text.split("\n");
 
-  // a paragraph runs until a blank line or any other block starts: that is the only buffer this parser needs
+  // a paragraph runs until a blank line or any other block starts: that is the only buffer this parser needs. Its
+  // lines stay lines (each read on its own, so bold never runs across a break): the agent broke them on purpose
   const flushParagraph = () => {
-    if (paragraph.length) blocks.push({ kind: "paragraph", spans: parseInline(paragraph.join(" ")) });
+    if (paragraph.length)
+      blocks.push({ kind: "paragraph", spans: paragraph.flatMap((line, i) => (i === 0 ? parseInline(line) : [{ text: "\n", br: true }, ...parseInline(line)])) });
     paragraph = [];
   };
   // consecutive bullets group by appending to the last block when it is already a list of the same kind
