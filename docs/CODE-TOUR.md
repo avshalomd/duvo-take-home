@@ -491,3 +491,47 @@ Per file: what it does and why it is built that way. Grows at every merge.
   column and sheet dissolve (`display: contents`) into the page's grid, which orders the header, Try it (examples and
   the approval) and the document, each its own sheet; from sm up and for a Ready automation the markup draws as before
   (U32).
+
+### Page-to-page speed (2026-09-24, "moving from page to page feels slow")
+
+Measured on a production build (`next build && next start`) against the QA database, which is in eu-central-1 like
+production's: from this machine each database round trip costs ~33 ms, from Vercel fra1 a few, so the count of round
+trips one after another is the number that carries over. Production itself: a warm function answers /sign-in in
+~170 ms from Norway, of which ~65 ms is the edge; a cold one took 1.0-1.5 s.
+
+- `src/lib/auth/auth.ts` `advanced.database.joins` - every page, prefetch and route reads the session first, and that
+  was the session, then its user, then the memberships: three round trips in a row. With joins Better Auth reads the
+  session with its user in one query, through the relations already in `db/auth-schema.ts`. Freshness is unchanged:
+  no session cookie cache (a signed-out or removed person is refused on the next request, as before).
+- `src/lib/runs/queries.ts` `getRun` - the run, its events and its files go as one `db.batch` (one HTTP request); the
+  events and files are read only through a run of the session's workspace (`inArray(runId, <the scoped run>)`), so
+  another workspace's come back empty. `getFile` joins the file to its run for the workspace check: one query.
+- `src/app/(app)/automations/[id]/page.tsx` - the automation, its trials, the connections and its runs are read at once
+  (all scoped, so a missing automation finds nothing), then the judges' names beside the examples' runs: 8 round trips
+  in a row became 4. `settings/members/page.tsx` reads the members and the invitations together and hands the list to
+  `PendingInvitations`, which no longer reads for itself.
+- `src/components/shell/top-bar.tsx` - Settings links to `/settings/connections`: `/settings` only redirects, which cost
+  every visit a second server round trip. `section` keeps it marked current on every tab.
+- `src/app/(app)/(home)/page.tsx`, `src/app/(app)/loading.tsx`, `skeleton-for.ts` - a dynamic page is prefetched only
+  as far as its first loading boundary, so a page without one changes nothing on screen until the server answers.
+  Home cannot have its own: a boundary in Home's segment is keyed by the page and its `?run=`, and would show a
+  skeleton on every run opened. So Home moved into the `(home)` group, and the app's boundary above it is keyed by
+  the group: opened from another page it draws Home's shape in the first frame; a run opened inside Home is a
+  transition inside an already visible boundary, which keeps the old sheet until the new one is complete. The
+  boundary is a client component that draws the shape of the page being opened (`usePathname()` is already the new
+  address), so it also stands in for another page's own boundary until that is prefetched. No page under it may call
+  `notFound()` (it streams a 200 first). Home's two inner Suspense boundaries went: they showed their fallbacks again
+  after the app's skeleton.
+- React holds a shown Suspense fallback for at least 300 ms before it reveals the content (its fallback throttle). A
+  skeleton therefore puts the content at 300 ms or later even when the server answered in 150. That is why Settings
+  has no loading.tsx of its own: between tabs, `settings-tabs.tsx` moves the pill at the click (`tab-choice.ts`
+  `tabShown`) and the page follows as soon as it is ready (~165 ms here, was ~210); `aria-current` stays on the page on
+  screen. From another page, Settings still gets the app boundary's skeleton (`SettingsFrame` + `SettingsSkeleton`).
+- `src/components/shell/link-pending.tsx` - `useLinkStatus` inside the top bar's pages and the rail's runs: a soft
+  paper pill behind the label from the click until the page arrives, faded in after 100 ms so a page that is there at
+  once never flashes it. It is the only feedback a run's click has, since Home has no skeleton for a run.
+- Not done, for the owner: Better Auth's session cookie cache would save one more round trip per page render, but a
+  Server Component cannot set cookies, so the cache is refreshed only by Server Actions and auth routes, and a revoked
+  session or a workspace switch made outside Better Auth (`setActiveWorkspace`) would be seen up to its max age late.
+  Client JS: Home loads ~400 KB gzipped (1.39 MB raw) on a first visit, other pages ~280 KB; after the first visit the
+  chunks are cached, so it is not what slows a navigation.

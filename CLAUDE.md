@@ -86,6 +86,13 @@ and why it is built that way; `docs/QA.md` is the log of every finding and its f
   `AI_MODEL` and `AI_MODEL_FALLBACK` switch either in one variable; `AI_SIMULATE_DOWN=1` walks the model-down path.
 - **Next 16:** a `loading.tsx` streams the page before `notFound()` runs, so a missing record answers 200: use
   `<Suspense>` inside pages that can 404. `error.tsx` receives `{ error, retry }`.
+- **Next 16 navigation feedback:** a dynamic page is prefetched only as far as its first `loading.tsx`, so without one
+  a click changes nothing until the server answers. A boundary is keyed by the segment under it: Home lives in the
+  `(home)` group so the app's `(app)/loading.tsx` is keyed by the group, not by `?run=` (no skeleton on opening a run).
+  React holds a shown fallback at least 300 ms, so a skeleton delays content the server had ready sooner: where a page
+  is faster than that (Settings tabs) move the control at the click instead (docs/CODE-TOUR.md, "Page-to-page speed").
+- **A production build locally** (`next build && next start -p 3002`) trusts only its `BETTER_AUTH_URL` (origins.ts):
+  start it with `BETTER_AUTH_URL=http://localhost:3002`, or sign-in answers "Invalid origin".
 - **Next 16 dev log, "Set objects are not supported. {P, c, q, i, f, m: Set, ...}":** Next's own page payload, not
   ours: `m` is app-render's `missingSlots` Set, made only on the dev server, and React's dev-only check reports it
   once that Set no longer passes `instanceof Set` - seen on a long-running dev server after a full reload, never on a
