@@ -172,6 +172,28 @@ describe.skipIf(!process.env.DATABASE_URL)("members and invitations", () => {
     expect((await listInvitations(ownerCtx)).map((i) => [i.email, i.role, i.link])).toEqual([[guestEmail, "admin", asAdmin.link]]);
   });
 
+  // QA F5: three invitations to one address sent at once all stayed pending, and accepting two made two memberships
+  it("inviting one address three times at once leaves one pending invitation", async () => {
+    const owner = await signUp("Tria Thrice", email("thrice"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+    const guestEmail = email("thrice-guest");
+
+    const links = await Promise.all([1, 2, 3].map(() => createInvite(owner.headers, ownerCtx, { email: guestEmail, role: "member" })));
+
+    expect(new Set(links.map((l) => l.link)).size).toBe(1);
+    expect((await listInvitations(ownerCtx)).map((i) => i.email)).toEqual([guestEmail]);
+  });
+
+  it("a person is in a workspace once: a second membership row is refused by the database", async () => {
+    const owner = await signUp("Una Once", email("once"));
+    const ownerCtx = (await sessionFromHeaders(owner.headers))!;
+
+    const again = db.insert(member).values({ id: crypto.randomUUID(), organizationId: ownerCtx.workspaceId, userId: owner.userId, role: "member", createdAt: new Date() });
+
+    await expect(again).rejects.toThrow();
+    expect((await listMembers(ownerCtx.workspaceId)).map((m) => m.role)).toEqual(["owner"]);
+  });
+
   it("a plain member cannot invite, and is told so in plain words", async () => {
     const owner = await signUp("Inty Boss", email("boss"));
     const ownerCtx = (await sessionFromHeaders(owner.headers))!;
