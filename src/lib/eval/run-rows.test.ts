@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toFiles } from "./run-rows";
+import { HELD_BACK, forEvaluator, toFiles } from "./run-rows";
 
 type FileRow = Parameters<typeof toFiles>[0][number];
 const row = (over: Partial<FileRow>): FileRow => ({
@@ -25,5 +25,19 @@ describe("toFiles", () => {
 
   it("hands a text file over as it is", () => {
     expect(toFiles([row({})])).toEqual([{ name: "notes.md", content: "hello" }]);
+  });
+
+  // Security review S8: a file the scan held back for a credential still went, whole, to the judges (third parties)
+  it("hands a held-back file over as a placeholder, never its content", () => {
+    const secret = "api_key=sk-live-0123456789abcdefghij";
+    const [file] = toFiles([row({ name: "keys.txt", content: secret, quarantined: true })]);
+    expect(file).toEqual({ name: "keys.txt", content: "(held back: contains a credential)" });
+  });
+});
+
+describe("forEvaluator - what the live run hands the evaluator for each file it stored", () => {
+  it("keeps a file the scan let through, and puts the placeholder in place of a held-back one", () => {
+    expect(forEvaluator({ name: "a.csv", content: "x,y", quarantined: false })).toEqual({ name: "a.csv", content: "x,y" });
+    expect(forEvaluator({ name: "b.md", content: "token ghp_x", quarantined: true })).toEqual({ name: "b.md", content: HELD_BACK });
   });
 });
