@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The route's own logic is the auth; the tick and the sweep are the runner's, tested elsewhere.
 vi.mock("@/lib/runner/schedules", () => ({ tickSchedules: vi.fn(async () => ["run-a", "run-b"]) }));
 vi.mock("@/lib/runner/recover", () => ({ closeAbandonedRuns: vi.fn(async () => ["run-old"]) }));
+// the real comparison, watched: the secret must be compared in constant time
+vi.mock("node:crypto", async (original) => {
+  const real = await original<typeof import("node:crypto")>();
+  return { ...real, timingSafeEqual: vi.fn(real.timingSafeEqual) };
+});
 
+import { timingSafeEqual } from "node:crypto";
 import { closeAbandonedRuns } from "@/lib/runner/recover";
 import { tickSchedules } from "@/lib/runner/schedules";
 import { GET } from "./route";
@@ -22,11 +28,26 @@ afterEach(() => {
 });
 
 describe("GET /api/cron/tick", () => {
-  it("answers 503 and runs nothing when CRON_SECRET is not set, so an unset secret is never 'no secret needed'", async () => {
+  // QA F23: the 503 told any visitor which setting was missing
+  it("answers a plain 404 and runs nothing when CRON_SECRET is not set, naming no setting", async () => {
     vi.stubEnv("CRON_SECRET", "");
     const res = await call(`Bearer ${SECRET}`);
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toMatch(/CRON|secret/i);
     expect(tickSchedules).not.toHaveBeenCalled();
+  });
+
+  // Security review S12: the secret was compared with !==, which leaks its length and prefix by timing
+  it("compares the secret in constant time, and a longer or shorter guess is refused like any other", async () => {
+    expect((await call(`Bearer ${SECRET}x`)).status).toBe(401);
+    expect((await call(`Bearer ${SECRET.slice(0, -1)}`)).status).toBe(401);
+    expect((await call("Bearer ")).status).toBe(401);
+  });
+
+  it("decides a same-length guess with timingSafeEqual", async () => {
+    vi.mocked(timingSafeEqual).mockClear();
+    expect((await call(`Bearer ${"x".repeat(SECRET.length)}`)).status).toBe(401);
+    expect(timingSafeEqual).toHaveBeenCalledTimes(1);
   });
 
   it("answers 401 without an Authorization header", async () => {
