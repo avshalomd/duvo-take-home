@@ -65,6 +65,15 @@ export const rowsModule = {
     const r = rows.get(id);
     if (r && r.workspaceId === workspaceId) r.authType = "oauth";
   },
+  // the real one is a conditional update (rows.ts): the same address, a sign-in state, and none pending
+  storeTokensIfUnchanged: async (workspaceId: string, id: string, url: string, oauth: unknown) => {
+    const r = rows.get(id);
+    const current = r?.oauth as OAuthBlob | null | undefined;
+    if (!r || r.workspaceId !== workspaceId || r.url !== url || !current || current.pending) return false;
+    r.oauth = structuredClone(oauth);
+    writes.push({ workspaceId, id, oauth: structuredClone(oauth) });
+    return true;
+  },
 };
 
 export const storeModule = {
