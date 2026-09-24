@@ -31,6 +31,7 @@ import { closeAsCancelled, updateUnlessCancelled } from "./close";
 import { reachableConnections } from "./connection-reach";
 import { statusUpdates } from "./connection-status";
 import { startDeadline, within } from "./deadline";
+import { createEventWriter } from "./event-writer";
 import { prepareFollowUp } from "./follow-up";
 import { buildGuardHooks } from "./guards";
 import { attemptFingerprint, EVAL_MAX_MS, healPrompt, noProgress, runBudgetMs, SETTLE_MAX_MS, shouldHeal, type AttemptFingerprint } from "./heal";
@@ -136,37 +137,34 @@ export const runAutomation: RunAutomation = async (runId) => {
   }
 
   const map = createMapper(); // one mapper for every attempt: the plan and the turn count carry on across heals
-  let seq = 1;
   const recorded: RunEvent[] = []; // kept so the closing update reads the plan and the result from the same events
   let plan: Plan | null = null;
   const checks = new Set<Promise<void>>(); // the per-step checks still waiting on Jev
 
-  // One writer, in order: the agent's messages, the guards' decisions and the step checks all arrive here, from
-  // different callbacks, and each gets the next seq only when it is written.
-  let chain: Promise<void> = Promise.resolve();
-  const write = (events: Omit<RunEvent, "seq">[]) => {
-    chain = chain.then(async () => {
-      for (const raw of events) {
-        const e = { ...raw, seq: seq++ } as RunEvent;
-        await db.insert(runEvents).values({ runId, seq: e.seq, kind: e.kind, payload: e.payload, at: new Date(e.at) });
-        recorded.push(e);
-        if (e.kind === "started") {
-          // the init message is where a connection's real status shows up; write it back so the list stops guessing
-          for (const u of statusUpdates(e.payload.mcp_servers, enabled)) {
-            const key = connectionKey(enabled.find((c) => c.id === u.id)?.name ?? "");
-            const tools = e.payload.tools.filter((t) => t.startsWith(`mcp__${key}__`)).map((t) => t.slice(`mcp__${key}__`.length));
-            await recordConnectionSeen(u.id, { lastStatus: u.lastStatus, tools });
-          }
-        }
-        if (e.kind === "plan") {
-          const before = plan;
-          plan = e.payload;
-          if (limits.stepChecks) for (const i of newlyDone(before, e.payload)) track(stepCheck(e.payload, i));
+  // One writer, in order (event-writer.ts): a failed write fails its own caller only, never every write after it.
+  const writer = createEventWriter({
+    insert: async (e) => {
+      await db.insert(runEvents).values({ runId, seq: e.seq, kind: e.kind, payload: e.payload, at: new Date(e.at) });
+    },
+    written: (e) => {
+      recorded.push(e);
+      if (e.kind === "started") {
+        // the init message is where a connection's real status shows up; written back so the list stops guessing. Out
+        // of the chain and only logged when it fails: a connection's badge is not worth failing the run (review #12).
+        for (const u of statusUpdates(e.payload.mcp_servers, enabled)) {
+          const key = connectionKey(enabled.find((c) => c.id === u.id)?.name ?? "");
+          const tools = e.payload.tools.filter((t) => t.startsWith(`mcp__${key}__`)).map((t) => t.slice(`mcp__${key}__`.length));
+          void recordConnectionSeen(u.id, { lastStatus: u.lastStatus, tools }).catch((err) => console.error(`run ${runId}: connection status not recorded`, err));
         }
       }
-    });
-    return chain;
-  };
+      if (e.kind === "plan") {
+        const before = plan;
+        plan = e.payload;
+        if (limits.stepChecks) for (const i of newlyDone(before, e.payload)) track(stepCheck(e.payload, i));
+      }
+    },
+  });
+  const write = writer.write;
   const now = () => new Date().toISOString();
 
   // settle() ends a round: a check begun in an earlier round that answers after it gave up waiting is dropped, so no
@@ -198,7 +196,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   const settle = async () => {
     await within(Promise.allSettled([...checks]), SETTLE_MAX_MS, () => []);
     round += 1;
-    await chain;
+    await writer.drained();
   };
 
   const recordGuard = async (r: GuardRecord) => {
