@@ -23,6 +23,16 @@ export function applyPlanCall(current: Plan | null, toolName: string, input: unk
   return current;
 }
 
+/**
+ * The plan with the steps a successful agent left pending or running marked "unmarked", or null when there are none
+ * (qa-ai F8, the owner's call): a correct answer whose last steps were never ticked read "1 of 3 done" with "Not
+ * started" steps, and cost the pass. The run writes this as its plan once the agent has ended well.
+ */
+export function untickedMarked(plan: Plan | null): Plan | null {
+  if (!plan || !plan.steps.some((s) => s.status === "pending" || s.status === "running")) return null;
+  return { ...plan, steps: plan.steps.map((s) => (s.status === "pending" || s.status === "running" ? { ...s, status: "unmarked" as const } : s)) };
+}
+
 /** The plan tool's server key; tool names reach the model as mcp__plan__set_plan / mcp__plan__update_step. */
 export const PLAN_SERVER_KEY = "plan";
 export const isPlanTool = (name: string) => name.startsWith(`mcp__${PLAN_SERVER_KEY}__`);

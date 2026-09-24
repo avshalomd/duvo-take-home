@@ -2,6 +2,7 @@ import { AutomationTemplate } from "@/contracts/automation";
 import type { EvaluateInput } from "@/contracts/eval";
 import { RunEvent, RunPurpose, type Run } from "@/contracts/run";
 import type { automations, files, runEvents, runs } from "@/db/schema";
+import { untickedMarked } from "@/lib/agent/plan-state";
 import { spreadsheetsIn, whatItRead } from "./from-events";
 
 // A run's database rows as the evaluator reads them. Pure and free of `@/db` (server-only), so Re-evaluate
@@ -12,11 +13,13 @@ import { spreadsheetsIn, whatItRead } from "./from-events";
 export function toEvaluateInput(run: Run, events: RunEvent[], files: { name: string; content: string }[]): EvaluateInput {
   const plans = events.filter((e) => e.kind === "plan");
   const toolNames = events.filter((e) => e.kind === "tool_call").map((e) => e.payload.name);
+  const plan = plans.length ? plans[plans.length - 1].payload : null; // the last plan event is the plan as it ended
   return {
     prompt: run.prompt,
     runStatus: run.status,
     report: run.report ?? run.error,
-    plan: plans.length ? plans[plans.length - 1].payload : null, // the last plan event is the plan as it ended
+    // A run from before the engine marked unticked steps (qa-ai F8) is judged the way a new one is.
+    plan: run.status === "succeeded" ? (untickedMarked(plan) ?? plan) : plan,
     files,
     // The run's own day, not today's: re-evaluating next week must not turn "the last 7 days" into a failure.
     today: (run.finishedAt ?? run.createdAt).slice(0, 10),

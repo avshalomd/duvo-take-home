@@ -40,7 +40,7 @@ import { scanOutput } from "./guards/scan";
 import { createMapper } from "./map-message";
 import { tripwireReason, unexpectedServers } from "./mcp-tripwire";
 import { newlyDone } from "./plan-diff";
-import { PLAN_SERVER_KEY } from "./plan-state";
+import { PLAN_SERVER_KEY, untickedMarked } from "./plan-state";
 import { createPlanServer } from "./plan-tool";
 import { resumeOptions, sessionIdOf } from "./session";
 import { ownCost, readSdkTotals, runTotals, stoppedTotals, withAttemptCost } from "./stopped-cost";
@@ -380,6 +380,11 @@ export const runAutomation: RunAutomation = async (runId) => {
         durationMs: spent.ms,
         costUsd: spent.usd, // every attempt of the run, each counted once
       });
+
+      // The agent ended well but left steps unticked: they are "not marked", not "not started" (qa-ai F8), in the trace
+      // the page and the evaluator both read. A fix attempt ticks them again with update_step like any other step.
+      const marked = end.is_error ? null : untickedMarked(plan);
+      if (marked) await write([{ kind: "plan", payload: marked, at: now() }]);
 
       // An evaluator failure must not lose the run the agent already did, and must not look like a pass either:
       // the run is stored as "not checked" with the reason, which Re-evaluate can then show (QA Q59). So is an

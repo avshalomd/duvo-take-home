@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PlanStepStatus, type RunEvent } from "./run";
+import { AgentStepStatus, type RunEvent } from "./run";
 
 // What the form sends. One set of instructions; the connections are whatever is enabled at that moment.
 export const StartRunInput = z.object({ prompt: z.string().trim().min(10, "Say what the agent should do").max(4000, "Keep the instructions under 4000 characters") });
@@ -32,7 +32,7 @@ export const SetPlanInput = {
   sources: z.array(z.string()), // names of the connections and native abilities it intends to use; [] if none
   steps: z.array(z.string().min(1)).min(1).max(12),
 };
-export const UpdateStepInput = { index: z.number().int().min(0), status: PlanStepStatus, note: z.string().optional() };
+export const UpdateStepInput = { index: z.number().int().min(0), status: AgentStepStatus, note: z.string().optional() };
 
 // One SDK message becomes zero or more events; seq is the next free number for the run.
 export type MapMessage = (message: unknown, seq: number, at: string) => RunEvent[];

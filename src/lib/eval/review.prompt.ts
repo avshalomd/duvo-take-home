@@ -12,7 +12,8 @@ wrote (the first lines of each; a chart as its title, axes and values, a spreads
 the start of each page, search result and connection answer it read. Decide two things, separately:
 
 - taskFinished: did the run carry out the instructions end to end? A run that stopped early, dropped a step or
-  wrote a placeholder file is NOT finished.
+  wrote a placeholder file is NOT finished. A step shown [not marked] is one the agent finished the run without
+  ticking: judge it by the report and the files, not by the missing tick.
 - responseSuitable: could this go back to the user as it is? One borderline row in a long list can pass; a wrong
   answer cannot. Check the substance, not only the form:
   - When the instructions give data (a table, amounts, a list), recompute every total, share and count from data
@@ -76,7 +77,7 @@ export function reviewInput(input: EvaluateInput, checks: Check[]): string {
     : "WHAT THE RUN READ\n(nothing from outside)";
   const plan = input.plan
     ? `PLAN\nintent: ${input.plan.intent}\nexpected outputs: ${input.plan.expectedOutputs.join("; ")}\nsteps:\n` +
-      input.plan.steps.map((s) => `  ${s.index + 1}. [${s.status}] ${s.title}${s.note ? ` - ${s.note}` : ""}`).join("\n")
+      input.plan.steps.map((s) => `  ${s.index + 1}. [${s.status === "unmarked" ? "not marked" : s.status}] ${s.title}${s.note ? ` - ${s.note}` : ""}`).join("\n")
     : "PLAN\n(the run recorded no plan)";
   return [
     `TODAY: ${input.today}`,

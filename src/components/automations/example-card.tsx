@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { outcome } from "@/components/run/outcome";
+import { threadSteps } from "@/components/run/thread-steps";
 import { Thread, threadTone, type ThreadStep } from "@/components/thread/thread";
 import { cn } from "@/lib/utils";
 import { DOT } from "./dot";
@@ -28,7 +29,8 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
   const o = outcome(run.status, run.outcome);
   const tone = threadTone(run.status, run.outcome);
   const finished = FINISHED.includes(run.status);
-  const steps: ThreadStep[] = (run.plan?.steps ?? []).map((s) => ({ key: s.index, title: s.title, status: s.status }));
+  // the run page's own reading of the plan: a finished example's unticked steps are "not marked" there too (qa-ai F8)
+  const steps: ThreadStep[] = threadSteps(run.plan ?? null, run.status, []).map((s) => ({ key: s.key, title: s.title, status: s.status }));
 
   return (
     <li data-testid="example" className={cn(TILE, "space-y-4 p-5")}>

@@ -143,21 +143,24 @@ export async function judgeRun(input: EvaluateInput, deadline?: Deadline): Promi
 
 // The second question reads "followed the automation" for a saved automation's run, "followed its plan" for a
 // free-text run with a plan, and "did the work end to end" when there is neither.
+// A step "unmarked" is one the agent ended without ticking (qa-ai F8): the tick is no evidence either way, so such a
+// plan is judged on whether the work was done, which the report and the files show.
 function followedQuestion(input: EvaluateInput) {
+  const unticked = input.plan?.steps.some((s) => s.status === "unmarked") ?? false;
   if (input.template) {
     return noul("The run followed the saved automation: it took the automation's steps and produced the outputs the automation promises.", {
-      true: "every step of the automation is done or has a note saying why it could not be, and the promised outputs are there",
+      true: "every step of the automation is done, has a note saying why it could not be, or is unmarked while the report shows it was done, and the promised outputs are there",
       false: "a step of the automation was dropped or left undone without a note, or the run produced something other than it promises",
     });
   }
-  if (input.plan) {
+  if (input.plan && !unticked) {
     return noul("The run carried out the plan it set: every step was done, none was silently dropped.", {
       true: "every step is done or has a note saying why it could not be",
       false: "steps are still pending or were skipped without saying so",
     });
   }
-  // With no plan recorded the same question has to be asked of the run itself, or every planless run would
-  // escalate to the LLM review and nothing could ever come back a plain "pass".
+  // With no plan recorded (or one the agent stopped ticking) the same question has to be asked of the run itself, or
+  // every such run would escalate to the LLM review and nothing could ever come back a plain "pass".
   return noul("The run did the work end to end: nothing important was left half-done or silently dropped.", {
     true: "the report and the files show the whole task was carried out",
     false: "part of the task was not done, or the report admits work is missing",
