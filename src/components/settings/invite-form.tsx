@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { inviteMemberAction, type InviteState } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
 import { RowGlyph, rowLine } from "./grouped";
+import { INVITE_HELP } from "./role-words";
 import { submitKeepingValues } from "./submit-keeping-values";
 
 // The field style inside an unfolded row: a recess on the paper, no border, the ring only on focus.
@@ -68,9 +69,7 @@ export function InviteRow() {
             exit={{ opacity: 0, transition: { duration: 0.12 } }}
             className="space-y-3 pr-4 pb-4 pl-4 sm:pl-[58px]"
           >
-            <p className="text-[13px] tracking-[0.01em] text-slate">
-              You get a link to send them. A member runs and builds automations; an admin can also change settings and invite people.
-            </p>
+            <p className="text-[13px] tracking-[0.01em] text-slate">{INVITE_HELP}</p>
             {/* the address gets the whole width; the role and the button share the line under it */}
             <form ref={form} onSubmit={(e) => submitKeepingValues(e, action)} className="grid grid-cols-[1fr_auto] gap-2">
               <label htmlFor="invite-email" className="sr-only">

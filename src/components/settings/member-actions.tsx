@@ -17,17 +17,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { SessionCtx } from "@/contracts/auth";
 import { cn } from "@/lib/utils";
+import { ROLE_MEANS } from "./role-words";
 import { SHEET, SHEET_DESCRIPTION, SHEET_TITLE, SheetActions } from "./sheet";
 
 type Role = SessionCtx["role"];
 
 const ROLE_NAME: Record<Role, string> = { owner: "Owner", admin: "Admin", member: "Member" };
-// What each role may do, short enough for one line on a phone, so the choice is made knowing what it gives
-const ROLE_MEANS: Record<Role, string> = {
-  member: "Runs tasks, builds automations and tries them",
-  admin: "Also approves automations and manages settings and people", // Q178: approving is theirs, not a member's
-  owner: "Can also make and remove owners",
-};
 const item = "rounded-xl px-2.5 py-2 text-[15px] gap-2.5";
 
 /**
