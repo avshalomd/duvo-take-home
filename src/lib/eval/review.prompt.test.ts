@@ -93,6 +93,12 @@ describe("REVIEW_INSTRUCTIONS: numbers, facts and sources", () => {
     expect(REVIEW_INSTRUCTIONS).not.toMatch(/a summary that is thin/);
   });
 
+  // The suite's mixed-topic case: one stray row in nine is a note, not a fail; the stricter prompt failed it.
+  it("still lets one borderline or off-topic row in a list pass, and says a wrong number or fact never does", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/one borderline or off-topic row in a list/i);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/never a small blemish/i);
+  });
+
   it("says a truthful 'cannot be done here' or one question only the person can answer is finished and suitable", () => {
     expect(REVIEW_INSTRUCTIONS).toMatch(/truthfully[^.]*cannot be done/i);
   });

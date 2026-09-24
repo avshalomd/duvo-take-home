@@ -330,10 +330,16 @@ describe("whyLines - could not be done, needs your answer", () => {
   });
 });
 
-// qa-ai F2: the fourth answer, whether the numbers and facts agree, is a line when it is not a clear yes
+// qa-ai F2: the fourth answer, whether the numbers and facts agree, is a line when the check leaned to no - the bar
+// evaluate() sends a run on by, since Jev sees only the start of what a run read
 describe("whyLines - numbers and facts", () => {
-  it("adds a line when the check was not sure the numbers and facts agree with your instructions or the sources", () => {
-    const v: Verdict = { ...NOTES_BY_REVIEW, judgment: { answeredQuery: 0.9, followedPlan: 0.9, factsAgree: 0.5 } };
+  it("adds a line when the check leaned to the numbers and facts not agreeing with your instructions or the sources", () => {
+    const v: Verdict = { ...NOTES_BY_REVIEW, judgment: { answeredQuery: 0.9, followedPlan: 0.9, factsAgree: 0.4 } };
     expect(whyLines(v, "succeeded").map((l) => l.text)).toContain("Some numbers or facts may not agree with your instructions or the sources");
+  });
+
+  it("says nothing when it only fell short of sure", () => {
+    const v: Verdict = { ...NOTES_BY_REVIEW, judgment: { answeredQuery: 0.9, followedPlan: 0.9, factsAgree: 0.7 } };
+    expect(whyLines(v, "succeeded").map((l) => l.text).join(" ")).not.toMatch(/numbers or facts/);
   });
 });

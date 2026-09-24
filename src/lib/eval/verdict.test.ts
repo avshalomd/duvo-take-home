@@ -329,6 +329,14 @@ describe("evaluate: numbers and facts", () => {
     expect(verdict.reasons.join(" ")).toMatch(/numbers or facts/);
   });
 
+  // The first live run of the fourth suite: clean runs came back 0.65-0.77 on this question - Jev sees only the start
+  // of what a run read - and went to the reviewer as "with notes". The wrong chart came back 0.03.
+  it("sends a run on only when the judge leans to no on the facts, not when it merely falls short of sure", async () => {
+    const d = deps({ answeredQuery: 0.95, followedPlan: 0.95, factsAgree: 0.65 });
+    expect((await evaluate(input, d)).verdict).toBe("pass");
+    expect(d.review).not.toHaveBeenCalled();
+  });
+
   it("always has the reviewer read a plain question answered with facts or numbers and no file", async () => {
     const d = deps({ answeredQuery: 0.95, followedPlan: 0.95, factsAgree: 0.9, statesFacts: 0.9 }, review({ responseSuitable: false, changeNeeded: "Norway has no public holiday in October." }));
     const verdict = await evaluate(plainQuestion, d);
