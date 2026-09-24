@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   setActive: vi.fn(async () => ({})),
   createOrganization: vi.fn(async () => ({ id: "ws-new" })),
+  acceptInvitation: vi.fn(async () => ({})),
   redirect: vi.fn((to: string) => {
     throw new Error(`NEXT_REDIRECT ${to}`); // Next's redirect() throws to end the action; so does this stand-in
   }),
@@ -13,7 +14,9 @@ const h = vi.hoisted(() => ({
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: h.redirect }));
-vi.mock("./auth", () => ({ auth: { api: { setActiveOrganization: h.setActive, createOrganization: h.createOrganization } } }));
+vi.mock("./auth", () => ({
+  auth: { api: { setActiveOrganization: h.setActive, createOrganization: h.createOrganization, acceptInvitation: h.acceptInvitation } },
+}));
 vi.mock("./session", () => ({
   requireSession: async () => ({ userId: "u1", userName: "Sam", email: "sam@example.com", workspaceId: "ws-a", workspaceName: "A", role: "owner" }),
 }));
@@ -25,7 +28,8 @@ vi.mock("./members", () => ({
   revokeInvitation: vi.fn(),
 }));
 
-import { createWorkspace, trySwitchWorkspace } from "./actions";
+import { acceptInvitation, createWorkspace, revokeInvitationAction, trySwitchWorkspace } from "./actions";
+import { revokeInvitation } from "./members";
 
 const NOT_YOURS = "You are not a member of that workspace, so it cannot be opened.";
 
@@ -45,6 +49,19 @@ describe("switching to one of the user's workspaces", () => {
   it("makes it the active one and opens Home", async () => {
     await expect(trySwitchWorkspace("ws-b")).rejects.toThrow("NEXT_REDIRECT /");
     expect(h.setActive).toHaveBeenCalledWith({ headers: expect.any(Headers), body: { organizationId: "ws-b" } });
+  });
+});
+
+// QA F16: forged calls with an empty, a 200-character or a non-string id threw (a 500 error page)
+describe("revoking and accepting an invitation by a forged id", () => {
+  it.each([[""], ["a".repeat(200)], [5], [null]])("revoking %j is refused in plain words, and nothing is asked", async (id) => {
+    expect(await revokeInvitationAction(id as string)).toEqual({ error: "That invitation is no longer pending." });
+    expect(revokeInvitation).not.toHaveBeenCalled();
+  });
+
+  it.each([[""], ["a".repeat(200)], [5], [{ id: "x" }]])("accepting %j is refused in plain words, and Better Auth is never asked", async (id) => {
+    expect(await acceptInvitation(id as string)).toEqual({ error: "This invitation has expired or was already used. Ask for a new link." });
+    expect(h.acceptInvitation).not.toHaveBeenCalled();
   });
 });
 
