@@ -25,7 +25,9 @@ async function scheduled(what: string, over: Partial<typeof automations.$inferIn
 }
 const row = async (id: string) => (await db.select().from(automations).where(eq(automations.id, id)))[0];
 
-beforeEach(() => vi.mocked(startRun).mockReset());
+beforeEach(() => {
+  vi.mocked(startRun).mockReset(); // in braces: a function returned from beforeEach is run after the test as its teardown
+});
 afterAll(async () => {
   await db.delete(automations).where(eq(automations.workspaceId, WS));
 });
@@ -35,7 +37,10 @@ afterAll(async () => {
 describe.skipIf(!process.env.DATABASE_URL)("a scheduled run that does not start", () => {
   it("records the slot and the reason in plain words when a limit refuses the start", async () => {
     const id = await scheduled("refused");
-    vi.mocked(startRun).mockRejectedValue(new RunLimitError("This workspace has spent its $5.00 budget for today. More can start after 00:00 UTC."));
+    const refusal = new RunLimitError("This workspace has spent its $5.00 budget for today. More can start after 00:00 UTC.");
+    vi.mocked(startRun).mockImplementation(async () => {
+      throw refusal;
+    });
     await tickSchedules(justAfter);
     const a = await row(id);
     expect(a.lastSkippedAt?.toISOString()).toBe(slot.toISOString());
