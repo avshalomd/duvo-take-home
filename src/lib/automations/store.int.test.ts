@@ -1,7 +1,7 @@
 // The automations store against the real tables. `npm run test:int`. The database is shared: everything here lives in
 // workspaces whose ids start with "int-", its runs are named "[int] ...", and afterAll deletes all of it.
 import { afterAll, describe, expect, it } from "vitest";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { automations, runs } from "@/db/schema";
 import type { AutomationDraft, AutomationEdit } from "@/contracts/automation";
@@ -247,6 +247,28 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect(await getActiveByCommand(WS, "int-onoff")).toBeNull();
     await setAutomationStatus(WS, draft.id, "active");
     expect((await getActiveByCommand(WS, "int-onoff"))?.id).toBe(draft.id);
+  });
+
+  // Engine review #5, the owner's call: turning an automation back on kept the old next_run_at, and the next tick
+  // fired it at once - "weekdays 08:00" turned on again on a Friday afternoon started a paid run then.
+  it("counts the next run from now when an automation is turned back on", async () => {
+    const a = await createAutomationDraft(ctx, draftWith("int-reactivate"), null);
+    await approvedTrial(a.id, 1);
+    await approveAutomation(WS, a.id);
+    await setSchedule(WS, a.id, "0 8 * * 1-5", "Apple Inc.", "UTC");
+    await setAutomationStatus(WS, a.id, "disabled");
+    await db.update(automations).set({ nextRunAt: new Date("2026-09-21T08:00:00Z") }).where(eq(automations.id, a.id)); // the slot passed while it was off
+    await setAutomationStatus(WS, a.id, "active");
+    expect(new Date((await getAutomation(WS, a.id))!.nextRunAt!).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("counts the next run from now when an edited automation is approved again", async () => {
+    const a = await createAutomationDraft(ctx, draftWith("int-reapprove"), null);
+    await setSchedule(WS, a.id, "0 8 * * 1-5", "Apple Inc.", "UTC");
+    await db.update(automations).set({ nextRunAt: new Date("2026-09-21T08:00:00Z") }).where(eq(automations.id, a.id)); // passed while it was a draft
+    await approvedTrial(a.id, 1);
+    await approveAutomation(WS, a.id);
+    expect(new Date((await getAutomation(WS, a.id))!.nextRunAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
   it("stores a schedule with its input and the next run, and clears it", async () => {
