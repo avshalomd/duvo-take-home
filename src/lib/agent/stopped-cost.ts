@@ -31,17 +31,21 @@ async function transcriptEntries(sessionId: string): Promise<unknown[]> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Read a stopped session's totals, waiting up to `waitMs` for the CLI to write them as it shuts down. */
+/**
+ * Read a stopped session's totals, waiting up to `waitMs` for the CLI to write them as it shuts down. `above` is the
+ * total the attempt started from in a resumed session: an entry at or below it is an earlier attempt's, already
+ * there before this one wrote its own, so it is waited past (engine review #13). A fresh session passes nothing.
+ */
 export async function readSdkTotals(
   sessionId: string,
-  opts: { load?: (sessionId: string) => Promise<unknown[]>; waitMs?: number; everyMs?: number } = {},
+  opts: { load?: (sessionId: string) => Promise<unknown[]>; waitMs?: number; everyMs?: number; above?: number } = {},
 ): Promise<SdkTotals | null> {
-  const { load = transcriptEntries, waitMs = 3000, everyMs = 250 } = opts;
+  const { load = transcriptEntries, waitMs = 3000, everyMs = 250, above = 0 } = opts;
   const until = Date.now() + waitMs;
   for (;;) {
     try {
       const totals = costStateOf(await load(sessionId));
-      if (totals) return totals;
+      if (totals && (above === 0 || totals.costUsd > above)) return totals;
     } catch {
       return null; // no transcript on this machine: nothing to wait for
     }

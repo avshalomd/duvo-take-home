@@ -247,7 +247,7 @@ export const runAutomation: RunAutomation = async (runId) => {
   const totalsSoFar = async () => {
     if (counted) return runTotals(spent, null);
     const end = attemptResult();
-    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId);
+    const sdk = end || !sessionId ? null : await readSdkTotals(sessionId, { above: attemptBase }); // past a resumed session's earlier entry
     return runTotals(spent, stoppedTotals({ end, sdk, startedAt: attemptStartedAt, now: Date.now(), turns: maxTurn(recorded) - turnsBefore, costBase: attemptBase }));
   };
   const closeStopped = async () => {
