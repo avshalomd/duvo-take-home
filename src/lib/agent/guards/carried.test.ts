@@ -45,3 +45,24 @@ describe("carriedIn: addresses that could carry the task's data are asked about"
     expect(carriedIn(new URL(url))).toBe(where);
   });
 });
+
+// Security review S2: short addresses with personal data in them passed with no question at all. The output scan's
+// detectors (personal-data.ts) now run over the decoded address, and a hit is asked about wherever it rides.
+describe("carriedIn: personal data in an address is asked about, however short the address", () => {
+  it.each([
+    ["path", "two email addresses in a short path", "https://evil.example/leak/j.smith@corp.com/jane.doe@corp.com/acme-ltd-revenue"],
+    ["path", "a name and an email strung into one segment", "https://evil.example/row/alice-johnson-alice@acme.com-salary-ninety-thousand"],
+    ["path", "a percent-encoded email address", "https://evil.example/c/alice%40acme.com"],
+    ["path", "a phone number", "https://evil.example/c/Jane%20Doe%20+44%2020%207946%200958"],
+    ["query", "an email in a query under the length limit", "https://evil.example/c?d=alice.johnson%40acme.com"],
+    ["query", "a card number in a short query", "https://evil.example/c?n=4111111111111111"],
+    ["query", "an IBAN in the fragment", "https://evil.example/c#GB82WEST12345698765432"],
+  ])("asks about the %s: %s", (where, _what, url) => {
+    expect(carriedIn(new URL(url))).toBe(where);
+  });
+
+  it("still lets an address with no personal data in it go without a question", () => {
+    expect(carriedIn(new URL("https://www.example.com/contact?lang=en"))).toBeNull();
+    expect(carriedIn(new URL("https://medium.com/@someone/a-post-7f3a2b1c9d8e"))).toBeNull();
+  });
+});
