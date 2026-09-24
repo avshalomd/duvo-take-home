@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db, transaction } from "@/db";
 import { jobs } from "@/db/schema";
 import type { ClaimedJob } from "./worker-loop";
@@ -33,6 +33,22 @@ export async function claimJob(workerId: string): Promise<ClaimedJob | null> {
   });
 }
 
-export async function finishJob(jobId: string, status: "done" | "failed"): Promise<void> {
-  await db.update(jobs).set({ status }).where(eq(jobs.id, jobId));
+/**
+ * Mark this worker's job done or failed. Only while this worker holds it: a job taken for dead and claimed again
+ * belongs to the next worker, and a late finish from the first must not close it under that one (engine review #15).
+ */
+export async function finishJob(jobId: string, status: "done" | "failed", workerId: string): Promise<void> {
+  await db.update(jobs).set({ status }).where(and(eq(jobs.id, jobId), eq(jobs.lockedBy, workerId)));
+}
+
+/**
+ * The worker's sign of life: its running jobs' locked_at moves to now, so recoverStaleJobs (10 minutes without a
+ * sign) only ever takes the job of a worker that really stopped, not a slow run that is still writing.
+ */
+export async function heartbeat(workerId: string, jobIds: string[]): Promise<void> {
+  if (jobIds.length === 0) return;
+  await db
+    .update(jobs)
+    .set({ lockedAt: new Date() })
+    .where(and(inArray(jobs.id, jobIds), eq(jobs.status, "running"), eq(jobs.lockedBy, workerId)));
 }

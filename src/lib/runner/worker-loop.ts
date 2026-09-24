@@ -6,13 +6,16 @@ export type WorkerDeps = {
   claim: () => Promise<ClaimedJob | null>;
   run: (runId: string) => Promise<void>;
   finish: (jobId: string, status: "done" | "failed") => Promise<void>;
+  heartbeat?: (jobIds: string[]) => Promise<unknown>; // refreshes the locks of the jobs in flight
   recover: (now: Date) => Promise<unknown>; // stale locks and abandoned runs
   tick: (now: Date) => Promise<unknown>; // schedules that are due
   now?: () => Date;
   log?: (line: string) => void;
 };
 
-export type WorkerOptions = { concurrency: number; pollMs: number; tickMs: number };
+export type WorkerOptions = { concurrency: number; pollMs: number; tickMs: number; heartbeatMs?: number };
+
+const HEARTBEAT_MS = 60_000; // a minute: far inside the 10 minutes after which a job is taken for dead (recover.ts)
 
 export type Worker = {
   pollOnce: () => Promise<number>; // claims until every slot is busy or the queue is empty; how many it started
@@ -32,13 +35,16 @@ export function createWorker(deps: WorkerDeps, opts: WorkerOptions): Worker {
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? ((line: string) => console.log(line));
   const active = new Set<Promise<void>>();
+  const running = new Set<string>(); // the job ids in flight, for the heartbeat
   let stopping = false;
   let polling: Promise<number> | null = null; // one claim loop at a time, or two could fill the same free slot
   let ticking = false;
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let tickTimer: ReturnType<typeof setInterval> | undefined;
+  let beatTimer: ReturnType<typeof setInterval> | undefined;
 
   function launch(job: ClaimedJob) {
+    running.add(job.jobId);
     const p = (async () => {
       let status: "done" | "failed" = "done";
       try {
@@ -47,6 +53,7 @@ export function createWorker(deps: WorkerDeps, opts: WorkerOptions): Worker {
         status = "failed";
         log(`run ${job.runId} (job ${job.jobId}) threw: ${reason(e)}`);
       }
+      running.delete(job.jobId); // no more heartbeats for it: the job is being closed
       await deps.finish(job.jobId, status).catch((e) => log(`could not mark job ${job.jobId} ${status}: ${reason(e)}`));
     })();
     active.add(p);
@@ -90,6 +97,12 @@ export function createWorker(deps: WorkerDeps, opts: WorkerOptions): Worker {
     }
   }
 
+  // Never throws: a missed heartbeat is logged, and the next one a minute later still comes well inside the 10 minutes.
+  async function beatOnce() {
+    if (!deps.heartbeat || running.size === 0) return;
+    await deps.heartbeat([...running]).catch((e) => log(`heartbeat failed: ${reason(e)}`));
+  }
+
   return {
     pollOnce,
     tickOnce,
@@ -98,6 +111,7 @@ export function createWorker(deps: WorkerDeps, opts: WorkerOptions): Worker {
       void pollOnce();
       pollTimer = setInterval(() => void pollOnce(), opts.pollMs);
       tickTimer = setInterval(() => void tickOnce(), opts.tickMs);
+      beatTimer = setInterval(() => void beatOnce(), opts.heartbeatMs ?? HEARTBEAT_MS);
     },
     async stop() {
       stopping = true;
@@ -105,6 +119,7 @@ export function createWorker(deps: WorkerDeps, opts: WorkerOptions): Worker {
       clearInterval(tickTimer);
       await polling;
       await Promise.allSettled([...active]); // runs in flight end on their own wall clock, then their jobs are marked
+      clearInterval(beatTimer); // only now: the runs still going kept their locks fresh while stop() waited
     },
     inFlight: () => active.size,
   };

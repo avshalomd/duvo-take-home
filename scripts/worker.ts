@@ -6,7 +6,7 @@
 // app, recovers the jobs of dead workers and fires due schedules every 30 s, and stops cleanly on SIGINT/SIGTERM.
 import os from "node:os";
 import { runAutomation } from "@/lib/agent/run";
-import { claimJob, finishJob } from "@/lib/runner/jobs";
+import { claimJob, finishJob, heartbeat } from "@/lib/runner/jobs";
 import { closeAbandonedRuns, recoverStaleJobs } from "@/lib/runner/recover";
 import { tickSchedules } from "@/lib/runner/schedules";
 import { createWorker } from "@/lib/runner/worker-loop";
@@ -26,7 +26,8 @@ const worker = createWorker(
       await runAutomation(runId);
       log(`run ${runId}: closed`);
     },
-    finish: finishJob,
+    finish: (jobId, status) => finishJob(jobId, status, workerId), // only a job this worker still holds
+    heartbeat: (jobIds) => heartbeat(workerId, jobIds), // every minute, so a long run is never taken for dead
     recover: async (now) => {
       const r = await recoverStaleJobs(now);
       const closed = await closeAbandonedRuns(now);
