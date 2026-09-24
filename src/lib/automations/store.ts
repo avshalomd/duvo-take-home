@@ -62,6 +62,8 @@ function toAutomation(row: Row): Automation {
     scheduleInput: row.scheduleInput,
     scheduleTz: row.scheduleTz,
     nextRunAt: iso(row.nextRunAt),
+    lastSkippedAt: iso(row.lastSkippedAt),
+    lastSkippedReason: row.lastSkippedReason,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -194,6 +194,7 @@ function Schedule({ automation: a, governs }: { automation: Automation; governs:
       scheduleInput={a.scheduleInput}
       scheduleTz={a.scheduleTz ?? null}
       nextRunAt={a.status === "active" ? a.nextRunAt : null} // an automation that is off has no next run
+      lastSkipped={a.lastSkippedAt && a.lastSkippedReason ? { at: a.lastSkippedAt, reason: a.lastSkippedReason } : null}
       canEdit={governs}
     />
   );

@@ -5,7 +5,7 @@ import { useActionState, useState, useSyncExternalStore } from "react";
 import { setScheduleAction, type ActionState } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cronToChoice, describeChoice, zoneName } from "@/lib/automations/schedule-local";
+import { cronToChoice, describeChoice, skippedLine, zoneName } from "@/lib/automations/schedule-local";
 import { cn } from "@/lib/utils";
 import { FIELD, SMALL } from "./surfaces";
 
@@ -17,6 +17,7 @@ type Props = {
   scheduleInput: string | null;
   scheduleTz: string | null; // the zone the cron is read in; a schedule from before zones were stored reads in UTC
   nextRunAt: string | null;
+  lastSkipped: { at: string; reason: string } | null; // the last slot that started no run, and why
   canEdit: boolean; // owners and admins set the schedule; a member reads it (Q178)
 };
 
@@ -33,6 +34,7 @@ export function ScheduleForm(props: Props) {
     return (
       <div className="space-y-2">
         {props.schedule ? <ScheduleSummary {...props} zone={zone} /> : <p className="text-[15px] text-graphite">It runs only when someone runs it.</p>}
+        <LastSkipped {...props} />
         <p className={SMALL}>An owner or an admin sets its schedule.</p>
       </div>
     );
@@ -56,6 +58,13 @@ function ScheduleSummary({ schedule, scheduleInput, scheduleTz, nextRunAt, zone 
   );
 }
 
+// Why the last scheduled slot started no run, in plain words beside the schedule (engine review #6): a skipped run
+// used to leave no trace anywhere the person looks.
+function LastSkipped({ lastSkipped, scheduleTz }: Props) {
+  if (!lastSkipped) return null;
+  return <p className="text-[15px] text-slate">{skippedLine(lastSkipped.at, lastSkipped.reason, scheduleTz)}</p>;
+}
+
 // Not keyed by anything that changes on a save, so its state - "Schedule saved." - outlives the page's refresh (Q120).
 function ScheduleEditor(props: Props & { zone: string }) {
   const { automationId, inputLabel, inputExample, schedule, scheduleInput, zone } = props;
@@ -67,6 +76,7 @@ function ScheduleEditor(props: Props & { zone: string }) {
   return (
     <div className="space-y-4">
       <ScheduleSummary {...props} />
+      <LastSkipped {...props} />
       {/* keyed by the values a refused save sent back: they become the inputs' defaults (Base UI warns when a default changes) */}
       <form key={JSON.stringify(v ?? null)} action={action} className="space-y-4">
         <input type="hidden" name="id" value={automationId} />

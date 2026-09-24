@@ -118,6 +118,10 @@ export const automations = pgTable("automations", {
   scheduleInput: text("schedule_input"),
   scheduleTz: text("schedule_tz"), // the IANA time zone the schedule was set in, so 08:00 stays 08:00 across DST
   nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  // The last scheduled slot that started no run (a limit refused it, or it was over an hour late), and why in plain
+  // words; shown beside the schedule, cleared when a scheduled run next starts (engine review #6)
+  lastSkippedAt: timestamp("last_skipped_at", { withTimezone: true }),
+  lastSkippedReason: text("last_skipped_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("automations_ws_command").on(t.workspaceId, t.command)]);

@@ -49,6 +49,9 @@ export const Automation = z.object({
   scheduleInput: z.string().nullable(),
   scheduleTz: z.string().nullable().optional(), // IANA zone, e.g. "Europe/Prague"; cron times are read in it
   nextRunAt: z.string().nullable(),
+  // the last scheduled slot that started no run, and why in plain words (engine review #6); optional so older rows parse
+  lastSkippedAt: z.string().nullable().optional(),
+  lastSkippedReason: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
