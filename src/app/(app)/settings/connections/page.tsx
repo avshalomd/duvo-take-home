@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ConnectionsList } from "@/components/settings/connections-list";
 import { OAuthToast } from "@/components/settings/oauth-toast";
 import { requireSession } from "@/lib/auth/session";
@@ -7,6 +8,8 @@ import { oauthErrorSentence } from "./oauth-error";
 
 // The query only carries the OAuth routes' outcome back; anything but a single string is ignored.
 const one = (v: string | string[] | undefined) => (typeof v === "string" && v.length > 0 ? v.slice(0, 200) : undefined);
+
+export const metadata: Metadata = { title: "Connections" };
 
 export default async function ConnectionsPage({ searchParams }: PageProps<"/settings/connections">) {
   const { workspaceId, role } = await requireSession();

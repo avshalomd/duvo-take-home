@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandMark } from "@/components/auth/brand-mark";
 
-export const metadata: Metadata = { title: "Not found - Handover" };
+// absolute: the root layout's title template is for the segments under it, not for this page beside it
+export const metadata: Metadata = { title: { absolute: "Not found - Handover" } };
 
 // Any address the app does not have (Q201: it showed Next's bare 404, with no way back). It renders inside the root
 // layout only - the app's top bar needs a signed-in workspace, and this page may be reached without one - so it

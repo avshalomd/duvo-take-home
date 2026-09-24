@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { LimitsForm } from "@/components/settings/limits-form";
 import { UsageCard } from "@/components/settings/usage-card";
 import { requireSession } from "@/lib/auth/session";
 import { canChangeSettings } from "@/lib/auth/roles";
 import { getLimits, getUsage } from "@/lib/usage/budget";
+
+export const metadata: Metadata = { title: "Limits" };
 
 export default async function LimitsPage() {
   const session = await requireSession();

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CommandChip } from "@/components/automations/brief-text";
 import { GalleryTile } from "@/components/automations/gallery-tile";
@@ -6,6 +7,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/session";
 import { listAutomations } from "@/lib/automations/store";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Automations" };
 
 // /automations: the gallery. Each automation is its command, one line and its state; the way in is a run you liked.
 export default async function AutomationsPage() {

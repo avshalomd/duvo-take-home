@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import type { Automation, Trial } from "@/contracts/automation";
 import { ApprovalBar } from "@/components/automations/approval-bar";
 import { ApprovedNote } from "@/components/automations/approved-note";
@@ -34,6 +36,17 @@ import { cn } from "@/lib/utils";
 // page's budget bounds the run, as on Home: 300 s is Vercel's maximum and the run's wall clock is set under it.
 export const maxDuration = 300;
 
+// read once per request: the tab's title and the page both need it
+const readAutomation = cache(getAutomation);
+
+// "<automation> - Handover" in the tab (UX QA U5)
+export async function generateMetadata({ params }: PageProps<"/automations/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  const { workspaceId } = await requireSession();
+  const automation = await readAutomation(workspaceId, id);
+  return { title: automation ? automation.name : "Not found" };
+}
+
 const SHOWN_EXAMPLES = 6; // each one is read in full for its plan, files and verdict; one or two is the norm
 
 // /automations/<id>. A draft is a document to check, with "Try it" beside it and the approval bar under the examples.
@@ -42,7 +55,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   const { id } = await params;
   const { approved } = await searchParams;
   const { workspaceId, role, userId } = await requireSession();
-  const automation = await getAutomation(workspaceId, id);
+  const automation = await readAutomation(workspaceId, id);
   // not notFound(): the loading boundary above has already streamed a 200, so a plain message is what the reader gets anyway
   if (!automation) return <Missing />;
 

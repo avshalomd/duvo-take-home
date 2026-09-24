@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BackLink } from "@/components/automations/back-link";
 import { Drafting } from "@/components/automations/drafting";
@@ -7,6 +8,8 @@ import { requireSession } from "@/lib/auth/session";
 import { runsToStartFrom } from "@/lib/automations/runs";
 import { getRun } from "@/lib/runs/queries";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "New automation" };
 
 // The draft runs as a Server Action from this page, so this page's function budget bounds it: extract() may take its
 // 60 s and then try the fallback model for as long again.
