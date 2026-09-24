@@ -2,8 +2,9 @@
 
 /** "Avshalom Dayan" -> "Avshalom's workspace"; no name -> "My workspace". */
 export function personalWorkspaceName(name: string): string {
-  const first = name.trim().split(/\s+/)[0];
-  return first ? `${first}'s workspace` : "My workspace";
+  const suffix = "'s workspace";
+  const first = name.trim().split(/\s+/)[0].slice(0, 60 - suffix.length); // a workspace's name is at most 60 characters (F21)
+  return first ? `${first}${suffix}` : "My workspace";
 }
 
 /**

@@ -1,3 +1,6 @@
+import { NUL_REFUSED } from "@/contracts/text";
+import { NAME_TOO_LONG } from "./names";
+
 // Better Auth answers with codes ("INVALID_EMAIL_OR_PASSWORD"); the forms show a sentence a person can act on.
 const TAKEN = ["USER_ALREADY_EXISTS", "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"];
 
@@ -14,6 +17,9 @@ const MESSAGES: Record<string, string> = {
   // was opened in another browser (the sign-up needs the id it left in a cookie, Q167); one line for both, so the form
   // never tells a stranger which emails hold an invitation
   SIGNUP_INVITE_ONLY: "This does not match an invitation. Use the address your invitation was sent to, and open its link in this browser.",
+  // the name rules of lib/auth/names.ts (F1, F21)
+  NAME_TOO_LONG: NAME_TOO_LONG,
+  NAME_HIDDEN_CHARACTER: NUL_REFUSED,
 };
 
 const FALLBACK = "Something went wrong. Try again in a moment.";
