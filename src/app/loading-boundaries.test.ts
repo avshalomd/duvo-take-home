@@ -20,8 +20,10 @@ describe("the loading boundaries of the pages behind sign-in", () => {
     expect(at("(app)/(home)/loading.tsx")).toBe(false);
   });
 
-  it("Settings has one under its title and tabs, so a tab shows its skeleton at once", () => {
-    expect(at("(app)/settings/loading.tsx")).toBe(true);
+  // measured on a production build: with a skeleton a tab's content came at 365 ms (React holds a shown fallback for
+  // 300 ms), without one at 195 ms; the tab's pill moves at the click instead (components/settings/tab-choice.ts)
+  it("Settings keeps no boundary of its own, so a tab's page replaces the last one as soon as it is ready", () => {
+    expect(at("(app)/settings/loading.tsx")).toBe(false);
   });
 });
 
