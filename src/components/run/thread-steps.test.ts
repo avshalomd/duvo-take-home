@@ -83,6 +83,14 @@ describe("threadSteps - fixing what the check found", () => {
     ]);
   });
 
+  // qa-ai F14 (the owner's call): the fix is a step of its own, titled honestly by what it changed
+  it("titles an attempt's step by what the agent says it changed, with its note, once it has said so", () => {
+    const named = { ...plan(["done"]), fixes: [{ attempt: 1, title: "Put the unit in the axis title", note: "Sales (euros)" }] };
+    const steps = threadSteps(named, "succeeded", [], heals);
+    expect(steps[1]).toEqual({ key: "heal-1", title: "Put the unit in the axis title", status: "done", note: "Sales (euros)" });
+    expect(steps[2].title).toBe("Fix what the check found (attempt 2 of 2)"); // not named: the plain title stays
+  });
+
   it("draws every attempt done once the run has finished", () => {
     expect(threadSteps(plan(["done"]), "succeeded", [], heals).slice(1).map((s) => s.status)).toEqual(["done", "done"]);
   });

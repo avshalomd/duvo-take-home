@@ -118,6 +118,18 @@ describe("mapMessage", () => {
     });
   });
 
+  // qa-ai F14: a fix attempt is a step of its own, titled by what it changed; the run tells the mapper which attempt
+  it("records a fix attempt's own step, titled by what it changed, under the attempt the run says is under way", () => {
+    const map = createMapper();
+    map(assistant([{ type: "tool_use", id: "p1", name: "mcp__plan__set_plan", input: { intent: "i", expectedOutputs: ["o"], sources: [], steps: ["s"] } }]), 1, "t");
+    map.startFix(1);
+    const fix = { type: "tool_use", id: "f1", name: "mcp__plan__describe_fix", input: { title: "Put the unit in the axis title", note: "Sales (euros)" } };
+    const events = map(assistant([fix]), 2, "t");
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).toMatchObject({ fixes: [{ attempt: 1, title: "Put the unit in the axis title", note: "Sales (euros)" }] });
+    expect(map(userResult({ tool_use_id: "f1", content: "noted" }), 3, "t")).toEqual([]); // the plan tool's own reply
+  });
+
   it("does not record the plan tool's own result in the timeline", () => {
     const map = createMapper();
     map(assistant([{ type: "tool_use", id: "p1", name: "mcp__plan__set_plan", input: { intent: "i", expectedOutputs: ["o"], sources: [], steps: ["s"] } }]), 1, "t");

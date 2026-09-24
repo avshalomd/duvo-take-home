@@ -113,6 +113,20 @@ describe("reviewInput: steps not marked", () => {
   });
 });
 
+// qa-ai F14: a fix attempt is a step of its own, after the plan's steps
+describe("reviewInput: fix attempts", () => {
+  it("lists each fix attempt after the steps, by what it changed", () => {
+    const plan = {
+      intent: "x",
+      expectedOutputs: [],
+      sources: [],
+      steps: [{ index: 0, title: "Draw the chart", status: "done" as const }],
+      fixes: [{ attempt: 1, title: "Put the unit in the axis title", note: "Sales (euros)" }],
+    };
+    expect(reviewInput({ ...input, plan }, [])).toContain("fix 1: Put the unit in the axis title - Sales (euros)");
+  });
+});
+
 describe("reviewInput: what the run read", () => {
   it("shows the start of each outside result the run read", () => {
     const text = reviewInput({ ...input, read: [{ tool: "WebSearch", text: "Norway: no public holidays in October." }] }, []);
