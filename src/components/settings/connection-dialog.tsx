@@ -14,6 +14,8 @@ import { submitKeepingValues } from "./submit-keeping-values";
 
 type AuthType = "none" | "bearer" | "oauth";
 
+const ADDRESS_NOTE = "address-secret-note";
+
 // The three ways a server can let the agent in, in the words of someone who is not a developer.
 const SIGN_IN: { value: AuthType; label: string; hint: string }[] = [
   { value: "none", label: "No sign-in", hint: "The server is open to anyone, like DeepWiki." },
@@ -97,18 +99,20 @@ function ConnectionForm({ connection: current, onDone }: { connection?: Connecti
         <InsetGroup
           surface="mist"
           footer={
-            (errors?.name || errors?.url || movedNote) && (
-              <div className="space-y-1">
-                <FieldError id="name-error" text={errors?.name?.[0]} />
-                <FieldError id="url-error" text={errors?.url?.[0]} />
-                {movedNote && (
-                  <p aria-live="polite" className="flex gap-1.5 text-graphite">
-                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-saffron" aria-hidden />
-                    {movedNote}
-                  </p>
-                )}
-              </div>
-            )
+            <div className="space-y-1">
+              <FieldError id="name-error" text={errors?.name?.[0]} />
+              <FieldError id="url-error" text={errors?.url?.[0]} />
+              {movedNote && (
+                <p aria-live="polite" className="flex gap-1.5 text-graphite">
+                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-saffron" aria-hidden />
+                  {movedNote}
+                </p>
+              )}
+              {/* S7: some services put the key in the address itself; whoever types it should know it is one */}
+              <p id={ADDRESS_NOTE} data-testid="address-secret-note">
+                If the service put a key in the address, keep the address as secret as a password. Members see only its host.
+              </p>
+            </div>
           }
         >
           <TextRow name="name" label="Name" placeholder="Linear" defaultValue={connection?.name} invalid={Boolean(errors?.name)} />
@@ -119,6 +123,7 @@ function ConnectionForm({ connection: current, onDone }: { connection?: Connecti
             defaultValue={connection?.url}
             onChange={(e) => setUrl(e.currentTarget.value)}
             invalid={Boolean(errors?.url)}
+            describedBy={ADDRESS_NOTE}
           />
         </InsetGroup>
 
@@ -215,11 +220,13 @@ function TextRow({
   name,
   label,
   invalid,
+  describedBy,
   ...input
 }: {
   name: string;
   label: string;
   invalid: boolean;
+  describedBy?: string; // a note under the group that is about this field
   type?: string;
   placeholder?: string;
   defaultValue?: string;
@@ -235,7 +242,7 @@ function TextRow({
           id={name}
           name={name}
           aria-invalid={invalid}
-          aria-describedby={invalid ? `${name}-error` : undefined}
+          aria-describedby={[invalid ? `${name}-error` : "", describedBy ?? ""].filter(Boolean).join(" ") || undefined}
           className="min-w-0 flex-1 bg-transparent py-3 outline-none placeholder:text-slate/70 aria-invalid:text-crimson"
           {...input}
         />
