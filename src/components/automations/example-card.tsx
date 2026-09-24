@@ -1,11 +1,11 @@
 "use client";
 
-import { Download } from "lucide-react";
 import Link from "next/link";
 import { outcome } from "@/components/run/outcome";
 import { Thread, threadTone, type ThreadStep } from "@/components/thread/thread";
 import { cn } from "@/lib/utils";
 import { DOT } from "./dot";
+import { ExampleFiles } from "./example-files";
 import { LINK, SMALL, TILE } from "./surfaces";
 import { useLiveRun, type LiveRun } from "./use-live-run";
 import { VerdictForm } from "./verdict-form";
@@ -45,23 +45,7 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
         {o.label}
       </p>
 
-      {run.files.length > 0 && (
-        <ul className="flex flex-wrap gap-2">
-          {run.files.map((f) => (
-            <li key={f.name}>
-              <a
-                href={`/api/runs/${example.runId}/files/${encodeURIComponent(f.name)}`}
-                download
-                aria-label={`Download ${f.name}`}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-muted px-3 text-[13px] font-medium text-graphite outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                {f.name}
-                <Download aria-hidden className="size-3.5 text-slate" />
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ExampleFiles runId={example.runId} files={run.files} />
 
       <Link href={`/?run=${example.runId}`} className={cn(LINK, "inline-block text-[15px]")}>
         Open the full run
