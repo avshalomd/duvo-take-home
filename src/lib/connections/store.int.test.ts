@@ -225,6 +225,32 @@ describe.skipIf(!process.env.DATABASE_URL)("connections store", () => {
       expect((await rawRow(other.id)).name).toBe("QA Other");
     });
 
+    // QA F6: the name check is a read before the insert, so three adds at once made three "e2e dup" connections
+    it("adds one of three servers added at once under one name, and refuses the others in the same words", async () => {
+      const results = await Promise.allSettled(
+        [1, 2, 3].map((n) => addConnection(A, { name: "QA Race", url: `https://example.com/race${n}`, transport: "http" })),
+      );
+
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      for (const r of results.filter((r) => r.status === "rejected")) {
+        expect((r as PromiseRejectedResult).reason).toMatchObject({ name: "ConnectionNameTakenError", message: "That name is already used by QA Race" });
+      }
+      expect((await listConnections(A)).filter((c) => c.name === "QA Race")).toHaveLength(1);
+    });
+
+    it("refuses two renames to one name at once, keeping one, in the same words", async () => {
+      const one = await addConnection(A, { name: "QA Rename One", url: "https://example.com/rn1", transport: "http" });
+      const two = await addConnection(A, { name: "QA Rename Two", url: "https://example.com/rn2", transport: "http" });
+
+      const results = await Promise.allSettled([
+        updateConnection(A, one.id, { name: "QA Renamed", url: "https://example.com/rn1", transport: "http" }),
+        updateConnection(A, two.id, { name: "QA Renamed", url: "https://example.com/rn2", transport: "http" }),
+      ]);
+
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect((results.find((r) => r.status === "rejected") as PromiseRejectedResult).reason.name).toBe("ConnectionNameTakenError");
+    });
+
     it("lets a server keep its own name when something else is edited", async () => {
       const own = await addConnection(A, { name: "QA Own", url: "https://example.com/qa9", transport: "http" });
       await expect(updateConnection(A, own.id, { name: "QA Own", url: "https://example.com/qa9/v2", transport: "http" })).resolves.toMatchObject({
