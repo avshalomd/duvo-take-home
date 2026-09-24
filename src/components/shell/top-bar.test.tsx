@@ -14,6 +14,21 @@ beforeEach(() => {
   address.search = "";
 });
 
+// Speed: Settings pointed at /settings, which only redirects to Connections, so every visit was two server round trips
+describe("the Settings link", () => {
+  it("opens Connections directly, without the redirect through /settings", () => {
+    expect(render()).toMatch(/<a[^>]*href="\/settings\/connections"[^>]*>Settings<\/a>/);
+    expect(render()).not.toContain('href="/settings"');
+  });
+
+  it("marks Settings as the current page on each of its tabs", () => {
+    for (const path of ["/settings/connections", "/settings/limits", "/settings/members"]) {
+      address.path = path;
+      expect(render()).toMatch(/<a[^>]*aria-current="page"[^>]*>Settings<\/a>/);
+    }
+  });
+});
+
 // Review (frontend): the first Tab stop on a first visit to Home was "Skip to the run", a link to a run that is not there
 describe("the Skip to the run link", () => {
   it("is offered on Home when a run is open", () => {
