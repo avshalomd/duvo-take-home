@@ -43,7 +43,12 @@ export async function GET(req: Request) {
 
   const ok = database === "up";
   return Response.json(
-    { ok, database, ai, runner: runnerMode(), commit: process.env.APP_COMMIT ?? "local" }, // runner: deploy-handover.sh checks it
+    { ok, database, ai, runner: runnerMode(), commit: deployedCommit() }, // runner: deploy.sh checks it
     { status: ok ? 200 : 503 },
   );
+}
+
+/** The commit this deploy runs: a push to main carries Vercel's git sha, a CLI deploy (deploy.sh) sets APP_COMMIT. */
+function deployedCommit(): string {
+  return process.env.APP_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "local";
 }

@@ -47,7 +47,7 @@ describe("GET /api/health", () => {
   it("reports a usable model on deep=1", async () => {
     model.current = scriptedModel(["ok"]);
     const body = await (await GET(new Request("http://x/api/health?deep=1"))).json();
-    expect(body.ai).toEqual({ provider: "openrouter", usable: true }); // the shape deploy-handover.sh reads, unchanged
+    expect(body.ai).toEqual({ provider: "openrouter", usable: true }); // the shape deploy.sh reads, unchanged
   });
 
   it("names the provider's reason when the model is down, not the gateway's summary", async () => {
