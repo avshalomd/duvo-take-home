@@ -24,6 +24,7 @@ import {
 } from "@/contracts/automation";
 import { RunStatus } from "@/contracts/run";
 import { listConnections } from "@/lib/connections/store";
+import { nextRunAfter } from "@/lib/runner/next-run";
 import { startRun } from "@/lib/runs/start";
 import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName } from "./command";
 import { missingConnections } from "./connections";
@@ -215,7 +216,7 @@ export const approveAutomation: ApproveAutomation = async (workspaceId, id) => {
   if (!check.ok) throw new AutomationError(check.reason);
   const [row] = await db
     .update(automations)
-    .set({ status: "active", approvedAt: new Date(), updatedAt: new Date() })
+    .set({ status: "active", approvedAt: new Date(), updatedAt: new Date(), nextRunAt: nextRunFromNow(a) })
     // the version it was checked at: an edit saved in between bumps it, and this approval then matches nothing
     .where(and(inWorkspace(workspaceId, id), eq(automations.version, a.version)))
     .returning();
@@ -227,8 +228,20 @@ export const approveAutomation: ApproveAutomation = async (workspaceId, id) => {
 export const setAutomationStatus: SetAutomationStatus = async (workspaceId, id, status) => {
   const a = await mustGet(workspaceId, id);
   if (status === "active" && !a.approvedAt) throw new AutomationError("Approve it first: run an example and mark it as looks right.");
-  await db.update(automations).set({ status, updatedAt: new Date() }).where(inWorkspace(workspaceId, id));
+  await db
+    .update(automations)
+    .set({ status, updatedAt: new Date(), ...(status === "active" ? { nextRunAt: nextRunFromNow(a) } : {}) })
+    .where(inWorkspace(workspaceId, id));
 };
+
+/**
+ * The next slot counted from now, for an automation being turned on or approved again: a slot that passed while it
+ * was off or a draft is not due (the owner's call, engine review #5). null for no schedule, or one that no longer
+ * reads, which the tick then leaves alone as before.
+ */
+function nextRunFromNow(a: Pick<Automation, "schedule" | "scheduleTz">): Date | null {
+  return a.schedule ? nextRunAfter(a.schedule, new Date(), a.scheduleTz) : null;
+}
 
 /**
  * A cron, the zone it is read in (the browser's IANA zone, so 08:00 stays 08:00 across a clock change) and the input
