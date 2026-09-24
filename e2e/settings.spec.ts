@@ -43,7 +43,7 @@ test.afterAll(async () => {
 // Security review S7 (c): an address with a key in it must be treated as a secret by whoever types it
 test("the server form says in plain words that an address with a key in it is a secret", async ({ page }) => {
   await open(page, "/settings/connections");
-  await page.getByRole("button", { name: "Add a server" }).click();
+  await page.getByRole("button", { name: "Add a connection" }).click();
   const form = page.getByTestId("connection-form");
   await expect(form.getByTestId("address-secret-note")).toHaveText(
     "If the service put a key in the address, keep the address as secret as a password. Members see only its host.",
@@ -54,12 +54,28 @@ test("the server form says in plain words that an address with a key in it is a 
   await page.keyboard.press("Escape");
 });
 
+// UX QA U29: the tab said Connections, the group "Servers the agent can use" and the button "Add a server"
+test("Connections and its add form call them connections, and say server only under Advanced", async ({ page }) => {
+  await open(page, "/settings/connections");
+  await expect(page.getByText("Connections the agent can use")).toBeVisible();
+  await expect(page.getByText(/^A run uses the connections that are switched on\./)).toBeVisible();
+  await expect(page.getByText(/Servers the agent can use|Open a server/)).toHaveCount(0); // rows keep their own names
+
+  await page.getByRole("button", { name: "Add a connection" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Add a connection" })).toBeVisible();
+  expect(await dialog.innerText()).not.toMatch(/server/i); // Advanced is folded: its words are not on screen
+  await dialog.getByText("Advanced").click();
+  await expect(dialog.getByLabel("Connection type")).toContainText("most servers"); // the technical part keeps its word
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+});
+
 test("a connection is added with a token, edited, switched off and deleted", async ({ page }) => {
   await open(page, "/settings/connections");
   await expect(page.getByRole("link", { name: "Connections" })).toHaveAttribute("aria-current", "page");
 
   // Add
-  await page.getByRole("button", { name: /add a server/i }).click();
+  await page.getByRole("button", { name: /add a connection/i }).click();
   const add = page.getByRole("dialog");
   await add.getByLabel("Name").fill(NAME);
   await add.getByLabel("Address").fill("https://example.com/mcp");
@@ -125,7 +141,7 @@ test("a connection's switch follows the server when the page refreshes", async (
 
 test("a refused server keeps the sign-in choice and everything typed, the token included", async ({ page }) => {
   await open(page, "/settings/connections");
-  await page.getByRole("button", { name: /add a server/i }).click();
+  await page.getByRole("button", { name: /add a connection/i }).click();
   const add = page.getByRole("dialog");
   await add.getByLabel("Name").fill("e2e Settings refused");
   await add.getByLabel("Address").fill("http://192.168.1.4/mcp"); // a private address: refused by the contract
@@ -143,14 +159,14 @@ test("a refused server keeps the sign-in choice and everything typed, the token 
 
 test("a second server whose name a run could not tell apart is refused, naming the first", async ({ page }) => {
   await open(page, "/settings/connections");
-  await page.getByRole("button", { name: /add a server/i }).click();
+  await page.getByRole("button", { name: /add a connection/i }).click();
   const add = page.getByRole("dialog");
   await add.getByLabel("Name").fill("e2e Settings twin");
   await add.getByLabel("Address").fill("https://example.com/twin");
   await add.getByRole("button", { name: "Add" }).click();
   await expect(add).toBeHidden();
 
-  await page.getByRole("button", { name: /add a server/i }).click();
+  await page.getByRole("button", { name: /add a connection/i }).click();
   const again = page.getByRole("dialog");
   await again.getByLabel("Name").fill("E2E-settings Twin"); // the same name to a run: e2e_settings_twin
   await again.getByLabel("Address").fill("https://example.com/twin2");
@@ -169,7 +185,7 @@ test("a second server whose name a run could not tell apart is refused, naming t
 
 test("moving a connection to another server warns that the saved token stays behind, and then asks for a new one", async ({ page }) => {
   await open(page, "/settings/connections");
-  await page.getByRole("button", { name: /add a server/i }).click();
+  await page.getByRole("button", { name: /add a connection/i }).click();
   const add = page.getByRole("dialog");
   await add.getByLabel("Name").fill("e2e Settings moved");
   await add.getByLabel("Address").fill("https://example.com/mcp");
@@ -183,9 +199,9 @@ test("moving a connection to another server warns that the saved token stays beh
   await row.getByRole("button", { name: "Edit" }).click();
   const edit = page.getByRole("dialog");
   await edit.getByLabel("Address").fill("https://example.com/v2/mcp");
-  await expect(edit.getByText(/different server/)).toHaveCount(0); // the same server: nothing to warn about
+  await expect(edit.getByText(/different address/)).toHaveCount(0); // the same server: nothing to warn about
   await edit.getByLabel("Address").fill("https://attacker.example/mcp");
-  await expect(edit.getByText("This is a different server, so the saved token will not be sent to it. Paste a token for the new server.")).toBeVisible();
+  await expect(edit.getByText("This is a different address, so the saved token will not be sent to it. Paste a token for the new address.")).toBeVisible();
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toBeHidden();
   await expect(row).toContainText("Needs a token before a run can use it"); // the status is the row's line while it needs something
@@ -198,7 +214,7 @@ test("moving a connection to another server warns that the saved token stays beh
 
 test("a server that signs in with the service offers Sign in, linking to the OAuth start", async ({ page }) => {
   await open(page, "/settings/connections");
-  await page.getByRole("button", { name: /add a server/i }).click();
+  await page.getByRole("button", { name: /add a connection/i }).click();
   const add = page.getByRole("dialog");
   await add.getByLabel("Name").fill("e2e Settings oauth");
   await add.getByLabel("Address").fill("https://example.com/oauth-mcp");

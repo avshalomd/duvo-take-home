@@ -328,7 +328,7 @@ test.describe("the composer", () => {
   test("the connections that are on are named under the box, with a way to Settings", async ({ page }) => {
     await page.goto("/");
     const chips = page.getByTestId("composer-connections");
-    await expect(chips).toContainText(/Using|No connections on/);
+    await expect(chips).toContainText(/Connections on|No connections on/);
     await expect(chips.getByRole("link").first()).toHaveAttribute("href", "/settings/connections");
   });
 

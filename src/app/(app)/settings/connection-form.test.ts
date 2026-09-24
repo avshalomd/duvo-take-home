@@ -46,7 +46,7 @@ describe("parseConnectionForm, adding", () => {
 
   it("refuses a name the agent could not use", () => {
     const out = parseConnectionForm(form({ ...base, name: "" }), "add");
-    expect(!out.ok && out.fieldErrors.name?.[0]).toBe("Give the server a name");
+    expect(!out.ok && out.fieldErrors.name?.[0]).toBe("Give the connection a name"); // one word for it (UX QA U29)
   });
 
   it("gives a refused form back as typed, but never the token", () => {
