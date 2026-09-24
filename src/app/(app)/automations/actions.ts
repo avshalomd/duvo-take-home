@@ -119,7 +119,7 @@ export async function setVerdictAction(_prev: ActionState, formData: FormData): 
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose looks right or not right." };
   try {
     // who judged is the session's user, never a field of the form
-    await setHumanVerdict(await ctx(), { runId: parsed.data.runId, verdict: parsed.data.verdict, note: parsed.data.note });
+    await setHumanVerdict(await ctx(), { automationId: parsed.data.automationId, runId: parsed.data.runId, verdict: parsed.data.verdict, note: parsed.data.note });
   } catch (e) {
     return { error: readError(e) };
   }

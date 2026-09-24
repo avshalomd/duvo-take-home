@@ -100,6 +100,7 @@ export const ParsedCommand = z.object({ command: z.string(), input: z.string() }
 export type ParsedCommand = z.infer<typeof ParsedCommand>;
 
 export const HumanVerdictInput = z.object({
+  automationId: z.uuid(), // the automation whose example it is: only its own examples are judged on its page (F10)
   runId: z.uuid(),
   verdict: z.enum(["approved", "rejected"]),
   note: noNul(z.string().trim().max(500)).optional(),

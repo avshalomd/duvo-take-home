@@ -287,9 +287,14 @@ const FINISHED = ["succeeded", "failed", "cancelled"];
  * needs a run that succeeded; "not right" fits any ending. A second judgment replaces the first, judge included.
  */
 export const setHumanVerdict: SetHumanVerdict = async ({ workspaceId, userId }, input) => {
-  const { runId, verdict, note } = HumanVerdictInput.parse(input);
-  const [run] = await db.select({ status: runs.status }).from(runs).where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
+  const { automationId, runId, verdict, note } = HumanVerdictInput.parse(input);
+  const [run] = await db
+    .select({ status: runs.status, purpose: runs.purpose, automationId: runs.automationId })
+    .from(runs)
+    .where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
   if (!run) throw new AutomationError("That run was not found.");
+  // QA F10: the judgment is an example's, on its automation's page; a plain run or another automation's is not one
+  if (run.purpose !== "trial" || run.automationId !== automationId) throw new AutomationError("That run is not an example of this automation.");
   if (!FINISHED.includes(run.status)) throw new AutomationError("This example is still running. Judge it when it has finished.");
   if (verdict === "approved" && run.status !== "succeeded") throw new AutomationError("This example failed, so it cannot be marked as looks right.");
   await db
