@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { runs, workspaceSettings } from "@/db/schema";
 import { WorkspaceLimits, type CheckBudget, type GetLimits, type GetUsage, type UpdateLimits } from "@/contracts/usage";
 import { budgetBlockReason, healBudgetReason, nextUtcMidnight, startOfUtcDay } from "./budget-rule";
+import { modelSpendToday } from "./spend-today";
 
 export const DEFAULT_LIMITS: WorkspaceLimits = {
   dailyBudgetUsd: 5,
@@ -48,7 +49,7 @@ export const updateLimits: UpdateLimits = async (workspaceId, input) => {
 /** Today's usage, computed from the runs rather than stored, so it can never drift from what actually ran. */
 export const getUsage: GetUsage = async (workspaceId) => {
   const now = new Date();
-  const [[today], [live]] = await Promise.all([
+  const [[today], [live], checks] = await Promise.all([
     db
       .select({ runs: count(), cost: sum(runs.costUsd) })
       .from(runs)
@@ -57,10 +58,11 @@ export const getUsage: GetUsage = async (workspaceId) => {
       .select({ runs: count() })
       .from(runs)
       .where(and(eq(runs.workspaceId, workspaceId), inArray(runs.status, IN_FLIGHT))), // any day: a run started before midnight still holds its slot
+    modelSpendToday(db, workspaceId, now), // Check again and Make an automation are paid model calls too (QA F18)
   ]);
   return {
     runsToday: today.runs,
-    costTodayUsd: Number(today.cost ?? 0), // Postgres sums a real column into a numeric, which arrives as a string (or null for no rows)
+    costTodayUsd: Number(today.cost ?? 0) + checks, // Postgres sums a real column into a numeric, which arrives as a string (or null for no rows)
     inFlight: live.runs,
     resetsAt: nextUtcMidnight(now).toISOString(),
   };
@@ -78,7 +80,7 @@ export const checkBudget: CheckBudget = async (workspaceId) => {
  * read from its row, which may not carry the latest attempt yet, so the row's cost is left out of the sum.
  */
 export async function healBudgetStop(workspaceId: string, runId: string, runSpentUsd: number): Promise<string | null> {
-  const [limits, [others], [working]] = await Promise.all([
+  const [limits, [others], [working], checks] = await Promise.all([
     getLimits(workspaceId),
     db
       .select({ cost: sum(runs.costUsd) })
@@ -88,6 +90,7 @@ export async function healBudgetStop(workspaceId: string, runId: string, runSpen
       .select({ runs: count() })
       .from(runs)
       .where(and(eq(runs.workspaceId, workspaceId), inArray(runs.status, IN_FLIGHT), ne(runs.id, runId))), // each may still spend an attempt's worth
+    modelSpendToday(db, workspaceId, new Date()), // today's checks and drafts (QA F18)
   ]);
-  return healBudgetReason(limits, Number(others.cost ?? 0) + runSpentUsd, working.runs); // sum() of a real arrives as a string
+  return healBudgetReason(limits, Number(others.cost ?? 0) + checks + runSpentUsd, working.runs); // sum() of a real arrives as a string
 }

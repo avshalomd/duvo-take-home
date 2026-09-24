@@ -145,6 +145,19 @@ export const workspaceSettings = pgTable("workspace_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// The paid model calls outside a run (QA F18, security review S10): Check again (a judge and maybe a reviewer) and
+// Make an automation (a draft). One row per press, written before the model is asked and given its cost after, so
+// the row is both the limit's count (one re-check a minute per run, three drafts in 10 minutes) and part of the day's
+// spend (lib/usage/budget.ts, deployment-budget.ts). A table of its own, added without touching the others.
+export const modelSpend = pgTable("model_spend", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: text("workspace_id").notNull(),
+  runId: uuid("run_id"), // the run checked again, or drafted from
+  kind: text("kind").notNull(), // recheck | draft
+  costUsd: real("cost_usd").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("model_spend_ws_created").on(t.workspaceId, t.createdAt)]);
+
 // The queue for RUNNER=queue: the web app inserts a job, the worker claims it with FOR UPDATE SKIP LOCKED.
 export const jobs = pgTable("jobs", {
   id: uuid("id").primaryKey().defaultRandom(),

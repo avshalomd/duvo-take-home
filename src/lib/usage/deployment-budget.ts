@@ -3,6 +3,7 @@ import { AgentLimits } from "@/contracts/agent";
 import type { Tx } from "@/db";
 import { runs } from "@/db/schema";
 import { startOfUtcDay } from "./budget-rule";
+import { modelSpendToday } from "./spend-today";
 
 /**
  * The deployment's money for a day (security review S1, his call 2026-09-24). Each workspace has a budget of its own,
@@ -29,11 +30,16 @@ export function deploymentBudgetReason(day: { spentTodayUsd: number; inFlight: n
   return day.spentTodayUsd + day.inFlight * AgentLimits.maxBudgetUsd >= day.budgetUsd ? DEPLOYMENT_SPENT : null;
 }
 
-/** What today's finished runs of every workspace cost, read inside the start's transaction (lib/runs/start.ts). */
+/**
+ * What today's finished runs of every workspace cost, and today's checks and drafts (QA F18), read inside the start's
+ * transaction (lib/runs/start.ts).
+ */
 export async function deploymentSpentToday(tx: Tx, now: Date): Promise<number> {
+  // one after the other: a transaction is one connection, which runs one statement at a time anyway
   const [today] = await tx
     .select({ usd: sum(runs.costUsd) })
     .from(runs)
     .where(and(gte(runs.createdAt, startOfUtcDay(now)), notInArray(runs.status, IN_FLIGHT))); // runs in flight are reserved instead
-  return Number(today.usd ?? 0); // Postgres sums a real into a numeric, which arrives as a string (or null for no rows)
+  const checks = await modelSpendToday(tx, null, now);
+  return Number(today.usd ?? 0) + checks; // Postgres sums a real into a numeric, which arrives as a string (or null for no rows)
 }
