@@ -20,7 +20,9 @@ vi.mock("@/lib/runs/run-again", () => ({ startRunAgain: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
-import { startRunAction } from "./actions";
+import { reevaluateRun } from "@/lib/eval/reevaluate";
+import { getRun } from "@/lib/runs/queries";
+import { reevaluateAction, startRunAction } from "./actions";
 
 function form(prompt: string): FormData {
   const f = new FormData();
@@ -44,5 +46,27 @@ describe("the Home box in a tab that still shows a workspace its user has left",
   it("starts the run as before once the tab shows a workspace the user is in", async () => {
     expect(await startRunAction({}, form("Write three facts about Acme Ltd"))).toEqual({ startedId: "run-1" });
     expect(engine.startRun).toHaveBeenCalledWith({ workspaceId: "ws-own", userId: "u1" }, { prompt: "Write three facts about Acme Ltd" });
+  });
+});
+
+// QA F19: Check again on a stopped run said "Only a run that has finished can be checked again", yet it had ended
+describe("Check again", () => {
+  const RUN = "9d1c4f0e-7c1b-4a55-9a3e-2f0b6a1d2c3e";
+  const pressed = () => {
+    const f = new FormData();
+    f.set("runId", RUN);
+    return reevaluateAction({}, f);
+  };
+
+  it("on a stopped run says there is no result to check, and asks the judge nothing", async () => {
+    vi.mocked(getRun).mockResolvedValue({ run: { status: "cancelled" } } as Awaited<ReturnType<typeof getRun>>);
+    expect(await pressed()).toEqual({ error: "A stopped run has no result to check." });
+    expect(reevaluateRun).not.toHaveBeenCalled();
+  });
+
+  it("on a run still working says to wait for it to finish", async () => {
+    vi.mocked(getRun).mockResolvedValue({ run: { status: "running" } } as Awaited<ReturnType<typeof getRun>>);
+    expect(await pressed()).toEqual({ error: "Only a run that has finished can be checked again" });
+    expect(reevaluateRun).not.toHaveBeenCalled();
   });
 });
