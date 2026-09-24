@@ -45,6 +45,14 @@ describe("the in-bounds question (production, 2026-09-23)", () => {
     }
   });
 
+  // Engine review #4: a follow-up continues its parent's conversation, with the pages the parent read still in it,
+  // so "make the bars horizontal" can carry an injected instruction forward without calling a web tool itself.
+  it("is asked on a follow-up even when it read nothing itself: its conversation holds what the earlier run read", async () => {
+    const got = await judgeRun({ ...input, toolsUsed: ["mcp__outputs__make_chart", "Read", "Write"], followUp: true });
+    expect(Object.keys(sent().questions)).toContain("stayedInBounds");
+    expect(got.stayedInBounds).toBe(0.95);
+  });
+
   it("is asked when the tools are not known, as on a run recorded before they were", async () => {
     await judgeRun({ ...input, toolsUsed: undefined });
     expect(Object.keys(sent().questions)).toContain("stayedInBounds");

@@ -44,6 +44,11 @@ describe("toEvaluateInput", () => {
   it("dates the evaluation by when the run finished, so re-evaluating later does not move the freshness window", () => {
     expect(toEvaluateInput(run, events, files).today).toBe("2026-09-22");
   });
+
+  it("marks a follow-up as one, so Re-evaluate judges it like the live run did", () => {
+    expect(toEvaluateInput({ ...run, parentRunId: "run-0" }, events, files).followUp).toBe(true);
+    expect(toEvaluateInput(run, events, files).followUp).toBe(false);
+  });
 });
 
 describe("reevaluate", () => {
