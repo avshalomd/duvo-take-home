@@ -22,7 +22,8 @@ export async function GET(req: Request) {
 
 /**
  * Start a run without the form: the id comes back at once and the agent keeps going. The same rule as Home: a text
- * that starts with \command or /command runs that saved automation (or is refused in its words), never paid free text.
+ * that starts with "/" and a word runs that saved automation, or is refused in its words ("There's no /über
+ * command.", F14) - never paid free text.
  */
 export async function POST(req: Request) {
   const found = await resolveSession(req.headers);

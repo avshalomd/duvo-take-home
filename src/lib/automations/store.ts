@@ -26,7 +26,7 @@ import {
 import { RunStatus } from "@/contracts/run";
 import { listConnections } from "@/lib/connections/store";
 import { startRun } from "@/lib/runs/start";
-import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName } from "./command";
+import { MAX_COMMAND_INPUT, nextFreeCommand, toCommandName, unknownCommandRefusal } from "./command";
 import { missingConnections } from "./connections";
 import { AutomationError } from "./errors";
 import { APPROVED_COMMAND_LOCKED } from "./permissions";
@@ -327,6 +327,8 @@ export const startTrial: StartTrial = async (ctx, automationId, rawInput) => {
 /** "/audit Apple Inc." from the Home box or the Run box: only an approved, switched-on automation runs. */
 export const runCommand: RunCommand = async (ctx, parsed) => {
   const command = parsed.command.toLowerCase();
+  const impossible = unknownCommandRefusal(command); // "/über": no automation can be called that (F14)
+  if (impossible) throw new AutomationError(impossible);
   const a = await getActiveByCommand(ctx.workspaceId, command);
   if (!a) {
     const any = await getByCommand(ctx.workspaceId, command);

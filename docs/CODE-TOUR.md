@@ -164,8 +164,11 @@ Per file: what it does and why it is built that way. Grows at every merge.
   Details); a v1 verdict without `path` still gets a sensible answer.
 - `src/components/run/use-run-poll.ts` - the event stream first, resumed with `?after=<seq>` when it ends at 280 s;
   a stream that never delivers falls back to polling every 2 s.
-- `src/components/run/command-query.ts` - text starting with `/` is always a command: a mistyped command
-  names itself in an error instead of becoming a paid free-text run.
+- `src/lib/automations/command.ts` `parseCommand` - text starting with `/` and a character that is not a space is
+  always a command, whatever the word (his call, F14): `/über test`, `/2024-report x` and `/audit, Apple` had become
+  paid free-text runs. `runCommand` refuses a name no automation can have ("There's no /über command.") before any
+  lookup, and an unknown valid one in its own words, on Home and on `POST /api/runs` (400) alike.
+  `command-query.ts` only drives the list under the box, which opens for names an automation can have.
 
 ### automations
 - `src/lib/automations/template.ts` `changesThePrompt` - which edits need a new approved example: the template, the

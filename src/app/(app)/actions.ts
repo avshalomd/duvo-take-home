@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { FollowUpInput, StartRunInput } from "@/contracts/agent";
-import { commandWord } from "@/components/run/command-query";
 import { leftWorkspaceRefusal, requireSession } from "@/lib/auth/session";
 import { parseCommand } from "@/lib/automations/command";
 import { runCommand } from "@/lib/automations/store";
@@ -41,14 +40,12 @@ export async function startRunAction(_prev: FormState, formData: FormData): Prom
   if (left) return { error: left, values };
   const ctx = { workspaceId: session.workspaceId, userId: session.userId };
 
-  // A text that starts like a command is always treated as one: a mistyped command must never quietly become a
-  // paid free-text run. parseCommand reads it; commandWord still names the command when it does not parse.
+  // A text that starts with "/" and a word is always a command (F14): a mistyped one must never quietly become a
+  // paid free-text run.
   const parsed = parseCommand(values.prompt.trim());
-  const word = parsed?.command ?? commandWord(values.prompt);
   try {
-    if (word) {
-      if (!parsed) return { error: `There is no saved automation called /${word}. Type / to see the ones you have.`, values };
-      // runCommand refuses in its own words - not found, not approved yet, turned off, no input (Q116)
+    if (parsed) {
+      // runCommand refuses in its own words - no such command, not approved yet, turned off, no input (Q116)
       const { id } = await runCommand(ctx, parsed);
       return { startedId: id };
     }
