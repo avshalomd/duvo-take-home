@@ -9,6 +9,7 @@ import { auth } from "./auth";
 import { ORGANIZATION_WRITES_REFUSED } from "./organization-writes";
 import { listMembers } from "./members";
 import { sessionFromHeaders } from "./session";
+import { ownedWorkspaceCount, workspaceLimitRefusal } from "./workspace-limit";
 
 const BASE = (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 const PASSWORD = "int-password-123";
@@ -90,6 +91,21 @@ describe.skipIf(!process.env.DATABASE_URL)("Better Auth's organization writes ov
     const ctx = (await sessionFromHeaders(owner.headers))!;
 
     expect((await post("/organization/set-active", owner.headers, { organizationId: ctx.workspaceId })).status).toBe(200);
+  });
+
+  // Security review S1, his call: one account made ten workspaces, each with a budget of its own
+  it("lets a person own five workspaces, their own one included, and refuses a sixth in plain words", async () => {
+    const owner = await signUp("Fifi Five", email("five"));
+    for (let i = 2; i <= 5; i++) {
+      await auth.api.createOrganization({ headers: owner.headers, body: { name: `[int] ${i}`, slug: `int-orgw-${crypto.randomUUID().slice(0, 8)}` } });
+    }
+    expect(await ownedWorkspaceCount(owner.userId)).toBe(5);
+
+    await expect(
+      auth.api.createOrganization({ headers: owner.headers, body: { name: "[int] 6", slug: `int-orgw-${crypto.randomUUID().slice(0, 8)}` } }),
+    ).rejects.toMatchObject({ status: "FORBIDDEN" });
+    expect(await ownedWorkspaceCount(owner.userId)).toBe(5);
+    expect(await workspaceLimitRefusal(owner.userId)).toBe("You already own 5 workspaces, the most one person can have.");
   });
 
   it("lets the app's own writes through auth.api: a new workspace is made, and deleting one is not offered at all", async () => {

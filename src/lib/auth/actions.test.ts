@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   setActive: vi.fn(async () => ({})),
   createOrganization: vi.fn(async () => ({ id: "ws-new" })),
   acceptInvitation: vi.fn(async () => ({})),
+  limitRefusal: vi.fn(async (): Promise<string | null> => null),
   redirect: vi.fn((to: string) => {
     throw new Error(`NEXT_REDIRECT ${to}`); // Next's redirect() throws to end the action; so does this stand-in
   }),
@@ -20,6 +21,7 @@ vi.mock("./auth", () => ({
 vi.mock("./session", () => ({
   requireSession: async () => ({ userId: "u1", userName: "Sam", email: "sam@example.com", workspaceId: "ws-a", workspaceName: "A", role: "owner" }),
 }));
+vi.mock("./workspace-limit", () => ({ workspaceLimitRefusal: h.limitRefusal }));
 vi.mock("./members", () => ({
   listWorkspaces: async () => [
     { id: "ws-a", name: "Sam's workspace", role: "owner" },
@@ -67,6 +69,16 @@ describe("revoking and accepting an invitation by a forged id", () => {
 
 // QA F1: a NUL byte in the name reached Postgres, which refused it with a 500
 describe("making a workspace", () => {
+  // Security review S1, his call: a few workspaces per person, each one having a budget of its own
+  it("is refused in plain words to a person who owns the most workspaces one can, keeping the name typed", async () => {
+    h.limitRefusal.mockResolvedValueOnce("You already own 5 workspaces, the most one person can have.");
+    const form = new FormData();
+    form.set("name", "Finance");
+    expect(await createWorkspace({}, form)).toEqual({ error: "You already own 5 workspaces, the most one person can have.", name: "Finance" });
+    expect(h.limitRefusal).toHaveBeenCalledWith("u1");
+    expect(h.createOrganization).not.toHaveBeenCalled();
+  });
+
   it("refuses a name with a hidden NUL character in plain words, and Better Auth is never asked", async () => {
     const form = new FormData();
     form.set("name", "[e2e] nul \u0000 ws");
