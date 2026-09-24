@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 
 // The automation builder, from a finished run to a draft that cannot be approved yet. Signed in as the demo user by
@@ -284,5 +284,72 @@ test.describe("a ready automation", () => {
     await page.waitForURL(/\/automations$/);
     const [left] = await neon(process.env.DATABASE_URL!)`select count(*)::int as n from automations where id = ${readyId}`;
     expect(left.n).toBe(0);
+  });
+});
+
+// UX QA U32: on a phone a draft's "Try it" (its examples and the approval) came after the whole brief, output and
+// steps, about 1,500 px down, while approving is a draft's next step. Seeded ("[e2e]", deleted in afterAll): a draft
+// and a ready automation, no run.
+test.describe("where Try it sits", () => {
+  const stamp = Date.now().toString(36);
+  const template = {
+    instructions: "Write facts.md with three facts about {input}.",
+    intent: "Writes three facts about a company.",
+    expectedOutputs: ["facts.md with three facts about {input}"],
+    outputFormat: "",
+    steps: ["Find three facts about {input}", "Write facts.md"],
+    connections: [],
+  };
+  const ids: string[] = [];
+  let draftId = "";
+  let readyId = "";
+
+  test.beforeAll(async () => {
+    const seed = async (command: string, status: "draft" | "active") => {
+      const [row] = await sql()`
+        insert into automations (workspace_id, name, command, description, input_label, input_hint, input_example, template, status, version, approved_at)
+        values ('demo-workspace', ${`[e2e] Try it ${status}`}, ${command}, 'Writes three facts about a company.', 'Company name', 'e.g. Apple Inc.',
+                'Acme Ltd', ${JSON.stringify(template)}::jsonb, ${status}, 1, ${status === "active" ? new Date() : null})
+        returning id`;
+      ids.push(row.id as string);
+      return row.id as string;
+    };
+    draftId = await seed(`e2e-tryit-d-${stamp}`, "draft");
+    readyId = await seed(`e2e-tryit-r-${stamp}`, "active");
+  });
+
+  test.afterAll(async () => {
+    if (ids.length) await sql()`delete from automations where id = any(${ids})`;
+  });
+
+  const top = async (page: Page, name: string) => (await page.getByRole("heading", { name, exact: true }).boundingBox())!;
+
+  test.describe("on a phone", () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test("a draft's Try it comes right under the header, before the brief", async ({ page }) => {
+      await page.goto(`/automations/${draftId}`);
+      const [title, tryIt, brief] = [await top(page, "[e2e] Try it draft"), await top(page, "Try it"), await top(page, "The brief")];
+      expect(title.y).toBeLessThan(tryIt.y);
+      expect(tryIt.y).toBeLessThan(brief.y);
+      const approve = (await page.getByRole("button", { name: "Approve and save" }).boundingBox())!; // the approval came up with it
+      expect(approve.y).toBeLessThan(brief.y);
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth); // nothing sticks out sideways
+    });
+
+    test("a ready automation keeps its order: Run and its runs first, Try it after the brief", async ({ page }) => {
+      await page.goto(`/automations/${readyId}`);
+      const [runs, brief, tryIt] = [await top(page, "Its runs"), await top(page, "The brief"), await top(page, "Try it")];
+      expect(runs.y).toBeLessThan(brief.y);
+      expect(brief.y).toBeLessThan(tryIt.y);
+    });
+  });
+
+  test("on a desk a draft's Try it stays in the column beside the document", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/automations/${draftId}`);
+    const [brief, tryIt] = [await top(page, "The brief"), await top(page, "Try it")];
+    expect(tryIt.x).toBeGreaterThan(brief.x + brief.width);
   });
 });
