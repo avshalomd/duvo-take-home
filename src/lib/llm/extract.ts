@@ -76,7 +76,13 @@ async function generate<S extends z.ZodType>(m: LanguageModel, args: ExtractArgs
     return output as z.infer<S>;
   }
   const { text } = await generateText({ ...common, instructions: rules + jsonShapeInstruction(schema) });
-  return schema.parse(JSON.parse(onlyJson(text))) as z.infer<S>; // same schema, checked after the fact
+  try {
+    return schema.parse(JSON.parse(onlyJson(text))) as z.infer<S>; // same schema, checked after the fact
+  } catch (e) {
+    // The model answered, just not in the shape: the same plain words as schema mode's NoObjectGeneratedError, never
+    // the ZodError's JSON, and not "unavailable" - the provider is up.
+    throw new LlmError("The model's answer did not fit the expected format. Retry.", "off-schema", { cause: e });
+  }
 }
 
 // In prompt mode the shape has to be said in words: Zod 4 renders it as JSON Schema, which every model understands.
