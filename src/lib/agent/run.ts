@@ -19,7 +19,7 @@ import { connectionKey } from "@/lib/connections/key";
 import { authHeaders } from "@/lib/connections/oauth";
 import { evaluateRun } from "@/lib/eval/evaluate";
 import { feedbackForAgent, isHealable } from "@/lib/eval/feedback";
-import { spreadsheetsIn } from "@/lib/eval/from-events";
+import { spreadsheetsIn, whatItRead } from "@/lib/eval/from-events";
 import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
@@ -397,6 +397,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
         followUp: Boolean(run.parentRunId), // it resumed a conversation that may have read a page: the in-bounds question is asked
         spreadsheets: spreadsheetsIn(recorded), // what each .xlsx holds, for the judge and the reviewer (qa-ai F1)
+        read: whatItRead(recorded), // what its numbers and facts can be held to (qa-ai F2)
         template,
         // the model calls are budgeted inside the box, and end a little before it: the verdict then names the model
         // that was slow instead of the box's "the check took too long"

@@ -73,14 +73,14 @@ const FIXABLE = new Set([
   "freshness", "chart", "spreadsheet", "template_outputs", "template_steps",
 ]);
 
+// A pass needs nothing, and neither does a run that could not be done or needs the person's answer (qa-ai F3): only a
+// fail is healed, and only when the agent finished - a stopped run is not a bad result.
 export const isHealable: IsHealable = (verdict, agentFinished) => {
-  if (verdict.verdict !== "fail" || !agentFinished) return false; // a pass needs nothing; a stopped run is not a bad result
+  if (verdict.verdict !== "fail" || !agentFinished) return false;
   const failed = verdict.checks.filter((c) => !c.ok);
   if (failed.some((c) => c.id === "completed")) return false;
   if (failed.some((c) => FIXABLE.has(c.id))) return true;
-  const r = verdict.review;
-  if (r && (!r.taskFinished || !r.responseSuitable)) return true;
-  // The judge alone failed it: only a confident "does not answer the instructions" says what to fix.
-  const answered = verdict.judgment?.answeredQuery;
-  return answered !== undefined && answered < 0.5 && isConfident({ type: "noul", noul: answered }, CONFIDENT);
+  // qa-ai F4: only a finding the agent can act on is worth another attempt - a failed check (above) or the change the
+  // reviewer names. "Check the result against the instructions" is not one: two heals on it changed only the words.
+  return Boolean(verdict.review?.changeNeeded?.trim());
 };

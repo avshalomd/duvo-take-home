@@ -116,7 +116,7 @@ export const Run = z.object({
   createdAt: z.string(),
   finishedAt: z.string().nullable(),
   // The verdict's headline, so a run row can say "Done, with notes" like the panel; the full Verdict is on GetRun.
-  outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown"]).nullable().optional(),
+  outcome: z.enum(["pass", "pass_with_notes", "fail", "unknown", "cannot_do", "needs_answer"]).nullable().optional(), // VerdictKind (eval.ts imports this file)
   // v2, optional so v1 rows and fixtures still parse
   workspaceId: z.string().nullable().optional(),
   purpose: RunPurpose.optional(),

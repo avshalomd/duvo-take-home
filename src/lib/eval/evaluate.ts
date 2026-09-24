@@ -23,22 +23,40 @@ export const REVIEW_SHARE_MS = 20_000;
 // back 0.89/0.84 and the genuinely ambiguous one 0.74/0.75, so 0.80 is what separates "call it" from "look again".
 export const CONFIDENT = 0.8; // exported: the feedback to the agent names a doubt at the same bar (feedback.ts)
 
+// qa-ai F3: what a run that did not do the work did instead, as its outcome - neutral, never a fail, never healed.
+type Refusal = "cannot_do" | "needs_answer";
+const REFUSAL: Record<"cannot_be_done" | "needs_information", Refusal> = { cannot_be_done: "cannot_do", needs_information: "needs_answer" };
+const REFUSAL_REASON: Record<Refusal, string> = {
+  cannot_do: "The run explained why the task cannot be done here.",
+  needs_answer: "The run needs an answer from you before it can do the task.",
+};
+
 export const evaluateRun: EvaluateRun = async (input, opts) => evaluate(input, { judge: judgeRun, review: reviewRun }, opts);
 
 export async function evaluate(input: EvaluateInput, deps: EvaluateDeps, opts: { withinMs?: number } = {}): Promise<Verdict> {
   const endsAt = opts.withinMs === undefined ? undefined : Date.now() + opts.withinMs; // no box: each tier's own timeouts
+  const judgeDeadline = endsAt === undefined ? undefined : { endsAt: endsAt - REVIEW_SHARE_MS };
   const checks = runChecks(input);
   const failed = checks.filter((c) => !c.ok);
   const at = () => new Date().toISOString();
   // A failed check ends it here: no model is paid to look at an empty file, and the reason is already exact.
   if (failed.length) {
+    // One exception (qa-ai F3): a truthful refusal writes no file, so when the missing file is the only failure the
+    // judge is asked what the run did. A confident refusal is its outcome; anything else leaves the checks' fail.
+    if (input.runStatus === "succeeded" && failed.every((c) => c.id === "file_expected")) {
+      const judgment = await deps.judge(input, judgeDeadline).catch(() => null);
+      const refusal = judgment ? confidentRefusal(judgment) : null;
+      if (judgment && refusal) {
+        return { verdict: refusal, checks, judgment, review: null, reasons: [REFUSAL_REASON[refusal]], evaluatedAt: at(), decidedBy: "judge", path: ["checks", "judge"] };
+      }
+    }
     const reasons = failed.map((c) => `${c.label}: ${c.detail}`);
     return { verdict: "fail", checks, judgment: null, review: null, reasons, evaluatedAt: at(), decidedBy: "checks", path: ["checks"] };
   }
 
   let judgment: Judgment;
   try {
-    judgment = await deps.judge(input, endsAt === undefined ? undefined : { endsAt: endsAt - REVIEW_SHARE_MS });
+    judgment = await deps.judge(input, judgeDeadline);
   } catch (e) {
     // "unknown", not "fail": the checks passed and nobody looked at the content. The UI offers Re-evaluate.
     // The judge stays on the path because it was tried: "Why?" says it was unavailable, not that it was skipped.
@@ -46,28 +64,40 @@ export async function evaluate(input: EvaluateInput, deps: EvaluateDeps, opts: {
     return { verdict: "unknown", checks, judgment: null, review: null, reasons, evaluatedAt: at(), decidedBy: "nobody", path: ["checks", "judge"] };
   }
 
-  const answered = { type: "noul" as const, noul: judgment.answeredQuery };
-  const followed = { type: "noul" as const, noul: judgment.followedPlan };
-  if (isConfident(answered, CONFIDENT) && judgment.answeredQuery < 0.5) {
-    const reason = `The files and report do not answer the instructions (${pct(1 - judgment.answeredQuery)} confident).`;
-    return { verdict: "fail", checks, judgment, review: null, reasons: [reason], evaluatedAt: at(), decidedBy: "judge", path: ["checks", "judge"] };
+  // What the run did with the instructions comes first: a sure "cannot be done here" or "needs your answer" is not
+  // a result to hold to the instructions, and the other answers (a refusal does not "answer" them) would fail it.
+  const refusal = confidentRefusal(judgment);
+  if (refusal) {
+    return { verdict: refusal, checks, judgment, review: null, reasons: [REFUSAL_REASON[refusal]], evaluatedAt: at(), decidedBy: "judge", path: ["checks", "judge"] };
   }
-  // Did the run act only on the user's instructions? A doubt here is never a verdict on its own - a page quoted in
-  // a summary is not an injection - so it sends the run to the reviewer, who reads the whole run. Optional: a
-  // judgment recorded before the question existed carries no doubt about it.
-  const bounds = judgment.stayedInBounds;
-  const inBounds = bounds === undefined || (isConfident({ type: "noul", noul: bounds }, CONFIDENT) && bounds >= 0.5);
-  if (isConfident(answered, CONFIDENT) && judgment.answeredQuery >= 0.5 && isConfident(followed, CONFIDENT) && judgment.followedPlan >= 0.5 && inBounds) {
+
+  const answered = judgment.answeredQuery;
+  // A doubt about staying in bounds or about the facts is never a verdict on its own - a page quoted in a summary is
+  // not an injection, and Jev cannot know the world - so it sends the run to the reviewer, who reads the whole run.
+  // Optional: a judgment recorded before a question existed carries no doubt about it.
+  const inBounds = judgment.stayedInBounds === undefined || sureYes(judgment.stayedInBounds);
+  const factsAgree = judgment.factsAgree === undefined || sureYes(judgment.factsAgree);
+  const sure = sureYes(answered) && sureYes(judgment.followedPlan) && inBounds && factsAgree;
+  // qa-ai F2 (the owner's call): a plain question answered with numbers or facts and no file always gets the reviewer's
+  // reading, which recomputes and checks them; a sure judge cannot tell a right number from a wrong one.
+  const factsToCheck = input.files.length === 0 && judgment.statesFacts !== undefined && judgment.statesFacts >= 0.5;
+  if (sure && !factsToCheck) {
     return { verdict: "pass", checks, judgment, review: null, reasons: [], evaluatedAt: at(), decidedBy: "judge", path: ["checks", "judge"] };
   }
 
-  // Anything left is a judgment the cheap model could not make: the plan was not followed, it was unsure, or the run
-  // may have taken orders from something it read.
+  // Anything left is a judgment the cheap model could not make, or one it must not make alone. Since qa-ai F4 that
+  // includes a sure "does not answer the instructions": its only feedback was "check the result against them", which
+  // no heal could act on, and it failed truthful refusals at 95%. The reviewer's fail names the change to make.
+  const lean = judgment.handling && judgment.handling.choice !== "did_work" ? judgment.handling : null;
   const unsure = [
-    !isConfident(answered, CONFIDENT) ? `The judge was unsure whether the work answers the instructions (${pct(judgment.answeredQuery)}).` : "",
-    judgment.followedPlan < 0.5 ? `The judge doubts the run did what it set out to do (${pct(1 - judgment.followedPlan)} confident).` : "",
-    isConfident(answered, CONFIDENT) && !isConfident(followed, CONFIDENT) ? `The judge was unsure the run finished its plan (${pct(judgment.followedPlan)}).` : "",
-    !inBounds ? `The run may have followed instructions it read on a page (the judge was ${pct(bounds ?? 0)} sure it kept to yours).` : "",
+    !isConfident(noul(answered), CONFIDENT) ? `A first check could not tell whether the work answers the instructions (${pct(answered)}).` : "",
+    isConfident(noul(answered), CONFIDENT) && answered < 0.5 ? `A first check found the work may not answer the instructions (${pct(1 - answered)} sure).` : "",
+    judgment.followedPlan < 0.5 ? `A first check doubts the run did what it set out to do (${pct(1 - judgment.followedPlan)} sure).` : "",
+    isConfident(noul(answered), CONFIDENT) && !isConfident(noul(judgment.followedPlan), CONFIDENT) ? `A first check was unsure the run finished its plan (${pct(judgment.followedPlan)}).` : "",
+    !inBounds ? `The run may have followed instructions it read on a page (the check was ${pct(judgment.stayedInBounds ?? 0)} sure it kept to yours).` : "",
+    !factsAgree ? `Some numbers or facts may not agree with the instructions or the sources (${pct(judgment.factsAgree ?? 0)} sure they do).` : "",
+    factsToCheck ? "The answer rests on numbers or facts, so it was read closely." : "",
+    lean ? `The run may not have done the task: it seems to ${lean.choice === "cannot_be_done" ? "say it cannot be done" : "ask you for something"} (${pct(lean.confidence)}).` : "",
   ].filter(Boolean);
 
   const path: Verdict["path"] = ["checks", "judge", "review"];
@@ -85,9 +115,25 @@ export async function evaluate(input: EvaluateInput, deps: EvaluateDeps, opts: {
   if (!review.responseSuitable) {
     return { verdict: "fail", checks, judgment, review, reasons: [...unsure, review.changeNeeded ?? review.reasoning], evaluatedAt: at(), decidedBy: "review", path };
   }
+  // The reviewer found it right. A run that leaned to a refusal is that refusal, confirmed (F3); a run the judge was
+  // sure of and only sent for its facts is a plain pass (F2): nobody was unsure of it.
+  if (lean) {
+    const kind = REFUSAL[lean.choice as keyof typeof REFUSAL];
+    return { verdict: kind, checks, judgment, review, reasons: [REFUSAL_REASON[kind], review.reasoning], evaluatedAt: at(), decidedBy: "review", path };
+  }
+  if (sure) return { verdict: "pass", checks, judgment, review, reasons: [], evaluatedAt: at(), decidedBy: "review", path };
   // Finished and usable, but nobody was sure enough to call it clean: pass, with the reviewer's note attached.
   return { verdict: "pass_with_notes", checks, judgment, review, reasons: [review.reasoning, ...unsure], evaluatedAt: at(), decidedBy: "review", path };
 }
 
+/** "cannot_do" or "needs_answer" when the judge is sure the run did one of those instead of the work. */
+function confidentRefusal(j: Judgment): Refusal | null {
+  const h = j.handling;
+  if (!h || h.choice === "did_work" || h.confidence < CONFIDENT) return null;
+  return REFUSAL[h.choice];
+}
+
+const noul = (p: number) => ({ type: "noul" as const, noul: p });
+const sureYes = (p: number) => p >= 0.5 && isConfident(noul(p), CONFIDENT);
 const pct = (p: number) => `${Math.round(p * 100)}%`;
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));

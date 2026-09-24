@@ -1,3 +1,4 @@
+import type { VerdictKind } from "@/contracts/eval";
 import type { Plan } from "@/contracts/run";
 
 /** The earlier run a follow-up continues, as much of it as the new prompt carries over. */
@@ -6,7 +7,7 @@ export type ParentRun = {
   report: string | null;
   files: { name: string; bytes: number }[];
   plan: Plan | null; // its final plan: each step with its status and note
-  verdict: "pass" | "pass_with_notes" | "fail" | "unknown" | null; // the automatic check's headline
+  verdict: VerdictKind | null; // the automatic check's headline
   feedback: string | null; // the check's findings as instructions (feedbackForAgent)
 };
 
