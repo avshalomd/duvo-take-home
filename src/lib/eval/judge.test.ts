@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AutomationTemplate } from "@/contracts/automation";
 import type { EvaluateInput } from "@/contracts/eval";
 
@@ -116,6 +116,31 @@ describe("judgeRun", () => {
 
   it("returns the three probabilities as the judgment", async () => {
     expect(await judgeRun(input)).toEqual({ answeredQuery: 0.9, followedPlan: 0.8, stayedInBounds: 0.95 });
+  });
+});
+
+// Engine review #1: 20 s per route on three routes is 60 s, past the evaluation's 50 s box.
+describe("the judge's time", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const threeRoutes = () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "ts");
+    vi.stubEnv("OPENROUTER_API_KEY", "or");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("JEV_MODEL", "");
+  };
+
+  it("spreads the time it is given over every route, so the last route still gets its turn", async () => {
+    threeRoutes();
+    await judgeRun(input, { endsAt: Date.now() + 30_000 });
+    const { timeoutMs } = decideMock.mock.calls[0][0] as { timeoutMs: number };
+    expect(timeoutMs).toBeGreaterThan(9_000);
+    expect(timeoutMs * 3).toBeLessThanOrEqual(30_000);
+  });
+
+  it("gives each route 20 s when no deadline is set", async () => {
+    threeRoutes();
+    await judgeRun(input);
+    expect((decideMock.mock.calls[0][0] as { timeoutMs: number }).timeoutMs).toBe(20_000);
   });
 });
 
