@@ -62,6 +62,16 @@ export function inviteLink(invitationId: string): string {
 export async function createInvite(requestHeaders: Headers, ctx: SessionCtx, input: InviteInput): Promise<{ link: string }> {
   const { email, role } = InviteInput.parse(input);
   if (!canChangeSettings(ctx.role)) throw new Error("Only an owner or an admin can invite people to this workspace.");
+  // One invitation at a time per workspace (QA F5): three sent at once all read "none pending" and all made one, and
+  // accepting two gave the person two memberships. Better Auth writes through its own connection and commits at once,
+  // so the next invitation in line, reading after our commit, finds this one and renews it.
+  return transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('handover:invitations'), hashtext(${ctx.workspaceId}))`);
+    return inviteNow(requestHeaders, ctx, email, role);
+  });
+}
+
+async function inviteNow(requestHeaders: Headers, ctx: SessionCtx, email: string, role: InviteInput["role"]): Promise<{ link: string }> {
   try {
     // Better Auth's resend only renews a pending invitation, role and all: one with another role is revoked first,
     // so the new invitation (and its new link) carries the role asked for now, and the old link stops working.
