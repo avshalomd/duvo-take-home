@@ -1,22 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { relativeTime } from "./relative-time";
+import { useSyncExternalStore } from "react";
+import { fullDate, relativeTime } from "./relative-time";
 
-// Relative time is computed from the reader's clock, which is not the server's: the first render is the server's
-// string (suppressed so a one-minute difference is not a hydration error) and an effect keeps it fresh.
-export function TimeAgo({ iso, className }: { iso: string; className?: string }) {
-  const [text, setText] = useState(() => relativeTime(iso));
+// The reader's clock ticks every 30 s; that is the only thing this subscribes to.
+function everyHalfMinute(onChange: () => void) {
+  const timer = setInterval(onChange, 30_000);
+  return () => clearInterval(timer);
+}
+const readerZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // the clock is an external system: the effect only subscribes to it, the first value came from useState
-  useEffect(() => {
-    const timer = setInterval(() => setText(relativeTime(iso)), 30_000);
-    return () => clearInterval(timer);
-  }, [iso]);
-
+// Relative time is the reader's: their clock and their calendar day, which the server does not know. So the server
+// renders it for UTC and the browser swaps in its own right after hydration (useSyncExternalStore: no mismatch
+// warning, and no stale server text kept on screen). The tooltip is the moment itself, in words.
+export function TimeAgo({ iso, className, testId }: { iso: string; className?: string; testId?: string }) {
+  const text = useSyncExternalStore(
+    everyHalfMinute,
+    () => relativeTime(iso, new Date(), readerZone()),
+    () => relativeTime(iso, new Date(), "UTC"),
+  );
+  const title = useSyncExternalStore(
+    everyHalfMinute,
+    () => fullDate(iso, readerZone()),
+    () => fullDate(iso, "UTC"),
+  );
   return (
-    <span className={className} suppressHydrationWarning title={iso}>
+    // suppressHydrationWarning: the server's minute may already be over by the time the browser hydrates
+    <time dateTime={iso} data-testid={testId} className={className} title={title} suppressHydrationWarning>
       {text}
-    </span>
+    </time>
   );
 }
