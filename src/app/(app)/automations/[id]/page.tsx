@@ -3,6 +3,7 @@ import type { Automation, Trial } from "@/contracts/automation";
 import { ApprovalBar } from "@/components/automations/approval-bar";
 import { ApprovedNote } from "@/components/automations/approved-note";
 import { AutomationDocument } from "@/components/automations/automation-document";
+import { AutomationSave } from "@/components/automations/automation-save";
 import { BackLink } from "@/components/automations/back-link";
 import { CommandChip, InputToken } from "@/components/automations/brief-text";
 import { DeleteButton } from "@/components/automations/delete-button";
@@ -71,46 +72,49 @@ export default async function AutomationPage({ params, searchParams }: PageProps
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-8 sm:px-6 sm:py-10">
       <BackLink />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
-        <div className="min-w-0 space-y-6">
-          <article className={cn(SHEET, "space-y-10 p-6 sm:p-10")}>
-            <Header automation={automation} governs={governs} />
-            {isDraft ? (
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
-            ) : (
-              <>
-                {approved === "1" && automation.status === "active" && <ApprovedNote command={automation.command} />}
-                {automation.status === "active" && (
-                  <RunForm
-                    automationId={automation.id}
-                    command={automation.command}
-                    inputLabel={automation.inputLabel}
-                    inputHint={automation.inputHint}
-                    inputExample={automation.inputExample}
-                  />
-                )}
-                <section aria-labelledby="schedule" className="space-y-3 border-t border-hairline pt-8">
-                  <h2 id="schedule" className={SECTION}>
-                    Schedule
-                  </h2>
-                  <Schedule automation={automation} governs={governs} />
-                </section>
-                <section aria-labelledby="its-runs" className="space-y-3 border-t border-hairline pt-8">
-                  <h2 id="its-runs" className={SECTION}>
-                    Its runs
-                  </h2>
-                  <History runs={history} callable={automation.status === "active"} />
-                </section>
-              </>
-            )}
-          </article>
-
-          {!isDraft && (
-            // what an edit does is said where it matters: under the editor, and in the save's own message
-            <article aria-label="The automation" className={cn(SHEET, "p-6 sm:p-10")}>
-              <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
+        {/* the save's state lives here, above both layouts: a save that makes a Ready one a draft keeps its message (review) */}
+        <AutomationSave key={automation.id}>
+          <div className="min-w-0 space-y-6">
+            <article className={cn(SHEET, "space-y-10 p-6 sm:p-10")}>
+              <Header automation={automation} governs={governs} />
+              {isDraft ? (
+                <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
+              ) : (
+                <>
+                  {approved === "1" && automation.status === "active" && <ApprovedNote command={automation.command} />}
+                  {automation.status === "active" && (
+                    <RunForm
+                      automationId={automation.id}
+                      command={automation.command}
+                      inputLabel={automation.inputLabel}
+                      inputHint={automation.inputHint}
+                      inputExample={automation.inputExample}
+                    />
+                  )}
+                  <section aria-labelledby="schedule" className="space-y-3 border-t border-hairline pt-8">
+                    <h2 id="schedule" className={SECTION}>
+                      Schedule
+                    </h2>
+                    <Schedule automation={automation} governs={governs} />
+                  </section>
+                  <section aria-labelledby="its-runs" className="space-y-3 border-t border-hairline pt-8">
+                    <h2 id="its-runs" className={SECTION}>
+                      Its runs
+                    </h2>
+                    <History runs={history} callable={automation.status === "active"} />
+                  </section>
+                </>
+              )}
             </article>
-          )}
-        </div>
+
+            {!isDraft && (
+              // what an edit does is said where it matters: under the editor, and in the save's own message
+              <article aria-label="The automation" className={cn(SHEET, "p-6 sm:p-10")}>
+                <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
+              </article>
+            )}
+          </div>
+        </AutomationSave>
 
         <aside aria-labelledby="try-it" className="space-y-4 lg:sticky lg:top-20">
           <div className="space-y-1 px-1">
