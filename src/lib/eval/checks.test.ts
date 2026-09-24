@@ -385,6 +385,7 @@ describe("reading the instructions for the checks", () => {
 
   it("reads no columns from a sentence that only mentions 'with the'", () => {
     expect(columnsAskedFor("Compare them with the latest figures.")).toEqual([]);
+    expect(columnsAskedFor("Compare Teams with Slack and Google Chat for 50 people.")).toEqual([]);
   });
 
   it("reads 'the top 10 stories' and '12 articles' as a floor of rows", () => {

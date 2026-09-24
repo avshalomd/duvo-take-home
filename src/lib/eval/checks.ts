@@ -258,18 +258,29 @@ export function asksForFile(prompt: string): boolean {
   return /\b(csv|file|files|spreadsheet|save|saved|export|exported)\b|\.(md|txt|csv|xlsx)\b/i.test(prompt);
 }
 
+// Things a list is counted in: "the top 10 stories", "12 articles". Days and hours are a window, never a floor.
+const COUNTED = "rows|entries|items|lines|stories|articles|headlines|results|links|companies|products|papers|posts";
+
 /** "At least 8 rows" is a promise the file either keeps or does not; with no floor named, one row is the floor. */
 export function rowFloor(prompt: string): number {
-  const m = prompt.match(/at least (\d+)\s*(?:rows|entries|items|lines)/i) ?? prompt.match(/(\d+)\+?\s*(?:rows|entries|items)/i);
+  const m =
+    prompt.match(/at least (\d+)\s*(?:rows|entries|items|lines)/i) ??
+    prompt.match(/\btop\s+(\d+)\b/i) ?? // "the top 10 stories" (qa-ai F7)
+    prompt.match(new RegExp(`(\\d+)\\+?\\s*(?:${COUNTED})\\b`, "i"));
   return m ? Number(m[1]) : 1;
 }
 
-/** The column list in "a CSV with title, source, url, published_at, summary": two or more names in a row. */
+/**
+ * The column list in "a CSV with title, source, url", "with the columns a, b and c" or "with columns: a, b, c": two or
+ * more names in a row. "the columns" broke the old pattern, and it is how /news-digest words it (qa-ai F7).
+ */
 export function columnsAskedFor(prompt: string): string[] {
-  const m = prompt.match(/\bwith\s+([a-z][a-z0-9_]*(?:\s*,\s*[a-z][a-z0-9_]*)+)/i);
+  const name = "[a-z][a-z0-9_]*";
+  // At least one comma: "Compare Teams with Slack and Google Chat" names no columns.
+  const m = prompt.match(new RegExp(`\\bwith\\s+(?:the\\s+)?(?:columns?\\s*:?\\s*)?(${name}(?:\\s*,\\s*${name})+(?:\\s*,?\\s+and\\s+${name})?)`, "i"));
   if (!m) return [];
   return m[1]
-    .split(",")
+    .split(/\s*,\s*(?:and\s+)?|\s+and\s+/i)
     .map((c) => c.trim().toLowerCase())
     .filter(Boolean);
 }
@@ -278,7 +289,11 @@ export function columnsAskedFor(prompt: string): string[] {
 export function freshnessWindow(prompt: string): number | null {
   const named = prompt.match(/(?:last|past)\s+(\d+)\s*days/i);
   if (named) return Number(named[1]);
+  const hours = prompt.match(/(?:last|past)\s+(\d+)\s*hours/i);
+  if (hours) return Math.ceil(Number(hours[1]) / 24) + 1; // a day more: "today" in the run's zone may be yesterday in UTC
   if (/\b(last|past)\s+week\b/i.test(prompt)) return 7;
+  if (/\b(this|last|past)\s+month\b/i.test(prompt)) return 31;
+  if (/\byesterday\b/i.test(prompt)) return 2; // yesterday's items, dated in any time zone
   return /\b(latest|recent|newest|today|this week)\b/i.test(prompt) ? DEFAULT_FRESH_DAYS : null;
 }
 
