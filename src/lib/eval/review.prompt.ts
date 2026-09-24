@@ -14,8 +14,9 @@ the start of each page, search result and connection answer it read. Decide two 
 - taskFinished: did the run carry out the instructions end to end? A run that stopped early, dropped a step or
   wrote a placeholder file is NOT finished. A step shown [not marked] is one the agent finished the run without
   ticking: judge it by the report and the files, not by the missing tick.
-- responseSuitable: could this go back to the user as it is? One borderline row in a long list can pass; a wrong
-  answer cannot. Check the substance, not only the form:
+- responseSuitable: could this go back to the user as it is? It can still be suitable with a small blemish -
+  one borderline or off-topic row in a list of several - as long as the user gets what they asked for; say it in
+  reasoning. A wrong or unsupported number, fact or source is never a small blemish. Check the substance:
   - When the instructions give data (a table, amounts, a list), recompute every total, share and count from data
     the instructions give, and check that each number the instructions give appears unchanged in the result.
     Recompute the totals, shares and counts from data the instructions give yourself; never take the report's word.

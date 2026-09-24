@@ -134,10 +134,12 @@ function judgeLine(judgment: Judgment | null): Body {
   return { tone, text: `An automatic check was sure ${sure[0]}, but could not tell ${unsure[0]}` };
 }
 
-// factsAgree (qa-ai F2): P(the numbers and facts agree with the instructions and what the run read). Absent on older verdicts.
+// factsAgree (qa-ai F2): P(the numbers and facts agree with the instructions and what the run read). Absent on older
+// verdicts. Said only when the check leaned to no, the bar evaluate() sends a run on by (FACTS_BAR, 0.5): Jev sees only
+// the start of what a run read, so short of sure is not a doubt worth a line.
 function factsLine(judgment: Judgment | null): Body | null {
   const p = judgment?.factsAgree;
-  if (p === undefined || p >= SURE) return null;
+  if (p === undefined || p >= 0.5) return null;
   if (p <= 1 - SURE) return { tone: "bad", text: "Some numbers or facts do not agree with your instructions or the sources" };
   return { tone: "warn", text: "Some numbers or facts may not agree with your instructions or the sources" };
 }

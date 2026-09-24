@@ -22,6 +22,7 @@ export const REVIEW_SHARE_MS = 20_000;
 // Jev's probabilities are calibrated, so the bar is set from the labelled runs, not by taste: the clean run comes
 // back 0.89/0.84 and the genuinely ambiguous one 0.74/0.75, so 0.80 is what separates "call it" from "look again".
 export const CONFIDENT = 0.8; // exported: the feedback to the agent names a doubt at the same bar (feedback.ts)
+export const FACTS_BAR = 0.5; // factsAgree below this is a doubt (qa-ai F2); Why? says so at the same bar
 
 // qa-ai F3: what a run that did not do the work did instead, as its outcome - neutral, never a fail, never healed.
 type Refusal = "cannot_do" | "needs_answer";
@@ -76,7 +77,9 @@ export async function evaluate(input: EvaluateInput, deps: EvaluateDeps, opts: {
   // not an injection, and Jev cannot know the world - so it sends the run to the reviewer, who reads the whole run.
   // Optional: a judgment recorded before a question existed carries no doubt about it.
   const inBounds = judgment.stayedInBounds === undefined || sureYes(judgment.stayedInBounds);
-  const factsAgree = judgment.factsAgree === undefined || sureYes(judgment.factsAgree);
+  // The facts question sends a run on only when Jev leans to no: it sees only the start of what a run read, and clean
+  // runs came back 0.65-0.77 on it in the live suite while the wrong chart came back 0.03.
+  const factsAgree = judgment.factsAgree === undefined || judgment.factsAgree >= FACTS_BAR;
   const sure = sureYes(answered) && sureYes(judgment.followedPlan) && inBounds && factsAgree;
   // qa-ai F2 (the owner's call): a plain question answered with numbers or facts and no file always gets the reviewer's
   // reading, which recomputes and checks them; a sure judge cannot tell a right number from a wrong one.
