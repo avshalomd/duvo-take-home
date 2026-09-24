@@ -132,8 +132,10 @@ const HISTORY = [
   "   value, a confident wrong fact) and two false fails (a truthful refusal, a question for the person) in cases the",
   "   suite did not hold. Four cases were added from real runs (the chart and the fact altered by hand); the judge",
   "   reads a chart's values and a spreadsheet's rows, answers three more questions (`factsAgree`, `handling`,",
-  "   `statesFacts`), and a sure \"does not answer\" goes to the reviewer (off-topic is now decided there). The table",
-  "   above is the fourth run.",
+  "   `statesFacts`), and a sure \"does not answer\" goes to the reviewer (off-topic is now decided there). Its first",
+  "   live run was 20/24: clean runs at 0.65-0.77 on `factsAgree` went to the reviewer as \"with notes\", and the",
+  "   stricter reviewer failed mixed-topic's one stray row. A facts doubt now needs a lean to no (below 0.50), and one",
+  "   stray row may pass with a note. The table above is the run after that.",
 ];
 
 function answers(r: Row): string {
