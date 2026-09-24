@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 import { StartRunInput } from "@/contracts/agent";
-import { sessionFromHeaders } from "@/lib/auth/session";
+import { WORKSPACE_LEFT, resolveSession, sessionFromHeaders } from "@/lib/auth/session";
 import { parseCommand } from "@/lib/automations/command";
 import { AutomationError } from "@/lib/automations/errors";
 import { runCommand } from "@/lib/automations/store";
@@ -25,8 +25,11 @@ export async function GET(req: Request) {
  * that starts with \command or /command runs that saved automation (or is refused in its words), never paid free text.
  */
 export async function POST(req: Request) {
-  const session = await sessionFromHeaders(req.headers);
-  if (!session) return Response.json({ error: "sign in first" }, { status: 401 });
+  const found = await resolveSession(req.headers);
+  if (!found) return Response.json({ error: "sign in first" }, { status: 401 });
+  // Removed from the workspace the session names: a run would start unseen in the one fallen back to (F15, as Q226 for actions)
+  if (found.left) return Response.json({ error: WORKSPACE_LEFT }, { status: 409 });
+  const session = found.ctx;
   const body: unknown = await req.json().catch(() => null);
   // Plain words for a body that is not what we take, instead of Zod's "expected object, received null" (QA Q132).
   const text = body && typeof body === "object" && !Array.isArray(body) ? (body as { prompt?: unknown }).prompt : undefined;
