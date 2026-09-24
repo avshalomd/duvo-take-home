@@ -217,6 +217,9 @@ Per file: what it does and why it is built that way. Grows at every merge.
   inline script. It is left off `/api/runs/<id>/files/*` by a negative lookahead in its `source`: a config header
   replaces a route's header of the same name, which had stripped the inline chart's sandbox policy (F8);
   `e2e/headers.spec.ts` checks both on real responses.
+- `src/contracts/text.ts` `noNul` - one Zod rule for a NUL character, which Postgres refuses in text and which had
+  surfaced as an empty 500 (F1); the run, follow-up, automation, judgment, connection and workspace schemas use it,
+  and Better Auth's names are checked in its hooks (`src/lib/auth/names.ts`).
 
 ### Roles and limits (his decisions after the deep QA: Q169, Q176-Q178)
 - `src/lib/auth/member-rules.ts` - who may change whose role or remove whom, as plain functions the page and the

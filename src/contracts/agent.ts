@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { PlanStepStatus, type RunEvent } from "./run";
+import { noNul } from "./text";
 
 // What the form sends. One set of instructions; the connections are whatever is enabled at that moment.
-export const StartRunInput = z.object({ prompt: z.string().trim().min(10, "Say what the agent should do").max(4000, "Keep the instructions under 4000 characters") });
+export const StartRunInput = z.object({ prompt: noNul(z.string().trim().min(10, "Say what the agent should do").max(4000, "Keep the instructions under 4000 characters")) });
 export type StartRunInput = z.infer<typeof StartRunInput>;
 // Everything a start can carry. The plain form sends only prompt; automations, trials and follow-ups fill the rest.
 export type StartRunRequest = {
@@ -19,7 +20,7 @@ export type StartRun = (ctx: { workspaceId: string; userId: string | null }, req
 // "Ask for a change" on a finished run: a follow-up continues the same agent session with the earlier files in place.
 export const FollowUpInput = z.object({
   runId: z.uuid(),
-  prompt: z.string().trim().min(3, "Say what should change").max(4000, "Keep it under 4000 characters"),
+  prompt: noNul(z.string().trim().min(3, "Say what should change").max(4000, "Keep it under 4000 characters")),
 });
 export type FollowUpInput = z.infer<typeof FollowUpInput>;
 export type StartFollowUp = (ctx: { workspaceId: string; userId: string }, input: FollowUpInput) => Promise<{ id: string }>;

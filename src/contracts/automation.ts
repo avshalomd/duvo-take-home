@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RunStatus } from "./run";
+import { noNul } from "./text";
 
 // A saved automation (his flow, 2026-09-23): a normal run -> "Make an automation" -> an LLM drafts the template from
 // the run -> the user edits it -> runs one or two examples and judges them -> approves -> it is callable as
@@ -13,18 +14,21 @@ export const CommandName = z
   .regex(/^[a-z][a-z0-9-]{1,23}$/, "Use 2-24 lower-case letters, digits or -, starting with a letter");
 
 // The template: what the agent is told and what it must produce. {input} marks where the command's input goes.
+// Every text field refuses a NUL character (F1, text.ts): Postgres cannot store one.
 export const AutomationTemplate = z.object({
-  instructions: z
-    .string()
-    .trim()
-    .min(10, "Say what the agent should do")
-    .max(4000, "Keep the instructions under 4000 characters")
-    .refine((s) => s.includes("{input}"), "Put {input} where the input goes"),
-  intent: z.string().default(""), // one line: what this automation is for
-  expectedOutputs: z.array(z.string().trim().min(1)).min(1, "Name at least one output"), // "audit.md with sections Ownership, Filings, News, Risks"
-  outputFormat: z.string().default(""), // CSV columns, report headings: what "the same output every time" means
-  steps: z.array(z.string().trim().min(1)).min(1, "Give at least one step").max(12, "Keep it to 12 steps"),
-  connections: z.array(z.string()).default([]), // connection names that must be on, or the run refuses to start
+  instructions: noNul(
+    z
+      .string()
+      .trim()
+      .min(10, "Say what the agent should do")
+      .max(4000, "Keep the instructions under 4000 characters")
+      .refine((s) => s.includes("{input}"), "Put {input} where the input goes"),
+  ),
+  intent: noNul(z.string()).default(""), // one line: what this automation is for
+  expectedOutputs: z.array(noNul(z.string().trim().min(1))).min(1, "Name at least one output"), // "audit.md with sections Ownership, Filings, News, Risks"
+  outputFormat: noNul(z.string()).default(""), // CSV columns, report headings: what "the same output every time" means
+  steps: z.array(noNul(z.string().trim().min(1))).min(1, "Give at least one step").max(12, "Keep it to 12 steps"),
+  connections: z.array(noNul(z.string())).default([]), // connection names that must be on, or the run refuses to start
 });
 export type AutomationTemplate = z.infer<typeof AutomationTemplate>;
 
@@ -68,12 +72,12 @@ export type AutomationDraft = z.infer<typeof AutomationDraft>;
 
 // What the editor form submits. Arrays arrive as one item per line.
 export const AutomationEdit = z.object({
-  name: z.string().trim().min(1, "Give it a name").max(60),
+  name: noNul(z.string().trim().min(1, "Give it a name").max(60)),
   command: CommandName,
-  description: z.string().trim().max(200).default(""),
-  inputLabel: z.string().trim().min(1, "Name the input").max(40),
-  inputHint: z.string().trim().max(120).default(""),
-  inputExample: z.string().trim().max(200).default(""),
+  description: noNul(z.string().trim().max(200)).default(""),
+  inputLabel: noNul(z.string().trim().min(1, "Name the input").max(40)),
+  inputHint: noNul(z.string().trim().max(120)).default(""),
+  inputExample: noNul(z.string().trim().max(200)).default(""),
   template: AutomationTemplate,
 });
 export type AutomationEdit = z.infer<typeof AutomationEdit>;
@@ -98,7 +102,7 @@ export type ParsedCommand = z.infer<typeof ParsedCommand>;
 export const HumanVerdictInput = z.object({
   runId: z.uuid(),
   verdict: z.enum(["approved", "rejected"]),
-  note: z.string().trim().max(500).optional(),
+  note: noNul(z.string().trim().max(500)).optional(),
 });
 export type HumanVerdictInput = z.infer<typeof HumanVerdictInput>;
 

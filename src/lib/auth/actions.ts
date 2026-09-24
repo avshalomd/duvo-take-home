@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { WorkspaceSummary } from "@/contracts/auth";
+import { noNul } from "@/contracts/text";
 import { auth } from "./auth";
 import { listWorkspaces, revokeInvitation } from "./members";
 import { safeNext, withNext } from "./paths";
@@ -48,7 +49,7 @@ export async function trySwitchWorkspace(workspaceId: string): Promise<SwitchSta
 
 export type NewWorkspaceState = { error?: string; name?: string };
 
-const NewWorkspace = z.object({ name: z.string().trim().min(1, "Give the workspace a name").max(60, "Keep the name under 60 characters") });
+const NewWorkspace = z.object({ name: noNul(z.string().trim().min(1, "Give the workspace a name").max(60, "Keep the name under 60 characters")) });
 
 /** A new, empty workspace with the user as its owner; Better Auth makes it the active one. */
 export async function createWorkspace(_prev: NewWorkspaceState, form: FormData): Promise<NewWorkspaceState> {
