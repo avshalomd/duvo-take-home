@@ -329,7 +329,10 @@ test.describe("the composer", () => {
     await page.goto("/");
     const chips = page.getByTestId("composer-connections");
     await expect(chips).toContainText(/Using|No connections on/); // "Using DeepWiki and 3 more" (U24)
-    await expect(chips.getByRole("link").first()).toHaveAttribute("href", "/settings/connections");
+    // one connection is a chip linking to Settings; several are one chip whose list ends with "Change in Settings" (U24)
+    const several = chips.getByRole("button");
+    if (await several.count()) await several.first().click();
+    await expect(page.locator('a[href="/settings/connections"]').first()).toBeVisible();
   });
 
   // Q147: two names ran together into one ("DeepWiki e2e Settings moved"). UX QA U24: several are one chip, "DeepWiki
