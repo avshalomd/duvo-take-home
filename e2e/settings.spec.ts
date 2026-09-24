@@ -290,7 +290,7 @@ test.describe("in Tokyo", () => {
 
   test("Limits says when the day starts over in the reader's own time", async ({ page }) => {
     await open(page, "/settings/limits");
-    await expect(page.getByTestId("usage")).toContainText("The day starts over at 09:00 your time, in ");
+    await expect(page.getByText(/The day starts over at 09:00 your time, in /)).toBeVisible(); // the Today group's footer
     await expect(page.getByText("When a limit is reached, new runs wait until the day starts over at 09:00 your time.")).toBeVisible();
     await expect(page.getByText(/midnight UTC/)).toHaveCount(0);
   });
