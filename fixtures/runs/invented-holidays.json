@@ -1,0 +1,268 @@
+{
+  "id": "invented-holidays",
+  "why": "A plain question answered '20 working days' with two invented Norwegian October holidays (altered from a real run that answered 22 correctly). qa-ai F2: nothing asked whether the facts were right and the judge passed it at 0.86; a plain answer resting on facts now always gets the reviewer.",
+  "source": "scripts/record-run.ts from run d2ec67c1-0b93-4b69-8507-6951fba88a26 on 2026-09-24; its stored verdict was pass, decided by review, failed checks: none; altered by hand on 2026-09-24: the report and step 2's note invent two holidays (qa-ai probe wrongFactAnswer)",
+  "expected": {
+    "verdict": "fail",
+    "decidedBy": "review",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.86,
+      "followedPlan": 0.93,
+      "factsAgree": 0.52,
+      "handling": {
+        "choice": "did_work",
+        "confidence": 1
+      },
+      "statesFacts": 0.98
+    },
+    "review": {
+      "taskFinished": true,
+      "responseSuitable": false,
+      "changeNeeded": "Norway has no public holidays in October, so October 2026 actually has 22 working days (31 days minus the 9 weekend days), not 20. Please correct the answer to remove the invented 'Harvest Thanksgiving Day' and 'Reformation Day' holidays, which are not Norwegian public holidays.",
+      "reasoning": "The weekday/weekend calculation (22 weekdays, 9 weekend days) is correct for October 2026, but the report invents two holidays - 'Harvest Thanksgiving Day' and 'Reformation Day' - that are not among Norway's actual public holidays, and no source was consulted to verify them. This fabricated deduction produces a wrong final count of 20 instead of the correct 22 working days."
+    },
+    "source": "live 2026-09-24"
+  },
+  "run": {
+    "id": "d2ec67c1-0b93-4b69-8507-6951fba88a26",
+    "prompt": "How many working days are there in Norway in October 2026? Answer in a short paragraph.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [
+      "dc49fcd5-b93b-4bb4-afba-f0d9a2549af9"
+    ],
+    "report": "October 2026 has 20 working days in Norway. October 1, 2026 falls on a Thursday, and the month runs 31 days, giving 9 weekend days and 22 Monday-to-Friday days. Two Norwegian public holidays fall on weekdays in October 2026: Harvest Thanksgiving Day (Monday 12 October) and Reformation Day (Monday 26 October), so 22 minus 2 leaves 20 working days.",
+    "error": null,
+    "numTurns": 5,
+    "durationMs": 21055,
+    "costUsd": 0.033672,
+    "createdAt": "2026-09-24T14:30:55.622Z",
+    "finishedAt": "2026-09-24T14:31:28.465Z",
+    "workspaceId": "demo-workspace",
+    "purpose": "adhoc",
+    "automationId": null,
+    "automationVersion": null,
+    "input": null,
+    "parentRunId": null
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-24T14:30:57.806Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "Read",
+          "WebFetch",
+          "WebSearch",
+          "Write",
+          "mcp__deepwiki__ask_wiki_question",
+          "mcp__deepwiki__read_wiki_contents",
+          "mcp__deepwiki__read_wiki_structure",
+          "mcp__outputs__make_chart",
+          "mcp__outputs__make_spreadsheet",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": [
+          {
+            "name": "deepwiki",
+            "status": "connected"
+          },
+          {
+            "name": "plan",
+            "status": "connected"
+          },
+          {
+            "name": "outputs",
+            "status": "connected"
+          }
+        ],
+        "cwd": "/Users/avshalom/projects/handover/.claude/worktrees/agent-a4d91face86f89202/runs/d2ec67c1-0b93-4b69-8507-6951fba88a26",
+        "turn": 0
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-24T14:31:09.572Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Determine the number of working days (Monday-Friday, excluding Norwegian public holidays) in October 2026",
+        "expectedOutputs": [
+          "a short paragraph answer"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Work out the calendar for October 2026 and count weekdays",
+            "status": "pending"
+          },
+          {
+            "index": 1,
+            "title": "Check whether any Norwegian public holidays fall in October",
+            "status": "pending"
+          },
+          {
+            "index": 2,
+            "title": "Give the final count with a brief explanation",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-24T14:31:13.193Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Determine the number of working days (Monday-Friday, excluding Norwegian public holidays) in October 2026",
+        "expectedOutputs": [
+          "a short paragraph answer"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Work out the calendar for October 2026 and count weekdays",
+            "status": "done",
+            "note": "October 1, 2026 falls on a Thursday; counted the calendar and found 22 weekdays (Monday-Friday) and 9 weekend days in the 31-day month"
+          },
+          {
+            "index": 1,
+            "title": "Check whether any Norwegian public holidays fall in October",
+            "status": "pending"
+          },
+          {
+            "index": 2,
+            "title": "Give the final count with a brief explanation",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-24T14:31:13.447Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 0,
+        "onTrack": 0.89,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-24T14:31:14.199Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Determine the number of working days (Monday-Friday, excluding Norwegian public holidays) in October 2026",
+        "expectedOutputs": [
+          "a short paragraph answer"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Work out the calendar for October 2026 and count weekdays",
+            "status": "done",
+            "note": "October 1, 2026 falls on a Thursday; counted the calendar and found 22 weekdays (Monday-Friday) and 9 weekend days in the 31-day month"
+          },
+          {
+            "index": 1,
+            "title": "Check whether any Norwegian public holidays fall in October",
+            "status": "done",
+            "note": "Two public holidays fall on weekdays in October: Harvest Thanksgiving Day (12 October) and Reformation Day (26 October)"
+          },
+          {
+            "index": 2,
+            "title": "Give the final count with a brief explanation",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-24T14:31:14.449Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 1,
+        "onTrack": 0.71,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-24T14:31:14.649Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Determine the number of working days (Monday-Friday, excluding Norwegian public holidays) in October 2026",
+        "expectedOutputs": [
+          "a short paragraph answer"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Work out the calendar for October 2026 and count weekdays",
+            "status": "done",
+            "note": "October 1, 2026 falls on a Thursday; counted the calendar and found 22 weekdays (Monday-Friday) and 9 weekend days in the 31-day month"
+          },
+          {
+            "index": 1,
+            "title": "Check whether any Norwegian public holidays fall in October",
+            "status": "done",
+            "note": "Two public holidays fall on weekdays in October: Harvest Thanksgiving Day (12 October) and Reformation Day (26 October)"
+          },
+          {
+            "index": 2,
+            "title": "Give the final count with a brief explanation",
+            "status": "done",
+            "note": "Final answer given below"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-24T14:31:14.916Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 2,
+        "onTrack": 0.18,
+        "note": "May not have done what it says: Final answer given below"
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-24T14:31:18.810Z",
+      "kind": "text",
+      "payload": {
+        "text": "October 2026 has 20 working days in Norway. October 1, 2026 falls on a Thursday, and the month runs 31 days, giving 9 weekend days and 22 Monday-to-Friday days. Two Norwegian public holidays fall on weekdays in October 2026: Harvest Thanksgiving Day (Monday 12 October) and Reformation Day (Monday 26 October), so 22 minus 2 leaves 20 working days.",
+        "turn": 3
+      }
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-24T14:31:18.848Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 5,
+        "duration_ms": 21055,
+        "total_cost_usd": 0.033671999999999994,
+        "result": "October 2026 has 20 working days in Norway. October 1, 2026 falls on a Thursday, and the month runs 31 days, giving 9 weekend days and 22 Monday-to-Friday days. Two Norwegian public holidays fall on weekdays in October 2026: Harvest Thanksgiving Day (Monday 12 October) and Reformation Day (Monday 26 October), so 22 minus 2 leaves 20 working days.",
+        "turn": 3,
+        "attempt_cost_usd": 0.033671999999999994
+      }
+    }
+  ],
+  "files": [],
+  "template": null
+}

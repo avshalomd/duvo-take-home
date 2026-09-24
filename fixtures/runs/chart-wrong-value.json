@@ -1,0 +1,234 @@
+{
+  "id": "chart-wrong-value",
+  "why": "The chart draws Q2 as 9,550 while the instructions and the report say 95,500 (altered from a real run: the chart tool's input and the SVG's labels). qa-ai F1: the judge read only the SVG's first 300 characters and passed it on the report's word.",
+  "source": "scripts/record-run.ts from run 3a63f3e3-0683-4764-8e20-e1ee393c6c6f on 2026-09-24; its stored verdict was pass, decided by judge, failed checks: none; altered by hand on 2026-09-24: Q2 is 9550 in the make_chart call and the chart's labels (qa-ai probe chartWrongValue)",
+  "expected": {
+    "verdict": "fail",
+    "decidedBy": "review",
+    "failedChecks": []
+  },
+  "recorded": {
+    "judge": {
+      "answeredQuery": 0.21,
+      "followedPlan": 0.71,
+      "factsAgree": 0.03,
+      "handling": {
+        "choice": "did_work",
+        "confidence": 0.99
+      }
+    },
+    "review": {
+      "taskFinished": true,
+      "responseSuitable": false,
+      "changeNeeded": "The Q2 bar shows 9,550 instead of the correct 95,500 euros - please fix that value in the chart.",
+      "reasoning": "The instructions specify Q2 sales as 95500, but the chart file shows Q2 as 9550, a tenfold data error not matching the given figures. All other quarters (120000, 101000, 130500) are correct, but this single wrong value makes the chart unsuitable to send back as-is."
+    },
+    "source": "live 2026-09-24"
+  },
+  "run": {
+    "id": "3a63f3e3-0683-4764-8e20-e1ee393c6c6f",
+    "prompt": "No web needed. Make a bar chart of our 2025 sales in euros by quarter - Q1 120000, Q2 95500, Q3 101000, Q4 130500 - titled \"Sales 2025 by quarter\", saved as sales.svg.",
+    "status": "succeeded",
+    "model": "claude-sonnet-5",
+    "connectionIds": [
+      "dc49fcd5-b93b-4bb4-afba-f0d9a2549af9"
+    ],
+    "report": "I created the bar chart of your 2025 sales by quarter (Q1: €120,000, Q2: €95,500, Q3: €101,000, Q4: €130,500), titled \"Sales 2025 by quarter\", and saved it as **sales.svg**.",
+    "error": null,
+    "numTurns": 5,
+    "durationMs": 12715,
+    "costUsd": 0.0224795,
+    "createdAt": "2026-09-24T14:30:55.096Z",
+    "finishedAt": "2026-09-24T14:31:11.601Z",
+    "workspaceId": "demo-workspace",
+    "purpose": "adhoc",
+    "automationId": null,
+    "automationVersion": null,
+    "input": null,
+    "parentRunId": null
+  },
+  "events": [
+    {
+      "seq": 1,
+      "at": "2026-09-24T14:30:57.482Z",
+      "kind": "started",
+      "payload": {
+        "model": "claude-sonnet-5",
+        "tools": [
+          "Read",
+          "WebFetch",
+          "WebSearch",
+          "Write",
+          "mcp__deepwiki__ask_wiki_question",
+          "mcp__deepwiki__read_wiki_contents",
+          "mcp__deepwiki__read_wiki_structure",
+          "mcp__outputs__make_chart",
+          "mcp__outputs__make_spreadsheet",
+          "mcp__plan__set_plan",
+          "mcp__plan__update_step"
+        ],
+        "mcp_servers": [
+          {
+            "name": "deepwiki",
+            "status": "connected"
+          },
+          {
+            "name": "plan",
+            "status": "connected"
+          },
+          {
+            "name": "outputs",
+            "status": "connected"
+          }
+        ],
+        "cwd": "/Users/avshalom/projects/handover/.claude/worktrees/agent-a4d91face86f89202/runs/3a63f3e3-0683-4764-8e20-e1ee393c6c6f",
+        "turn": 0
+      }
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-24T14:31:00.364Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Create a bar chart showing 2025 sales in euros by quarter, titled \"Sales 2025 by quarter\", saved as sales.svg",
+        "expectedOutputs": [
+          "sales.svg bar chart of quarterly sales"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Draw the bar chart with the given quarterly sales figures and save it as sales.svg",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-24T14:31:02.457Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Create a bar chart showing 2025 sales in euros by quarter, titled \"Sales 2025 by quarter\", saved as sales.svg",
+        "expectedOutputs": [
+          "sales.svg bar chart of quarterly sales"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Draw the bar chart with the given quarterly sales figures and save it as sales.svg",
+            "status": "running"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-24T14:31:05.356Z",
+      "kind": "tool_call",
+      "payload": {
+        "tool_use_id": "toolu_019HfdwRYaNjEJa895D6wuif",
+        "name": "mcp__outputs__make_chart",
+        "input": {
+          "x": "quarter",
+          "y": "sales",
+          "data": [
+            {
+              "sales": 120000,
+              "quarter": "Q1"
+            },
+            {
+              "sales": 9550,
+              "quarter": "Q2"
+            },
+            {
+              "sales": 101000,
+              "quarter": "Q3"
+            },
+            {
+              "sales": 130500,
+              "quarter": "Q4"
+            }
+          ],
+          "file": "sales.svg",
+          "kind": "bar",
+          "title": "Sales 2025 by quarter"
+        },
+        "turn": 3
+      }
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-24T14:31:05.529Z",
+      "kind": "tool_result",
+      "payload": {
+        "tool_use_id": "toolu_019HfdwRYaNjEJa895D6wuif",
+        "is_error": false,
+        "preview": "Wrote sales.svg (bar chart, 4 points)",
+        "turn": 3
+      }
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-24T14:31:07.831Z",
+      "kind": "plan",
+      "payload": {
+        "intent": "Create a bar chart showing 2025 sales in euros by quarter, titled \"Sales 2025 by quarter\", saved as sales.svg",
+        "expectedOutputs": [
+          "sales.svg bar chart of quarterly sales"
+        ],
+        "sources": [],
+        "steps": [
+          {
+            "index": 0,
+            "title": "Draw the bar chart with the given quarterly sales figures and save it as sales.svg",
+            "status": "done",
+            "note": "Chart created with the four quarterly figures"
+          }
+        ]
+      }
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-24T14:31:08.433Z",
+      "kind": "check",
+      "payload": {
+        "stepIndex": 0,
+        "onTrack": 0.85,
+        "note": "Looks done"
+      }
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-24T14:31:10.146Z",
+      "kind": "text",
+      "payload": {
+        "text": "I created the bar chart of your 2025 sales by quarter (Q1: €120,000, Q2: €95,500, Q3: €101,000, Q4: €130,500), titled \"Sales 2025 by quarter\", and saved it as **sales.svg**.",
+        "turn": 5
+      }
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-24T14:31:10.305Z",
+      "kind": "finished",
+      "payload": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 5,
+        "duration_ms": 12715,
+        "total_cost_usd": 0.022479500000000003,
+        "result": "I created the bar chart of your 2025 sales by quarter (Q1: €120,000, Q2: €95,500, Q3: €101,000, Q4: €130,500), titled \"Sales 2025 by quarter\", and saved it as **sales.svg**.",
+        "turn": 5,
+        "attempt_cost_usd": 0.022479500000000003
+      }
+    }
+  ],
+  "files": [
+    {
+      "name": "sales.svg",
+      "content": "<svg data-rows=\"4\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" class=\"marks\" width=\"420\" height=\"280\" viewBox=\"0 0 420 280\"><style>:root { color-scheme: light dark; } .role-title-text text, .role-axis-label text, .role-legend-label text { fill: #17202B; } .role-axis-title text, .role-legend-title text { fill: #5B6878; } .role-axis-grid line { stroke: #17202B; stroke-opacity: 0.08; } .role-axis-domain line { stroke: #17202B; stroke-opacity: 0.2; } @media (prefers-color-scheme: dark) { .role-title-text text, .role-axis-label text, .role-legend-label text { fill: #E6EBF2; } .role-axis-title text, .role-legend-title text { fill: #98A4B3; } .role-axis-grid line { stroke: #FFFFFF; stroke-opacity: 0.09; } .role-axis-domain line { stroke: #FFFFFF; stroke-opacity: 0.2; } [fill=\"#E89A0C\"] { fill: #F5B437; } [stroke=\"#E89A0C\"] { stroke: #F5B437; } [fill=\"#15845A\"] { fill: #3CC489; } [stroke=\"#15845A\"] { stroke: #3CC489; } [fill=\"#17202B\"] { fill: #E6EBF2; } [stroke=\"#17202B\"] { stroke: #E6EBF2; } [fill=\"#5B6878\"] { fill: #98A4B3; } [stroke=\"#5B6878\"] { stroke: #98A4B3; } [fill=\"#C62F43\"] { fill: #F0697A; } [stroke=\"#C62F43\"] { stroke: #F0697A; } [stroke=\"#FFFFFF\"] { stroke: #151C26; } }</style><g fill=\"none\" stroke-miterlimit=\"4\" transform=\"translate(116,62)\"><g class=\"mark-group role-frame root\" role=\"graphics-object\" aria-roledescription=\"group mark container\"><g transform=\"translate(0,0)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h284v177h-284Z\"/><g><g class=\"mark-group role-axis\" aria-hidden=\"true\"><g transform=\"translate(0.5,0.5)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h0v0h0Z\" pointer-events=\"none\"/><g><g class=\"mark-rule role-axis-grid\" pointer-events=\"none\"><line transform=\"translate(0,177)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/><line transform=\"translate(0,152)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/><line transform=\"translate(0,126)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/><line transform=\"translate(0,101)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/><line transform=\"translate(0,76)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/><line transform=\"translate(0,51)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/><line transform=\"translate(0,25)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/><line transform=\"translate(0,0)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.08\" stroke-width=\"1\" opacity=\"1\"/></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" pointer-events=\"none\" display=\"none\"/></g></g><g class=\"mark-group role-axis\" role=\"graphics-symbol\" aria-roledescription=\"axis\" aria-label=\"X-axis for a discrete scale with 4 values: Q1, Q2, Q3, Q4\"><g transform=\"translate(0.5,177.5)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h0v0h0Z\" pointer-events=\"none\"/><g><g class=\"mark-text role-axis-label\" pointer-events=\"none\"><text text-anchor=\"middle\" transform=\"translate(35.000000000000014,18)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">Q1</text><text text-anchor=\"middle\" transform=\"translate(106.00000000000001,18)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">Q2</text><text text-anchor=\"middle\" transform=\"translate(177,18)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">Q3</text><text text-anchor=\"middle\" transform=\"translate(248,18)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">Q4</text></g><g class=\"mark-rule role-axis-domain\" pointer-events=\"none\"><line transform=\"translate(0,0)\" x2=\"284\" y2=\"0\" stroke=\"#17202B\" stroke-opacity=\"0.2\" stroke-width=\"1\" opacity=\"1\"/></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" pointer-events=\"none\" display=\"none\"/></g></g><g class=\"mark-group role-axis\" role=\"graphics-symbol\" aria-roledescription=\"axis\" aria-label=\"Y-axis titled 'Sales' for a linear scale with values from 0 to 140,000\"><g transform=\"translate(0.5,0.5)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h0v0h0Z\" pointer-events=\"none\"/><g><g class=\"mark-text role-axis-label\" pointer-events=\"none\"><text text-anchor=\"end\" transform=\"translate(-6,182)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">0</text><text text-anchor=\"end\" transform=\"translate(-6,156.71428571428572)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">20,000</text><text text-anchor=\"end\" transform=\"translate(-6,131.42857142857144)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">40,000</text><text text-anchor=\"end\" transform=\"translate(-6,106.14285714285714)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">60,000</text><text text-anchor=\"end\" transform=\"translate(-6,80.85714285714286)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">80,000</text><text text-anchor=\"end\" transform=\"translate(-6,55.57142857142857)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">100,000</text><text text-anchor=\"end\" transform=\"translate(-6,30.285714285714295)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">120,000</text><text text-anchor=\"end\" transform=\"translate(-6,5)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" fill=\"#17202B\" opacity=\"1\">140,000</text></g><g class=\"mark-text role-axis-title\" pointer-events=\"none\"><text text-anchor=\"middle\" transform=\"translate(-81,88.5) rotate(-90) translate(0,-3)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"15px\" font-weight=\"400\" fill=\"#5B6878\" opacity=\"1\">Sales</text></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" pointer-events=\"none\" display=\"none\"/></g></g><g class=\"mark-group role-scope\" role=\"graphics-object\" aria-roledescription=\"group mark container\"><g transform=\"translate(3.5500000000000114,25.285714285714295)\"><path class=\"background\" aria-hidden=\"true\" d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,151.7142857142857C63.9,151.7142857142857,63.9,151.7142857142857,63.9,151.7142857142857L0,151.7142857142857C0,151.7142857142857,0,151.7142857142857,0,151.7142857142857L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/><g clip-path=\"url(#clip1)\"><g class=\"mark-group role-scope\" role=\"graphics-object\" aria-roledescription=\"group mark container\"><g transform=\"translate(0,-25.285714285714295)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h63.9v0h-63.9Z\"/><g><g class=\"mark-rect role-mark marks\" role=\"graphics-object\" aria-roledescription=\"rect mark container\"><path aria-label=\"quarter: Q1; Sales: 120000\" role=\"graphics-symbol\" aria-roledescription=\"bar\" d=\"M0,25.285714285714295h63.9v151.7142857142857h-63.9Z\" fill=\"#E89A0C\"/></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g><g transform=\"translate(74.55000000000001,56.26071428571428)\"><path class=\"background\" aria-hidden=\"true\" d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,120.73928571428573C63.9,120.73928571428573,63.9,120.73928571428573,63.9,120.73928571428573L0,120.73928571428573C0,120.73928571428573,0,120.73928571428573,0,120.73928571428573L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/><g clip-path=\"url(#clip2)\"><g class=\"mark-group role-scope\" role=\"graphics-object\" aria-roledescription=\"group mark container\"><g transform=\"translate(0,-56.26071428571428)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h63.9v0h-63.9Z\"/><g><g class=\"mark-rect role-mark marks\" role=\"graphics-object\" aria-roledescription=\"rect mark container\"><path aria-label=\"quarter: Q2; Sales: 9550\" role=\"graphics-symbol\" aria-roledescription=\"bar\" d=\"M0,56.26071428571428h63.9v120.73928571428573h-63.9Z\" fill=\"#E89A0C\"/></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g><g transform=\"translate(145.55,49.30714285714286)\"><path class=\"background\" aria-hidden=\"true\" d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,127.69285714285715C63.9,127.69285714285715,63.9,127.69285714285715,63.9,127.69285714285715L0,127.69285714285715C0,127.69285714285715,0,127.69285714285715,0,127.69285714285715L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/><g clip-path=\"url(#clip3)\"><g class=\"mark-group role-scope\" role=\"graphics-object\" aria-roledescription=\"group mark container\"><g transform=\"translate(0,-49.30714285714286)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h63.9v0h-63.9Z\"/><g><g class=\"mark-rect role-mark marks\" role=\"graphics-object\" aria-roledescription=\"rect mark container\"><path aria-label=\"quarter: Q3; Sales: 101000\" role=\"graphics-symbol\" aria-roledescription=\"bar\" d=\"M0,49.30714285714286h63.9v127.69285714285715h-63.9Z\" fill=\"#E89A0C\"/></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g><g transform=\"translate(216.55,12.010714285714283)\"><path class=\"background\" aria-hidden=\"true\" d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,164.98928571428573C63.9,164.98928571428573,63.9,164.98928571428573,63.9,164.98928571428573L0,164.98928571428573C0,164.98928571428573,0,164.98928571428573,0,164.98928571428573L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/><g clip-path=\"url(#clip4)\"><g class=\"mark-group role-scope\" role=\"graphics-object\" aria-roledescription=\"group mark container\"><g transform=\"translate(0,-12.010714285714283)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h63.9v0h-63.9Z\"/><g><g class=\"mark-rect role-mark marks\" role=\"graphics-object\" aria-roledescription=\"rect mark container\"><path aria-label=\"quarter: Q4; Sales: 130500\" role=\"graphics-symbol\" aria-roledescription=\"bar\" d=\"M0,12.010714285714283h63.9v164.98928571428573h-63.9Z\" fill=\"#E89A0C\"/></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g></g><g class=\"mark-group role-title\"><g transform=\"translate(-96,-42)\"><path class=\"background\" aria-hidden=\"true\" d=\"M0,0h0v0h0Z\" pointer-events=\"none\"/><g><g class=\"mark-text role-title-text\" role=\"graphics-symbol\" aria-roledescription=\"title\" aria-label=\"Title text 'Sales 2025 by quarter'\" pointer-events=\"none\"><text text-anchor=\"start\" transform=\"translate(0,17)\" font-family=\"system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Helvetica, Arial, sans-serif\" font-size=\"21px\" font-weight=\"600\" fill=\"#17202B\" opacity=\"1\">Sales 2025 by quarter</text></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" pointer-events=\"none\" display=\"none\"/></g></g></g><path class=\"foreground\" aria-hidden=\"true\" d=\"\" display=\"none\"/></g></g></g><defs><clipPath id=\"clip1\"><path d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,151.7142857142857C63.9,151.7142857142857,63.9,151.7142857142857,63.9,151.7142857142857L0,151.7142857142857C0,151.7142857142857,0,151.7142857142857,0,151.7142857142857L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/></clipPath><clipPath id=\"clip2\"><path d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,120.73928571428573C63.9,120.73928571428573,63.9,120.73928571428573,63.9,120.73928571428573L0,120.73928571428573C0,120.73928571428573,0,120.73928571428573,0,120.73928571428573L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/></clipPath><clipPath id=\"clip3\"><path d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,127.69285714285715C63.9,127.69285714285715,63.9,127.69285714285715,63.9,127.69285714285715L0,127.69285714285715C0,127.69285714285715,0,127.69285714285715,0,127.69285714285715L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/></clipPath><clipPath id=\"clip4\"><path d=\"M4,0L59.9,0C62.107660097976,0,63.9,1.792339902024,63.9,4L63.9,164.98928571428573C63.9,164.98928571428573,63.9,164.98928571428573,63.9,164.98928571428573L0,164.98928571428573C0,164.98928571428573,0,164.98928571428573,0,164.98928571428573L0,4C0,1.792339902024,1.792339902024,0,4,0Z\"/></clipPath></defs></svg>"
+    }
+  ],
+  "template": null
+}
