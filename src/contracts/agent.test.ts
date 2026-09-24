@@ -136,8 +136,9 @@ describe("UpdateStepInput", () => {
 });
 
 describe("AgentLimits", () => {
-  it("caps a runaway run on turns, money and wall clock", () => {
-    expect(AgentLimits.maxTurns).toBe(25);
+  // qa-ai F12 (the owner's call): /news-digest used 24 of 25 turns, so 40 leaves room; the $1 still caps what it costs.
+  it("caps a runaway run on turns, money and wall clock, with room for a digest that searches a lot", () => {
+    expect(AgentLimits.maxTurns).toBe(40);
     expect(AgentLimits.maxBudgetUsd).toBe(1);
     expect(AgentLimits.wallClockMs).toBeLessThan(300_000); // under the route's maxDuration, so we time out first
   });
