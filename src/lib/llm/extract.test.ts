@@ -52,6 +52,18 @@ describe("extract", () => {
     expect(data).toEqual(expected);
   });
 
+  // Engine review #16: in prompt mode a ZodError or a JSON SyntaxError became "unavailable" with the raw ZodError
+  // JSON as its message, which reached the run's "Why?" line and was retried as if the provider were down.
+  it("turns a prompt-mode answer that does not fit the schema into a plain off-schema error", async () => {
+    const refusal = apiError(400, { error: { message: "does not support feature: structured-outputs" } });
+    for (const [id, answer] of [["prompt-wrong-shape", '{"changes":[{"product":3}]}'], ["prompt-not-json", "{changes: oops}"]]) {
+      const err = await extract({ ...args, model: () => failingModel([refusal], [answer], id) }).catch((e) => e);
+      expect(err).toBeInstanceOf(LlmError);
+      expect(err.kind).toBe("off-schema");
+      expect(err.message).toBe("The model's answer did not fit the expected format. Retry.");
+    }
+  });
+
   it("remembers the refusal, so the next call goes straight to prompt mode", async () => {
     const refusal = apiError(400, { error: { message: "response_format is not supported" } });
     const first = failingModel([refusal], [reply], "remembers-model");
