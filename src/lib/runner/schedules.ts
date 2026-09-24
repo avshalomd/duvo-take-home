@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db";
-import { automations } from "@/db/schema";
+import { automations, organization } from "@/db/schema";
 import { AutomationTemplate } from "@/contracts/automation";
 import type { TickSchedules } from "@/contracts/runner";
 import { fillTemplate } from "@/lib/automations/template";
@@ -15,10 +15,15 @@ const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * by the worker and by Vercel cron (/api/cron/tick); both may run at once, so a slot is taken with a conditional
  * update before its run starts. One automation failing (a bad template, the budget spent) never stops the others.
  */
-export const tickSchedules: TickSchedules = async (now) => {
-  const candidates = await db
-    .select()
+/**
+ * The active schedules that are due, of workspaces that still exist: automations have no foreign key to their
+ * workspace, and one whose workspace is gone must never start paid runs nobody can see or stop (security review S4).
+ */
+export async function dueAutomations(now: Date) {
+  const rows = await db
+    .select({ automation: automations })
     .from(automations)
+    .innerJoin(organization, eq(organization.id, automations.workspaceId))
     .where(
       and(
         eq(automations.status, "active"),
@@ -26,6 +31,11 @@ export const tickSchedules: TickSchedules = async (now) => {
         or(isNull(automations.nextRunAt), lte(automations.nextRunAt, now)), // null: just scheduled, compute its first slot
       ),
     );
+  return rows.map((r) => r.automation);
+}
+
+export const tickSchedules: TickSchedules = async (now) => {
+  const candidates = await dueAutomations(now);
 
   const started: string[] = [];
   for (const a of candidates) {

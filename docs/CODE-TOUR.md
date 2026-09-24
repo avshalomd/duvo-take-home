@@ -112,6 +112,12 @@ Per file: what it does and why it is built that way. Grows at every merge.
   before opening Home, or the top bar keeps naming the old workspace.
 - `src/app/(auth)/invite/[id]` - explains the invitation before asking anyone to sign in, pre-fills the email, and
   refuses a different signed-in account with "Sign in as ...".
+- `src/lib/auth/organization-writes.ts` - Better Auth's organization writes (create, rename, invite, role, remove,
+  leave, delete) are refused over HTTP by a tiny plugin: the app makes them only through its actions with
+  `auth.api`, where its own rules sit (the member-change lock, name limits, one pending invitation). A request
+  carries `ctx.request`; an `auth.api` call does not, which is how the two are told apart. Deleting a workspace is
+  off altogether (`disableOrganizationDeletion`), and `dueAutomations` joins `organization`, so a schedule whose
+  workspace is gone never fires.
 
 ### engine
 - `src/lib/agent/close.ts` `updateUnlessCancelled` - every exit of the run loop writes through it, so a Stop that

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { invitationIdFromCookies } from "./invitation-cookie";
 import { refuseInvitationLists, stripInvitationsForMembers } from "./invitation-privacy";
+import { organizationWritesGuard } from "./organization-writes";
 import { googleConfigured } from "./providers";
 import { assertMayCreateAccount } from "./signup";
 import { createPersonalWorkspace, firstWorkspaceId } from "./workspaces";
@@ -70,7 +71,12 @@ export const auth = betterAuth({
   },
   // Invitation ids go to owners and admins only (lib/auth/invitation-privacy.ts): the plugin would give them to any member.
   hooks: { before: refuseInvitationLists, after: stripInvitationsForMembers },
-  plugins: [organization(), nextCookies()], // nextCookies last: it sets cookies from Server Actions
+  plugins: [
+    // No screen deletes a workspace: its runs, connections and schedules have no foreign key to it and would outlive it (S4)
+    organization({ disableOrganizationDeletion: true }),
+    organizationWritesGuard(), // the org writes only through our actions, never over HTTP (organization-writes.ts)
+    nextCookies(), // last: it sets cookies from Server Actions
+  ],
 });
 
 export type Auth = typeof auth;
