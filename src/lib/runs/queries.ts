@@ -1,4 +1,4 @@
-import { asc, desc, eq, and } from "drizzle-orm";
+import { asc, desc, eq, and, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
 import { RunEvent, type GetFile, type GetRun, type ListRuns, type Run, type RunStatus } from "@/contracts/run";
@@ -44,6 +44,15 @@ function outcomeOf(verdict: unknown): Run["outcome"] {
   return v === "pass" || v === "pass_with_notes" || v === "fail" || v === "unknown" ? v : null;
 }
 
+// jsonb is only typed at compile time: parse each row against the contract and drop what does not fit,
+// so one odd row from an older shape cannot break the whole run page.
+function parseEvents(rows: (typeof runEvents.$inferSelect)[]): RunEvent[] {
+  return rows
+    .map((e) => RunEvent.safeParse({ seq: e.seq, at: e.at.toISOString(), kind: e.kind, payload: e.payload }))
+    .filter((r) => r.success)
+    .map((r) => r.data);
+}
+
 // Tenancy: every read filters on the workspace from the session. A run of another workspace reads as "not found",
 // never as "forbidden", so its existence does not leak either.
 export const listRuns: ListRuns = async (workspaceId) => {
@@ -57,12 +66,7 @@ export const getRun: GetRun = async (workspaceId, id) => {
   if (!row) return null;
   const eventRows = await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq));
   const fileRows = await db.select().from(files).where(eq(files.runId, id)).orderBy(asc(files.name));
-  // jsonb is only typed at compile time: parse each row against the contract and drop what does not fit,
-  // so one odd row from an older shape cannot break the whole run page.
-  const events = eventRows
-    .map((e) => RunEvent.safeParse({ seq: e.seq, at: e.at.toISOString(), kind: e.kind, payload: e.payload }))
-    .filter((r) => r.success)
-    .map((r) => r.data);
+  const events = parseEvents(eventRows);
   // The verdict is stored whole on the run so a pass or fail can be defended later; parsed here, not trusted raw.
   const verdict = Verdict.safeParse(row.verdict);
   return {
@@ -72,6 +76,18 @@ export const getRun: GetRun = async (workspaceId, id) => {
     verdict: verdict.success ? verdict.data : null,
   };
 };
+
+/**
+ * The run as it is now and only its events after `after` (a seq): what the event stream sends each second. No files
+ * and no verdict: the client reads the full run once the stream says it is done. Scoped like getRun.
+ */
+export async function getRunSince(workspaceId: string, id: string, after: number): Promise<{ run: Run; events: RunEvent[] } | null> {
+  if (!isUuid(id)) return null;
+  const [row] = await db.select().from(runs).where(and(eq(runs.id, id), eq(runs.workspaceId, workspaceId)));
+  if (!row) return null;
+  const eventRows = await db.select().from(runEvents).where(and(eq(runEvents.runId, id), gt(runEvents.seq, after))).orderBy(asc(runEvents.seq));
+  return { run: toRun(row), events: parseEvents(eventRows) };
+}
 
 export const getFile: GetFile = async (workspaceId, runId, name) => {
   if (!isUuid(runId)) return null;

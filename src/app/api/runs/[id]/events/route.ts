@@ -1,6 +1,6 @@
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { sweepIfOverdue } from "@/lib/runner/recover";
-import { getRun } from "@/lib/runs/queries";
+import { getRunSince } from "@/lib/runs/queries";
 import { nextMessage, parseAfter, sseFrame } from "./diff";
 
 export const runtime = "nodejs"; // a long-lived stream and the database driver: not the edge runtime
@@ -34,10 +34,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!session) return Response.json({ error: "sign in first" }, { status: 401 });
   const { id } = await params;
   const workspaceId = session.workspaceId;
-  // Checked before the stream opens, so another workspace's run is a plain 404 and not an empty stream.
-  if (!(await getRun(workspaceId, id))) return Response.json({ error: "not found" }, { status: 404 });
-
   let after = parseAfter(new URL(req.url).searchParams.get("after"));
+  // Checked before the stream opens, so another workspace's run is a plain 404 and not an empty stream.
+  if (!(await getRunSince(workspaceId, id, after))) return Response.json({ error: "not found" }, { status: 404 });
+
   const encoder = new TextEncoder();
   const until = Date.now() + STREAM_MS;
   // The client leaving arrives two ways: the request's signal, or the stream being cancelled. Either one stops the
@@ -50,11 +50,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     async start(controller) {
       try {
         while (!gone.signal.aborted && Date.now() < until) {
-          let found = await getRun(workspaceId, id);
+          // the run and only its new events: a long run is not read whole every second (files come with the done payload)
+          let found = await getRunSince(workspaceId, id, after);
           if (gone.signal.aborted) break; // left during the read: there is nobody to send it to
           if (!found) break; // deleted while streaming
           // A run that has outlived every runner is closed now, while someone watches it, and sent closed.
-          if (await sweepIfOverdue(workspaceId, found.run)) found = (await getRun(workspaceId, id)) ?? found;
+          if (await sweepIfOverdue(workspaceId, found.run)) found = (await getRunSince(workspaceId, id, after)) ?? found;
           const next = nextMessage(found, after);
           after = next.after;
           controller.enqueue(encoder.encode(sseFrame(next.message)));
