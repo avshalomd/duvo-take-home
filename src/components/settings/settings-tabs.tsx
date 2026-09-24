@@ -3,7 +3,9 @@
 import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { tabShown, type PickedTab } from "./tab-choice";
 
 const TABS = [
   { href: "/settings/connections", label: "Connections" },
@@ -15,15 +17,19 @@ const TABS = [
 // next with a spring. Links, not tabs: each segment is a page with its own address.
 export function SettingsTabs() {
   const path = usePathname();
+  const [picked, setPicked] = useState<PickedTab | null>(null);
+  const shown = tabShown(path, picked); // the clicked tab at once; the page follows when it is ready
   return (
     <nav aria-label="Settings" className="flex w-full rounded-full bg-graphite/[0.06] p-1 sm:w-fit">
       {TABS.map((t) => {
-        const active = path.startsWith(t.href);
+        const active = shown.startsWith(t.href);
         return (
           <Link
             key={t.href}
             href={t.href}
-            aria-current={active ? "page" : undefined}
+            onClick={() => setPicked({ from: path, href: t.href })}
+            // the page on screen, which is the old one until the new one arrives
+            aria-current={path.startsWith(t.href) ? "page" : undefined}
             className={cn(
               "relative flex-1 rounded-full px-5 py-1.5 text-center text-sm font-medium transition-[color,transform] duration-100 active:scale-[0.97] sm:flex-none",
               // slate on the grey track measured 4.44:1, just under AA's 4.5: a fifth of graphite in it gives 5.5:1
