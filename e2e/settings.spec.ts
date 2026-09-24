@@ -90,6 +90,25 @@ test("a connection is added with a token, edited, switched off and deleted", asy
   await expect(rowOf(page, RENAMED)).toHaveCount(0);
 });
 
+// Review (frontend): a row's switch kept the value it first rendered with, so a connection another admin (or another
+// tab) turned off still read on after this page refreshed. Both rows are seeded; pressing one refreshes the page.
+test("a connection's switch follows the server when the page refreshes", async ({ page }) => {
+  const sql = neon(databaseUrl()!);
+  const [one] = await sql`insert into connections (workspace_id, name, url, enabled) values ('demo-workspace', 'e2e Settings follow one', 'https://example.com/one', true) returning id`;
+  await sql`insert into connections (workspace_id, name, url, enabled) values ('demo-workspace', 'e2e Settings follow two', 'https://example.com/two', true)`;
+  try {
+    await open(page, "/settings/connections");
+    await expect(rowOf(page, "e2e Settings follow one").getByRole("switch")).toHaveAttribute("aria-checked", "true");
+
+    await sql`update connections set enabled = false where id = ${one.id}`; // someone else turns it off
+    await rowOf(page, "e2e Settings follow two").getByRole("switch").click(); // this press refreshes the page
+    await expect(page.getByText("e2e Settings follow two off for the next run")).toBeVisible();
+    await expect(rowOf(page, "e2e Settings follow one").getByRole("switch")).toHaveAttribute("aria-checked", "false");
+  } finally {
+    await sql`delete from connections where name like 'e2e Settings follow %'`; // switched on only for these seconds
+  }
+});
+
 test("a refused server keeps the sign-in choice and everything typed, the token included", async ({ page }) => {
   await open(page, "/settings/connections");
   await page.getByRole("button", { name: /add a server/i }).click();
