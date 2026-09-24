@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 import { DEMO_EMAIL, DEMO_PASSWORD, E2E_PASSWORD, SIGNED_OUT, asNewClient, deleteUsers, e2eEmail, formError, inviteByRow, signInThroughUi } from "./auth-helpers";
 
 // Sign-up by invitation only, as production runs. The same variable starts the server in that mode and turns
-// these tests on (they skip in the default open mode, where auth.spec.ts signs people up freely):
-//   SIGNUP_MODE=invite .claude/scripts/wt-serve.sh . 3004
+// these tests on (they skip in the default open mode, where auth.spec.ts signs people up freely). Next runs one dev
+// server per folder, so serve a second checkout (git worktree add) on a port Better Auth trusts (3000-3010):
+//   SIGNUP_MODE=invite npx next dev -p 3004
 //   SIGNUP_MODE=invite BASE_URL=http://localhost:3004 npx playwright test e2e/auth-invite-only.spec.ts
 test.skip(process.env.SIGNUP_MODE !== "invite", "run with SIGNUP_MODE=invite, against a server started the same way");
 test.use({ storageState: SIGNED_OUT });

@@ -10,8 +10,9 @@ Claude Code as a library. `npm i @anthropic-ai/claude-agent-sdk` (the tarballs a
 unpacks to ~270 MB because it carries the Claude Code binary for darwin-arm64). `query({ prompt, options })`
 spawns that binary as a child process; the child runs the whole agent loop (model calls, built-in tools, MCP
 servers, permissions) and streams messages back. Our code renders and records the messages; it never runs the
-loop itself. It runs where a subprocess can run: this laptop, a container. **It does not run on Vercel functions**
-(250 MB cap, an open issue in the SDK repo), so the deploy is optional for this task; the README says so.
+loop itself. It runs where a subprocess can run: this laptop, a container, and on Vercel in one function only: with
+`RUNNER=route` each run executes in `/api/runner/<id>`, the only route that carries the ~240 MB Linux binary
+(`next.config.ts`); every other route stays small (the Hobby plan's 12-function cap).
 
 ## The call that works
 
@@ -23,7 +24,7 @@ const q = query({
   options: {
     cwd: runDir,                       // runs/<id>, gitignored; the agent's files land here
     settingSources: [],                // REQUIRED: the default loads ~/.claude/settings.json AND this repo's
-                                       // .claude/settings.json - the clock hooks and the secrets guard would run
+                                       // .claude/settings.json - its hooks (the secrets guard) would run
                                        // inside the agent. [] = SDK isolation mode.
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,   // required with bypassPermissions

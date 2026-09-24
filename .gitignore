@@ -40,7 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# harness (the clock's own state lives in .claude/run/, ignored by .claude/.gitignore)
 # agent worktrees: without this, `git add -A` on main commits them as embedded repos
 .claude/worktrees/
 test-results

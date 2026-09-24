@@ -8,12 +8,7 @@
       "Bash(gh:*)",
       "Bash(vercel:*)",
       "Bash(curl:*)",
-      "Bash(.claude/scripts/clock-start.sh:*)",
-      "Bash(.claude/scripts/gate.sh:*)",
-      "Bash(.claude/scripts/scaffold.sh:*)",
       "Bash(.claude/scripts/deploy.sh:*)",
-      "Bash(.claude/scripts/wt-setup.sh:*)",
-      "Bash(.claude/scripts/wt-serve.sh:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(grep:*)",
@@ -52,32 +47,7 @@
           }
         ]
       }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/clock.sh\""
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/clock-tick.sh\""
-          }
-        ]
-      }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/statusline.sh\""
   },
   "disableClaudeAiConnectors": true,
   "worktree": {
