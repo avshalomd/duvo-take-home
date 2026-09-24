@@ -134,6 +134,10 @@ Per file: what it does and why it is built that way. Grows at every merge.
   be reached, `fail-start.ts` closes the run as failed so it never waits forever.
 - `src/lib/runner/token.ts` - the runner's token is an HMAC of the run id under the sign-in secret, with its own
   label: no new secret to set, and a token seen once starts no other run (the run's own claim stops a replay).
+  `src/app/api/cron/tick/route.ts` compares `CRON_SECRET` the same way, in constant time (S12), and without a secret
+  answers a plain 404 that names no setting (F23).
+- `src/lib/runs/without-machine-paths.ts` - `GET /api/runs/<id>` takes the machine's folder off every path in its
+  answer, as the page does (F20), and drops the started event's own `cwd`.
 - `src/lib/agent/session.ts` - a follow-up resumes the parent's SDK session with `forkSession` when it still exists
   (checked with `getSessionInfo`), and always carries a preamble of what the parent did, because on Vercel /tmp is
   per instance and the session is gone.
@@ -142,6 +146,8 @@ Per file: what it does and why it is built that way. Grows at every merge.
 
 ### eval
 - `src/lib/eval/evaluate.ts` - every verdict records `decidedBy` and `path`, which is what "Why?" shows.
+- `src/lib/eval/run-rows.ts` `forEvaluator` - a file the output scan held back for a credential reaches the judges
+  (third-party services) as `(held back: contains a credential)`, never its content, live and on Check again (S8).
 - `src/lib/eval/template-checks.ts` - a run of a saved automation is also checked against its template: a plan step
   keeps a template step when it holds 40% of its words (filler and `{input}` dropped), a skip with a note counts as
   kept, and the promised files must exist.
