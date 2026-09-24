@@ -217,6 +217,11 @@ Per file: what it does and why it is built that way. Grows at every merge.
   of its own id (`isPersonalWorkspace`, workspace-name.ts); the invitation and sign-up pages say so in words.
 - `src/lib/runs/limits.ts` - a deployment-wide cap of six runs in flight under a second advisory lock, beside each
   workspace's own limits: every account can make workspaces, and they all spend one key (Q175).
+- `src/lib/usage/deployment-budget.ts` - and a deployment-wide cap on a day's money (S1, his call): today's finished
+  runs of every workspace plus each run in flight at its most ($1), read under that same global lock, against
+  `DEPLOYMENT_DAILY_BUDGET_USD` (default $50; a value that is not an amount keeps the default). A file of its own,
+  apart from the workspace's budget. `src/lib/auth/workspace-limit.ts` - a person owns at most five workspaces, the
+  personal one included: asked in the action for the words, and held for every caller by `organizationLimit`.
 - `next.config.ts` headers - no framing (`X-Frame-Options`, `frame-ancestors 'none'`), `nosniff`, a referrer policy
   and no `X-Powered-By` on every route (Q173). The content policy also says `object-src 'none'; base-uri 'none';
   script-src 'self' 'unsafe-inline'` (S13): static, so pages stay cacheable; inline because Next's hydration data is

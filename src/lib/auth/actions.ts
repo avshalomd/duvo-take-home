@@ -11,6 +11,7 @@ import { auth } from "./auth";
 import { listWorkspaces, revokeInvitation } from "./members";
 import { safeNext, withNext } from "./paths";
 import { requireSession } from "./session";
+import { workspaceLimitRefusal } from "./workspace-limit";
 import { workspaceSlug } from "./workspace-name";
 
 /**
@@ -53,10 +54,13 @@ const NewWorkspace = z.object({ name: noNul(z.string().trim().min(1, "Give the w
 
 /** A new, empty workspace with the user as its owner; Better Auth makes it the active one. */
 export async function createWorkspace(_prev: NewWorkspaceState, form: FormData): Promise<NewWorkspaceState> {
-  await requireSession();
+  const ctx = await requireSession();
   const parsed = NewWorkspace.safeParse({ name: form.get("name") });
   if (!parsed.success) return { error: parsed.error.issues[0].message, name: String(form.get("name") ?? "") };
   const { name } = parsed.data;
+  // asked here for the words; Better Auth's organizationLimit (auth.ts) holds the same rule for any other caller
+  const tooMany = await workspaceLimitRefusal(ctx.userId);
+  if (tooMany) return { error: tooMany, name };
   await auth.api.createOrganization({
     headers: await headers(),
     body: { name, slug: workspaceSlug(name, crypto.randomUUID().slice(0, 6)) },

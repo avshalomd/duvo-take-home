@@ -11,6 +11,7 @@ import { userNameRefusal, workspaceNameRefusal } from "./names";
 import { refuseInvitationLists, stripInvitationsForMembers } from "./invitation-privacy";
 import { organizationWritesGuard } from "./organization-writes";
 import { trustedOrigins } from "./origins";
+import { MAX_OWNED_WORKSPACES, ownedWorkspaceCount } from "./workspace-limit";
 import { googleConfigured } from "./providers";
 import { assertMayCreateAccount } from "./signup";
 import { createPersonalWorkspace, firstWorkspaceId } from "./workspaces";
@@ -85,6 +86,8 @@ export const auth = betterAuth({
     // No screen deletes a workspace: its runs, connections and schedules have no foreign key to it and would outlive it (S4)
     organization({
       disableOrganizationDeletion: true,
+      // at most five owned, the personal one included (S1): true refuses the new one (workspace-limit.ts)
+      organizationLimit: async (user) => (await ownedWorkspaceCount(user.id)) >= MAX_OWNED_WORKSPACES,
       organizationHooks: {
         // the new-workspace form's limit, held for every caller of Better Auth (F21); no NUL character (F1)
         beforeCreateOrganization: async ({ organization: o }) => refuseName(workspaceNameRefusal(o.name ?? "")),
