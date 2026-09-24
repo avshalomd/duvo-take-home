@@ -402,7 +402,7 @@ export const runAutomation: RunAutomation = async (runId) => {
         // the tools the run actually called: "claimed a connection but never used it" is a code check, not a judge call
         toolsUsed: [...new Set(recorded.filter((e) => e.kind === "tool_call").map((e) => e.payload.name))],
         followUp: Boolean(run.parentRunId), // it resumed a conversation that may have read a page: the in-bounds question is asked
-        spreadsheets: spreadsheetsIn(recorded), // what each .xlsx holds, for the judge and the reviewer (qa-ai F1)
+        spreadsheets: spreadsheetsIn(recorded, new Set(written.filter((f) => f.quarantined).map((f) => f.name))), // what each .xlsx holds, for the judge and the reviewer (qa-ai F1)
         read: whatItRead(recorded), // what its numbers and facts can be held to (qa-ai F2)
         template,
         // the model calls are budgeted inside the box, and end a little before it: the verdict then names the model

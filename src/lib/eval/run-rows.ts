@@ -25,7 +25,7 @@ export function toEvaluateInput(run: Run, events: RunEvent[], files: { name: str
     today: (run.finishedAt ?? run.createdAt).slice(0, 10),
     toolsUsed: [...new Set(toolNames)],
     followUp: Boolean(run.parentRunId), // as the live run was judged: its conversation holds what the parent read
-    spreadsheets: spreadsheetsIn(events),
+    spreadsheets: spreadsheetsIn(events, new Set(files.filter((f) => f.content === HELD_BACK).map((f) => f.name))),
     read: whatItRead(events),
   };
 }

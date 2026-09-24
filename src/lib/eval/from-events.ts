@@ -32,12 +32,12 @@ export function whatItRead(events: RunEvent[]): { tool: string; text: string }[]
  * What each spreadsheet holds: the spreadsheet tool's input, which our code turns into the .xlsx as it is (qa-ai F1).
  * The last call per file wins, because a fix writes the file again under the same name.
  */
-export function spreadsheetsIn(events: RunEvent[]): SheetFile[] {
+export function spreadsheetsIn(events: RunEvent[], heldBack: ReadonlySet<string> = new Set()): SheetFile[] {
   const byFile = new Map<string, SheetFile>();
   for (const e of events) {
     if (e.kind !== "tool_call" || !e.payload.name.endsWith("__make_spreadsheet")) continue;
     const parsed = SheetFile.safeParse(e.payload.input);
     if (parsed.success) byFile.set(parsed.data.file, { file: parsed.data.file, sheets: parsed.data.sheets });
   }
-  return [...byFile.values()];
+  return [...byFile.values()].filter((f) => !heldBack.has(f.file)); // a held-back file's data stays out, as its content does (S8)
 }
