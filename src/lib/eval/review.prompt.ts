@@ -43,7 +43,9 @@ Null when it is suitable. reasoning: two or three sentences naming the concrete 
 missing columns) - never "it looks good".
 
 changeNeeded and reasoning are read by an office worker, not an engineer: plain words about the work, no tool names
-(say "the page could not be opened", not "WebFetch failed"), no shell or curl, no file paths beyond a file's own name.`;
+(say "the page could not be opened", not "WebFetch failed"), no shell or curl, no file paths beyond a file's own name,
+and no security jargon ("data-exfiltration", "endpoint", "query parameter", "proxies"): say what it means
+("sending your data to another website", "the web address the data would have gone to").`;
 
 // Bounded (engine review #10): a single-line 200 KB file or a long report went to the reviewer whole, slow and costly
 // inside the evaluation's 50 s. The first 60 lines of each file, each line cut at 500 characters, as many files as fit
