@@ -47,6 +47,27 @@ test("signing up with an email that already has an account links to sign-in with
   await expect(page.getByLabel("Email")).toHaveValue(DEMO_EMAIL);
 });
 
+// UX QA U27: the browser's own bubble said it, unlike every other error in the app
+test("a short password is refused under its field in the app's words, with the cursor back in it", async ({ page }) => {
+  await page.goto("/sign-up");
+  await page.getByLabel("Your name").fill("Pat Short");
+  await page.getByLabel("Email").fill(e2eEmail("short-password"));
+  const password = page.getByLabel("Password", { exact: true });
+  await password.fill("short");
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  const error = page.getByRole("alert").and(page.locator("#password-error"));
+  await expect(error).toHaveText("Use at least 8 characters for the password.");
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAttribute("aria-invalid", "true");
+  await expect(password).toHaveAttribute("aria-describedby", "password-error");
+  expect(await password.evaluate((el: HTMLInputElement) => el.validationMessage)).toBe(""); // no browser bubble to show
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-up"); // nothing was sent, no account made
+
+  await password.fill(E2E_PASSWORD); // corrected: the error goes as soon as the field is changed
+  await expect(error).toHaveCount(0);
+});
+
 test("sign-in sets the example thread beside the form, and it draws itself through to done", async ({ page }) => {
   await page.goto("/sign-in");
   const thread = visibleThread(page);
