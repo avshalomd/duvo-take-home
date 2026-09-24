@@ -76,6 +76,38 @@ describe("GET /api/runs/<id>/events", () => {
     expect(getRun).not.toHaveBeenCalled();
   });
 
+  // Review (coordinator): the session was checked once, at open, so someone removed from the workspace (or signed out
+  // elsewhere) kept receiving the run for up to 280 s. It is checked again every 15 reads.
+  it.each([
+    ["no longer names this workspace", { ...session, workspaceId: "ws-own" }],
+    ["has ended", null],
+  ])("ends the stream within about 15 s once the session %s", async (_, later) => {
+    vi.useFakeTimers();
+    vi.mocked(sessionFromHeaders).mockResolvedValueOnce(session).mockResolvedValue(later);
+    const res = await call();
+    let ended = false;
+    const text = res.text().then((t) => {
+      ended = true;
+      return t;
+    });
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(ended).toBe(true);
+    const frames = (await text).split("\n\n").filter(Boolean);
+    expect(frames.length).toBeLessThanOrEqual(16); // no message after the check that found it gone
+    expect(vi.mocked(sessionFromHeaders).mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("keeps streaming while the session still names this workspace", async () => {
+    vi.useFakeTimers();
+    const res = await call();
+    let ended = false;
+    void res.text().then(() => (ended = true));
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(ended).toBe(false);
+    expect(vi.mocked(sessionFromHeaders).mock.calls.length).toBeGreaterThan(1); // it did look again
+    await res.body?.cancel().catch(() => {});
+  });
+
   it("ends quietly when the client leaves while the stream waits for the next read (Q131)", async () => {
     vi.useFakeTimers();
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
