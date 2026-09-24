@@ -9,4 +9,6 @@ export const DOT: Record<Tone, string> = {
   busy: "bg-saffron",
   bad: "bg-crimson",
   idle: "bg-slate/60",
+  unchecked: "border-[1.5px] border-slate bg-transparent", // the same rings as StatusDot (qa-ux U7, qa-ai F3)
+  asks: "border-[1.5px] border-dashed border-graphite bg-transparent",
 };

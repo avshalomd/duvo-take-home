@@ -184,7 +184,7 @@ describe("whyLines - the reviewer", () => {
   it("shortens a long reasoning to one readable line", () => {
     const long: Verdict = { ...NOTES_BY_REVIEW, review: { ...NOTES_BY_REVIEW.review!, reasoning: "word ".repeat(80).trim() } };
     const line = text(long, "review")!;
-    expect(line.length).toBeLessThan(260);
+    expect(line.length).toBeLessThan(270); // the quote is cut at 200; the lead is "A closer check read the whole run"
     expect(line).toMatch(/\.\.\."$/);
   });
 

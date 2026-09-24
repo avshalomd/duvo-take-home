@@ -1,5 +1,6 @@
 import type { Verdict } from "@/contracts/eval";
 import type { Run } from "@/contracts/run";
+import { plainCheckReason } from "@/lib/eval/check-words";
 
 /**
  * "Ask for a change" on a result that did not pass opens with a first draft: fix the first thing the check found. The
@@ -7,7 +8,8 @@ import type { Run } from "@/contracts/run";
  */
 export function changeSuggestion(verdict: Pick<Verdict, "verdict" | "reasons"> | null): string | null {
   const first = verdict?.verdict === "fail" ? verdict.reasons[0] : undefined;
-  return first ? `Please fix what did not pass: ${first}` : null;
+  // a failed check named by what failed, not by its pass label (qa-ux U10)
+  return first ? `Please fix what did not pass: ${plainCheckReason(first) ?? first}` : null;
 }
 
 // An automation repeats what a run did, so only a run whose result passed is worth saving as one (Q121) - and not a

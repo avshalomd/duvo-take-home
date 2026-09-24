@@ -147,7 +147,7 @@ test.describe("the frame", () => {
     const before = (await title.boundingBox())!.width;
     await row.hover();
     expect((await title.boundingBox())!.width).toBe(before);
-    await expect(row).toHaveAttribute("title", `Done - looks good\n${TITLES.parent}`);
+    await expect(row).toHaveAttribute("title", `Done, looks good\n${TITLES.parent}`);
   });
 
   // Q143: a press answers with a small give, the same everywhere
@@ -401,8 +401,8 @@ test.describe("a finished run", () => {
     await why.click();
     const lines = panel.getByTestId("why");
     await expect(lines).toContainText("4 checks passed");
-    await expect(lines).toContainText("The judge was sure the result answers your instructions, but could not tell whether the plan was finished");
-    await expect(lines).toContainText("A reviewer read the whole run: finished and usable.");
+    await expect(lines).toContainText("An automatic check was sure the result answers your instructions, but could not tell whether the plan was finished");
+    await expect(lines).toContainText("A closer check read the whole run: finished and usable.");
     await expect(lines).not.toContainText("%");
   });
 
@@ -410,13 +410,13 @@ test.describe("a finished run", () => {
     const panel = await openRun(page, runs.parent);
     await panel.getByRole("button", { name: /why\?/i }).click();
     await expect(panel.getByTestId("why")).toContainText("4 checks passed");
-    await expect(panel.getByTestId("why")).toContainText("The judge was sure the result answers your instructions and that the plan was finished");
+    await expect(panel.getByTestId("why")).toContainText("An automatic check was sure the result answers your instructions and that the plan was finished");
   });
 
   // Q91: the outcome said "looks good", Why? "not checked" and Details "not judged" about the same run
   test("a run checked by the first version says the same thing in the outcome, Why? and Details", async ({ page }) => {
     const panel = await openRun(page, runs.legacy);
-    await expect(panel.getByTestId("outcome")).toHaveText("Done - looks good");
+    await expect(panel.getByTestId("outcome")).toHaveText("Done, looks good");
     await panel.getByRole("button", { name: /why\?/i }).click();
     await expect(panel.getByTestId("why")).toContainText("Checked by an earlier version of the app");
     await panel.getByRole("button", { name: /details/i }).click();
@@ -537,7 +537,7 @@ test.describe("a finished run", () => {
   // Check again is not pressed here: it would call the model
   test("a result nobody could check says so in words beside the outcome, with Check again there", async ({ page }) => {
     const panel = await openRun(page, runs.unchecked);
-    await expect(panel.getByTestId("outcome")).toHaveText("Done - not checked");
+    await expect(panel.getByTestId("outcome")).toHaveText("Done, not checked");
     await expect(panel.getByTestId("not-checked")).toContainText("The result was not checked: the checker could not be reached.");
     await expect(panel.getByTestId("not-checked").getByRole("button", { name: "Check again" })).toBeVisible();
 
@@ -580,7 +580,7 @@ test.describe("a finished run", () => {
 test.describe("a run that fixes what the check found", () => {
   test("while it fixes, it reads as progress: the attempt in the outcome line, the thread going on, the reason under Why?", async ({ page }) => {
     const panel = await openRun(page, runs.healing);
-    await expect(panel.getByTestId("outcome")).toHaveText("Checking the result - fixing what the check found (attempt 1 of 2)");
+    await expect(panel.getByTestId("outcome")).toHaveText("Fixing what the check found (attempt 1 of 2)");
     await expect(panel.getByTestId("outcome")).not.toContainText(/did not pass/i);
     const last = panel.getByTestId("thread").getByRole("listitem").last();
     await expect(last).toContainText("Fix what the check found (attempt 1 of 2)");
@@ -592,7 +592,7 @@ test.describe("a run that fixes what the check found", () => {
 
   test("a fixed run reads like any good run, Why? notes the fix, and Details shows what the agent was told", async ({ page }) => {
     const panel = await openRun(page, runs.healed);
-    await expect(panel.getByTestId("outcome")).toHaveText("Done - looks good");
+    await expect(panel.getByTestId("outcome")).toHaveText("Done, looks good");
     await panel.getByRole("button", { name: /why\?/i }).click();
     await expect(panel.getByTestId("why")).toContainText("Fixed after 1 attempt");
     await panel.getByRole("button", { name: /details/i }).click();

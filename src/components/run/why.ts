@@ -1,4 +1,5 @@
 import type { Check, Judgment, Review, Verdict } from "@/contracts/eval";
+import { failureWords, plainCheckReason } from "@/lib/eval/check-words";
 import { fixesRun, ordinal, stoppedLine, type Heal } from "./heal";
 
 // "Why?" under the outcome: one plain line per tier of the evaluator that ran (checks -> judge -> review), in the
@@ -47,17 +48,26 @@ export function whyLines(verdict: Verdict | null, runStatus: string, storedOutco
 function verdictLines(verdict: Verdict): WhyLine[] {
   const path = verdict.path ?? inferPath(verdict);
   const decidedBy = verdict.decidedBy ?? inferDecidedBy(verdict);
+  // qa-ai F3: a run that could not be done or asked a question is said as that, never as "does not answer"
+  const refusal = verdict.verdict === "cannot_do" || verdict.verdict === "needs_answer" ? verdict.verdict : null;
   return path.flatMap((tier): WhyLine[] => {
-    const line = tier === "checks" ? checksLine(verdict.checks) : tier === "judge" ? judgeLine(verdict.judgment) : reviewLine(verdict.review);
+    const line =
+      tier === "checks"
+        ? checksLine(verdict.checks, refusal !== null)
+        : tier === "judge"
+          ? refusal && decidedBy === "judge"
+            ? refusalLine(refusal)
+            : judgeLine(verdict.judgment)
+          : reviewLine(verdict.review);
     const lines: WhyLine[] = [{ tier, decided: tier === decidedBy, ...line }];
-    // the judge's third answer, asked in the same request: only worth a line when it is not a clear yes
-    const bounds = tier === "judge" ? boundsLine(verdict.judgment) : null;
-    if (bounds) lines.push({ tier, decided: false, ...bounds });
+    // the judge's other answers, asked in the same request: each only worth a line when it is not a clear yes
+    const extra = tier === "judge" && !refusal ? [boundsLine(verdict.judgment), factsLine(verdict.judgment)] : [];
+    for (const body of extra) if (body) lines.push({ tier, decided: false, ...body });
     return lines;
   });
 }
 
-const EARLIER_TONE: Record<string, WhyLine["tone"]> = { pass: "ok", pass_with_notes: "warn", fail: "bad", unknown: "idle" };
+const EARLIER_TONE: Record<string, WhyLine["tone"]> = { pass: "ok", pass_with_notes: "warn", fail: "bad", unknown: "idle", cannot_do: "idle", needs_answer: "idle" };
 
 // Why? only appears when it adds something (Q102): a stopped or broken run already says so in its outcome line and
 // banner, and a live one has not been checked yet, so for those there is nothing to open.
@@ -85,20 +95,30 @@ function inferDecidedBy(v: Verdict): Verdict["decidedBy"] {
 
 type Body = Omit<WhyLine, "tier" | "decided">;
 
-function checksLine(checks: Check[]): Body {
+// quiet: a run that could not be done wrote no file, and that is no fault of its own (qa-ai F3)
+function checksLine(checks: Check[], quiet = false): Body {
   if (checks.length === 0) return { tone: "idle", text: "No automatic checks applied to this run" };
   const failed = checks.filter((c) => !c.ok);
   const noun = checks.length === 1 ? "check" : "checks";
   if (failed.length === 0)
     return { tone: "ok", text: `${checks.length} ${noun} passed: ${checks.map((c) => lowerFirst(c.label)).join(", ")}` };
-  const what = failed.map((c) => (c.detail ? `${lowerFirst(c.label)} (${fileInWords(c.detail)})` : lowerFirst(c.label))).join("; ");
-  return { tone: "bad", text: `${failed.length} of ${checks.length} ${noun} failed: ${what}` };
+  // named by what failed, never by the check's pass label: "the CSV parses (...)" read as if it parsed (qa-ux U10)
+  const what = failed.map((c) => lowerFirst(failureWords(c))).join("; ");
+  return { tone: quiet ? "idle" : "bad", text: `${failed.length} of ${checks.length} ${noun} failed: ${what}` };
+}
+
+// qa-ai F3: the deciding line of a run that did not do the work, and said truthfully why, or asked the person
+function refusalLine(kind: "cannot_do" | "needs_answer"): Body {
+  return kind === "cannot_do"
+    ? { tone: "idle", text: "An automatic check found the run explained why the task cannot be done here" }
+    : { tone: "idle", text: "An automatic check found the run needs an answer from you before it can do the task" };
 }
 
 // Each of the judge's answers is a clause; "sure" clauses and "not sure" clauses are then joined into one sentence.
+// The judge is "an automatic check" here: "judge" and "reviewer" are our words, not the person's (qa-ux U23).
 function judgeLine(judgment: Judgment | null): Body {
   if (!judgment)
-    return { tone: "idle", text: "The judge could not be reached, so nobody checked whether the result answers your instructions" };
+    return { tone: "idle", text: "The automatic check could not be reached, so nobody checked whether the result answers your instructions" };
   const answers = [
     { p: judgment.answeredQuery, yes: "the result answers your instructions", no: "the result does not answer your instructions" },
     { p: judgment.followedPlan, yes: "the plan was finished", no: "the plan was not finished" },
@@ -109,9 +129,17 @@ function judgeLine(judgment: Judgment | null): Body {
   const anyNo = answers.some((a) => a.p <= 1 - SURE);
   const tone = anyNo ? "bad" : unsure.length ? "warn" : "ok";
 
-  if (unsure.length === 0) return { tone, text: `The judge was sure ${sure.join(" and that ")}` };
-  if (sure.length === 0) return { tone, text: `The judge could not tell ${unsure.join(", or ")}` };
-  return { tone, text: `The judge was sure ${sure[0]}, but could not tell ${unsure[0]}` };
+  if (unsure.length === 0) return { tone, text: `An automatic check was sure ${sure.join(" and that ")}` };
+  if (sure.length === 0) return { tone, text: `An automatic check could not tell ${unsure.join(", or ")}` };
+  return { tone, text: `An automatic check was sure ${sure[0]}, but could not tell ${unsure[0]}` };
+}
+
+// factsAgree (qa-ai F2): P(the numbers and facts agree with the instructions and what the run read). Absent on older verdicts.
+function factsLine(judgment: Judgment | null): Body | null {
+  const p = judgment?.factsAgree;
+  if (p === undefined || p >= SURE) return null;
+  if (p <= 1 - SURE) return { tone: "bad", text: "Some numbers or facts do not agree with your instructions or the sources" };
+  return { tone: "warn", text: "Some numbers or facts may not agree with your instructions or the sources" };
 }
 
 // stayedInBounds: P(the run acted only on the person's instructions, not on text it read). Absent on older verdicts.
@@ -123,10 +151,10 @@ function boundsLine(judgment: Judgment | null): Body | null {
 }
 
 function reviewLine(review: Review | null): Body {
-  if (!review) return { tone: "idle", text: "A reviewer was asked for a second reading but could not be reached" };
+  if (!review) return { tone: "idle", text: "A closer check was asked for a second reading but could not be reached" };
   const finding = !review.taskFinished ? "not finished" : review.responseSuitable ? "finished and usable" : "finished, but not usable as it is";
   const tone = review.taskFinished && review.responseSuitable ? "ok" : "bad";
-  return { tone, text: `A reviewer read the whole run: ${finding}. "${shorten(review.reasoning)}"` };
+  return { tone, text: `A closer check read the whole run: ${finding}. "${shorten(review.reasoning)}"` };
 }
 
 function lowerFirst(s: string): string {
@@ -150,6 +178,8 @@ const OPENERS = /^(The|A|An|Only|No|None|Not|It|Its|This|That|These|There|Some|A
  * Lower case, the file in words, the detail in brackets, and no numbers that belong in Details.
  */
 function plainReason(reason: string): string {
+  const failure = plainCheckReason(reason); // a failed check, said as what went wrong (qa-ux U10)
+  if (failure) return lowerFirst(failure);
   const text = reason
     .replace(/\s*\([^)]*\d+%[^)]*\)/g, "") // "(85% confident)", "(62%)": the probabilities stay in Details
     .trim()

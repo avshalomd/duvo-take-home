@@ -49,6 +49,8 @@ export function carryOverPrompt(parent: ParentRun, change: string): string {
       : parent.report
     : "(it ended with no report)";
   const found = findings(parent);
+  // qa-ai F3: "Needs your answer" is answered with Ask for a change, so what the person sends is their answer
+  const asked = parent.verdict === "needs_answer";
 
   return [
     "This continues an earlier run. Its instructions were:",
@@ -73,7 +75,9 @@ export function carryOverPrompt(parent: ParentRun, change: string): string {
       "brought up to date, not only this change. It may say what changed in terms of the work, but never mention " +
       "a check, an earlier run, a correction or re-checking.",
     "",
-    "The user now asks for this change:",
+    ...(asked
+      ? ["The earlier run asked the user for something it needed before it could do the task. Now do the task with their answer.", "Their answer:"]
+      : ["The user now asks for this change:"]),
     change,
   ].join("\n");
 }
