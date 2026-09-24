@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/auth/session", () => ({ sessionFromHeaders: vi.fn() }));
+vi.mock("@/lib/auth/session", () => ({
+  sessionFromHeaders: vi.fn(),
+  resolveSession: vi.fn(),
+  WORKSPACE_LEFT: "You are no longer in that workspace. Reload the page.",
+}));
 vi.mock("@/lib/runs/queries", () => ({ listRuns: vi.fn(async () => []) }));
 vi.mock("@/lib/runs/start", () => ({ startRun: vi.fn(async () => ({ id: "free-text-run" })) }));
 vi.mock("@/lib/automations/store", () => ({ runCommand: vi.fn(async () => ({ id: "command-run" })) }));
 
 import { StartRunInput } from "@/contracts/agent";
-import { sessionFromHeaders } from "@/lib/auth/session";
+import { resolveSession, sessionFromHeaders } from "@/lib/auth/session";
 import { runCommand } from "@/lib/automations/store";
 import { AutomationError } from "@/lib/automations/errors";
 import { RunLimitError } from "@/lib/runs/limits";
@@ -20,6 +24,7 @@ const json = (v: unknown) => post(JSON.stringify(v));
 
 beforeEach(() => {
   vi.mocked(sessionFromHeaders).mockResolvedValue(session);
+  vi.mocked(resolveSession).mockResolvedValue({ ctx: session, left: false }); // a start reads whether the workspace was left too
   vi.mocked(startRun).mockClear();
   vi.mocked(runCommand).mockClear();
 });
@@ -100,8 +105,18 @@ describe("POST /api/runs (Q132)", () => {
   });
 
   it("answers 401 without a session", async () => {
-    vi.mocked(sessionFromHeaders).mockResolvedValue(null);
+    vi.mocked(resolveSession).mockResolvedValue(null);
     expect((await json({ prompt: "Fetch the latest AI news" })).status).toBe(401);
+  });
+
+  // QA F15: removed from the workspace the session named, the caller's run started in their own workspace unseen
+  it("refuses with 409 in plain words when the caller is no longer in the session's workspace, and starts nothing", async () => {
+    vi.mocked(resolveSession).mockResolvedValue({ ctx: { ...session, workspaceId: "own-ws" }, left: true });
+    const res = await json({ prompt: "Fetch the latest AI news into news.csv" });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("You are no longer in that workspace. Reload the page.");
+    expect(startRun).not.toHaveBeenCalled();
+    expect(runCommand).not.toHaveBeenCalled();
   });
 
   // Q197: a command whose filled brief was over 4000 characters failed startRun's own validation, and the route
