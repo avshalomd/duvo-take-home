@@ -226,3 +226,25 @@ Per file: what it does and why it is built that way. Grows at every merge.
   or an admin's to change, even after an edit sends it back to draft; the save's SQL repeats the check (Q212, Q225).
 - `src/lib/auth/session.ts` - in a Server Action (Next's `next-action` header) a workspace the user has left is not
   swapped for their own: writes that name no record are refused in words instead of landing elsewhere (Q226).
+
+### Frontend review (2026-09-24)
+- `src/components/automations/automation-save.tsx` - the document's save state sits above the automation page's two
+  layouts: a save that sends a Ready automation back to draft draws the document elsewhere in the tree, and state
+  kept inside it (the "version 2 now" message) was lost. Cancel drops a refused save's values, so Edit opens clean.
+- `src/components/automations/example-files.tsx` - a held-back file on an example card is not a download (the route
+  answers 409 until confirmed); the card says so and the full run offers "Download anyway".
+- `src/app/(app)/automations/actions.ts` `parseRunInput` - an example's and a Run's input get the command's 2000
+  character limit in the action (Zod) and again in `startTrial`.
+- `src/app/(app)/error.tsx`, `src/app/global-error.tsx` - a failed page, action or transition behind sign-in shows a
+  calm Try again under the top bar; the root layout has its own net. Neither shows the error's text.
+- `src/components/automations/follow-draft.ts` - leaving the drafting page stops following the draft, so nobody is
+  pulled onto it half a minute later; one draft per attempt still survives React's double effect in development.
+- `src/lib/runs/queries.ts` `getRunSince` - the event stream reads the run and only its new events each second, and
+  checks the session again every 15 reads, ending the stream for someone removed from the workspace or signed out.
+- `src/components/run/poll.ts` `reconnectDelay`, `pollGivesUp` - a broken stream is reopened after 1, 2, then 5 s;
+  polling stops on 401/403/404 and the page refreshes once to say why.
+- `src/components/thread/thread.tsx` `planShape`, `nextTrack` - the thread re-measures when its plan's keys and
+  statuses change, not on every new array a live run hands it, and an unchanged measure causes no render.
+- `src/components/settings/connection-row.tsx` - the switch is `useOptimistic` over the server's value, so it follows
+  a change made elsewhere after a refresh and falls back by itself when a press is refused.
+- `src/components/focus-ring.test.ts` - a row that tints on keyboard focus must also draw the app's focus ring.
