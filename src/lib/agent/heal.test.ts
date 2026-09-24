@@ -141,6 +141,14 @@ describe("noProgress", () => {
     expect(noProgress(b, [a])).toBe("This attempt failed the same way as an earlier one, so healing stopped here.");
   });
 
+  // Engine review #17: the judge's reason carries its probability, which moves a little on every attempt, so a
+  // judge-only failure that did not move was never seen as the same one and healing ran to the limit.
+  it("stops when the judge fails an attempt again for the same reason, with only its percentage changed", () => {
+    const a = attemptFingerprint(failing(["The files and report do not answer the instructions (93% confident)."], []), brokenFile);
+    const b = attemptFingerprint(failing(["The files and report do not answer the instructions (88% confident)."], []), quotedFile);
+    expect(noProgress(b, [a])).toBe("This attempt failed the same way as an earlier one, so healing stopped here.");
+  });
+
   it("never stops the first attempt: there is nothing earlier to compare with", () => {
     expect(noProgress(first, [])).toBeNull();
   });
