@@ -33,6 +33,13 @@ describe("what a model reads of a chart", () => {
     expect(forModel({ name: "sales.svg", content: svg })).toContain("Y-axis titled 'Sales'");
   });
 
+  // qa-ai F6: asked to "show each bar's value", the judge must be able to tell that the chart does
+  it("says whether the chart writes its values on the marks", () => {
+    const labelled = svg.replace("</g></svg>", '<g class="mark-text role-mark value_labels_marks" aria-hidden="true"><text>120,000</text></g></g></svg>');
+    expect(forModel({ name: "sales.svg", content: labelled })).toMatch(/each value is written on its mark/i);
+    expect(forModel({ name: "sales.svg", content: svg })).toMatch(/values are not written on the marks/i);
+  });
+
   it("says so when a chart carries no labels to read", () => {
     expect(forModel({ name: "empty.svg", content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>' })).toMatch(/no labels/);
   });

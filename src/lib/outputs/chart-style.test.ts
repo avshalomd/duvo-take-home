@@ -41,6 +41,12 @@ describe("the chart's style block (Q141)", () => {
     }
   });
 
+  // qa-ai F6: the values written on the bars sit on the tile's own ground, so they are text like the axis labels
+  it("writes the values on the marks in graphite on light and in #E6EBF2 on dark", () => {
+    expect(light).toMatch(rule(".value_labels_marks text", "fill: #17202B"));
+    expect(dark).toMatch(rule(".value_labels_marks text", "fill: #E6EBF2"));
+  });
+
   it("draws the pie's seams in the dark paper colour, so slices stay separated on a dark tile", () => {
     expect(dark).toMatch(rule('[stroke="#FFFFFF"]', "stroke: #151C26"));
   });

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { makeChart } from "./make-chart";
+import { makeChart, makeChartTool } from "./make-chart";
 
 let root: string; // a parent folder, so a file that escaped the run directory would be visible here
 let dir: string;
@@ -47,6 +47,22 @@ describe("make_chart", () => {
     const result = await makeChart(dir, { ...args, file: "x.exe" });
     expect(result.isError).toBe(true);
     expect(text(result)).toMatch(/\.svg/);
+  });
+
+  // qa-ai F6: the agent can only use an option its tool tells it about
+  it("tells the agent it can write each value on the chart and title the value axis with its unit", () => {
+    const { description, inputSchema } = makeChartTool(dir);
+    expect(description).toMatch(/labels: true/);
+    expect(description).toMatch(/y_title/);
+    expect(description).toMatch(/unit/);
+    expect(Object.keys(inputSchema)).toEqual(expect.arrayContaining(["labels", "y_title"]));
+  });
+
+  it("says in its answer that a pie gets no values written on it, so the agent does not claim them", async () => {
+    const result = await makeChart(dir, { ...args, kind: "pie", labels: true });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toMatch(/values are not written on a pie/);
+    expect(text(await makeChart(dir, { ...args, labels: true }))).toMatch(/each value written on the chart/);
   });
 
   it("answers a missing field with an error the agent can act on, instead of throwing", async () => {
