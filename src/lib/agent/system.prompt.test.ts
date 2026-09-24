@@ -106,4 +106,13 @@ describe("SYSTEM_PROMPT: notes and the report in plain words", () => {
     expect(SYSTEM_PROMPT).toMatch(/no shell or curl/i);
     expect(SYSTEM_PROMPT).toMatch(/no file paths beyond a file's own name/i);
   });
+
+  // qa-ux U31: a run that rightly refused to send data out titled a step "data-exfiltration pattern" and its report
+  // spoke of an "endpoint", a "query parameter" and "logs/proxies"
+  it("keeps security jargon out of step titles, notes and the report, and says what it means instead", () => {
+    expect(SYSTEM_PROMPT).toMatch(/step titles, step notes and the report are read by an office worker/i);
+    expect(SYSTEM_PROMPT).toMatch(/no security jargon/i);
+    for (const jargon of ["data-exfiltration", "endpoint", "query parameter", "proxies"]) expect(SYSTEM_PROMPT).toContain(`"${jargon}`);
+    expect(SYSTEM_PROMPT).toMatch(/sending your data to another website/i);
+  });
 });

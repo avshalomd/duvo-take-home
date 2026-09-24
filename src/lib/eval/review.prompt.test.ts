@@ -152,4 +152,11 @@ describe("REVIEW_INSTRUCTIONS", () => {
     expect(REVIEW_INSTRUCTIONS).toMatch(/no shell or curl/i);
     expect(REVIEW_INSTRUCTIONS).toMatch(/no file paths beyond a file's own name/i);
   });
+
+  // qa-ux U31: the reviewer's reasoning is quoted in Why?, where "data-exfiltration pattern" means nothing to the reader
+  it("keeps security jargon out of changeNeeded and reasoning, and says what it means instead", () => {
+    expect(REVIEW_INSTRUCTIONS).toMatch(/no security jargon/i);
+    for (const jargon of ["data-exfiltration", "endpoint", "query parameter", "proxies"]) expect(REVIEW_INSTRUCTIONS).toContain(`"${jargon}`);
+    expect(REVIEW_INSTRUCTIONS).toMatch(/sending your data to another website/i);
+  });
 });
