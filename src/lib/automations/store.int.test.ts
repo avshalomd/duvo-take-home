@@ -326,6 +326,15 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect(err.message).toMatch(/\/int-nothing/);
   });
 
+  // QA F14: a name no automation can have is refused in plain words, and no run starts
+  it("runCommand refuses a name no automation can have, in plain words", async () => {
+    const before = (await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length;
+    const err = await runCommand(ctx, { command: "über", input: "test" }).catch((e) => e);
+    expect(err).toBeInstanceOf(AutomationError);
+    expect(err.message).toBe("There's no /über command.");
+    expect((await db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS]))).length).toBe(before);
+  });
+
   it("runCommand refuses a command that is still a draft", async () => {
     await createAutomationDraft(ctx, draftWith("int-notyet"), null);
     const err = await runCommand(ctx, { command: "int-notyet", input: "Apple" }).catch((e) => e);

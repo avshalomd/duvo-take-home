@@ -53,6 +53,17 @@ describe("POST /api/runs (Q132)", () => {
     expect(startRun).not.toHaveBeenCalled();
   });
 
+  // QA F14: "/über test" was started as a paid free-text run
+  it.each([
+    ["/über test", { command: "über", input: "test" }],
+    ["/2024-report x", { command: "2024-report", input: "x" }],
+    ["/audit, Apple", { command: "audit,", input: "Apple" }],
+  ])("reads %j as a command, never as paid free text", async (prompt, parsed) => {
+    await json({ prompt });
+    expect(runCommand).toHaveBeenCalledWith({ workspaceId: "ws", userId: "u" }, parsed);
+    expect(startRun).not.toHaveBeenCalled();
+  });
+
   it("refuses a short free text with the form's own words", async () => {
     const res = await json({ prompt: "news" });
     expect(res.status).toBe(400);

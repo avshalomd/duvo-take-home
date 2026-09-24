@@ -20,6 +20,7 @@ vi.mock("@/lib/runs/run-again", () => ({ startRunAgain: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 
+import { AutomationError } from "@/lib/automations/errors";
 import { reevaluateRun } from "@/lib/eval/reevaluate";
 import { getRun } from "@/lib/runs/queries";
 import { reevaluateAction, startRunAction } from "./actions";
@@ -46,6 +47,16 @@ describe("the Home box in a tab that still shows a workspace its user has left",
   it("starts the run as before once the tab shows a workspace the user is in", async () => {
     expect(await startRunAction({}, form("Write three facts about Acme Ltd"))).toEqual({ startedId: "run-1" });
     expect(engine.startRun).toHaveBeenCalledWith({ workspaceId: "ws-own", userId: "u1" }, { prompt: "Write three facts about Acme Ltd" });
+  });
+});
+
+// QA F14: a mistyped command became a paid free-text run
+describe("the Home box with a slash and a word no automation can have", () => {
+  it.each(["/über test", "/2024-report x", "/audit, Apple"])("hands %j to the command's own refusal, and starts no free-text run", async (prompt) => {
+    engine.runCommand.mockRejectedValueOnce(new AutomationError("There's no /x command."));
+    expect(await startRunAction({}, form(prompt))).toEqual({ error: "There's no /x command.", values: { prompt } });
+    expect(engine.runCommand).toHaveBeenCalledTimes(1);
+    expect(engine.startRun).not.toHaveBeenCalled();
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextFreeCommand, parseCommand, toCommandName } from "./command";
+import { nextFreeCommand, parseCommand, toCommandName, unknownCommandRefusal } from "./command";
 
 describe("parseCommand", () => {
   it("reads a slash command and the rest of the line as its input", () => {
@@ -38,13 +38,34 @@ describe("parseCommand", () => {
     expect(parseCommand("please run /audit Apple Inc.")).toBeNull();
   });
 
-  it("answers null for a path, which starts with a slash but is not a command", () => {
-    expect(parseCommand("/usr/bin is where it lives")).toBeNull();
-  });
-
   it("answers null for a prefix with no name after it", () => {
     expect(parseCommand("/ Apple")).toBeNull();
     expect(parseCommand("/")).toBeNull();
+  });
+
+  // QA F14, his call (2026-09-24): "/über test", "/2024-report x" and "/audit, Apple" became paid free-text runs. Any
+  // text that starts with "/" and a character that is not a space is a command, which is refused if there is none.
+  it.each([
+    ["/über test", "über", "test"],
+    ["/2024-report x", "2024-report", "x"],
+    ["/audit, Apple", "audit,", "Apple"],
+    ["/usr/bin is where it lives", "usr/bin", "is where it lives"],
+    ["/Ünïcode", "ünïcode", ""],
+  ])("reads %j as a command, even one no automation can be called", (text, command, input) => {
+    expect(parseCommand(text)).toEqual({ command, input });
+  });
+});
+
+describe("unknownCommandRefusal", () => {
+  it("refuses a name no automation can have, in plain words, without looking anything up", () => {
+    expect(unknownCommandRefusal("über")).toBe("There's no /über command.");
+    expect(unknownCommandRefusal("audit,")).toBe("There's no /audit, command.");
+    expect(unknownCommandRefusal("usr/bin")).toBe("There's no /usr/bin command.");
+  });
+
+  it("leaves a name an automation could have to the lookup, which says whether it exists", () => {
+    expect(unknownCommandRefusal("audit")).toBeNull();
+    expect(unknownCommandRefusal("ai-news")).toBeNull();
   });
 });
 

@@ -49,11 +49,17 @@ describe("commandWord - the command a text asks for, before anything checks that
     expect(commandWord("/nope-e2e")).toBe("nope-e2e");
   });
 
-  it("is null for plain text, a backslash, and a word that does not start with a letter", () => {
+  it("is null for plain text, a backslash, and a slash followed by a space", () => {
     expect(commandWord("Fetch the news")).toBeNull();
     expect(commandWord("\\audit Acme")).toBeNull();
     expect(commandWord("/ audit")).toBeNull();
-    expect(commandWord("/1st")).toBeNull();
+  });
+
+  // QA F14, his call: whatever follows the slash up to a space is the command asked for, a letter first or not
+  it("reads a word that no automation could have, so its refusal can name it", () => {
+    expect(commandWord("/1st")).toBe("1st");
+    expect(commandWord("/über test")).toBe("über");
+    expect(commandWord("/audit, Apple")).toBe("audit,");
   });
 });
 
