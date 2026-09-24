@@ -9,7 +9,7 @@ import { allowed, type Verdict } from "./verdict";
 /**
  * The url guard, on every WebFetch. Code first: an address that is not a public web page, and a host on the
  * workspace's deny list, are blocked outright. Then, only for an address with room to carry data out - a long query
- * string, an encoded path, an encoded subdomain (carried.ts) - one question to Jev. Jev being down or slow must not
+ * string, an encoded path, an encoded subdomain, or personal data anywhere in it (carried.ts) - one question to Jev. Jev being down or slow must not
  * stop the run, so that case is let through and recorded as "unchecked".
  */
 

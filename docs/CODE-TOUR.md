@@ -95,7 +95,9 @@ Per file: what it does and why it is built that way. Grows at every merge.
   wins. Only decisions that are not "allowed" are recorded, so the timeline stays quiet.
 - `src/lib/agent/guards/url.ts` - code decides first (private hosts, denied domains); Jev is asked only when a query
   string is long enough to carry data out (CSV rows in a query scored 0.94, a long search 0.17). Jev down or slow
-  lets the fetch through, recorded as "unchecked": a guard must not stop honest work.
+  lets the fetch through, recorded as "unchecked": a guard must not stop honest work. `carried.ts` also runs the
+  output scan's personal-data detectors over the decoded path and query (security review S2): `/leak/jane@corp.com`
+  is short, yet it is exactly what must not leave, so it is asked about too.
 - `src/lib/agent/guards/scan.ts` - credentials quarantine a file; personal data (emails, phones, Luhn-checked cards,
   mod-97-checked IBANs) is only counted, because a contact list is often the task.
 - `src/contracts/connection.ts` `isPrivateHost` - one rule for "private or local" shared by the connection form and

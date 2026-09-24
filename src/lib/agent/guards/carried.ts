@@ -1,3 +1,5 @@
+import { countCards, countEmails, countIbans, countPhones } from "./personal-data";
+
 /**
  * Where a web address could be carrying data out: the query string, the path, or the host name in front of the
  * site's own name. Code, and cheap, because it runs on every fetch: it only decides whether the url guard spends a
@@ -45,10 +47,21 @@ function hostCarries(hostname: string): boolean {
   return encodedLength(front.flatMap((label) => label.split("-"))) >= HOST_ENCODED_LIMIT;
 }
 
+/**
+ * Personal data - an email address, a phone number, a card number, an IBAN - in this part of the address, counted as
+ * the output scan counts it (security review S2): /leak/jane@corp.com has no "room" by the rules above, yet carries
+ * exactly what must not leave.
+ */
+function hasPersonalData(text: string): boolean {
+  return countEmails(text) + countPhones(text) + countCards(text) + countIbans(text) > 0;
+}
+
 /** The first place, in this order, where the address has room for the task's data; null for an ordinary address. */
 export function carriedIn(url: URL): Carrier | null {
-  if (url.search.slice(1).length + url.hash.slice(1).length > QUERY_LIMIT) return "query"; // without the ? and #
-  if (pathCarries(url.pathname)) return "path";
+  const query = url.search.slice(1) + url.hash.slice(1); // without the ? and #
+  // a form-encoded query writes a space as "+"; in a path "+" is itself (a phone's +44)
+  if (query.length > QUERY_LIMIT || hasPersonalData(decoded(`${url.search.slice(1)} ${url.hash.slice(1)}`.replace(/\+/g, " ")))) return "query";
+  if (pathCarries(url.pathname) || hasPersonalData(decoded(url.pathname))) return "path";
   if (hostCarries(url.hostname)) return "host";
   return null;
 }
