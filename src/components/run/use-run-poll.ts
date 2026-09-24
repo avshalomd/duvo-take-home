@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, shouldPoll, streamUrl } from "./poll";
+import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, pollGivesUp, reconnectDelay, shouldPoll, streamUrl } from "./poll";
 import type { RunView } from "./types";
 
 const INTERVAL_MS = 2000;
+const HEALTHY_MS = 10_000; // a stream that stayed open this long broke by chance (or ended at 280 s): the next try waits the least
 
 // The panel is server-rendered first; this keeps a live run moving. It listens to the run's event stream
 // (server-sent events, one message a second) and falls back to one small GET every two seconds when the stream
@@ -38,11 +39,19 @@ export function useRunPoll(initial: RunView): RunView {
     let closed = false;
     let timer: ReturnType<typeof setInterval> | undefined;
     let source: EventSource | undefined;
+    let reopen: ReturnType<typeof setTimeout> | undefined;
+    let breaks = 0; // broken streams in a row: each new try waits a little longer
 
     async function fetchFull() {
       try {
         const res = await fetch(`/api/runs/${id}`, { cache: "no-store" });
-        if (!res.ok) return; // the run is gone, or the session expired: keep what we have
+        if (pollGivesUp(res.status)) {
+          // the run is gone, or the session ended: no later poll changes that. The page says which (a missing run, or sign-in)
+          stop();
+          router.refresh();
+          return;
+        }
+        if (!res.ok) return; // a passing server error: keep what we have, the next tick tries again
         const next = parseRunPayload(await res.json());
         if (next) setPolled(next); // chooseView ignores it if the panel has moved to another run since
       } catch {
@@ -53,6 +62,12 @@ export function useRunPoll(initial: RunView): RunView {
       if (closed || timer !== undefined) return;
       timer = setInterval(fetchFull, INTERVAL_MS);
     }
+    function stop() {
+      closed = true;
+      source?.close();
+      if (timer !== undefined) clearInterval(timer);
+      if (reopen !== undefined) clearTimeout(reopen);
+    }
 
     // Each connection asks for the events after the last one the panel has. The route ends a stream after 280 s
     // (under the function's limit): a stream that delivered and then ended is opened again from where it stopped;
@@ -60,6 +75,7 @@ export function useRunPoll(initial: RunView): RunView {
     function listen() {
       if (closed) return;
       let delivered = false;
+      const openedAt = Date.now();
       source = new EventSource(streamUrl(id, latest.current.events));
       source.onmessage = (m) => {
         const msg = parseStreamMessage(safeJson(m.data));
@@ -75,20 +91,17 @@ export function useRunPoll(initial: RunView): RunView {
       };
       source.onerror = () => {
         source?.close(); // EventSource would retry on its own, without the cursor: we decide instead
-        if (delivered) listen();
-        else startPolling();
+        if (!delivered) return startPolling();
+        if (Date.now() - openedAt > HEALTHY_MS) breaks = 0;
+        reopen = setTimeout(listen, reconnectDelay(breaks++)); // never at once: a server that drops every stream is not hammered
       };
     }
 
     if (typeof EventSource === "undefined") startPolling();
     else listen();
 
-    return () => {
-      closed = true;
-      source?.close();
-      if (timer !== undefined) clearInterval(timer);
-    };
-  }, [id, live]);
+    return stop;
+  }, [id, live, router]);
 
   return view;
 }
