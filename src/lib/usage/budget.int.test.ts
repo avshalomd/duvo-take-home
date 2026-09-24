@@ -60,6 +60,12 @@ describe.skipIf(!process.env.DATABASE_URL)("workspace limits and usage", () => {
     expect(await checkBudget(WS)).toBe("2 runs are already working. Wait for one to finish.");
   });
 
+  it("holds back a dollar for each run working before letting another start", async () => {
+    await updateLimits(WS, { ...(await getLimits(WS)), dailyRunLimit: 100, maxInFlight: 5, dailyBudgetUsd: 3 });
+    // 0.4 spent today and two runs working: 0.4 + 2 + the new run's 1 is more than 3
+    expect(await checkBudget(WS)).toBe("The runs already working may use the rest of today's $3.00 budget. Wait for one to finish.");
+  });
+
   it("lets a run start when there is room", async () => {
     await updateLimits(WS, { ...(await getLimits(WS)), dailyRunLimit: 100, maxInFlight: 5, dailyBudgetUsd: 10 });
     expect(await checkBudget(WS)).toBeNull();
@@ -68,11 +74,21 @@ describe.skipIf(!process.env.DATABASE_URL)("workspace limits and usage", () => {
 
 describe.skipIf(!process.env.DATABASE_URL)("healBudgetStop: may a run pay for another fix attempt?", () => {
   it("counts the workspace's other runs today and this run's own spend so far, its row's stale cost not twice", async () => {
-    await updateLimits(HEAL, { ...DEFAULT_LIMITS, dailyBudgetUsd: 1 });
+    await updateLimits(HEAL, { ...DEFAULT_LIMITS, dailyBudgetUsd: 2 });
     await addRun(HEAL, "succeeded", 0.6); // another run today
     const [mine] = await db.insert(runs).values({ workspaceId: HEAL, prompt: "[int] budget", status: "evaluating", model: "test", costUsd: 0.3 }).returning({ id: runs.id });
 
-    expect(await healBudgetStop(HEAL, mine.id, 0.3)).toBeNull(); // 0.9 of 1
-    expect(await healBudgetStop(HEAL, mine.id, 0.45)).toBe("The workspace's $1.00 budget for today is spent, so healing stopped here.");
+    expect(await healBudgetStop(HEAL, mine.id, 0.3)).toBeNull(); // 0.9 spent, and a fix's $1 fits in 2
+    expect(await healBudgetStop(HEAL, mine.id, 1.45)).toBe("The workspace's $2.00 budget for today is spent, so healing stopped here.");
+  });
+
+  // Engine review #7: another run in flight has no cost yet, but may spend up to $1 before the day ends.
+  it("holds back a dollar for each other run still working", async () => {
+    await db.delete(runs).where(eq(runs.workspaceId, HEAL));
+    await updateLimits(HEAL, { ...DEFAULT_LIMITS, dailyBudgetUsd: 2 });
+    const [mine] = await db.insert(runs).values({ workspaceId: HEAL, prompt: "[int] budget", status: "evaluating", model: "test", costUsd: 0.3 }).returning({ id: runs.id });
+    expect(await healBudgetStop(HEAL, mine.id, 0.3)).toBeNull();
+    await addRun(HEAL, "running", null); // another run working, its cost not known yet
+    expect(await healBudgetStop(HEAL, mine.id, 0.3)).toBe("The other runs working may use the rest of today's $2.00 budget, so healing stopped here.");
   });
 });
