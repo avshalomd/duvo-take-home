@@ -3,8 +3,9 @@
 An agentic automation platform for everyday office work: say what needs doing in plain words, watch an agent plan
 it and work through it, take the files it made, and turn a run that went well into a tested, reusable command.
 
-**Live:** https://handover-gold.vercel.app runs **v2** (this branch). Sign-up is by invitation; a demo account is
-available on request. **v1.1.0**, the take-home as delivered, stays live at https://duvo-take-home.vercel.app.
+**Live:** https://handover-gold.vercel.app. Sign-up is by invitation; a demo account is available on request. A push
+to `main` deploys it (the Vercel project `handover`, connected to this repo). The take-home as first delivered is the
+tag `v1.1.0`.
 
 ## What it does (v2)
 

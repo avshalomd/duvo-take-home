@@ -1,3 +1,12 @@
+# Handover, after the take-home
+
+The timed take-home this file was written for is over (v1.1.0 is its tag). The repo is now **Handover**, live at
+https://handover-gold.vercel.app. Deploys: a push to `main` deploys production (the Vercel project `handover`,
+connected to this repo; preview deployments are off); `.claude/scripts/deploy.sh` deploys the committed HEAD without a
+push and runs the read-only smoke. Production has its own database: schema changes stay additive and are applied there
+first (`node .claude/scripts/handover-db.mjs npm run sql -- "<statement>"`). Production is a showroom: QA against it
+is read-only. The sections below describe the timed session and its harness.
+
 # The take-home
 
 This repo is built in a **timed, recorded session**, usually 60 minutes. The task arrives by mail when the clock

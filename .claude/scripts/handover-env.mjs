@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sets the Handover project's production environment on Vercel (the deploy folder ../handover is linked to it).
+// Sets the Handover project's production environment on Vercel (this checkout is linked to it: .vercel/project.json).
 // Model keys are copied from this repo's .env.local; the sign-in secret and the encryption key are generated fresh
 // for Handover (never shared with local or with v1). Values go to `vercel env add` on stdin and are never printed.
 // Usage: node .claude/scripts/handover-env.mjs [NAME=value ...]   (plain settings such as BETTER_AUTH_URL=...)
@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
-const deployDir = path.resolve(root, "../handover");
+const deployDir = root;
 const parse = (f) =>
   Object.fromEntries(
     fs.readFileSync(f, "utf8").split("\n")
