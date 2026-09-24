@@ -53,6 +53,12 @@ describe("spreadsheetsIn (qa-ai F1)", () => {
     expect(spreadsheetsIn(events)).toEqual([{ file: "prices.xlsx", sheets: [{ name: "Prices", columns: ["app", "eur"], rows: [["Teams", 5.6]] }] }]);
   });
 
+  // Security review S8 met qa-ai F1: a held-back spreadsheet reached the judge through the tool's input, not its file
+  it("leaves out a spreadsheet that was held back, so what it holds never reaches the judge", () => {
+    const events = [call(1, "mcp__outputs__make_spreadsheet", { file: "keys.xlsx", sheets: [{ name: "Keys", columns: ["key"], rows: [["sk-live-x"]] }] })];
+    expect(spreadsheetsIn(events, new Set(["keys.xlsx"]))).toEqual([]);
+  });
+
   it("keeps the last call for a file made twice: a fix writes it again under the same name", () => {
     const events = [
       call(1, "mcp__outputs__make_spreadsheet", { file: "p.xlsx", sheets: [{ name: "Old", columns: ["a"], rows: [] }] }),
