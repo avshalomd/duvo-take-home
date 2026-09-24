@@ -8,13 +8,10 @@ import * as schema from "@/db/schema";
 import { invitationIdFromCookies } from "./invitation-cookie";
 import { refuseInvitationLists, stripInvitationsForMembers } from "./invitation-privacy";
 import { organizationWritesGuard } from "./organization-writes";
+import { trustedOrigins } from "./origins";
 import { googleConfigured } from "./providers";
 import { assertMayCreateAccount } from "./signup";
 import { createPersonalWorkspace, firstWorkspaceId } from "./workspaces";
-
-// Local dev servers: main on 3000, each worktree on 3001+. Better Auth refuses a sign-in whose Origin it does not
-// trust, and BETTER_AUTH_URL names only one of them.
-const LOCAL_ORIGINS = Array.from({ length: 11 }, (_, i) => `http://localhost:${3000 + i}`);
 
 /**
  * Sign-in and workspaces. Better Auth keeps users, sessions and accounts in our Postgres through Drizzle; its
@@ -29,7 +26,7 @@ export const auth = betterAuth({
   socialProviders: googleConfigured()
     ? { google: { clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! } }
     : {},
-  trustedOrigins: LOCAL_ORIGINS,
+  trustedOrigins: trustedOrigins(), // the local dev servers, outside production only (origins.ts)
   // Tries per client address and path (Q176). Better Auth turns this on only when NODE_ENV is production and counts in
   // each server's memory, so on Vercel every function instance kept a count of its own. On everywhere (development and
   // the tests meet what production does), counted in the rate_limit table (db/schema.ts) that every instance shares.
