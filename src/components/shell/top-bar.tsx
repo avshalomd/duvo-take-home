@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/auth/brand-mark";
 import { UserMenu } from "@/components/auth/user-menu";
 import { cn } from "@/lib/utils";
@@ -20,11 +20,13 @@ export const TOP_BAR_SLOT = "top-bar-slot";
 // scrolls under it, blurred, and the glass fades out at its lower edge instead of ending on a 1 px line.
 export function TopBar({ userName, workspaceName }: { userName: string; workspaceName: string }) {
   const path = usePathname();
+  const search = useSearchParams();
+  const runOpen = path === "/" && search.has("run"); // a first visit has no run to skip to
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   return (
     <header data-testid="app-header" className="sticky top-0 z-30">
       {/* the first thing the keyboard reaches on Home: past the bar and the rail, straight to the open run (Q70) */}
-      {path === "/" && (
+      {runOpen && (
         <a
           href="#run"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-paper focus:px-4 focus:py-2 focus:text-sm focus:shadow-float focus:ring-[3px] focus:ring-ring/50"
