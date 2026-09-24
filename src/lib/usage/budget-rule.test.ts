@@ -43,6 +43,14 @@ describe("budgetBlockReason", () => {
     expect(budgetBlockReason(limits, usage({ costTodayUsd: 5 }))).not.toBeNull();
   });
 
+  // QA F17: a budget of $0.001 was refused as "its $0.00 budget"
+  it("names the budget as it was set: cents as cents, and a fraction of a cent saved before cents were enforced as it is", () => {
+    expect(budgetBlockReason({ ...limits, dailyBudgetUsd: 2.5 }, usage({ costTodayUsd: 3 }))).toMatch(/spent its \$2\.50 budget/);
+    expect(budgetBlockReason({ ...limits, dailyBudgetUsd: 0.07000000029802322 }, usage({ costTodayUsd: 1 }))).toMatch(/spent its \$0\.07 budget/); // a real column reads 0.07 back so
+    expect(budgetBlockReason({ ...limits, dailyBudgetUsd: 0.001 }, usage({ costTodayUsd: 1 }))).toMatch(/spent its \$0\.001 budget/);
+    expect(healBudgetReason({ dailyBudgetUsd: 0.001 }, 1)).toMatch(/\$0\.001 budget/);
+  });
+
   it("lets a run start just under the budget", () => {
     expect(budgetBlockReason(limits, usage({ costTodayUsd: 4.99 }))).toBeNull();
   });
