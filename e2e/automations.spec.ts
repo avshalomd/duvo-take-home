@@ -144,6 +144,21 @@ test.describe("editing and judging a ready automation", () => {
     await expect(card.getByRole("button", { name: "Looks right" })).toHaveCount(0);
   });
 
+  // UX QA U17: the owner read only a general line under Save, whether or not anything changed, not naming the command
+  test("an approver who changes the brief is told beside Save that saving takes the command out of use", async ({ page }) => {
+    const warning = page.getByText(`Saving takes /${command} out of use until a new example looks right.`);
+    await page.goto(`/automations/${automationId}`);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(warning).toHaveCount(0); // nothing changed yet
+    await page.getByLabel("Hint", { exact: true }).fill("e.g. Globex"); // the agent never reads the hint
+    await expect(warning).toHaveCount(0);
+    await page.getByLabel("The brief").fill("Write facts.md with five facts about {input}.");
+    await expect(warning).toBeVisible();
+    await page.getByLabel("The brief").fill(template.instructions); // back as it was
+    await expect(warning).toHaveCount(0);
+    await page.getByRole("button", { name: "Cancel" }).click();
+  });
+
   test("saving a new brief says it is a new version, where the document now stands, and sends it back to draft", async ({ page }) => {
     await page.goto(`/automations/${automationId}`);
     await page.getByRole("button", { name: "Edit", exact: true }).click();
@@ -236,6 +251,22 @@ test.describe("a ready automation", () => {
     await page.goto(`/automations/${readyId}`);
     await expect(page.getByText("No runs yet.", { exact: true })).toBeVisible();
     await expect(page.getByText(/call it from Home/)).toHaveCount(0);
+  });
+
+  // UX QA U5 and U14: every tab read "Handover", and a missing automation had no way on but the small back link
+  test("the gallery and an automation are named in the tab, and a missing automation leads back to the gallery", async ({ page }) => {
+    await page.goto("/automations");
+    await expect(page).toHaveTitle("Automations - Handover");
+    await page.goto(`/automations/${readyId}`);
+    await expect(page).toHaveTitle("[e2e] Company facts - Handover");
+    await page.goto("/automations/new");
+    await expect(page).toHaveTitle("New automation - Handover");
+
+    await page.goto("/automations/00000000-0000-0000-0000-000000000000");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("That automation was not found");
+    await expect(page).toHaveTitle("Not found - Handover");
+    await page.getByRole("link", { name: "Back to automations" }).last().click();
+    await expect(page).toHaveURL(/\/automations$/);
   });
 
   // UX R2: Delete asked with the browser's own confirm; now the same paper sheet as the Members page's Remove

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEditForm } from "./form";
+import { changesWhatTheAgentIsTold, parseEditForm } from "./form";
 
 function form(over: Record<string, string | string[]> = {}): FormData {
   const fields: Record<string, string | string[]> = {
@@ -81,5 +81,40 @@ describe("parseEditForm", () => {
     expect(r.values.steps).toContain("Read the filings");
     expect(r.values.connections).toEqual(["DeepWiki"]);
     expect(r.fieldErrors.name).toBeTruthy();
+  });
+});
+
+// UX QA U17: an approver editing a Ready command was never told, beside Save, that saving a new brief takes the
+// command out of use. The editor asks this on every change, with the form as it stands.
+describe("changesWhatTheAgentIsTold", () => {
+  // the saved automation the form above was filled from
+  const saved = {
+    name: "Company audit",
+    inputLabel: "Company name",
+    template: {
+      instructions: "Audit {input} and write audit.md.",
+      intent: "Audits a company",
+      expectedOutputs: ["audit.md with sections Ownership, Filings", "a short report"],
+      outputFormat: "Markdown headings",
+      steps: ["Search the web for {input}", "Read the filings", "Write audit.md"],
+      connections: ["DeepWiki"],
+    },
+  };
+
+  it("is false for the form as it opened, and for the hint, the example and the command", () => {
+    expect(changesWhatTheAgentIsTold(saved, form())).toBe(false);
+    expect(changesWhatTheAgentIsTold(saved, form({ inputHint: "e.g. Globex", inputExample: "Globex", command: "audit2" }))).toBe(false);
+  });
+
+  it("is true once the brief, a step, an output, the name or a connection changes", () => {
+    expect(changesWhatTheAgentIsTold(saved, form({ instructions: "Audit {input} briefly." }))).toBe(true);
+    expect(changesWhatTheAgentIsTold(saved, form({ steps: "Search the web for {input}" }))).toBe(true);
+    expect(changesWhatTheAgentIsTold(saved, form({ expectedOutputs: "audit.csv" }))).toBe(true);
+    expect(changesWhatTheAgentIsTold(saved, form({ name: "Audit" }))).toBe(true);
+    expect(changesWhatTheAgentIsTold(saved, form({ connections: [] }))).toBe(true);
+  });
+
+  it("is false while the form cannot be saved anyway: the save says what to fix instead", () => {
+    expect(changesWhatTheAgentIsTold(saved, form({ name: "" }))).toBe(false);
   });
 });
