@@ -78,12 +78,16 @@ export const checkBudget: CheckBudget = async (workspaceId) => {
  * read from its row, which may not carry the latest attempt yet, so the row's cost is left out of the sum.
  */
 export async function healBudgetStop(workspaceId: string, runId: string, runSpentUsd: number): Promise<string | null> {
-  const [limits, [others]] = await Promise.all([
+  const [limits, [others], [working]] = await Promise.all([
     getLimits(workspaceId),
     db
       .select({ cost: sum(runs.costUsd) })
       .from(runs)
       .where(and(eq(runs.workspaceId, workspaceId), gte(runs.createdAt, startOfUtcDay(new Date())), ne(runs.id, runId))),
+    db
+      .select({ runs: count() })
+      .from(runs)
+      .where(and(eq(runs.workspaceId, workspaceId), inArray(runs.status, IN_FLIGHT), ne(runs.id, runId))), // each may still spend an attempt's worth
   ]);
-  return healBudgetReason(limits, Number(others.cost ?? 0) + runSpentUsd); // sum() of a real arrives as a string
+  return healBudgetReason(limits, Number(others.cost ?? 0) + runSpentUsd, working.runs); // sum() of a real arrives as a string
 }
