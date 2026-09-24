@@ -10,6 +10,7 @@ import { invitationIdFromCookies } from "./invitation-cookie";
 import { userNameRefusal, workspaceNameRefusal } from "./names";
 import { refuseInvitationLists, stripInvitationsForMembers } from "./invitation-privacy";
 import { organizationWritesGuard } from "./organization-writes";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./password";
 import { trustedOrigins } from "./origins";
 import { MAX_OWNED_WORKSPACES, ownedWorkspaceCount } from "./workspace-limit";
 import { googleConfigured } from "./providers";
@@ -30,7 +31,8 @@ export const auth = betterAuth({
   // transaction: false (the default, said out loud): `db` is the Neon HTTP driver, which cannot hold an
   // interactive transaction open, so Better Auth runs a multi-step write (sign-up: user, account, session) step by step.
   database: drizzleAdapter(db, { provider: "pg", schema, transaction: false }),
-  emailAndPassword: { enabled: true, minPasswordLength: 8 },
+  // the same numbers the sign-up form asks before sending (password.ts, UX QA U27)
+  emailAndPassword: { enabled: true, minPasswordLength: MIN_PASSWORD_LENGTH, maxPasswordLength: MAX_PASSWORD_LENGTH },
   socialProviders: googleConfigured()
     ? { google: { clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! } }
     : {},
