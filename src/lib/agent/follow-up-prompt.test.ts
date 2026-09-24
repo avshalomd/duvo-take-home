@@ -131,6 +131,15 @@ describe("carryOverPrompt: the earlier run's plan and its check (his words: the 
   it("says there was no plan when the earlier run set none", () => {
     expect(carryOverPrompt(parent, change)).toMatch(/set no plan/i);
   });
+
+  // qa-ai F3: "Needs your answer" is answered with Ask for a change: what the person sends is their answer, not a change
+  it("reads the person's words as the answer to the earlier run's question, and asks for the task done with it", () => {
+    const asked: ParentRun = { ...parent, report: "What do you mean by 'the best ones'?", verdict: "needs_answer" };
+    const p = carryOverPrompt(asked, "AI coding assistants");
+    expect(p).toMatch(/asked the user for something it needed[\s\S]*their answer:\s*AI coding assistants$/i);
+    expect(p).not.toContain("The user now asks for this change");
+    expect(p).toMatch(/do the task/i);
+  });
 });
 
 describe("followUpInstructions", () => {
