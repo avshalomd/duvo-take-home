@@ -405,7 +405,9 @@ test.describe("the handover", () => {
     test(`the sheet that stands in for a new run is laid out as the run's own page, ${viewport.width} px wide`, async ({ page }) => {
       await page.setViewportSize(viewport);
       const brief = "fresh: write a three-line haiku about a quiet office on Monday";
-      const fresh = await createFreshRun(brief);
+      // the run to compare with is made after the press (UX QA U3): one more run working would fill the demo
+      // workspace's three, and Run would then be refused in the box instead of handing over
+      let fresh: string | undefined;
       try {
         let release!: () => void;
         const held = new Promise<void>((resolve) => (release = resolve));
@@ -428,11 +430,12 @@ test.describe("the handover", () => {
         await expect(pending).toHaveCount(0);
         await page.unroute("**/*");
 
+        fresh = await createFreshRun(brief);
         await openRun(page, fresh);
         const real = await skeleton(page.locator("article[data-sheet]"));
         for (const [part, y] of Object.entries(standIn)) expect(Math.abs(y - real[part as keyof typeof real]), part).toBeLessThanOrEqual(1);
       } finally {
-        await deleteRun(fresh);
+        if (fresh) await deleteRun(fresh);
       }
     });
   }
