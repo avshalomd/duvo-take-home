@@ -93,6 +93,10 @@ test("a wrong password shows the error and stays on the sign-in page", async ({ 
   await signInThroughUi(page, DEMO_EMAIL, "not-the-password");
   await expect(formError(page)).toHaveText("That email and password do not match.");
   await expect(page).toHaveURL(/\/sign-in/);
+  // UX QA U15: the focus fell to the page's body; it goes back to the field to type again, which names the error
+  const password = page.getByLabel("Password", { exact: true });
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAccessibleDescription("That email and password do not match.");
 });
 
 // Q176: 3 sign-in tries per 10 s per client, counted in the database. This test's browser is one client (beforeEach).
@@ -193,6 +197,10 @@ test("an invitation link lets a new person create an account and join the worksp
     await expect(guestPage.getByText(`Olga Owner invited ${invitee}`)).toBeVisible();
 
     await guestPage.getByRole("link", { name: "Create an account" }).click();
+    // UX QA U4: it promised a workspace of their own, and no longer named the one they were joining
+    await expect(guestPage.getByRole("heading", { level: 1 })).toHaveText("Create an account to join Olga's workspace");
+    await expect(guestPage.getByText("Olga Owner invited you.", { exact: false })).toBeVisible();
+    await expect(guestPage.getByText(/workspace of your own/)).toHaveCount(0);
     await expect(guestPage.getByLabel("Email")).toHaveValue(invitee); // the address the invitation was sent to
     await guestPage.getByLabel("Your name").fill("Ivan Invitee");
     await guestPage.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);

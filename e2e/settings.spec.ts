@@ -278,9 +278,25 @@ test("the members list shows who is in the workspace and their role", async ({ p
   await expect(me).toContainText("Owner");
 });
 
+// UX QA U5: every Settings tab was titled "Handover"
+test("each Settings page is named in the browser tab", async ({ page }) => {
+  for (const [path, title] of [
+    ["/settings/connections", "Connections - Settings - Handover"],
+    ["/settings/limits", "Limits - Settings - Handover"],
+    ["/settings/members", "Members - Settings - Handover"],
+  ]) {
+    await open(page, path);
+    await expect(page).toHaveTitle(title);
+  }
+});
+
 test("an owner invites someone and gets the link to send them", async ({ page }) => {
   await open(page, "/settings/members");
   await page.getByRole("button", { name: "Invite someone" }).click(); // the invite is a row that unfolds
+  // UX QA U12: in the role menu's own words
+  await expect(page.getByTestId("invite")).toContainText(
+    "A member runs tasks, builds automations and tries them; an admin also approves automations and manages settings and people.",
+  );
   await page.getByLabel("Email").fill(INVITED);
   await page.getByRole("button", { name: "Create invite link" }).click();
   const link = page.getByTestId("invite-link");
@@ -365,6 +381,32 @@ test.describe("changing roles and removing people", () => {
     } finally {
       await olga.context.close();
       await admin.context.close();
+      await plain.context.close();
+    }
+  });
+
+  // UX QA U18: a member's Limits said why nothing could be changed on its last line, and the websites box looked editable
+  test("a member's Limits page says first that only an owner or an admin changes them, and its fields look read-only", async ({ playwright, browser, baseURL }) => {
+    const [owner, mia] = [e2eEmail("limits-owner"), e2eEmail("limits-mia")];
+    created.push(owner, mia);
+    const olga = await signedInAs(playwright.request, browser, baseURL!, "Olga Owner", owner);
+    const plain = await signedInAs(playwright.request, browser, baseURL!, "Mia Member", mia);
+    try {
+      await joinByRow(owner, mia, "member");
+      const page = plain.page;
+      await page.goto("/settings/limits");
+      const reason = page.getByTestId("limits-read-only");
+      await expect(reason).toHaveText("Only an owner or an admin can change the limits.");
+      const usage = page.getByTestId("usage");
+      expect((await reason.boundingBox())!.y).toBeLessThan((await usage.boundingBox())!.y); // above everything it is about
+      await expect(page.getByRole("button", { name: "Save limits" })).toHaveCount(0);
+
+      const websites = page.getByLabel("Blocked websites");
+      await expect(websites).toBeDisabled();
+      await expect(websites).toHaveCSS("cursor", "not-allowed");
+      await expect(page.getByRole("switch").first()).toHaveAttribute("data-disabled", "");
+    } finally {
+      await olga.context.close();
       await plain.context.close();
     }
   });
