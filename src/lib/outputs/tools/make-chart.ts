@@ -29,7 +29,9 @@ export async function makeChart(dir: string, input: unknown): Promise<CallToolRe
     const svg = await renderChartSvg(buildChartSpec(args));
     await writeFile(target, svg, "utf8");
     const points = args.data.length;
-    return answer(`Wrote ${args.file} (${args.kind} chart, ${points} ${points === 1 ? "point" : "points"})`);
+    // the agent is told what was drawn, so its report never claims values on a pie that has none (qa-ai F6)
+    const labels = !args.labels ? "" : args.kind === "pie" ? "; values are not written on a pie: its legend names the slices" : ", each value written on the chart";
+    return answer(`Wrote ${args.file} (${args.kind} chart, ${points} ${points === 1 ? "point" : "points"}${labels})`);
   } catch (err) {
     return failure(args.file, err);
   }
@@ -43,7 +45,9 @@ export const makeChartTool = (dir: string) =>
       "kind: bar, horizontal-bar, line, area, pie or scatter. data: one object per point, values as numbers. " +
       "x names the field for the categories or the horizontal axis (the slice label, for a pie), y the field for the value; " +
       "a horizontal-bar chart takes the same fields as bar and draws the categories down the side, which suits long names. " +
-      "series (optional) a field that splits the data into coloured groups. The order of data is kept.",
+      "series (optional) a field that splits the data into coloured groups. The order of data is kept. " +
+      "labels: true writes each value on its bar or point (not on a pie); use it whenever the user wants to see the numbers. " +
+      'y_title (optional) titles the value axis; put the unit in it when the instructions give one, e.g. "Sales (euros)".',
     Advertised,
     (args) => makeChart(dir, args),
   );

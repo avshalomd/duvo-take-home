@@ -27,6 +27,11 @@ export const TOKENS = {
   crimson: { light: "#C62F43", dark: "#F0697A" },
   paper: { light: "#FFFFFF", dark: "#151C26" },
 } as const;
+// The layer of values written on the marks. vega gives its group the class "<name>_marks", which is how the style
+// block colours it and the evaluator knows the chart shows its values (eval/file-view.ts).
+export const VALUE_LABELS = "value_labels";
+export const VALUE_LABELS_CLASS = `${VALUE_LABELS}_marks`;
+
 const GRAPHITE = TOKENS.graphite.light;
 const SLATE = TOKENS.slate.light;
 const SAFFRON = TOKENS.saffron.light;
@@ -74,6 +79,7 @@ export const THEME = {
   },
   range: { category: PALETTE },
   mark: { color: ACCENT },
+  text: { color: GRAPHITE, fontSize: TEXT_PX }, // a value written on a bar: text like the axis labels, not saffron
   bar: { cornerRadiusEnd: 4 },
   line: { strokeWidth: 2.5 },
   point: { size: 70, opacity: 0.9 }, // Vega-Lite's default 0.7 left saffron points pale on paper

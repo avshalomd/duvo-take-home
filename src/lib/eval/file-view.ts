@@ -1,4 +1,5 @@
 import type { SheetFile } from "@/contracts/eval";
+import { VALUE_LABELS_CLASS } from "@/lib/outputs/chart-theme";
 
 // What the judge and the reviewer read of a file. A text file is its text. The two files our tools render are read
 // for what they hold (qa-ai F1): a chart by the labels vega writes on every mark ("quarter: Q2; Sales: 95500"), since
@@ -52,6 +53,8 @@ function chartText(svg: string): string {
   if (!titles.length && !axes.length && !values.length) return "(a chart with no labels to read: it may draw nothing)";
   return [
     `(a chart: ${values.length} ${values.length === 1 ? "value" : "values"}, read from its labels)`,
+    // the values written on the bars are hidden from the labels above (they would repeat them): said here instead (qa-ai F6)
+    svg.includes(VALUE_LABELS_CLASS) ? "Each value is written on its mark in the picture." : "The values are not written on the marks.",
     ...titles.map((t) => `Title: ${t}`),
     ...axes,
     ...values,

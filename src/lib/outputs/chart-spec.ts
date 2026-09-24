@@ -1,7 +1,7 @@
 import type { TopLevelSpec } from "vega-lite";
 import type { z } from "zod";
 import type { ChartInput } from "@/contracts/outputs";
-import { CHAR_EM, CHART_HEIGHT, CHART_WIDTH, INNER_WIDTH, TEXT_PX, THEME, TITLE_PX } from "./chart-theme";
+import { CHAR_EM, CHART_HEIGHT, CHART_WIDTH, INNER_WIDTH, TEXT_PX, THEME, TITLE_PX, VALUE_LABELS } from "./chart-theme";
 import { asNumber } from "./numbers";
 
 export { ACCENT, CHART_HEIGHT, CHART_WIDTH } from "./chart-theme";
@@ -11,6 +11,7 @@ export type ChartArgs = Omit<z.infer<z.ZodObject<typeof ChartInput>>, "file">;
 type Row = ChartArgs["data"][number];
 
 const ROW_ORDER = "__row"; // a computed field: the double underscore keeps it clear of the agent's own field names
+const LABEL = "__label"; // a computed field too: each value as it is written on its mark
 
 const ISO_DATE = /^\d{4}-\d{2}(-\d{2})?([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
 
@@ -130,6 +131,64 @@ function xEncoding(rows: Row[], field: string, kind: "bar" | "line" | "area", wi
   };
 }
 
+// ---- values written on the marks (qa-ai F6) -------------------------------------------------------------------
+
+const VALUE_GAP_PX = 4; // between a bar's end and its value
+const POINT_GAP_PX = 8; // a point is drawn about 9 px across, so its value sits higher than a bar's
+// What the plot has, roughly: the chart less its padding, the title and the category labels (about 60 px down, and
+// up to the axis's labelLimit of 110 px across on a horizontal bar chart).
+const PLOT_HEIGHT = CHART_HEIGHT - 2 * THEME.padding - 60;
+const FLAT_PLOT_WIDTH = INNER_WIDTH - THEME.axis.labelLimit;
+const MAX_ROOM = 0.4; // never give labels more than this share of the plot: the bars must still read
+
+const DIGITS = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+const SHORT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
+/** A value as it is written on its mark: its digits (95,500), or short once the values reach the millions (84.7M), as the axis does. */
+function valueLabel(value: number, largest: number): string {
+  return largest >= 1e6 ? SHORT.format(value) : DIGITS.format(value);
+}
+
+/** The rows with each value's label beside it, in a field of its own, so the text mark reads it as it is. */
+function withLabels(rows: Row[], y: string): Row[] {
+  const largest = Math.max(0, ...rows.map((r) => (typeof r[y] === "number" ? Math.abs(r[y]) : 0)));
+  return rows.map((r) => (typeof r[y] === "number" ? { ...r, [LABEL]: valueLabel(r[y], largest) } : r));
+}
+
+/**
+ * The value scale stretched past the largest value by what its label needs, so the label of the tallest bar stays
+ * inside the plot: above it, the title; past the longest horizontal bar, the chart's edge. Nothing to stretch when no
+ * value is above zero.
+ */
+function roomForLabels(rows: Row[], y: string, direction: "up" | "across"): { scale?: { domainMax: number } } {
+  const largest = Math.max(0, ...rows.map((r) => (typeof r[y] === "number" ? r[y] : 0)));
+  if (largest <= 0) return {};
+  const widest = Math.max(...rows.map((r) => String(r[LABEL] ?? "").length));
+  const needed = direction === "up" ? TEXT_PX + VALUE_GAP_PX : widest * CHAR_PX + VALUE_GAP_PX;
+  const share = Math.min(MAX_ROOM, needed / (direction === "up" ? PLOT_HEIGHT : FLAT_PLOT_WIDTH));
+  return { scale: { domainMax: largest / (1 - share) } };
+}
+
+/**
+ * The layer that writes each value: above its bar or point, or just past the end of a horizontal bar. aria false:
+ * the marks under it already carry each value for a screen reader and for the evaluator, and would say it twice.
+ */
+function labelLayer(place: "above-bar" | "above-point" | "after-bar") {
+  const mark =
+    place === "after-bar"
+      ? { type: "text" as const, aria: false, align: "left" as const, baseline: "middle" as const, dx: VALUE_GAP_PX }
+      : { type: "text" as const, aria: false, baseline: "bottom" as const, dy: -(place === "above-bar" ? VALUE_GAP_PX : POINT_GAP_PX) };
+  return { name: VALUE_LABELS, mark, encoding: { text: { field: LABEL, type: "nominal" as const } } };
+}
+
+/**
+ * One mark, or the mark and its labels as two layers over the same encodings. The mark's own encodings (a series'
+ * colour) stay on its layer, so a label is written in the text colour, not in its bar's.
+ */
+function drawn(shared: object, mark: object, own: object, labels: ReturnType<typeof labelLayer> | null) {
+  return labels ? { encoding: shared, layer: [{ mark, encoding: own }, labels] } : { mark, encoding: { ...shared, ...own } };
+}
+
 function requireField(rows: Row[], field: string) {
   if (rows.some((r) => field in r)) return;
   const fields = [...new Set(rows.flatMap((r) => Object.keys(r)))].join(", ");
@@ -146,16 +205,22 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
 
   // Numbers the agent sent as text ("83.4") are read as numbers, on y and on a scatter's x; everything else as sent.
   const numeric = kind === "scatter" ? [x, y] : [y];
-  const values = args.data.map((row) => {
+  const read = args.data.map((row) => {
     const out: Row = { ...row };
     for (const f of numeric) out[f] = asNumber(row[f]);
     return out;
   });
-  if (!values.some((r) => typeof r[y] === "number")) {
+  if (!read.some((r) => typeof r[y] === "number")) {
     throw new Error(`The field "${y}" holds no numbers, so there is nothing to draw. Send the values as numbers.`);
   }
+  // a pie's legend names its slices, and a number in each would sit on a coloured slice: labels are for the rest
+  const labelled = args.labels === true && kind !== "pie";
+  const values = labelled ? withLabels(read, y) : read;
+  const room = (direction: "up" | "across"): { scale?: { domainMax: number } } => (labelled ? roomForLabels(values, y, direction) : {});
+  const labels = (place: Parameters<typeof labelLayer>[0]) => (labelled ? labelLayer(place) : null);
 
-  const yEnc = { field: ref(y), type: "quantitative" as const, title: words(y), axis: valueAxis(values, y) };
+  // the agent's own title keeps the unit the instructions gave ("Sales (euros)"); otherwise the field in words
+  const yEnc = { field: ref(y), type: "quantitative" as const, title: args.y_title?.trim() || words(y), axis: valueAxis(values, y) };
   const color = series ? { color: { field: ref(series), type: "nominal" as const, title: words(series) } } : {};
   const base = {
     title: { text: titleLines(title) },
@@ -167,39 +232,34 @@ export function buildChartSpec(args: ChartArgs): TopLevelSpec {
   };
 
   switch (kind) {
-    case "bar":
-      return {
-        ...base,
-        mark: { type: "bar" },
-        // grouped, not stacked: with a series each value is read on its own against the axis
-        encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color, ...(series ? { xOffset: { field: ref(series) } } : {}) },
-      } as TopLevelSpec;
+    case "bar": {
+      // grouped, not stacked: with a series each value is read on its own against the axis
+      const shared = { x: xEncoding(values, x, kind, Boolean(series)), y: { ...yEnc, ...room("up") }, ...(series ? { xOffset: { field: ref(series) } } : {}) };
+      return { ...base, ...drawn(shared, { type: "bar" }, color, labels("above-bar")) } as TopLevelSpec;
+    }
     case "horizontal-bar": {
       // The same fields as a bar chart, turned: categories down the side (level labels, so no slanting), values along
       // the bottom. The value axis keeps its title and short numbers; the category axis needs none.
       const category = { field: ref(x), type: fieldKind(values, x) === "number" ? ("ordinal" as const) : ("nominal" as const), sort: null, title: null };
-      return {
-        ...base,
-        mark: { type: "bar" },
-        // about five ticks: numbers sit side by side along the bottom, and ten of them ran together ("80 90")
-        encoding: { y: category, x: { ...yEnc, axis: { labelAngle: 0, tickCount: 5, ...valueAxis(values, y) } }, ...color, ...(series ? { yOffset: { field: ref(series) } } : {}) },
-      } as TopLevelSpec;
+      // about five ticks: numbers sit side by side along the bottom, and ten of them ran together ("80 90")
+      const value = { ...yEnc, axis: { labelAngle: 0, tickCount: 5, ...valueAxis(values, y) }, ...room("across") };
+      const shared = { y: category, x: value, ...(series ? { yOffset: { field: ref(series) } } : {}) };
+      return { ...base, ...drawn(shared, { type: "bar" }, color, labels("after-bar")) } as TopLevelSpec;
     }
     case "line":
-      return { ...base, mark: { type: "line", point: true }, encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color } } as TopLevelSpec;
-    case "area":
-      return { ...base, mark: { type: "area", opacity: 0.85 }, encoding: { x: xEncoding(values, x, kind, Boolean(series)), y: yEnc, ...color } } as TopLevelSpec;
-    case "scatter":
-      return {
-        ...base,
-        mark: { type: "point", filled: true },
-        encoding: {
-          // x is a quantity here, so it keeps its title, under level labels (titlePadding from the theme)
-          x: { field: ref(x), type: "quantitative", title: words(x), scale: { zero: false }, axis: { labelAngle: 0, titlePadding: 12, ...valueAxis(values, x) } },
-          y: { ...yEnc, scale: { zero: false } },
-          ...color,
-        },
-      } as TopLevelSpec;
+    case "area": {
+      const mark = kind === "line" ? { type: "line", point: true } : { type: "area", opacity: 0.85 };
+      const shared = { x: xEncoding(values, x, kind, Boolean(series)), y: { ...yEnc, ...room("up") } };
+      return { ...base, ...drawn(shared, mark, color, labels(kind === "line" ? "above-point" : "above-bar")) } as TopLevelSpec;
+    }
+    case "scatter": {
+      const shared = {
+        // x is a quantity here, so it keeps its title, under level labels (titlePadding from the theme)
+        x: { field: ref(x), type: "quantitative", title: words(x), scale: { zero: false }, axis: { labelAngle: 0, titlePadding: 12, ...valueAxis(values, x) } },
+        y: { ...yEnc, scale: { zero: false, ...room("up").scale } },
+      };
+      return { ...base, ...drawn(shared, { type: "point", filled: true }, color, labels("above-point")) } as TopLevelSpec;
+    }
     case "pie":
       return {
         ...base,
