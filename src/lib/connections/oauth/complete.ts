@@ -6,7 +6,7 @@ import { decryptSecret } from "@/lib/connections/crypto";
 import { setConnectionOAuth } from "@/lib/connections/store";
 import { SignInError, serverWords } from "./errors";
 import { publicFetch } from "./fetch";
-import { findByPendingState, markOAuth } from "./rows";
+import { findByPendingState, markOAuth, storeTokensIfUnchanged } from "./rows";
 import { clientInformation, sealTokens } from "./sealed";
 import { readBlob } from "./shape";
 import { checkState } from "./state";
@@ -44,7 +44,9 @@ export const completeOAuth: CompleteOAuth = async ({ code, state, redirectUri })
     throw new SignInError("token_refused", `The server did not accept the sign-in: ${serverWords(e)}`);
   }
 
-  await setConnectionOAuth(row.workspaceId, row.id, { ...consumed, tokens: sealTokens(tokens, now), needsSignIn: false });
+  // Conditional (S3): moved to another server or signed in again meanwhile, the tokens are dropped, never sent there.
+  const stored = await storeTokensIfUnchanged(row.workspaceId, row.id, row.url, { ...consumed, tokens: sealTokens(tokens, now), needsSignIn: false });
+  if (!stored) throw new SignInError("expired", STATE_GONE);
   await markOAuth(row.workspaceId, row.id);
   return { workspaceId: row.workspaceId, connectionId: row.id };
 };
