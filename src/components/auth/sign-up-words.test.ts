@@ -13,7 +13,7 @@ describe("signUpWords - what the sign-up page says", () => {
   it("names the workspace and who invited them, to someone who came from an invitation", () => {
     expect(signUpWords({ workspaceName: "Demo workspace", inviterName: "Olga Owner" })).toEqual({
       title: "Create an account to join Demo workspace",
-      description: "Olga Owner invited you. Once your account is made, you join Demo workspace to work together.",
+      description: "Olga Owner invited you to work together in Demo workspace. Create your account, then join.",
     });
   });
 });
