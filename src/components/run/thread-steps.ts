@@ -20,7 +20,21 @@ const OFF_TRACK = 0.5;
 // first step, so a new run opens on work under way instead of a line of text.
 const READING: PlanThreadStep = { key: "reading", title: "Reading your brief", status: "running" };
 
-export function threadSteps(plan: Plan | null, runStatus: string, stepChecks: RunState["stepChecks"], heals: Heal[] = []): PlanThreadStep[] {
+// Outcomes that are not a failure: a doubt about one step of such a run only worried the person (qa-ux U22)
+const NOT_FAILED = new Set(["pass", "pass_with_notes", "cannot_do", "needs_answer"]);
+
+/**
+ * Whether the glance view flags the steps the checker doubted (qa-ux U22, the owner's call): only once the run has
+ * ended without passing - failed, stopped, not checked or not passed. On any other run the doubt, with the checker's
+ * reason, is in Details; a live run has not passed or failed yet.
+ */
+export function showsStepDoubts(runStatus: string, headline: string | null): boolean {
+  if (runStatus === "queued" || runStatus === "running" || runStatus === "evaluating") return false;
+  return !(headline && NOT_FAILED.has(headline));
+}
+
+/** doubts: flag the steps the checker doubted (showsStepDoubts). */
+export function threadSteps(plan: Plan | null, runStatus: string, stepChecks: RunState["stepChecks"], heals: Heal[] = [], doubts = true): PlanThreadStep[] {
   const live = runStatus === "queued" || runStatus === "running" || runStatus === "evaluating";
   const stoppedMidway = runStatus === "cancelled" || runStatus === "failed";
   if (!plan) return live && heals.length === 0 ? [READING] : [];
@@ -40,8 +54,8 @@ export function threadSteps(plan: Plan | null, runStatus: string, stepChecks: Ru
     }
 
     const check = stepChecks?.find((c) => c.stepIndex === step.index);
-    // the checker has no reason of its own to add: its note repeats the step's note, which the thread already shows
-    if (step.status === "done" && check && check.onTrack < OFF_TRACK) out.flag = "This step may not have done what it says.";
+    // the flag only: the checker's reason is a line in Details, beside the percentages
+    if (doubts && step.status === "done" && check && check.onTrack < OFF_TRACK) out.flag = "This step may not have done what it says.";
     return out;
   });
 

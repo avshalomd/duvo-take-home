@@ -23,7 +23,7 @@ import { RunTitle } from "./run-title";
 import { SHEET_GUTTER } from "./sheet";
 import { StatusDot } from "./status-dot";
 import { StopButton } from "./stop-button";
-import { threadSteps } from "./thread-steps";
+import { showsStepDoubts, threadSteps } from "./thread-steps";
 import { TimeAgo } from "./time-ago";
 import type { RunView } from "./types";
 import { useRunPoll } from "./use-run-poll";
@@ -70,7 +70,8 @@ export function RunPanel({
   const why = whyLines(verdict, run.status, run.outcome, heals);
   const notChecked = notCheckedLine(run.status, headline);
   const hint = outcomeHint(run.status, headline);
-  const steps = threadSteps(state.plan, run.status, state.stepChecks, heals);
+  // a step the checker doubted is flagged here only on a run that did not pass; otherwise it is in Details (qa-ux U22)
+  const steps = threadSteps(state.plan, run.status, state.stepChecks, heals, showsStepDoubts(run.status, headline));
   const progress = planProgress(state.plan, steps); // counts what the thread draws, fixes included
 
   function closeDetails() {
