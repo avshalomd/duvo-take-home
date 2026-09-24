@@ -284,6 +284,18 @@ test("how often the agent may fix its own result is saved, and 0 reads Off", asy
   await expect(page.getByLabel(LABEL, { exact: true })).toHaveValue(before);
 });
 
+// UX QA U28: "at midnight UTC" twice, where office workers read their own clock (schedules already do, Q107)
+test.describe("in Tokyo", () => {
+  test.use({ timezoneId: "Asia/Tokyo" }); // UTC+9 all year: the day starts over at 09:00 there
+
+  test("Limits says when the day starts over in the reader's own time", async ({ page }) => {
+    await open(page, "/settings/limits");
+    await expect(page.getByTestId("usage")).toContainText("The day starts over at 09:00 your time, in ");
+    await expect(page.getByText("When a limit is reached, new runs wait until the day starts over at 09:00 your time.")).toBeVisible();
+    await expect(page.getByText(/midnight UTC/)).toHaveCount(0);
+  });
+});
+
 test("the members list shows who is in the workspace and their role", async ({ page }) => {
   await open(page, "/settings/members");
   await expect(page.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");
