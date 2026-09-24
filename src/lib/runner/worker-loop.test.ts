@@ -24,7 +24,7 @@ function setup(queue: ClaimedJob[], overrides: Partial<WorkerDeps> = {}) {
       return d.promise;
     }),
     finish: vi.fn(async () => {}),
-    heartbeat: vi.fn(async (_jobIds: string[]) => {}),
+    heartbeat: vi.fn<(jobIds: string[]) => Promise<void>>(async () => {}),
     recover: vi.fn(async () => {}),
     tick: vi.fn(async () => {}),
     now: () => new Date("2026-09-23T10:00:00Z"),
