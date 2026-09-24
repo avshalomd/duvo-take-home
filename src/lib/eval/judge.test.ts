@@ -5,7 +5,8 @@ import type { EvaluateInput } from "@/contracts/eval";
 // decide() is replaced; noul() stays real, so the questions asked are the ones the product code builds.
 vi.mock("@/lib/llm/decide", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/llm/decide")>()), decide: vi.fn() }));
 const { decide } = await import("@/lib/llm/decide");
-const { judgeRun } = await import("./judge");
+const { judgeRun, judgeState } = await import("./judge");
+const { stateTooLong } = await import("@/lib/llm/decide");
 const decideMock = vi.mocked(decide);
 
 const template: AutomationTemplate = {
@@ -115,5 +116,37 @@ describe("judgeRun", () => {
 
   it("returns the three probabilities as the judgment", async () => {
     expect(await judgeRun(input)).toEqual({ answeredQuery: 0.9, followedPlan: 0.8, stayedInBounds: 0.95 });
+  });
+});
+
+// Engine review #10: nothing bounded the judge's state. A long report or a dozen wide files went past Jev's 32K
+// tokens, the provider refused, and the run was "not checked".
+describe("judgeState", () => {
+  const wideFile = (i: number) => ({ name: `f${i}.csv`, content: Array.from({ length: 60 }, () => "x".repeat(400)).join("\n") });
+
+  it("stays inside Jev's context with a dozen wide files", () => {
+    const state = judgeState({ ...input, files: Array.from({ length: 12 }, (_, i) => wideFile(i)) });
+    expect(stateTooLong(state)).toBe(false);
+  });
+
+  it("stays inside Jev's context with a very long report, keeping its start and its end", () => {
+    const report = `START ${"r".repeat(120_000)} END`;
+    const state = judgeState({ ...input, report });
+    expect(stateTooLong(state)).toBe(false);
+    expect(state.report).toMatch(/^START/);
+    expect(state.report).toMatch(/END$/);
+    expect(state.report).toMatch(/characters left out/);
+  });
+
+  it("names the files it does not show, so the judge knows they exist", () => {
+    const state = judgeState({ ...input, files: Array.from({ length: 30 }, (_, i) => ({ name: `note-${i}.md`, content: "a note" })) });
+    expect(state.files.length).toBeLessThan(30);
+    expect(JSON.stringify(state)).toContain("note-29.md");
+  });
+
+  it("shows a short run whole", () => {
+    const state = judgeState(input);
+    expect(state.report).toBe(input.report);
+    expect(state.files).toEqual([{ name: "news.csv", head: input.files[0].content, lines: 3 }]);
   });
 });
