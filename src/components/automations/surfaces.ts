@@ -1,7 +1,11 @@
 // The materials of docs/DESIGN-V2.md as class strings, so every automations screen uses the same three: a sheet (the
 // document, the ready panel), a tile (a gallery entry, an example card) and a control. No borders: depth is the shadow.
 export const SHEET = "rounded-[22px] bg-paper shadow-sheet";
-export const TILE = "rounded-[16px] bg-paper shadow-tile";
+// A draft's page on a phone (UX QA U32): its one sheet is a sheet from sm up only; below sm it dissolves (display:
+// contents) so its header and its document become sheets of their own, and "Try it" can sit between them.
+export const SHEET_FROM_SM = "max-sm:contents sm:rounded-[22px] sm:bg-paper sm:shadow-sheet";
+export const SHEET_ON_PHONE = "min-w-0 max-sm:rounded-[22px] max-sm:bg-paper max-sm:p-6 max-sm:shadow-sheet";
+export const TILE ="rounded-[16px] bg-paper shadow-tile";
 export const FIELD = "h-10 rounded-[12px] bg-paper px-3 text-[15px]";
 
 // Links are graphite and underlined, never blue.

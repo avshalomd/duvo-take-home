@@ -15,7 +15,7 @@ import { RunForm } from "@/components/automations/run-form";
 import { ScheduleForm } from "@/components/automations/schedule-form";
 import { StateGlyph } from "@/components/automations/state-glyph";
 import { StatusToggle } from "@/components/automations/status-toggle";
-import { LINK, SECTION, SHEET, SMALL } from "@/components/automations/surfaces";
+import { LINK, SECTION, SHEET, SHEET_FROM_SM, SHEET_ON_PHONE, SMALL } from "@/components/automations/surfaces";
 import { TryExampleForm } from "@/components/automations/try-example-form";
 import { outcome } from "@/components/run/outcome";
 import { buttonVariants } from "@/components/ui/button";
@@ -50,7 +50,8 @@ export async function generateMetadata({ params }: PageProps<"/automations/[id]"
 
 const SHOWN_EXAMPLES = 6; // each one is read in full for its plan, files and verdict; one or two is the norm
 
-// /automations/<id>. A draft is a document to check, with "Try it" beside it and the approval bar under the examples.
+// /automations/<id>. A draft is a document to check, with "Try it" beside it and the approval bar under the examples
+// (on a phone, Try it right under the header, U32).
 // A ready one leads with its one primary action, Run, then its schedule and its runs; the document follows.
 export default async function AutomationPage({ params, searchParams }: PageProps<"/automations/[id]">) {
   const { id } = await params;
@@ -88,13 +89,22 @@ export default async function AutomationPage({ params, searchParams }: PageProps
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
         {/* the save's state lives here, above both layouts: a save that makes a Ready one a draft keeps its message (review) */}
         <AutomationSave key={automation.id}>
-          <div className="min-w-0 space-y-6">
-            <article className={cn(SHEET, "space-y-10 p-6 sm:p-10")}>
-              <Header automation={automation} governs={governs} />
+          {/* a draft on a phone (UX QA U32): this column and the sheet dissolve into the page's grid, which then orders
+              the header, Try it (its next step, the approval) and the document; from sm up nothing changes */}
+          <div className={cn("min-w-0 space-y-6", isDraft && "max-sm:contents")}>
+            <article className={isDraft ? cn(SHEET_FROM_SM, "sm:space-y-10 sm:p-10") : cn(SHEET, "space-y-10 p-6 sm:p-10")}>
               {isDraft ? (
-                <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
+                <>
+                  <div className={cn(SHEET_ON_PHONE, "max-sm:order-1")}>
+                    <Header automation={automation} governs={governs} />
+                  </div>
+                  <div className={cn(SHEET_ON_PHONE, "max-sm:order-3")}>
+                    <AutomationDocument automation={automation} connections={connections} footer={deleteButton} approver={governs} commandLocked={commandLocked} />
+                  </div>
+                </>
               ) : (
                 <>
+                  <Header automation={automation} governs={governs} />
                   {approved === "1" && automation.status === "active" && <ApprovedNote command={automation.command} />}
                   {automation.status === "active" && (
                     <RunForm
@@ -130,7 +140,7 @@ export default async function AutomationPage({ params, searchParams }: PageProps
           </div>
         </AutomationSave>
 
-        <aside aria-labelledby="try-it" className="space-y-4 lg:sticky lg:top-20">
+        <aside aria-labelledby="try-it" className={cn("space-y-4 lg:sticky lg:top-20", isDraft && "max-sm:order-2")}>
           <div className="space-y-1 px-1">
             <h2 id="try-it" className={SECTION}>
               Try it
