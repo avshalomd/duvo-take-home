@@ -13,7 +13,7 @@ export function budgetBlockReason(limits: DayLimits, usage: Usage): string | nul
     return `This workspace has used its ${plural(limits.dailyRunLimit, "run")} for today. ${after}`;
   // >=: a budget of $0 means no spending at all, and a run costs something the moment it starts
   if (usage.costTodayUsd >= limits.dailyBudgetUsd)
-    return `This workspace has spent its $${limits.dailyBudgetUsd.toFixed(2)} budget for today. ${after}`;
+    return `This workspace has spent its $${dollars(limits.dailyBudgetUsd)} budget for today. ${after}`;
   if (usage.inFlight >= limits.maxInFlight)
     return usage.inFlight === 1
       ? "1 run is already working. Wait for it to finish."
@@ -27,7 +27,16 @@ export function budgetBlockReason(limits: DayLimits, usage: Usage): string | nul
  */
 export function healBudgetReason(limits: Pick<WorkspaceLimits, "dailyBudgetUsd">, spentTodayUsd: number): string | null {
   if (spentTodayUsd < limits.dailyBudgetUsd) return null;
-  return `The workspace's $${limits.dailyBudgetUsd.toFixed(2)} budget for today is spent, so healing stopped here.`;
+  return `The workspace's $${dollars(limits.dailyBudgetUsd)} budget for today is spent, so healing stopped here.`;
+}
+
+/**
+ * A budget as it was set (F17): whole cents with two decimals ($2.50; a real column reads 0.07 back as 0.0700000003),
+ * and a fraction of a cent saved before the form took whole cents only as it is ($0.001), never rounded to "$0.00".
+ */
+function dollars(usd: number): string {
+  const cents = Math.round(usd * 100);
+  return Math.abs(usd * 100 - cents) < 1e-6 ? (cents / 100).toFixed(2) : String(usd);
 }
 
 // Usage is counted per UTC day, so every workspace resets at the same instant whatever the viewer's time zone.

@@ -9,7 +9,7 @@ export type LimitsFormResult =
 
 // The contract's messages are Zod's defaults ("expected number, received NaN"); a form asks for a fix in a sentence.
 const SENTENCE: Record<string, string> = {
-  dailyBudgetUsd: "Give an amount in dollars between 0 and 1000, for example 5.",
+  dailyBudgetUsd: "Give an amount in dollars and whole cents between 0 and 1000, for example 5 or 2.50.",
   dailyRunLimit: "Give a whole number of runs between 1 and 1000.",
   maxInFlight: "Give a whole number between 1 and 10.",
   deniedDomains: "Keep the list to 100 websites or fewer.",

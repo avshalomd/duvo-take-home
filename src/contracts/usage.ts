@@ -2,7 +2,8 @@ import { z } from "zod";
 
 // Per-workspace limits (Settings > Limits). The rate limit by address from v1 stays as the outer brake.
 export const WorkspaceLimits = z.object({
-  dailyBudgetUsd: z.coerce.number().min(0).max(1000),
+  // whole cents (F17): a fraction of one was saved and then read back as "$0.00"; *100 is checked with a float's slack
+  dailyBudgetUsd: z.coerce.number().min(0).max(1000).refine((usd) => Math.abs(usd * 100 - Math.round(usd * 100)) < 1e-6, "Give the budget in whole cents"),
   dailyRunLimit: z.coerce.number().int().min(1).max(1000),
   maxInFlight: z.coerce.number().int().min(1).max(10),
   stepChecks: z.boolean(),
