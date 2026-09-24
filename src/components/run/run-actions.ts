@@ -12,6 +12,20 @@ export function changeSuggestion(verdict: Pick<Verdict, "verdict" | "reasons"> |
   return first ? `Please fix what did not pass: ${plainCheckReason(first) ?? first}` : null;
 }
 
+/**
+ * The example in the Ask for a change box, fitted to what the run made (UX QA U25): a chart, a table or a spreadsheet
+ * each get a change a person might ask of one; a text file or no file gets the plain question, since no one example
+ * fits a haiku and a memo alike. The most particular file wins: a run with a chart and its data is about the chart.
+ */
+export function changePlaceholder(files: string[]): string {
+  const ext = new Set(files.map((name) => name.toLowerCase().split(".").pop()));
+  const ask = "What should change?";
+  if (ext.has("svg")) return `${ask} For example: make the bars horizontal`; // only the chart tool makes .svg files
+  if (ext.has("csv")) return `${ask} For example: add a column with each source's country`;
+  if (ext.has("xlsx")) return `${ask} For example: add a sheet with the totals`;
+  return ask;
+}
+
 // An automation repeats what a run did, so only a run whose result passed is worth saving as one (Q121) - and not a
 // run that already came from an automation (an example, a called or a scheduled one).
 const FROM_AUTOMATION = ["trial", "automation", "schedule"];

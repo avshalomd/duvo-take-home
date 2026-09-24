@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { outcome } from "@/components/run/outcome";
+import { againstTheCheck, outcome } from "@/components/run/outcome";
 import { threadSteps } from "@/components/run/thread-steps";
 import { Thread, threadTone, type ThreadStep } from "@/components/thread/thread";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ export type ExampleView = LiveRun & {
   humanNote: string | null;
   said: string | null; // the judgment in words, as who made it: "You said it looks right", "Mia said...", "Marked as ..."
   changeLabel: string; // the control that changes it: "Change", or whose judgment it replaces
+  judgedBy: string | null; // who judged it, as a sentence's subject: "You", a name, or null (judgeWho)
 };
 
 const FINISHED = ["succeeded", "failed", "cancelled"];
@@ -26,7 +27,8 @@ const FINISHED = ["succeeded", "failed", "cancelled"];
 // made, the way to the full run, and the person's own judgment once it has finished.
 export function ExampleCard({ automationId, example }: { automationId: string; example: ExampleView }) {
   const run = useLiveRun(example.runId, example);
-  const o = outcome(run.status, run.outcome);
+  // UX QA U30: a judgment the automatic check does not share is said with it, as on the run page
+  const o = againstTheCheck(run.status, run.outcome, example.humanVerdict, example.judgedBy) ?? outcome(run.status, run.outcome);
   const tone = threadTone(run.status, run.outcome);
   const finished = FINISHED.includes(run.status);
   // the run page's own reading of the plan: a finished example's unticked steps are "not marked" there too (qa-ai F8)
@@ -42,8 +44,9 @@ export function ExampleCard({ automationId, example }: { automationId: string; e
         <p className={SMALL}>{finished ? "No plan was recorded." : "Reading the brief..."}</p>
       )}
 
-      <p data-testid="example-outcome" className="flex items-center gap-2 text-[15px] text-graphite">
-        <span aria-hidden className={cn("size-2 rounded-full", DOT[o.tone])} />
+      {/* a sentence that wraps (U30) keeps its dot round, beside its first line */}
+      <p data-testid="example-outcome" className="flex items-start gap-2 text-[15px] leading-6 text-graphite">
+        <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", DOT[o.tone])} />
         {o.label}
       </p>
 

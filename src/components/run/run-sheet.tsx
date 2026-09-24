@@ -21,6 +21,7 @@ export function RunSheet({
   parentTitle,
   automationName,
   verdictLine,
+  judgedBy,
   facts,
   connections,
   composer,
@@ -30,6 +31,7 @@ export function RunSheet({
   parentTitle: string | null;
   automationName: string | null;
   verdictLine: string | null;
+  judgedBy: string | null;
   facts: FileFacts;
   connections: { name: string }[];
   composer: ComposerData;
@@ -45,6 +47,7 @@ export function RunSheet({
         parentTitle={parentTitle}
         automationName={automationName}
         verdictLine={verdictLine}
+        judgedBy={judgedBy}
         facts={facts}
         connections={connections}
       />

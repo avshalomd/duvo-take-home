@@ -6,6 +6,7 @@ import { cancelRunAction } from "@/app/(app)/actions";
 import { Thread, threadTone } from "@/components/thread/thread";
 import { Button } from "@/components/ui/button";
 import { ActionsRow } from "./actions-row";
+import { BriefTitle } from "./brief-title";
 import { DetailsPanel } from "./details-panel";
 import { Elapsed } from "./elapsed";
 import { failureCause } from "./failure";
@@ -13,13 +14,12 @@ import { FilesSection } from "./files-section";
 import { GuardNotices } from "./guard-notices";
 import { fixesRun, healsOf } from "./heal";
 import type { FileFacts } from "./home-data";
-import { notCheckedLine, outcome, outcomeHint } from "./outcome";
+import { againstTheCheck, notCheckedLine, outcome, outcomeHint } from "./outcome";
 import { planProgress } from "./plan-progress";
 import { isTerminal, shouldPoll } from "./poll";
 import { Report } from "./report";
 import { RunAgainButton } from "./run-again-button";
 import { RunNotes } from "./run-notes";
-import { RunTitle } from "./run-title";
 import { SHEET_GUTTER } from "./sheet";
 import { StatusDot } from "./status-dot";
 import { StopButton } from "./stop-button";
@@ -41,6 +41,7 @@ export function RunPanel({
   parentTitle,
   automationName,
   verdictLine,
+  judgedBy,
   facts,
   connections,
 }: {
@@ -49,6 +50,7 @@ export function RunPanel({
   parentTitle: string | null;
   automationName: string | null;
   verdictLine: string | null; // the person's mark as who made it, worded on the server (it knows the viewer and the judge)
+  judgedBy: string | null; // who made it, as a sentence's subject: "You", a name, or null (judgeWho)
   facts: FileFacts;
   connections: { name: string }[];
 }) {
@@ -66,7 +68,9 @@ export function RunPanel({
   const headline = verdict?.verdict ?? run.outcome ?? null;
   // auto-heal's attempts, the last one marked if the engine stopped trying instead of making it (Q148)
   const heals = healsOf(state.heals, events);
-  const result = outcome(run.status, headline, run.cancelRequested, { attempts: fixesRun(heals), max: heals.at(-1)?.max });
+  // UX QA U30: when the person's judgment and the automatic check disagree, the one line says both
+  const disputed = againstTheCheck(run.status, headline, run.humanVerdict, judgedBy);
+  const result = disputed ?? outcome(run.status, headline, run.cancelRequested, { attempts: fixesRun(heals), max: heals.at(-1)?.max });
   const why = whyLines(verdict, run.status, run.outcome, heals);
   const notChecked = notCheckedLine(run.status, headline);
   const hint = outcomeHint(run.status, headline);
@@ -104,15 +108,16 @@ export function RunPanel({
             </div>
           </div>
 
-          {/* The brief as the title, two lines at most so the thread below stays in view (Q137); the whole brief is
-              its tooltip and the first line of Details. The same element as the one the brief moves into on Run. */}
-          <RunTitle title={title} brief={run.prompt} />
-          <RunNotes run={run} parentTitle={parentTitle} automationName={automationName} verdictLine={verdictLine} />
+          {/* The brief as the title, two lines at most so the thread below stays in view (Q137); a cut one opens in
+              place from the title (U20), and the whole brief is its tooltip and the first line of Details. */}
+          <BriefTitle title={title} brief={run.prompt} />
+          <RunNotes run={run} parentTitle={parentTitle} automationName={automationName} verdictLine={verdictLine} judgmentInOutcome={Boolean(disputed)} />
 
           <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1">
             {/* role=status: this line changes as the run moves, and that change is the news a screen reader needs (Q68) */}
-            <p role="status" className="flex items-center gap-2.5 text-[15px]">
-              <StatusDot tone={result.tone} className="size-2.5" />
+            {/* items-start: a sentence that wraps on a phone (U30) keeps its dot beside its first line */}
+            <p role="status" className="flex items-start gap-2.5 text-[15px]">
+              <StatusDot tone={result.tone} className="mt-1.5 size-2.5" />
               <span data-testid="outcome" className="font-medium">
                 {result.label}
               </span>
@@ -187,7 +192,7 @@ export function RunPanel({
 
         {terminal && (
           <div className="mt-6">
-            <ActionsRow run={run} verdict={verdict} headline={headline} />
+            <ActionsRow run={run} verdict={verdict} headline={headline} files={files.map((f) => f.name)} />
           </div>
         )}
       </section>

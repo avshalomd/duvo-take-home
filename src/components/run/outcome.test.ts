@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notCheckedLine, outcome, outcomeHint, statusLabel } from "./outcome";
+import { againstTheCheck, notCheckedLine, outcome, outcomeHint, statusLabel } from "./outcome";
 
 describe("outcome", () => {
   it("says what is happening in words an office worker uses, not the status enum", () => {
@@ -123,6 +123,40 @@ describe("outcomeHint - what to do next, beside a neutral outcome", () => {
 
   it("has no hint for any other outcome", () => {
     for (const v of ["pass", "pass_with_notes", "fail", "unknown", null]) expect(outcomeHint("succeeded", v)).toBeNull();
+  });
+});
+
+// UX QA U30 (the owner's call): "Marked as looking right" under the title and "Done, but the result did not pass" as
+// the outcome, with nothing to say they disagree. When they do, the outcome line says both in one sentence.
+describe("againstTheCheck - a person's judgment that the automatic check does not share", () => {
+  it("says both when the person marked it right and the check did not pass it", () => {
+    expect(againstTheCheck("succeeded", "fail", "approved", "You")).toEqual({ label: "You marked it right; the automatic check did not pass it.", tone: "warn" });
+  });
+
+  it("says both when the person marked it not right and the check passed it", () => {
+    expect(againstTheCheck("succeeded", "pass", "rejected", "You")).toEqual({ label: "You marked it not right; the automatic check passed it.", tone: "bad" });
+    expect(againstTheCheck("succeeded", "pass_with_notes", "rejected", "You")).toEqual({
+      label: "You marked it not right; the automatic check passed it with notes.",
+      tone: "bad",
+    });
+  });
+
+  it("names a colleague who judged it, and stays neutral when nobody was recorded", () => {
+    expect(againstTheCheck("succeeded", "fail", "approved", "Mia Member")?.label).toBe("Mia Member marked it right; the automatic check did not pass it.");
+    expect(againstTheCheck("succeeded", "fail", "approved", null)?.label).toBe("It was marked right; the automatic check did not pass it.");
+  });
+
+  it("says nothing extra when they agree, when there is no judgment, or when the check had nothing to say", () => {
+    expect(againstTheCheck("succeeded", "pass", "approved", "You")).toBeNull();
+    expect(againstTheCheck("succeeded", "pass_with_notes", "approved", "You")).toBeNull();
+    expect(againstTheCheck("succeeded", "fail", "rejected", "You")).toBeNull();
+    expect(againstTheCheck("succeeded", "fail", null, "You")).toBeNull();
+    for (const v of ["unknown", "cannot_do", "needs_answer", null]) expect(againstTheCheck("succeeded", v, "approved", "You")).toBeNull();
+  });
+
+  it("only speaks of a finished result", () => {
+    expect(againstTheCheck("failed", "fail", "approved", "You")).toBeNull();
+    expect(againstTheCheck("evaluating", "fail", "approved", "You")).toBeNull();
   });
 });
 

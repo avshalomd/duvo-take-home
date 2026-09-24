@@ -11,11 +11,13 @@ export function RunNotes({
   parentTitle,
   automationName,
   verdictLine,
+  judgmentInOutcome = false,
 }: {
   run: Run;
   parentTitle: string | null;
   automationName: string | null;
   verdictLine: string | null; // "You said it looks right", "Mia said it looks right" or "Marked as looking right"
+  judgmentInOutcome?: boolean; // the outcome line already says the judgment, beside the check's (againstTheCheck, U30)
 }) {
   const notes: React.ReactNode[] = [];
 
@@ -42,14 +44,22 @@ export function RunNotes({
     );
   }
 
-  if (run.humanVerdict) {
+  // U30: when the outcome line says the judgment, it is not said twice; what the person wrote beside it still is
+  if (run.humanVerdict && !(judgmentInOutcome && !run.humanNote)) {
     const right = run.humanVerdict === "approved";
     const Thumb = right ? ThumbsUp : ThumbsDown;
+    const quote = run.humanNote && <span className="italic">&ldquo;{run.humanNote}&rdquo;</span>;
     notes.push(
       <span key="human">
         <Thumb aria-hidden className={`mr-1.5 inline size-3.5 align-[-2px] ${right ? "text-fern" : "text-crimson"}`} />
-        {verdictLine ?? verdictWords(run.humanVerdict, null, "") /* never "You" without knowing it was you */}
-        {run.humanNote && <span className="italic"> - &ldquo;{run.humanNote}&rdquo;</span>}
+        {judgmentInOutcome ? (
+          quote
+        ) : (
+          <>
+            {verdictLine ?? verdictWords(run.humanVerdict, null, "") /* never "You" without knowing it was you */}
+            {quote && <> - {quote}</>}
+          </>
+        )}
       </span>,
     );
   }
