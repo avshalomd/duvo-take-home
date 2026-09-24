@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, shouldPoll, streamUrl } from "./poll";
+import { chooseView, isTerminal, mergeStreamMessage, parseRunPayload, parseStreamMessage, pollGivesUp, reconnectDelay, shouldPoll, streamUrl } from "./poll";
 
 const payload = {
   run: {
@@ -162,5 +162,25 @@ describe("mergeStreamMessage - folding a stream message into what the panel show
     const next = mergeStreamMessage(server, parseStreamMessage({ events: [], run: payload.run, done: false })!);
     expect(next.files).toEqual(server.files);
     expect(next.verdict).toBe(server.verdict);
+  });
+});
+
+// Review (frontend): a stream that delivered and then broke was opened again at once, every time, and the polling
+// fallback asked every two seconds for a run that was deleted or a session that had ended, for as long as the tab stayed open.
+describe("reconnecting and giving up", () => {
+  it("waits longer before each new try of a stream that keeps breaking: 1 s, then 2 s, then 5 s", () => {
+    expect([0, 1, 2, 3, 10].map(reconnectDelay)).toEqual([1000, 2000, 5000, 5000, 5000]);
+  });
+
+  it("stops polling a run that is gone or a session that has ended", () => {
+    expect(pollGivesUp(404)).toBe(true);
+    expect(pollGivesUp(401)).toBe(true);
+    expect(pollGivesUp(403)).toBe(true);
+  });
+
+  it("keeps polling through a passing server error or a busy moment", () => {
+    expect(pollGivesUp(500)).toBe(false);
+    expect(pollGivesUp(503)).toBe(false);
+    expect(pollGivesUp(429)).toBe(false);
   });
 });
