@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { deleteUsers, e2eEmail, signedInAs, sql } from "./auth-helpers";
 import { AUTOMATION, createFreshRun, createHomeRuns, deleteHomeRuns, deleteRun, FAILED_ERROR, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
 
 // The Home page: the rail, the first-visit question, the run sheet with its thread, the floating composer and the
@@ -435,6 +436,56 @@ test.describe("the handover", () => {
       }
     });
   }
+
+  // UX QA U3 (his call, 2026-09-24): with the workspace's runs in flight at its limit, Run played the handover and the
+  // sheet snapped back half a second later with the reason. Home now knows the limit, so Run is refused in the box.
+  // A fresh "e2e-" account, so the shared demo workspace's limits are never changed.
+  test("a start the workspace's limits refuse is refused in the box with no handover, and Home reads the limit again once the run settles", async ({ playwright, browser, baseURL }) => {
+    const email = e2eEmail("refused-in-place");
+    const who = await signedInAs(playwright.request, browser, baseURL!, "Rhea Refused", email);
+    const db = sql();
+    let runId: string | undefined;
+    try {
+      const [ws] = await db`select m.organization_id as id from member m join "user" u on u.id = m.user_id where u.email = ${email} and m.role = 'owner'`;
+      await db`insert into workspace_settings (workspace_id, max_in_flight) values (${ws.id}, 1)
+        on conflict (workspace_id) do update set max_in_flight = 1`;
+      [{ id: runId }] = await db`insert into runs (workspace_id, prompt, status, model)
+        values (${ws.id}, '[e2e] home refused: still working', 'running', 'claude-sonnet-4-5') returning id`;
+
+      const page = who.page;
+      const starts: string[] = [];
+      page.on("request", (r) => {
+        if (r.method() === "POST" && r.headers()["next-action"]) starts.push(r.url());
+      });
+      await page.goto("/");
+      // any stand-in sheet, however briefly it is up, is caught
+      await page.evaluate(() => {
+        const w = window as unknown as { sawPending: boolean };
+        w.sawPending = false;
+        new MutationObserver(() => {
+          if (document.querySelector('[data-testid="run-pending"]')) w.sawPending = true;
+        }).observe(document.body, { childList: true, subtree: true });
+      });
+      const brief = "[e2e] home refused: list three facts about the Moon";
+      await composer(page).fill(brief);
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+
+      await expect(page.getByRole("alert").filter({ hasText: "1 run is already working. Wait for it to finish." })).toBeVisible();
+      await expect(composer(page)).toHaveValue(brief); // what was typed stays
+      await expect(composer(page)).toBeFocused();
+      expect(await page.evaluate(() => (window as unknown as { sawPending: boolean }).sawPending)).toBe(false);
+      expect(starts).toEqual([]); // nothing was asked of the server
+      expect(new URL(page.url()).search).toBe("");
+
+      // the run settles: Home reads the limit again, and the next Run goes to the server as usual
+      await db`update runs set status = 'succeeded', finished_at = now() where id = ${runId}`;
+      await expect(page.getByTestId("composer-form")).not.toHaveAttribute("data-start-refused", /.*/, { timeout: 20_000 });
+    } finally {
+      if (runId) await db`delete from runs where id = ${runId}`;
+      await who.context.close();
+      await deleteUsers([email]);
+    }
+  });
 
   test("a start the server would refuse does not move at all", async ({ page }) => {
     await page.goto("/");

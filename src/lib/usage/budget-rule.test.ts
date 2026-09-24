@@ -1,7 +1,7 @@
 // The budget decision, pure: may a run start, given the workspace's limits and what it used today?
 import { describe, expect, it } from "vitest";
 import type { Usage, WorkspaceLimits } from "@/contracts/usage";
-import { budgetBlockReason, healBudgetReason, nextUtcMidnight, startOfUtcDay } from "./budget-rule";
+import { budgetBlockReason, healBudgetReason, nextUtcMidnight, startOfUtcDay, startRefusal } from "./budget-rule";
 
 const limits: WorkspaceLimits = {
   dailyBudgetUsd: 5,
@@ -97,6 +97,28 @@ describe("budgetBlockReason", () => {
 
   it("states the reset time it is given, in UTC", () => {
     expect(budgetBlockReason(limits, usage({ runsToday: 30, resetsAt: "2026-09-24T00:00:00.000Z" }))).toContain("after 00:00 UTC");
+  });
+});
+
+// UX QA U3 (his call, 2026-09-24): Home knows before the press whether the workspace's limits refuse a start, so Run
+// is refused in the box; and whether the refusal lifts when a run settles, so Home knows to read it again then
+describe("startRefusal", () => {
+  it("is null while a run may start", () => {
+    expect(startRefusal(limits, usage())).toBeNull();
+  });
+
+  it("gives the same reason the start itself gives", () => {
+    expect(startRefusal(limits, usage({ inFlight: 3 }))?.reason).toBe(budgetBlockReason(limits, usage({ inFlight: 3 })));
+  });
+
+  it("waits for a run when runs in flight are what refuse it: at the limit, or holding back the rest of the budget", () => {
+    expect(startRefusal(limits, usage({ inFlight: 3 }))?.waitsForRun).toBe(true);
+    expect(startRefusal(limits, usage({ inFlight: 2, costTodayUsd: 2.5 }))?.waitsForRun).toBe(true);
+  });
+
+  it("does not wait for a run when the day itself is used up: only midnight lifts it", () => {
+    expect(startRefusal(limits, usage({ runsToday: 30 }))?.waitsForRun).toBe(false);
+    expect(startRefusal(limits, usage({ costTodayUsd: 5, inFlight: 3 }))?.waitsForRun).toBe(false);
   });
 });
 
