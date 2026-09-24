@@ -45,7 +45,9 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   // not notFound(): the loading boundary above has already streamed a 200, so a plain message is what the reader gets anyway
   if (!automation) return <Missing />;
 
-  const [trials, connections, history] = await Promise.all([listTrials(workspaceId, id), listConnections(workspaceId), automationHistory(workspaceId, id)]);
+  const [trials, allConnections, history] = await Promise.all([listTrials(workspaceId, id), listConnections(workspaceId), automationHistory(workspaceId, id)]);
+  // the editor offers them by name, on or off: no address, sign-in or tool list goes to the browser, members' included
+  const connections = allConnections.map((c) => ({ name: c.name, enabled: c.enabled }));
   const current = trials.filter((t) => t.version === automation.version);
   const older = trials.filter((t) => t.version !== automation.version);
   // each judgment says who made it: "You said" to them, their name to everyone else (Q178)
