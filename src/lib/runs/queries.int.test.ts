@@ -38,6 +38,25 @@ describe.skipIf(!process.env.DATABASE_URL)("run reads are scoped to the workspac
     expect((await getFile(WS_A, id, FILE))?.content).toBe("hello");
   });
 
+  // Engine review #8: the list read every run's whole verdict and the run page every file's content, where only the
+  // verdict's headline and the files' metadata are used. These pin what the lighter reads still return.
+  it("the run list gives each run its outcome, read from the verdict's headline", async () => {
+    const [judged] = await db
+      .insert(runs)
+      .values({ workspaceId: WS_A, prompt: "[int] outcome in the list", status: "succeeded", model: "int-model", verdict: { verdict: "pass_with_notes", checks: [], reasons: ["a note"] } })
+      .returning({ id: runs.id });
+    created.push(judged.id);
+    const listed = (await listRuns(WS_A)).find((r) => r.id === judged.id);
+    expect(listed?.outcome).toBe("pass_with_notes");
+    expect(listed?.prompt).toBe("[int] outcome in the list");
+  });
+
+  it("the run page lists each file's name, type and size", async () => {
+    const [id] = created;
+    const found = await getRun(WS_A, id);
+    expect(found?.files).toEqual([{ name: FILE, mime: "text/markdown", bytes: 5, encoding: "utf8", flags: [], quarantined: false }]);
+  });
+
   it("workspace B does not see workspace A's run in its list", async () => {
     const [id] = created;
     expect((await listRuns(WS_B)).map((r) => r.id)).not.toContain(id);
