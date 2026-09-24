@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useId, useState, useTransition } from "react";
+import { useId, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { setConnectionEnabledAction } from "@/app/(app)/settings/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -21,7 +21,9 @@ import { StatusGlyph } from "./status-glyph";
  * and Delete. A member (canEdit false) sees the same row with the switch read-only and no actions.
  */
 export function ConnectionRow({ connection, canEdit }: { connection: Connection; canEdit: boolean }) {
-  const [enabled, setEnabled] = useState(connection.enabled);
+  // the server's value, shown ahead of it while a press is saved: once the save ends it follows the server again, so
+  // a connection someone else turned off reads off after the page refreshes, and a refused press falls back by itself
+  const [enabled, setEnabled] = useOptimistic(connection.enabled);
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -33,12 +35,11 @@ export function ConnectionRow({ connection, canEdit }: { connection: Connection;
 
   function toggle(next: boolean) {
     if (pending) return; // a second press while the first is in flight is ignored, rather than disabling the switch (Q69)
-    setEnabled(next); // optimistic: the switch must feel instant
     startTransition(async () => {
+      setEnabled(next); // optimistic: the switch must feel instant
       const result = await setConnectionEnabledAction(connection.id, next);
       if (result.error) {
-        setEnabled(!next); // the store refused: put the switch back rather than lie about what the run will get
-        toast.error(result.error);
+        toast.error(result.error); // the store refused: the switch goes back to the server's value as the press ends
       } else {
         toast.success(`${connection.name} ${next ? "on" : "off"} for the next run`);
       }
