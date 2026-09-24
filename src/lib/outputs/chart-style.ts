@@ -1,4 +1,4 @@
-import { SERIES, TOKENS } from "./chart-theme";
+import { SERIES, TOKENS, VALUE_LABELS_CLASS } from "./chart-theme";
 
 /**
  * The chart's colours for both schemes, as a style block inside the SVG (Q141). An SVG in an <img> is its own
@@ -8,7 +8,8 @@ import { SERIES, TOKENS } from "./chart-theme";
  * vega writes colours as attributes (fill="#17202B"), and any CSS rule beats an attribute. Text, axes and grid are
  * picked by the class vega gives them; the data marks and legend swatches by the light colour they were drawn in.
  */
-const TEXT = ".role-title-text text, .role-axis-label text, .role-legend-label text";
+// the values written on the marks sit on the tile's own ground beside the bars, so they are text like the labels
+const TEXT = `.role-title-text text, .role-axis-label text, .role-legend-label text, .${VALUE_LABELS_CLASS} text`;
 const QUIET_TEXT = ".role-axis-title text, .role-legend-title text"; // axis and legend titles: slate, like secondary text
 
 function scheme(tone: "light" | "dark"): string {

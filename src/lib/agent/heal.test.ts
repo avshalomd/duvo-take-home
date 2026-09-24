@@ -69,8 +69,15 @@ describe("healPrompt", () => {
     expect(p).toMatch(/same name/i);
   });
 
-  it("asks it to mark the steps it redoes in its plan, so the person sees the fix happen", () => {
-    expect(healPrompt(feedback)).toMatch(/update_step/);
+  // qa-ai F14: a re-marked done step read "Explain that the request is too ambiguous" over a note about a list
+  it("asks it to name its fix as a step of its own, by what it changed, in plain words", () => {
+    const p = healPrompt(feedback);
+    expect(p).toMatch(/mcp__plan__describe_fix/);
+    expect(p).toMatch(/what you changed/i);
+  });
+
+  it("tells it to leave the steps already done as they are: their titles say what they did the first time", () => {
+    expect(healPrompt(feedback)).toMatch(/leave the steps already done as they are/i);
   });
 
   it("tells the agent to keep its plan, so the person's steps stay on the thread (production, 2026-09-23)", () => {

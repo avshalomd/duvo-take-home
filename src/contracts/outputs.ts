@@ -11,6 +11,8 @@ export const ChartInput = {
   x: z.string(), // field name for the x axis (or the category, for a pie)
   y: z.string(), // field name for the value
   series: z.string().optional(), // field name that splits the data into coloured series
+  labels: z.boolean().optional(), // write each value on its bar or point (qa-ai F6: "show the numbers on the bars")
+  y_title: z.string().max(60).optional(), // the value axis's title, where the unit goes: "Sales (euros)"
 };
 export const SpreadsheetInput = {
   file: z.string().regex(/^[\w-]{1,60}\.xlsx$/, "a file name ending in .xlsx"),

@@ -1,5 +1,5 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
-import { SetPlanInput, UpdateStepInput } from "@/contracts/agent";
+import { DescribeFixInput, SetPlanInput, UpdateStepInput } from "@/contracts/agent";
 import { PLAN_SERVER_KEY } from "./plan-state";
 
 /**
@@ -26,6 +26,14 @@ export const createPlanServer = () =>
         "Mark a step running when you start it, and done or skipped with a one-line note when it ends.",
         UpdateStepInput,
         async ({ index, status }) => ({ content: [{ type: "text" as const, text: `Step ${index} is ${status}.` }] }),
+      ),
+      // qa-ai F14: a fix attempt is a step of its own after the plan, and this is its title
+      tool(
+        "describe_fix",
+        "Only in a fix attempt, once the fix is done: name it in a few plain words by what you changed " +
+          '("Put the unit in the axis title"). It is shown as its own step after your plan.',
+        DescribeFixInput,
+        async () => ({ content: [{ type: "text" as const, text: "Fix recorded." }] }),
       ),
     ],
   });

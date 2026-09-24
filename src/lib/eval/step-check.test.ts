@@ -22,7 +22,8 @@ const calls = [
   { name: "WebFetch", input: { url: "https://news.example/rss", prompt: "AI stories" } },
 ];
 
-const answer = (p: number) => ({ answers: { onTrack: { type: "noul", noul: p } }, modelId: "jev", usage: { inputTokens: 1 } }) as never;
+const answer = (p: number, reason = "nothing") =>
+  ({ answers: { onTrack: { type: "noul", noul: p }, whatWentWrong: { type: "choice", choice: reason, probabilities: {}, confidence: 0.9 } }, modelId: "jev", usage: { inputTokens: 1 } }) as never;
 type Sent = { state: { instructions: string; step: { title: string; note?: string }; calls: { name: string; input: string; result?: string }[] }; questions: Record<string, { type: string; instructions: string }>; timeoutMs?: number };
 const sent = () => decideMock.mock.calls[0][0] as unknown as Sent;
 
@@ -34,10 +35,26 @@ beforeEach(() => {
 describe("checkStep", () => {
   it("asks Jev one yes/no question: did this step do what its title says?", async () => {
     await checkStep({ prompt, plan, stepIndex: 0, calls });
-    const questions = Object.values(sent().questions);
-    expect(questions).toHaveLength(1);
-    expect(questions[0].type).toBe("noul");
-    expect(questions[0].instructions).toMatch(/what its title says/);
+    const { onTrack } = sent().questions;
+    expect(onTrack.type).toBe("noul");
+    expect(onTrack.instructions).toMatch(/what its title says/);
+  });
+
+  // qa-ux U22: "May not have done what it says" gave the person no reason to act on. Jev names one, in the same
+  // request (free), as a closed choice; code words it.
+  it("asks, in the same request, which of a fixed list of things went wrong, with 'nothing' among them", async () => {
+    await checkStep({ prompt, plan, stepIndex: 0, calls });
+    const questions = sent().questions as Record<string, { type: string; criteria?: Record<string, string> }>;
+    expect(Object.keys(questions)).toEqual(["onTrack", "whatWentWrong"]);
+    expect(questions.whatWentWrong.type).toBe("choice");
+    expect(Object.keys(questions.whatWentWrong.criteria ?? {})).toEqual(["other_work", "failed", "not_done", "no_calls", "nothing"]);
+  });
+
+  it("gives the checker's reason in one plain line when it doubts a step", async () => {
+    decideMock.mockResolvedValue(answer(0.2, "failed"));
+    expect((await checkStep({ prompt, plan, stepIndex: 0, calls })).note).toBe("May not have done what it says: what it tried failed or found nothing to use.");
+    decideMock.mockResolvedValue(answer(0.3, "other_work"));
+    expect((await checkStep({ prompt, plan, stepIndex: 0, calls })).note).toBe("May not have done what it says: the work it did was not what the step names.");
   });
 
   it("shows Jev the head of the instructions, the step's title and note, and the calls made during it", async () => {
@@ -69,7 +86,7 @@ describe("checkStep", () => {
     expect(await checkStep({ prompt, plan, stepIndex: 1, calls })).toEqual({ stepIndex: 1, onTrack: 0.91, note: "Looks done" });
   });
 
-  it("quotes the step's own note when Jev doubts the step: code writes the sentence, not the model", async () => {
+  it("quotes the step's own note when Jev doubts the step but names nothing that went wrong: code writes the sentence, not the model", async () => {
     decideMock.mockResolvedValue(answer(0.2));
     const got = await checkStep({ prompt, plan, stepIndex: 0, calls });
     expect(got).toEqual({ stepIndex: 0, onTrack: 0.2, note: "May not have done what it says: no results from search, tried RSS" });

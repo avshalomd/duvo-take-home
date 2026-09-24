@@ -540,18 +540,20 @@ test.describe("a finished run", () => {
     await expect(panel).not.toContainText("You marked this");
   });
 
-  test("the plan is drawn as the thread, a doubted step says so, and a stopped guard is said in plain words", async ({ page }) => {
+  test("the plan is drawn as the thread, a doubt about a step of a passed run is in Details, and a stopped guard is said in plain words", async ({ page }) => {
     const panel = await openRun(page, runs.followUp);
     const thread = panel.getByTestId("thread");
     await expect(thread.getByRole("listitem")).toHaveCount(3);
-    // Q153: said once; the checker's note only repeated the step's own, so it is not added
-    await expect(thread.getByRole("listitem").nth(1)).toContainText("This step may not have done what it says.");
-    await expect(thread.getByRole("listitem").nth(1)).not.toContainText("It found two facts, not three.");
-    await expect(thread.getByText(/may not have done what it says/)).toHaveCount(1); // the on-track steps are not flagged
+    // qa-ux U22 (the owner's call): the run passed, so the checker's doubt about step 2 is not on the glance view
+    await expect(thread.getByText(/may not have done what it says/)).toHaveCount(0);
     await expect(panel.getByTestId("plan-progress")).toHaveText("3 of 3 done");
 
     await expect(panel.getByTestId("guard-notices")).toContainText("A web page tried to make the agent send your data elsewhere. It was stopped.");
     await expect(panel.getByTestId("guard-notices")).not.toContainText("carries the task"); // the raw reason is for Details
+
+    // ...it is in Details, with the checker's reason in one line
+    await panel.getByRole("button", { name: /details/i }).click();
+    await expect(page.getByRole("dialog", { name: /details/i }).getByTestId("state-card")).toContainText("It found two facts, not three.");
   });
 
   test("what it made: a chart shows itself, a CSV its rows and columns, a spreadsheet its sheets, a held-back file asks first", async ({ page }) => {

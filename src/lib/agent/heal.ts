@@ -77,9 +77,15 @@ export function healPrompt(feedback: string): string {
   return [
     feedback,
     "",
-    "Your files are still in your working directory: write each one you change back under the same name. Keep your " +
-      "plan as it is and do not call mcp__plan__set_plan again: mark the steps you redo with mcp__plan__update_step " +
-      "(running, then done with a note of what you fixed), and check the files yourself before you finish.",
+    "Your files are still in your working directory: write each one you change back under the same name, and check " +
+      "them yourself before you finish.",
+    "",
+    // qa-ai F14: a re-marked step read "Explain that the request is too ambiguous" over a note about the list the fix
+    // made. The plan stays as it is; the fix is shown as its own step, titled by the agent.
+    "Keep your plan as it is and do not call mcp__plan__set_plan again. Leave the steps already done as they are: " +
+      "their titles say what they did the first time. You may mark a step that is not done yet with " +
+      "mcp__plan__update_step. When the fix is done, call mcp__plan__describe_fix once with a title of a few plain " +
+      'words saying what you changed ("Put the unit in the axis title"), shown as its own step after the plan.',
     "",
     // qa-ai F5: the words of this line came back as the report's heading ("Report on the whole task as it now
     // stands:") and its last sentence ("One correction from the automatic check..."), so it gives no phrase to echo.

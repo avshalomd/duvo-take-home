@@ -22,7 +22,8 @@ const hooks: { onAttempt?: (attempt: number) => Promise<void>; onResult?: () => 
 // How an attempt ends: its result message, no result at all (the child died mid-stream), working until aborted, or
 // its result and then an abort while the child shuts down (Stop pressed just as the agent finished, qa-func F24).
 type Ending = "result" | "no-result" | "hang" | "result-then-abort";
-const script: { files: string[]; endings: Ending[]; plan: boolean } = { files: [BROKEN, FIXED], endings: [], plan: false }; // per attempt; "result" when unset; plan: a step marked done first
+// per attempt; "result" when unset; plan: a step marked done first; fixTitle: what each fix attempt says it changed
+const script: { files: string[]; endings: Ending[]; plan: boolean; fixTitle: string | null } = { files: [BROKEN, FIXED], endings: [], plan: false, fixTitle: null };
 // What the tests turn: the agent's time budget (to let the wall clock run out) and the SDK's totals for an attempt that
 // sent no result (its transcript's cost-state, which a fake session does not have).
 const knobs = vi.hoisted(() => ({ budgetMs: null as number | null, sdkTotals: null as { costUsd: number; durationMs: number | null } | null }));
@@ -37,7 +38,10 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => ({
       yield { type: "system", subtype: "init", session_id: SESSION, model: "fake", tools: [], mcp_servers: [{ name: "plan", status: "connected" }, { name: "outputs", status: "connected" }], cwd: options.cwd };
       await hooks.onAttempt?.(attempt);
       await writeFile(path.join(options.cwd, "output.csv"), script.files[attempt] ?? FIXED);
-      if (script.plan) {
+      if (attempt > 0 && script.fixTitle) {
+        // a fix attempt names its own step instead of planning again (qa-ai F14)
+        yield { type: "assistant", message: { content: [{ type: "tool_use", id: `fix-${attempt}`, name: "mcp__plan__describe_fix", input: { title: script.fixTitle } }] } };
+      } else if (script.plan) {
         const steps = { intent: "a table", expectedOutputs: ["output.csv"], sources: [], steps: ["Write output.csv"] };
         yield { type: "assistant", message: { content: [
           { type: "tool_use", id: `set-${attempt}`, name: "mcp__plan__set_plan", input: steps },
@@ -96,6 +100,7 @@ beforeEach(async () => {
   script.files = [BROKEN, FIXED];
   script.endings = [];
   script.plan = false;
+  script.fixTitle = null;
   knobs.budgetMs = null;
   knobs.sdkTotals = null;
   await db.insert(workspaceSettings).values({ workspaceId: THREE_WS, autoHealAttempts: 3 }).onConflictDoUpdate({ target: workspaceSettings.workspaceId, set: { autoHealAttempts: 3 } });
@@ -145,6 +150,37 @@ describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
     expect(costs.map((c) => c.total_cost_usd)).toEqual([0.01, 0.03]);
     expect(costs[0].attempt_cost_usd).toBeCloseTo(0.01, 10);
     expect(costs[1].attempt_cost_usd).toBeCloseTo(0.02, 10);
+  }, 30_000);
+
+  // qa-ai F13: the "[e2e]" tag QA puts on its runs steered the agent ("e2e" -> end-to-end testing tools)
+  it("sends the agent and the evaluator the instructions without a leading [e2e] tag, and keeps the tag on the run", async () => {
+    vi.mocked(evaluateRun).mockResolvedValueOnce(PASS);
+    const [row] = await db
+      .insert(runs)
+      .values({ prompt: "[e2e] Make me a list of the best ones.", status: "queued", model: "test", workspaceId: WS })
+      .returning({ id: runs.id });
+
+    await runAutomation(row.id);
+
+    expect(calls[0].prompt).toBe("Make me a list of the best ones.");
+    expect(vi.mocked(evaluateRun).mock.calls[0][0].prompt).toBe("Make me a list of the best ones.");
+    const [run] = await db.select().from(runs).where(eq(runs.id, row.id));
+    expect(run.prompt).toBe("[e2e] Make me a list of the best ones."); // QA's clean-up still finds it
+  }, 30_000);
+
+  // qa-ai F14: the plan is kept, and the fix attempt's own step carries what it changed, under its attempt
+  it("keeps the plan through a fix and records the fix attempt's own step, titled by what it changed", async () => {
+    vi.mocked(evaluateRun).mockResolvedValueOnce(FAIL).mockResolvedValueOnce(PASS);
+    script.plan = true;
+    script.fixTitle = "Put quotes around the values with a comma";
+    const id = await queuedRun(WS, "a CSV whose fix is named");
+
+    await runAutomation(id);
+
+    const plans = (await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq))).filter((e) => e.kind === "plan");
+    const last = plans.at(-1)?.payload as { steps: { title: string; status: string }[]; fixes?: { attempt: number; title: string }[] };
+    expect(last.steps).toEqual([expect.objectContaining({ title: "Write output.csv", status: "done" })]);
+    expect(last.fixes).toEqual([{ attempt: 1, title: "Put quotes around the values with a comma" }]);
   }, 30_000);
 
   // Q148: the live heal of 2026-09-23 put quotes in for the CSV check, took them out for the reviewer, and was back

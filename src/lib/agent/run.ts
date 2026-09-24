@@ -25,6 +25,7 @@ import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
 import { runnerMode } from "@/lib/runner/mode";
+import { withoutTestTag } from "@/lib/runs/test-tag";
 import { getLimits, healBudgetStop } from "@/lib/usage/budget";
 import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
@@ -107,8 +108,8 @@ export const runAutomation: RunAutomation = async (runId) => {
   let limits: Awaited<ReturnType<typeof getLimits>>;
   let systemPrompt = SYSTEM_PROMPT;
   let template: AutomationTemplate | null = null;
-  let prompt = run.prompt; // what the agent is sent
-  let instructions = run.prompt; // what the step checks and the evaluator judge the result against
+  let prompt = withoutTestTag(run.prompt); // what the agent is sent: never QA's "[e2e]" tag (qa-ai F13)
+  let instructions = prompt; // what the step checks and the evaluator judge the result against
   let resume: Awaited<ReturnType<typeof resumeOptions>> = null;
   let costBase = 0; // a resumed follow-up's SDK total starts from its parent's: only the rest is this run's cost
   try {
@@ -355,6 +356,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       if (next.heal) {
         heals += 1;
         await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, ...next.heal }, at: now() }]);
+        map.startFix(heals); // its describe_fix names this attempt's own step on the plan (qa-ai F14)
         await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
       }
       await runAttempt(next.prompt, next.resume);
@@ -383,7 +385,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       });
 
       // The agent ended well but left steps unticked: they are "not marked", not "not started" (qa-ai F8), in the trace
-      // the page and the evaluator both read. A fix attempt ticks them again with update_step like any other step.
+      // the page and the evaluator both read. A fix attempt may tick them; a step already done stays as it was (F14).
       const marked = end.is_error ? null : untickedMarked(plan);
       if (marked) await write([{ kind: "plan", payload: marked, at: now() }]);
 

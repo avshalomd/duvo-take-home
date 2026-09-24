@@ -85,6 +85,21 @@ describe("renderChartSvg", () => {
     expect(svg).toMatch(/^<svg[^>]* data-rows="3"/);
   });
 
+  // qa-ai F6: "show each bar's value on top of it"
+  it("writes each value on its bar in the chart's text size, and the bars stay the only marks read as data", async () => {
+    const data = [
+      { quarter: "Q1", sales: 80000 },
+      { quarter: "Q2", sales: 95500 },
+    ];
+    const svg = await renderChartSvg(buildChartSpec({ title: "Sales", kind: "bar", data, x: "quarter", y: "sales", labels: true, y_title: "Sales (euros)" }));
+    const labels = svg.match(/<g class="mark-text role-mark value_labels_marks"[^>]*>([\s\S]*?)<\/g>/)?.[1] ?? "";
+    expect(labels).toMatch(/font-size="15px"[^>]*>80,000</);
+    expect(labels).toContain(">95,500<");
+    expect(labels).toContain('fill="#17202B"'); // graphite, switched to its dark twin by the style block
+    expect(svg.split('aria-roledescription="bar"').length - 1).toBe(2);
+    expect(svg).toContain("Y-axis titled 'Sales (euros)'");
+  });
+
   it("escapes the title, so an ampersand from the agent cannot break the SVG", async () => {
     const svg = await renderChartSvg(buildChartSpec({ title: "Sales & costs", kind: "bar", data: countries, x: "country", y: "population" }));
     expect(svg).toContain("Sales &amp; costs");

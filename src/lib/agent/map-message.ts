@@ -21,13 +21,14 @@ function resultText(content: unknown): string {
  * One mapper per run. It holds that run's plan and the ids of its plan-tool calls, so two runs in the same
  * process never share state and the plan tool's own bookkeeping stays out of the timeline.
  */
-export function createMapper(): MapMessage {
+export function createMapper(): MapMessage & { startFix: (attempt: number) => void } {
   let plan: Plan | null = null;
   let turn = 0; // one model response is a turn, which is what the SDK's num_turns and maxTurns count
+  let fixAttempt: number | null = null; // the fix attempt under way, which a describe_fix call names (qa-ai F14)
   const planCallIds = new Set<string>();
   const responseIds = new Set<string>(); // the SDK sends one assistant message per content block, all with one message.id
 
-  return (message: unknown, seq: number, at: string): RunEvent[] => {
+  const map = (message: unknown, seq: number, at: string): RunEvent[] => {
     const m = rec(message);
     if (m.type === "assistant") {
       const id = str(rec(m.message).id);
@@ -70,7 +71,7 @@ export function createMapper(): MapMessage {
         if (isPlanTool(name)) {
           // A plan call is not work: it produces a plan event, never a tool_call, so `turn` counts real tools only.
           planCallIds.add(str(b.id));
-          plan = applyPlanCall(plan, name, b.input);
+          plan = applyPlanCall(plan, name, b.input, fixAttempt);
           if (plan) push({ kind: "plan", payload: plan });
           continue;
         }
@@ -118,6 +119,11 @@ export function createMapper(): MapMessage {
 
     return []; // stream_event and anything a later SDK version adds
   };
+  // The run loop says when a fix attempt begins; the mapper cannot tell one attempt's messages from the next's.
+  const startFix = (attempt: number) => {
+    fixAttempt = attempt;
+  };
+  return Object.assign(map, { startFix });
 }
 
 /** The contract's MapMessage for a single message on its own; the run loop uses createMapper() to keep the plan. */

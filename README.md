@@ -99,4 +99,7 @@ and [docs/CODE-TOUR.md](docs/CODE-TOUR.md) for a per-file tour.
 - A tab still open on a workspace its user was removed from refuses new runs, invitations, connections and limits;
   an action on a named record there answers "not found" (Q226).
 - With the model down, Details shows no step checks without saying why (Q208).
+- Known, accepted risk: a connection's MCP client may follow a redirect, or a changed name lookup, to an internal
+  address after the save and run-start checks (security review S5). The planned fix is an in-process proxy that sends
+  connection traffic through `publicFetch`, each hop checked ([docs/CODE-TOUR.md](docs/CODE-TOUR.md)).
 - Open QA items are listed in [docs/QA.md](docs/QA.md).

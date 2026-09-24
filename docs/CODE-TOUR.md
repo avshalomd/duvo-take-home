@@ -407,3 +407,43 @@ Per file: what it does and why it is built that way. Grows at every merge.
   meter around the work adds them up, so the evaluator's layers did not need a cost parameter each. Outside metered work
   (a live run's own checks) a report does nothing. `model-prices.ts` prices tokens: Sonnet 5 at its list price, Jev at
   a stated guess, and any other model at Sonnet 4.6's price, so the day never reads low.
+
+### The owner's calls on the last recommendations (2026-09-24: qa-ai F6, F13, F14; qa-ux U22, U31; security S5)
+
+- `src/lib/outputs/chart-spec.ts` `labels`, `y_title` - "show the numbers on the bars" is a common office ask the chart
+  tool could not meet (F6). With `labels: true` the mark and a text layer share the encodings; the series colour stays
+  on the mark's layer, so every value is written in the text colour. Each label is computed here (95,500; 84.7M once
+  the values reach the millions, as the axis shortens them), and the value scale's `domainMax` is stretched by what
+  a label needs, so the tallest bar's value never reaches the title. A pie gets none: its legend names the slices, and
+  the tool's answer says so, so the agent does not claim them. `y_title` carries the unit ("Sales (euros)").
+- `src/lib/outputs/chart-theme.ts` `VALUE_LABELS` - vega names the label layer's group `value_labels_marks`: the style
+  block colours it like the axis labels in both schemes, and `eval/file-view.ts` tells the judge whether the chart
+  writes its values. The layer is `aria: false`, because the bars already carry each value for a screen reader and
+  the evaluator, and would read twice.
+- `src/lib/agent/plan-state.ts` `applyPlanCall(..., fixAttempt)`, `describe_fix` - a fix attempt keeps the plan, and a
+  step already done keeps its title and note: the re-marked step "Explain that the request is too ambiguous" sat over a
+  note about the list the fix made (F14). The fix is a step of its own: the agent names it with `describe_fix` ("Put the
+  unit in the axis title"), stored as `plan.fixes` by attempt, and `thread-steps.ts` draws it in place of "Fix what the
+  check found (attempt n of m)". The mapper cannot tell attempts apart, so `run.ts` tells it (`map.startFix`) when it
+  writes the heal event.
+- `src/components/run/thread-steps.ts` `showsStepDoubts` - a doubt about one step is on the glance view only when the run
+  did not pass (failed, stopped, not checked, a fail); on a pass, a pass with notes and the neutral outcomes it is in
+  Details, and never while the run works (U22). `src/lib/eval/step-check.ts` asks Jev, in the same request, which of a
+  fixed list went wrong ("nothing" among them), and code words it: "May not have done what it says: what it tried failed
+  or found nothing to use."
+- `src/lib/agent/system.prompt.ts`, `src/lib/eval/review.prompt.ts` - the plain-words rule (Q183) covers step titles too,
+  and security jargon: no "data-exfiltration", "endpoint", "query parameter" or "proxies", but "sending your data to
+  another website" (U31).
+- `src/lib/runs/test-tag.ts` `withoutTestTag` - QA's leading "[e2e]" tag steered the agent ("e2e" read as the subject,
+  F13). It is taken off what the agent, the step checks and the evaluator read (the run, a follow-up, Check again), and
+  kept on the stored run: `instructionsOf` returns it as stored, because Run again saves what it returns and the
+  clean-up looks for the tag there.
+- **Known, accepted risk (security review S5, the owner's call):** a connection's address is checked when it is saved
+  and again at run start (`src/lib/agent/connection-reach.ts`), but the agent's MCP client then connects on its own,
+  inside the SDK's child process. A redirect from the server, or a name whose answer changes between the check and the
+  connect, can still take it to an internal address after the checks: a blind request from the runner function, since
+  the MCP transport does not go through `publicFetch` the way the OAuth fetches do (each hop checked, Q83). Not proven
+  (it would need a paid run against a redirecting server) and accepted for now; the plain case, an address that leads
+  inside, is closed by the two checks. The fix, when connections become common: route connection traffic
+  through an in-process MCP proxy that makes every request with `publicFetch` (`src/lib/connections/oauth/fetch.ts`),
+  redirects followed by hand and each hop checked, so the child only ever talks to the proxy.
