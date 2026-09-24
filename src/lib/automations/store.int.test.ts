@@ -101,6 +101,22 @@ describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {
     expect(err.message).toMatch(/\/int-taken is already used/);
   });
 
+  // QA F7: the clash check passed for both, then the unique index refused one, which read "Something went wrong"
+  it("renames two automations to one command at once: one saves, the other hears the command is taken", async () => {
+    const one = await createAutomationDraft(ctx, draftWith("int-race-one"), null);
+    const two = await createAutomationDraft(ctx, draftWith("int-race-two"), null);
+
+    const results = await Promise.allSettled([
+      updateAutomation(WS, one.id, editOf({ ...one, command: "int-race-same" })),
+      updateAutomation(WS, two.id, editOf({ ...two, command: "int-race-same" })),
+    ]);
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const refused = (results.find((r) => r.status === "rejected") as PromiseRejectedResult).reason;
+    expect(refused).toBeInstanceOf(AutomationError);
+    expect(refused.message).toBe('/int-race-same is already used by "[int] Company audit". Pick another command.');
+  });
+
   it("bumps the version when an edit changes what the agent is told, and keeps it for a hint", async () => {
     const a = await createAutomationDraft(ctx, draftWith("int-edit"), null);
     const hintOnly = await updateAutomation(WS, a.id, editOf({ ...a, inputHint: "The registered name" }));
