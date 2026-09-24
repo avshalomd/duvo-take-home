@@ -6,7 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { files, jobs, runEvents, runs } from "@/db/schema";
 import { enqueueRun } from "./enqueue";
-import { claimJob, finishJob } from "./jobs";
+import { claimJob, finishJob, heartbeat } from "./jobs";
 import { closeAbandonedRuns, recoverStaleJobs, sweepIfOverdue } from "./recover";
 
 const WS = `int-engine-jobs-${process.pid}`; // per process: other worktrees run these tests against the same database
@@ -83,12 +83,28 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue", () => {
   });
 
   it("finishJob marks a job done or failed", async () => {
-    const done = await makeJob(await makeRun("finish done"), { status: "running" });
-    const failed = await makeJob(await makeRun("finish failed"), { status: "running" });
-    await finishJob(done, "done");
-    await finishJob(failed, "failed");
+    const done = await makeJob(await makeRun("finish done"), { status: "running", lockedBy: "int-worker-1" });
+    const failed = await makeJob(await makeRun("finish failed"), { status: "running", lockedBy: "int-worker-1" });
+    await finishJob(done, "done", "int-worker-1");
+    await finishJob(failed, "failed", "int-worker-1");
     expect((await jobRow(done)).status).toBe("done");
     expect((await jobRow(failed)).status).toBe("failed");
+  });
+
+  // Engine review #15: a job taken for dead and claimed again belongs to the second worker; the first one's late
+  // finishJob marked the second worker's job done while its run was still going.
+  it("finishJob leaves alone a job another worker holds now", async () => {
+    const jobId = await makeJob(await makeRun("finish other worker"), { status: "running", lockedBy: "int-worker-2" });
+    await finishJob(jobId, "done", "int-worker-1");
+    expect((await jobRow(jobId)).status).toBe("running");
+  });
+
+  it("heartbeat keeps this worker's running jobs fresh and touches no other worker's", async () => {
+    const mine = await makeJob(await makeRun("beat mine"), { status: "running", lockedBy: "int-worker-1", lockedAt: t(1) });
+    const theirs = await makeJob(await makeRun("beat theirs"), { status: "running", lockedBy: "int-worker-2", lockedAt: t(1) });
+    await heartbeat("int-worker-1", [mine, theirs]);
+    expect((await jobRow(mine)).lockedAt!.getTime()).toBeGreaterThan(t(1).getTime());
+    expect((await jobRow(theirs)).lockedAt!.getTime()).toBe(t(1).getTime());
   });
 
   it("enqueueRun with RUNNER=queue inserts a queued job for the run instead of running it here", async () => {
