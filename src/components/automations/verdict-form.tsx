@@ -26,6 +26,16 @@ export function VerdictForm({ automationId, runId, succeeded, verdict, note, sai
   const [state, action, pending] = useActionState<ActionState, FormData>(setVerdictAction, {});
   const [changing, setChanging] = useState(false);
   const [explaining, setExplaining] = useState(false);
+  const [seen, setSeen] = useState(state);
+  // a saved judgment closes the form (derived during render, React's pattern): the key above only re-mounts it when
+  // the stored judgment changed, and giving the same one again changes nothing there
+  if (state !== seen) {
+    setSeen(state);
+    if (state.ok) {
+      setChanging(false);
+      setExplaining(false);
+    }
+  }
 
   if (verdict && !changing) {
     const words = said ?? verdictWords(verdict, null, ""); // never "You" without knowing it was you
