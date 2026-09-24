@@ -81,8 +81,10 @@ export function healPrompt(feedback: string): string {
       "plan as it is and do not call mcp__plan__set_plan again: mark the steps you redo with mcp__plan__update_step " +
       "(running, then done with a note of what you fixed), and check the files yourself before you finish.",
     "",
-    "Then end with your report for the person on the whole task as it now stands - what you did, what the files hold " +
-      "and anything you could not do - written as your answer to the task, not a note of the fix. At most one closing " +
-      "sentence may say what the check made you fix.",
+    // qa-ai F5: the words of this line came back as the report's heading ("Report on the whole task as it now
+    // stands:") and its last sentence ("One correction from the automatic check..."), so it gives no phrase to echo.
+    "Then end with your report for the person, written as your answer to the whole task - what you did, what the " +
+      "files hold and anything you could not do - not a note of the fix. The person reads it as the answer: never " +
+      "mention the check, this pass, a correction, re-checking or an earlier attempt, and give it no heading.",
   ].join("\n");
 }

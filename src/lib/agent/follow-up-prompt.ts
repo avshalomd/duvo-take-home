@@ -67,8 +67,10 @@ export function carryOverPrompt(parent: ParentRun, change: string): string {
     ...(found.length ? ["Fix what it found as part of this change, and check the files yourself before you finish."] : []),
     // This run's report stands for the whole thread: it is judged against every instruction so far, and it is what
     // "Make an automation" and the next change read.
-    "End with your report for the person on the whole task as it now stands - the earlier report brought up to date, " +
-      "not only this change. At most one closing sentence may say what this change did.",
+    // qa-ai F5: "I re-checked the file against your original request" reached the person as the report.
+    "End with your report for the person: the answer to the whole task with this change made - the earlier report " +
+      "brought up to date, not only this change. It may say what changed in terms of the work, but never mention " +
+      "a check, an earlier run, a correction or re-checking.",
     "",
     "The user now asks for this change:",
     change,

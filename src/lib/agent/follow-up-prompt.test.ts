@@ -93,7 +93,7 @@ describe("carryOverPrompt", () => {
   // reached the person as the report.
   it("says the report never mentions the check, earlier runs or corrections, and gives no phrase to echo", () => {
     const p = carryOverPrompt(hisParent, "fix the table");
-    expect(p).toMatch(/never mention the automatic check, an earlier run, a correction or re-checking/i);
+    expect(p).toMatch(/never mention a check, an earlier run, a correction or re-checking/i);
     expect(p).not.toMatch(/as it now stands/i);
     expect(p).not.toMatch(/closing sentence/i);
   });
