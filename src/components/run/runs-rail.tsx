@@ -3,6 +3,7 @@
 import { Search, SquarePen, X } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, useSyncExternalStore } from "react";
+import { LinkPending } from "@/components/shell/link-pending";
 import { cn } from "@/lib/utils";
 import { outcome } from "./outcome";
 import { groupByDay, matchesSearch } from "./rail";
@@ -112,7 +113,7 @@ function RailRow({ run, selected, onPick }: { run: RailRun; selected: boolean; o
       // row: shown in the row on hover, the words squeezed the title to two letters (Q140)
       title={`${result.label}\n${run.prompt}`}
       className={cn(
-        "flex items-center gap-2.5 rounded-full px-3 py-1.5 text-[14px] transition-[background-color,transform] duration-100 active:scale-[0.97] max-[899px]:min-h-10",
+        "relative isolate flex items-center gap-2.5 rounded-full px-3 py-1.5 text-[14px] transition-[background-color,transform] duration-100 active:scale-[0.97] max-[899px]:min-h-10",
         "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none", // the one focus ring (Q71)
         selected ? "bg-paper font-medium shadow-tile" : "text-graphite/85 hover:bg-paper/50",
       )}
@@ -127,6 +128,8 @@ function RailRow({ run, selected, onPick }: { run: RailRun; selected: boolean; o
         </span>
       )}
       <span className="sr-only">, {result.label}</span>
+      {/* Home has no skeleton for a run (the sheet is replaced in one commit), so the row says it is opening */}
+      <LinkPending />
     </Link>
   );
 }
