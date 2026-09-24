@@ -18,6 +18,7 @@ import { StatusToggle } from "@/components/automations/status-toggle";
 import { LINK, SECTION, SHEET, SMALL } from "@/components/automations/surfaces";
 import { TryExampleForm } from "@/components/automations/try-example-form";
 import { outcome } from "@/components/run/outcome";
+import { buttonVariants } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/session";
 import { approvalProgress } from "@/lib/automations/approval";
 import { canGovernAutomations, hasBeenApproved } from "@/lib/automations/permissions";
@@ -280,6 +281,12 @@ function Missing() {
       <section className={cn(SHEET, "space-y-3 p-6 sm:p-10")}>
         <h1 className="page-title text-graphite">That automation was not found</h1>
         <p className="text-slate">It may have been deleted.</p>
+        {/* the way on, as the run's not-found sheet has one: the back link above is easy to miss on a phone (UX QA U14) */}
+        <div className="pt-3">
+          <Link href="/automations" className={cn(buttonVariants(), "h-10 px-5 text-[15px]")}>
+            Back to automations
+          </Link>
+        </div>
       </section>
     </main>
   );
