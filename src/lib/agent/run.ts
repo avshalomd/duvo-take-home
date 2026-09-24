@@ -355,6 +355,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       if (next.heal) {
         heals += 1;
         await write([{ kind: "heal", payload: { attempt: heals, max: limits.autoHealAttempts, ...next.heal }, at: now() }]);
+        map.startFix(heals); // its describe_fix names this attempt's own step on the plan (qa-ai F14)
         await updateUnlessCancelled(runId, { status: "running", healAttempts: heals });
       }
       await runAttempt(next.prompt, next.resume);
@@ -383,7 +384,7 @@ export const runAutomation: RunAutomation = async (runId) => {
       });
 
       // The agent ended well but left steps unticked: they are "not marked", not "not started" (qa-ai F8), in the trace
-      // the page and the evaluator both read. A fix attempt ticks them again with update_step like any other step.
+      // the page and the evaluator both read. A fix attempt may tick them; a step already done stays as it was (F14).
       const marked = end.is_error ? null : untickedMarked(plan);
       if (marked) await write([{ kind: "plan", payload: marked, at: now() }]);
 

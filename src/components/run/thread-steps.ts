@@ -47,14 +47,18 @@ export function threadSteps(plan: Plan | null, runStatus: string, stepChecks: Ru
 
   // Auto-heal: each attempt to fix the result is one more step on the same thread. Only the latest can be under way;
   // what the check found is under Why?, not here, because the run has not said pass or fail yet (his call).
+  // Once the agent names an attempt by what it changed (describe_fix, qa-ai F14), that is its title and note: the
+  // plan above stays as it was, and this step says honestly what the fix did.
   const fixes = heals.map((heal, i): PlanThreadStep => {
-    const title = `Fix what the check found (attempt ${heal.attempt} of ${heal.max})`;
+    const named = heal.stopped ? undefined : plan.fixes?.find((f) => f.attempt === heal.attempt);
+    const title = named?.title ?? `Fix what the check found (attempt ${heal.attempt} of ${heal.max})`;
     const key = `heal-${heal.attempt}`;
+    const note = named?.note ? { note: named.note } : {};
     if (heal.stopped) return { key, title, status: "skipped", note: stoppedLine(heal) };
-    if (i < heals.length - 1) return { key, title, status: "done" };
-    if (live) return { key, title, status: "running" };
-    if (stoppedMidway) return { key, title, status: "pending", note: "Stopped here" };
-    return { key, title, status: "done" };
+    if (i < heals.length - 1) return { key, title, status: "done", ...note };
+    if (live) return { key, title, status: "running", ...note };
+    if (stoppedMidway) return { key, title, status: "pending", note: ["Stopped here", named?.note].filter(Boolean).join(". ") };
+    return { key, title, status: "done", ...note };
   });
   return [...steps, ...fixes];
 }

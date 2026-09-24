@@ -78,7 +78,9 @@ export function reviewInput(input: EvaluateInput, checks: Check[]): string {
     : "WHAT THE RUN READ\n(nothing from outside)";
   const plan = input.plan
     ? `PLAN\nintent: ${input.plan.intent}\nexpected outputs: ${input.plan.expectedOutputs.join("; ")}\nsteps:\n` +
-      input.plan.steps.map((s) => `  ${s.index + 1}. [${s.status === "unmarked" ? "not marked" : s.status}] ${s.title}${s.note ? ` - ${s.note}` : ""}`).join("\n")
+      input.plan.steps.map((s) => `  ${s.index + 1}. [${s.status === "unmarked" ? "not marked" : s.status}] ${s.title}${s.note ? ` - ${s.note}` : ""}`).join("\n") +
+      // a fix attempt is a step of its own after the plan, named by what it changed (qa-ai F14)
+      (input.plan.fixes ?? []).map((f) => `\n  fix ${f.attempt}: ${f.title}${f.note ? ` - ${f.note}` : ""}`).join("")
     : "PLAN\n(the run recorded no plan)";
   return [
     `TODAY: ${input.today}`,

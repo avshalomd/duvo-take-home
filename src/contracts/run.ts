@@ -22,6 +22,13 @@ export const PlanStep = z.object({
   status: PlanStepStatus,
   note: z.string().optional(), // what happened on this step, in the agent's words ("no results, tried RSS")
 });
+// A fix attempt's own step (qa-ai F14, the owner's call): the plan stays as the first attempt left it, and each fix
+// is a step after it, titled by the agent with what it changed. Optional, so plans stored before it still parse.
+export const PlanFix = z.object({
+  attempt: z.number().int().min(1),
+  title: z.string().min(1),
+  note: z.string().optional(),
+});
 // The agent's reading of the instructions comes first (his call, T+24): free text in, no presets, so the agent
 // states what it understood before it acts, and the user can see a wrong reading before the work is done.
 export const Plan = z.object({
@@ -29,8 +36,10 @@ export const Plan = z.object({
   expectedOutputs: z.array(z.string()).default([]), // e.g. ["output.csv with title,url,date", "a short report"]
   sources: z.array(z.string()).default([]), // which abilities and connections it will use: "web search", "GitHub"
   steps: z.array(PlanStep),
+  fixes: z.array(PlanFix).optional(),
 });
 export type PlanStep = z.infer<typeof PlanStep>;
+export type PlanFix = z.infer<typeof PlanFix>;
 export type Plan = z.infer<typeof Plan>;
 
 // One row of run_events: an SDK message mapped to what the UI needs. Payloads are loose: the SDK adds fields

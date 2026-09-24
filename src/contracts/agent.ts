@@ -34,6 +34,8 @@ export const SetPlanInput = {
   steps: z.array(z.string().min(1)).min(1).max(12),
 };
 export const UpdateStepInput = { index: z.number().int().min(0), status: AgentStepStatus, note: z.string().optional() };
+// A fix attempt names its own step by what it changed (qa-ai F14): "Put the unit in the axis title"
+export const DescribeFixInput = { title: z.string().min(1).max(120), note: z.string().max(300).optional() };
 
 // One SDK message becomes zero or more events; seq is the next free number for the run.
 export type MapMessage = (message: unknown, seq: number, at: string) => RunEvent[];
