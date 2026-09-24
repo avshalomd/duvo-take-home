@@ -36,7 +36,7 @@ function stateWith(input: EvaluateInput, headLines: number, reportChars: number)
     ...(t ? { automation: { intent: t.intent, expectedOutputs: t.expectedOutputs, outputFormat: t.outputFormat, steps: t.steps } } : {}),
     report: clipMiddle(input.report ?? "(the run wrote no report)", reportChars),
     files: shown.map((f) => {
-      const text = forModel(f); // a spreadsheet is shown as what it is and its size, never as base64
+      const text = forModel(f, input.spreadsheets); // a chart's values, a spreadsheet's rows: never markup or base64 (qa-ai F1)
       return { name: f.name, head: text.split("\n").slice(0, headLines).map((l) => l.slice(0, LINE_CHARS)).join("\n"), lines: text.split("\n").length };
     }),
     ...(rest.length ? { filesNotShown: namesOf(rest) } : {}), // named, so the judge knows they exist

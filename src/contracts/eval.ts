@@ -49,6 +49,15 @@ export type CheckStep = (input: {
   calls: { name: string; input: unknown; preview?: string }[]; // the tool calls made while the step was running
 }) => Promise<StepCheck>;
 
+// A spreadsheet's content as the spreadsheet tool was given it: our code builds the .xlsx from exactly this, so it is
+// what the file holds, readable without opening the workbook (qa-ai F1).
+const Cell = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export const SheetFile = z.object({
+  file: z.string(),
+  sheets: z.array(z.object({ name: z.string(), columns: z.array(z.string()), rows: z.array(z.array(Cell)) })),
+});
+export type SheetFile = z.infer<typeof SheetFile>;
+
 export const EvaluateInput = z.object({
   prompt: z.string(),
   runStatus: z.string(),
@@ -61,6 +70,7 @@ export const EvaluateInput = z.object({
   // A follow-up resumes its parent's conversation, whatever that one read: the in-bounds question is asked of it even
   // when its own tools read nothing from outside (engine review #4).
   followUp: z.boolean().optional(),
+  spreadsheets: z.array(SheetFile).optional(), // what each .xlsx holds, from the spreadsheet tool's calls (from-events.ts)
 });
 export type EvaluateInput = z.infer<typeof EvaluateInput>;
 // withinMs: the time box the caller holds the evaluation to (the run's 50 s); the model calls are budgeted inside it.

@@ -47,7 +47,7 @@ export function reviewInput(input: EvaluateInput, checks: Check[]): string {
   const notShown: { name: string }[] = [];
   let used = 0;
   for (const f of input.files) {
-    const lines = forModel(f).split("\n"); // a spreadsheet is shown as what it is and its size, never as base64
+    const lines = forModel(f, input.spreadsheets).split("\n"); // a chart's values, a spreadsheet's rows (qa-ai F1)
     const head = lines.slice(0, HEAD_LINES).map((l) => clipLine(l, LINE_CHARS)).join("\n");
     const block = `FILE ${f.name} (first ${HEAD_LINES} lines of ${lines.length}):\n${head}`;
     if (used + block.length > FILES_CHARS) {

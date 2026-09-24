@@ -2,6 +2,7 @@ import { AutomationTemplate } from "@/contracts/automation";
 import type { EvaluateInput } from "@/contracts/eval";
 import { RunEvent, RunPurpose, type Run } from "@/contracts/run";
 import type { automations, files, runEvents, runs } from "@/db/schema";
+import { spreadsheetsIn } from "./from-events";
 
 // A run's database rows as the evaluator reads them. Pure and free of `@/db` (server-only), so Re-evaluate
 // (reevaluate.ts), the offline suite (suite-case.ts) and the script that records a run into it
@@ -21,6 +22,7 @@ export function toEvaluateInput(run: Run, events: RunEvent[], files: { name: str
     today: (run.finishedAt ?? run.createdAt).slice(0, 10),
     toolsUsed: [...new Set(toolNames)],
     followUp: Boolean(run.parentRunId), // as the live run was judged: its conversation holds what the parent read
+    spreadsheets: spreadsheetsIn(events),
   };
 }
 
