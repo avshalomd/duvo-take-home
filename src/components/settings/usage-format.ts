@@ -15,6 +15,17 @@ export function resetsIn(resetsAt: string, now: Date): string {
   return `in ${[hours ? plural(hours, "hour") : "", rest ? plural(rest, "minute") : ""].filter(Boolean).join(" ")}`;
 }
 
+/**
+ * "at 02:00 your time": when the day's usage starts over, on the reader's clock (UX QA U28). The instant is the same for
+ * every workspace (the next UTC midnight); only the words follow the reader. en-GB for the schedules' 24-hour clock.
+ * `timeZone` null is the server's render, which cannot know the reader's zone.
+ */
+export function startsOverAt(resetsAt: string, timeZone: string | null): string {
+  if (!timeZone) return "at midnight UTC";
+  const clock = new Date(resetsAt).toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" });
+  return `at ${clock} your time`;
+}
+
 /** How full a meter is. Full only when the limit is reached, so 199 of 200 never rounds up to a full bar. */
 export function meterFill(used: number, limit: number): { percent: number; tone: "ok" | "warn" | "full" } {
   if (limit <= 0 || used >= limit) return { percent: 100, tone: "full" };

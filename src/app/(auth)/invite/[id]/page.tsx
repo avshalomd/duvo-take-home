@@ -60,12 +60,13 @@ export default async function InvitePage({ params }: PageProps<"/invite/[id]">) 
         description={noNewAccount ? `${description} It is ${invitation.inviterName}'s own workspace, which a new account cannot join: sign in if you have an account, or ask to be invited to a shared workspace.` : description}
       >
         <div className="flex flex-col gap-3">
+          {/* no email in either link (UX QA U26): both pages read the invited address from the invitation itself */}
           {!noNewAccount && (
-            <Link href={withNext("/sign-up", here, invitation.email)} className={primary}>
+            <Link href={withNext("/sign-up", here)} className={primary}>
               Create an account
             </Link>
           )}
-          <Link href={withNext("/sign-in", here, invitation.email)} className={noNewAccount ? primary : secondary}>
+          <Link href={withNext("/sign-in", here)} className={noNewAccount ? primary : secondary}>
             I already have an account
           </Link>
         </div>

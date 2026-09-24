@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { WorkspaceLimits } from "@/contracts/usage";
 import { cn } from "@/lib/utils";
+import { DayStartsOver } from "./day-starts-over";
 import { FOCUS_ROW, InsetGroup, rowLine } from "./grouped";
 import { Stepper } from "./stepper";
 import { submitKeepingValues } from "./submit-keeping-values";
@@ -15,7 +16,8 @@ import { submitKeepingValues } from "./submit-keeping-values";
 // The workspace's limits and guard switches, as rows with a stepper or a switch at the end. Submitted without React's
 // form reset, so a refused value stays as typed next to its error; the form is keyed on the saved limits, so once a
 // save lands its fields start from the saved values. Members see it read-only (the action refuses them anyway).
-export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEdit: boolean }) {
+// `resetsAt`: the next start of the day (today's usage), said on the reader's clock in the footer (UX QA U28).
+export function LimitsForm({ limits, canEdit, resetsAt }: { limits: WorkspaceLimits; canEdit: boolean; resetsAt: string }) {
   const [state, action, pending] = useActionState(updateLimitsAction, {});
   const submitted = useRef(false);
   const form = useRef<HTMLFormElement>(null);
@@ -44,7 +46,14 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
       className="space-y-8"
     >
       <fieldset disabled={!canEdit} className="space-y-8">
-        <InsetGroup title="Each day" footer="When a limit is reached, new runs wait until the day starts over at midnight UTC.">
+        <InsetGroup
+          title="Each day"
+          footer={
+            <>
+              When a limit is reached, new runs wait until the day starts over <DayStartsOver resetsAt={resetsAt} />.
+            </>
+          }
+        >
           <StepperRow
             name="dailyBudgetUsd"
             label="Spend per day"
@@ -83,7 +92,7 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
           <SwitchRow
             disabled={!canEdit}
             name="strictConnections"
-            label="Block servers the plan did not name"
+            label="Block connections the plan did not name"
             detail="When off, the run only notes it. When on, the agent is stopped from using them."
             defaultChecked={limits.strictConnections}
           />

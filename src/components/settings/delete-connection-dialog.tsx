@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import type { Connection } from "@/contracts/connection";
 import { SHEET, SHEET_DESCRIPTION, SHEET_TITLE, SheetActions } from "./sheet";
 
-// Deleting cannot be undone and takes a saved token with it, so it asks first, naming the server.
+// Deleting cannot be undone and takes a saved token with it, so it asks first, naming the connection.
 export function DeleteConnectionDialog({
   connection,
   open,

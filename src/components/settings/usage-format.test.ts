@@ -1,6 +1,21 @@
 // Today's usage in words and meters, as the Limits page shows it.
 import { describe, expect, it } from "vitest";
-import { meterFill, resetsIn, usd } from "./usage-format";
+import { meterFill, resetsIn, startsOverAt, usd } from "./usage-format";
+
+// UX QA U28: the day starts over at the same instant everywhere (UTC midnight); it is said on the reader's clock
+describe("startsOverAt", () => {
+  const midnight = "2026-09-24T00:00:00.000Z";
+
+  it("says the reader's own time, on the 24-hour clock the schedules use", () => {
+    expect(startsOverAt(midnight, "Europe/Oslo")).toBe("at 02:00 your time"); // summer time, UTC+2
+    expect(startsOverAt(midnight, "Asia/Kolkata")).toBe("at 05:30 your time");
+    expect(startsOverAt(midnight, "America/New_York")).toBe("at 20:00 your time");
+  });
+
+  it("says midnight UTC before the reader's zone is known (the server's render)", () => {
+    expect(startsOverAt(midnight, null)).toBe("at midnight UTC");
+  });
+});
 
 describe("usd", () => {
   it("writes dollars with cents", () => {

@@ -1,5 +1,6 @@
 import type { Usage, WorkspaceLimits } from "@/contracts/usage";
 import { cn } from "@/lib/utils";
+import { DayStartsOver } from "./day-starts-over";
 import { InsetGroup } from "./grouped";
 import { meterFill, resetsIn, usd } from "./usage-format";
 
@@ -11,7 +12,16 @@ export function UsageCard({ usage, limits, now }: { usage: Usage; limits: Worksp
       ? "No runs are working now."
       : `${usage.inFlight} ${usage.inFlight === 1 ? "run is" : "runs are"} working now, of ${limits.maxInFlight} allowed at the same time.`;
   return (
-    <InsetGroup title="Today" data-testid="usage" footer={`${working} The day starts over at midnight UTC, ${resetsIn(usage.resetsAt, now)}.`}>
+    <InsetGroup
+      title="Today"
+      data-testid="usage"
+      // on the reader's clock, not UTC (UX QA U28)
+      footer={
+        <>
+          {working} The day starts over <DayStartsOver resetsAt={usage.resetsAt} />, {resetsIn(usage.resetsAt, now)}.
+        </>
+      }
+    >
       <li className="grid sm:grid-cols-2">
         <Meter label="Runs" used={usage.runsToday} limit={limits.dailyRunLimit} value={`${usage.runsToday}`} of={`of ${limits.dailyRunLimit}`} />
         <Meter

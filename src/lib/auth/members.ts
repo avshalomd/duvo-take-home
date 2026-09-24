@@ -7,6 +7,7 @@ import { invitation, member, organization, user } from "@/db/schema";
 import type { InviteMember, ListMembers, ListWorkspaces, Member, SessionCtx } from "@/contracts/auth";
 import { InviteInput } from "@/contracts/auth";
 import { auth } from "./auth";
+import { invitationIdFrom } from "./paths";
 import { ASKER_GONE, MEMBER_NOT_FOUND, MemberChangeError, removalRefusal, roleChangeRefusal } from "./member-rules";
 import { canChangeSettings } from "./roles";
 import { toRole } from "./session-ctx";
@@ -58,6 +59,16 @@ export async function getInvitation(id: string): Promise<InvitationView | null> 
   const open = row.status === "pending" && row.expiresAt > new Date(); // accepted, cancelled or past 48 hours: closed
   const personal = isPersonalWorkspace({ id: row.workspaceId, slug: row.slug });
   return { id: row.id, email: row.email, workspaceName: row.workspaceName, inviterName: row.inviterName, open, personal };
+}
+
+/**
+ * The open invitation a sign-in or sign-up page's `next` leads back to ("/invite/<id>"), or null. Those pages take the
+ * invited address from here, not from the query string (UX QA U26), so it stays out of the address bar and its history.
+ */
+export async function openInvitationFrom(next: string): Promise<InvitationView | null> {
+  const id = invitationIdFrom(next);
+  const invitation = id ? await getInvitation(id) : null;
+  return invitation?.open ? invitation : null;
 }
 
 /** The link an invited person opens. No mail provider is configured, so the inviter copies and sends it. */

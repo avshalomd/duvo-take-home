@@ -7,8 +7,8 @@ import { AuthPanel } from "@/components/auth/auth-panel";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import { signUpWords } from "@/components/auth/sign-up-words";
 import { INVITE_ONLY } from "@/lib/auth/errors";
-import { getInvitation } from "@/lib/auth/members";
-import { invitationIdFrom, safeNext, withNext } from "@/lib/auth/paths";
+import { openInvitationFrom } from "@/lib/auth/members";
+import { safeNext, withNext } from "@/lib/auth/paths";
 import { googleConfigured } from "@/lib/auth/providers";
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { signupMode } from "@/lib/auth/signup-mode";
@@ -16,7 +16,7 @@ import { signupMode } from "@/lib/auth/signup-mode";
 export const metadata: Metadata = { title: "Create an account" };
 
 export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">) {
-  const { next, email } = await searchParams;
+  const { next } = await searchParams; // no `email`: an invitation's address is read from the invitation (UX QA U26)
   const target = safeNext(typeof next === "string" ? next : undefined);
   if (await sessionFromHeaders(await headers())) redirect(target);
 
@@ -26,7 +26,7 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
     </Link>
   );
 
-  const invitation = await openInvitation(target);
+  const invitation = await openInvitationFrom(target);
   // Invite-only: the form is for someone who came from an open invitation's page. The server refuses everyone
   // else anyway (lib/auth/signup.ts); this only saves them a form that cannot work.
   if (signupMode() === "invite" && (!invitation || invitation.personal)) { // one to a personal workspace opens no account (S11)
@@ -38,14 +38,7 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
   const words = signUpWords(invitation); // from an invitation: the workspace they are joining, and who asked them
   return (
     <AuthPanel title={words.title} description={words.description} footer={<>Already have an account? {signInLink}</>}>
-      <SignUpForm next={target} google={googleConfigured()} email={typeof email === "string" ? email : undefined} />
+      <SignUpForm next={target} google={googleConfigured()} email={invitation?.email} invitationId={invitation?.id} />
     </AuthPanel>
   );
-}
-
-/** The open invitation `next` leads back to, if it is one. */
-async function openInvitation(next: string): Promise<{ workspaceName: string; inviterName: string; personal: boolean } | null> {
-  const id = invitationIdFrom(next);
-  const invitation = id ? await getInvitation(id) : null;
-  return invitation?.open ? invitation : null;
 }

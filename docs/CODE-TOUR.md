@@ -468,3 +468,26 @@ Per file: what it does and why it is built that way. Grows at every merge.
   in one sentence, "You marked it right; the automatic check did not pass it.", on the run page and the example card.
   The person's judgment sets the dot's colour, since it is the one approval counts; the note under the title then shows
   only what the person wrote, if anything, so the judgment is not said twice (U30).
+### The owner's calls on the account and words findings (2026-09-24: U26-U29, U32)
+
+- `src/lib/auth/members.ts` `openInvitationFrom`, `src/app/(auth)/sign-up/page.tsx`, `sign-in/page.tsx` - the invited
+  address is read from the invitation that `next` leads back to, on the server; the invitation page's links no longer
+  carry `email=`. Sign-in still takes `email` from "Sign in instead" (Q110), what the person typed.
+  `src/components/auth/sign-up-form.tsx` - from an invitation the new account joins at once through the same
+  `acceptInvitation` action as the Join button, which opens the workspace; refused (another address typed with open
+  sign-up, or the invitation closed meanwhile) it goes to the invitation page, which says why in words. Invite-only
+  mode and S11 are unchanged: the sign-up hook still needs the invitation's cookie (U26).
+- `src/lib/auth/password.ts` - the password rule said once (8 to 128), for Better Auth's config and the form. The form
+  asks it before sending (no `minLength`, no `required` on the password, so the browser never bubbles), and a short
+  password, or Better Auth's own PASSWORD_TOO_* (`errors.ts` `aboutPassword`), is said under the field by `AuthField`'s
+  `error`: an alert in place of the hint, the field `aria-invalid` and described by it, the cursor back in it (U27).
+- `src/components/settings/day-starts-over.tsx`, `usage-format.ts` `startsOverAt` - Limits says when the day starts over
+  on the reader's clock ("at 02:00 your time", en-GB 24-hour as the schedules): UTC on the server, the browser's zone
+  after hydration through `useSyncExternalStore`, so there is no mismatch. The instant stays the UTC midnight (U28).
+- Connections words - one word, "connection", on the group, Add a connection, the form, its toasts and field errors
+  (`contracts/connection.ts`), the sign-in sentences (`oauth-error.ts`), Members, the Limits switch and the composer
+  ("Connections on"). "Server" stays only in the add form's folded Advanced, where the transport is chosen (U29).
+- `src/app/(app)/automations/[id]/page.tsx`, `surfaces.ts` `SHEET_FROM_SM`/`SHEET_ON_PHONE` - below 640 px a draft's
+  column and sheet dissolve (`display: contents`) into the page's grid, which orders the header, Try it (examples and
+  the approval) and the document, each its own sheet; from sm up and for a Ready automation the markup draws as before
+  (U32).

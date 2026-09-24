@@ -64,8 +64,7 @@ test.beforeAll(async ({ browser }) => {
   await page.getByRole("link", { name: "Create an account" }).click();
   await page.getByLabel("Your name").fill("e2e Mia Member");
   await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("button", { name: /^Join / }).click();
+  await page.getByRole("button", { name: "Create account" }).click(); // joins at once (UX QA U26)
   await expect(page).toHaveURL((url) => url.pathname === "/");
   await page.close();
 });

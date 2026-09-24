@@ -47,6 +47,27 @@ test("signing up with an email that already has an account links to sign-in with
   await expect(page.getByLabel("Email")).toHaveValue(DEMO_EMAIL);
 });
 
+// UX QA U27: the browser's own bubble said it, unlike every other error in the app
+test("a short password is refused under its field in the app's words, with the cursor back in it", async ({ page }) => {
+  await page.goto("/sign-up");
+  await page.getByLabel("Your name").fill("Pat Short");
+  await page.getByLabel("Email").fill(e2eEmail("short-password"));
+  const password = page.getByLabel("Password", { exact: true });
+  await password.fill("short");
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  const error = page.getByRole("alert").and(page.locator("#password-error"));
+  await expect(error).toHaveText("Use at least 8 characters for the password.");
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAttribute("aria-invalid", "true");
+  await expect(password).toHaveAttribute("aria-describedby", "password-error");
+  expect(await password.evaluate((el: HTMLInputElement) => el.validationMessage)).toBe(""); // no browser bubble to show
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-up"); // nothing was sent, no account made
+
+  await password.fill(E2E_PASSWORD); // corrected: the error goes as soon as the field is changed
+  await expect(error).toHaveCount(0);
+});
+
 test("sign-in sets the example thread beside the form, and it draws itself through to done", async ({ page }) => {
   await page.goto("/sign-in");
   const thread = visibleThread(page);
@@ -197,6 +218,8 @@ test("an invitation link lets a new person create an account and join the worksp
     await expect(guestPage.getByText(`Olga Owner invited ${invitee}`)).toBeVisible();
 
     await guestPage.getByRole("link", { name: "Create an account" }).click();
+    // UX QA U26: the invited address no longer travels in the address bar; the page reads it from the invitation
+    await expect(guestPage).toHaveURL((url) => url.pathname === "/sign-up" && !url.searchParams.has("email"));
     // UX QA U4: it promised a workspace of their own, and no longer named the one they were joining
     await expect(guestPage.getByRole("heading", { level: 1 })).toHaveText("Create an account to join Olga's workspace");
     await expect(guestPage.getByText("Olga Owner invited you to work together in Olga's workspace.", { exact: false })).toBeVisible();
@@ -206,13 +229,62 @@ test("an invitation link lets a new person create an account and join the worksp
     await guestPage.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
     await guestPage.getByRole("button", { name: "Create account" }).click();
 
-    await expect(guestPage).toHaveURL((url) => url.pathname === `/invite/${invitationId}`);
-    await guestPage.getByRole("button", { name: "Join Olga's workspace" }).click();
+    // UX QA U26: they came from the link, so the new account joins at once: no second press of Join
     await expect(guestPage).toHaveURL((url) => url.pathname === "/");
     await expect(guestPage.getByTestId("app-header")).toContainText("Olga's workspace");
   } finally {
     await guest.close();
   }
+});
+
+// UX QA U26: the address comes from the invitation on the server, whatever the link's query says
+test("an invitation's sign-up fills in the invited address, not one written into the link", async ({ page }) => {
+  const owner = e2eEmail("q-owner");
+  const invitee = e2eEmail("q-invitee");
+  created.push(owner, invitee);
+  await signUpThroughUi(page, "Quinn Owner", owner);
+  const invitationId = await inviteByRow(owner, invitee);
+  await page.context().clearCookies();
+
+  await page.goto(`/sign-up?next=${encodeURIComponent(`/invite/${invitationId}`)}&email=${encodeURIComponent("e2e-someone-else@example.com")}`);
+  await expect(page.getByLabel("Email")).toHaveValue(invitee);
+});
+
+test("signing in from an invitation fills in the invited address without carrying it in the link", async ({ page }) => {
+  const owner = e2eEmail("s-owner");
+  const invitee = e2eEmail("s-invitee");
+  created.push(owner, invitee);
+  await signUpThroughUi(page, "Sara Owner", owner);
+  const invitationId = await inviteByRow(owner, invitee);
+  await page.context().clearCookies();
+
+  await page.goto(`/invite/${invitationId}`);
+  await page.getByRole("link", { name: "I already have an account" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-in" && !url.searchParams.has("email"));
+  await expect(page.getByLabel("Email")).toHaveValue(invitee);
+});
+
+// UX QA U26: with open sign-up another address can be typed; its account is made, and the invitation says in words
+// that it was for someone else rather than joining anyone
+test("an account made from an invitation with another address lands on the invitation, which says who it was for", async ({ page }) => {
+  const owner = e2eEmail("w-owner");
+  const invitee = e2eEmail("w-invitee");
+  const other = e2eEmail("w-other");
+  created.push(owner, invitee, other);
+  await signUpThroughUi(page, "Wanda Owner", owner);
+  const invitationId = await inviteByRow(owner, invitee);
+  await page.context().clearCookies();
+
+  await page.goto(`/invite/${invitationId}`);
+  await page.getByRole("link", { name: "Create an account" }).click();
+  await page.getByLabel("Your name").fill("Walt Other");
+  await page.getByLabel("Email").fill(other);
+  await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  await expect(page).toHaveURL((url) => url.pathname === `/invite/${invitationId}`);
+  await expect(page.getByText(`This invitation was sent to ${invitee}, and you are signed in as ${other}.`)).toBeVisible();
+  await expect(page.getByRole("button", { name: `Sign in as ${invitee}` })).toBeVisible();
 });
 
 // Security QA: a plain member could read pending invitations' ids from Better Auth's API, then sign up as the invited

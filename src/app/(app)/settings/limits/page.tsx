@@ -24,7 +24,7 @@ export default async function LimitsPage() {
       )}
       <UsageCard usage={usage} limits={limits} now={now} />
       {/* a budget is the workspace's money: members see it, owners and admins change it */}
-      <LimitsForm limits={limits} canEdit={canEdit} />
+      <LimitsForm limits={limits} canEdit={canEdit} resetsAt={usage.resetsAt} />
     </div>
   );
 }

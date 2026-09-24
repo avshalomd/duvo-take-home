@@ -20,8 +20,8 @@ export function MembersList({ members, viewer }: { members: Member[]; viewer: Pi
       data-testid="members"
       footer={
         canManage
-          ? `Everyone here sees the workspace's runs, automations and servers. Press someone's role to change it or to remove them.${viewer.role === "admin" ? " Only an owner can change an owner." : ""}`
-          : "Everyone here sees the workspace's runs, automations and servers. Only an owner or an admin can invite people, change roles or remove someone."
+          ? `Everyone here sees the workspace's runs, automations and connections. Press someone's role to change it or to remove them.${viewer.role === "admin" ? " Only an owner can change an owner." : ""}`
+          : "Everyone here sees the workspace's runs, automations and connections. Only an owner or an admin can invite people, change roles or remove someone."
       }
     >
       {members.length === 0 && <li className="px-4 py-4 text-slate">No one to show yet.</li>}

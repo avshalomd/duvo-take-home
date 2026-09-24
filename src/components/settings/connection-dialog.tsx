@@ -16,14 +16,14 @@ type AuthType = "none" | "bearer" | "oauth";
 
 const ADDRESS_NOTE = "address-secret-note";
 
-// The three ways a server can let the agent in, in the words of someone who is not a developer.
+// The three ways a connection can let the agent in, in the words of someone who is not a developer.
 const SIGN_IN: { value: AuthType; label: string; hint: string }[] = [
-  { value: "none", label: "No sign-in", hint: "The server is open to anyone, like DeepWiki." },
+  { value: "none", label: "No sign-in", hint: "Open to anyone, like DeepWiki." },
   { value: "bearer", label: "With a token", hint: "You paste a key the service gave you." },
-  { value: "oauth", label: "Sign in with the service", hint: "After saving, press Sign in on the server's row." },
+  { value: "oauth", label: "Sign in with the service", hint: "After saving, press Sign in on its row." },
 ];
 
-/** Add a server, or edit one (`connection` given). One form for both, so the two can never ask different questions. */
+/** Add a connection, or edit one (`connection` given). One form for both, so the two can never ask different questions. */
 export function ConnectionDialog({
   open,
   onOpenChange,
@@ -37,8 +37,8 @@ export function ConnectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={SHEET} showCloseButton={false}>
         <div className="space-y-1 px-6 pt-6 pb-5">
-          <DialogTitle className={SHEET_TITLE}>{connection ? `Edit ${connection.name}` : "Add a server"}</DialogTitle>
-          <DialogDescription className={SHEET_DESCRIPTION}>A server gives the agent tools, such as reading a wiki or a code repository.</DialogDescription>
+          <DialogTitle className={SHEET_TITLE}>{connection ? `Edit ${connection.name}` : "Add a connection"}</DialogTitle>
+          <DialogDescription className={SHEET_DESCRIPTION}>A connection gives the agent tools, such as reading a wiki or a code repository.</DialogDescription>
         </div>
         {/* inside the content, so each opening mounts a fresh form: nothing typed last time lingers */}
         <ConnectionForm connection={connection} onDone={() => onOpenChange(false)} />
@@ -60,9 +60,9 @@ function ConnectionForm({ connection: current, onDone }: { connection?: Connecti
   const movedNote = !moved
     ? null
     : authType === "bearer" && connection?.hasToken
-      ? "This is a different server, so the saved token will not be sent to it. Paste a token for the new server."
+      ? "This address belongs to another service, so the saved token will not be sent to it. Paste a token for the new one."
       : authType === "oauth" && connection?.signedIn
-        ? "This is a different server, so the sign-in does not carry over. Sign in to the new server after saving."
+        ? "This address belongs to another service, so the sign-in does not carry over. Sign in to the new one after saving."
         : null;
   const submitted = useRef(false);
   const form = useRef<HTMLFormElement>(null);
@@ -79,7 +79,7 @@ function ConnectionForm({ connection: current, onDone }: { connection?: Connecti
     submitted.current = false;
     if (state.error) toast.error(state.error);
     else if (!state.fieldErrors) {
-      toast.success(connection ? "Changes saved" : authType === "oauth" ? "Server added. Press Sign in on its row to connect your account." : "Server added and switched on for the next run");
+      toast.success(connection ? "Changes saved" : authType === "oauth" ? "Connection added. Press Sign in on its row to connect your account." : "Connection added and switched on for the next run");
       onDone();
     }
   }, [state, pending, connection, authType, onDone]);
