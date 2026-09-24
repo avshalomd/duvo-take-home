@@ -354,3 +354,10 @@ the new CSP broke nothing (no console errors, pages hydrate), cron answers a pla
 
 Deployed after the recommendations round: check 2109, integration 255, e2e 150 plus invite-only 8. The e2e clean-ups now
 delete the model spend metered against their runs (a paid draft had pushed the demo workspace's day over its budget).
+
+### Round: page-to-page speed (2026-09-24, "the app feels very slow ... moving from page to page")
+
+| id | source | observed | expected | severity | owner | status |
+|---|---|---|---|---|---|---|
+| Q269 | him | page changes feel slow: Home and Settings showed nothing until the server answered, Settings cost two requests (a redirect), every request began with three queries in a row, a run page and an automation page read one thing after another | a click changes the screen at once; fewer round trips | major | fix-perf | fixed (loading shapes and pending marks, the session with its user in one query, a run in one request, parallel reads; local production build: round trips 4-8 down to 3 per page; e2e 150) |
+| Q270 | fix-perf | cold starts on Vercel (~1 s for a page's first visit; each page route is its own function), Fluid compute already on | measured on the live app | minor | main | open: link prefetch now warms a page's function before the click; a signed-in production measurement needs his own browser |
