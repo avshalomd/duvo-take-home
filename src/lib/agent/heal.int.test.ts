@@ -152,6 +152,22 @@ describe.skipIf(!process.env.DATABASE_URL)("auto-heal", () => {
     expect(costs[1].attempt_cost_usd).toBeCloseTo(0.02, 10);
   }, 30_000);
 
+  // qa-ai F13: the "[e2e]" tag QA puts on its runs steered the agent ("e2e" -> end-to-end testing tools)
+  it("sends the agent and the evaluator the instructions without a leading [e2e] tag, and keeps the tag on the run", async () => {
+    vi.mocked(evaluateRun).mockResolvedValueOnce(PASS);
+    const [row] = await db
+      .insert(runs)
+      .values({ prompt: "[e2e] Make me a list of the best ones.", status: "queued", model: "test", workspaceId: WS })
+      .returning({ id: runs.id });
+
+    await runAutomation(row.id);
+
+    expect(calls[0].prompt).toBe("Make me a list of the best ones.");
+    expect(vi.mocked(evaluateRun).mock.calls[0][0].prompt).toBe("Make me a list of the best ones.");
+    const [run] = await db.select().from(runs).where(eq(runs.id, row.id));
+    expect(run.prompt).toBe("[e2e] Make me a list of the best ones."); // QA's clean-up still finds it
+  }, 30_000);
+
   // qa-ai F14: the plan is kept, and the fix attempt's own step carries what it changed, under its attempt
   it("keeps the plan through a fix and records the fix attempt's own step, titled by what it changed", async () => {
     vi.mocked(evaluateRun).mockResolvedValueOnce(FAIL).mockResolvedValueOnce(PASS);
