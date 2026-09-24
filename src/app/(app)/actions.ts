@@ -120,6 +120,8 @@ export async function reevaluateAction(_prev: FormState, formData: FormData): Pr
   const { workspaceId } = await requireSession();
   const data = await getRun(workspaceId, runId.data); // the workspace check: another workspace's run reads as missing
   if (!data) return { error: "That run no longer exists" };
+  // a stopped run has ended, but with nothing the judge could check (F19)
+  if (data.run.status === "cancelled") return { error: "A stopped run has no result to check." };
   // judging a run that is still working would evaluate half a result and overwrite it a minute later
   if (data.run.status !== "succeeded" && data.run.status !== "failed")
     return { error: "Only a run that has finished can be checked again" };
