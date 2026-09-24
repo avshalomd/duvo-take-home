@@ -75,6 +75,7 @@ export function Stepper({
           style={{ width: `${Math.min(Math.max(value.length, 1), 7) + 0.25}ch` }}
           className={cn(
             "[appearance:textfield] bg-transparent py-1 text-center font-medium tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+            "disabled:cursor-not-allowed disabled:text-slate", // in a disabled fieldset (a member's Limits): read, not typed into
             saysZero && "opacity-0", // still there, still posted and focusable: only the word is drawn over it
           )}
         />
