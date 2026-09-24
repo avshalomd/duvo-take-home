@@ -27,7 +27,7 @@ export type Connection = z.infer<typeof Connection>;
 export { isPrivateHost }; // the rule, re-exported beside the schema that uses it
 export const PRIVATE_ADDRESS = "That address points at a private or local network, which a connection cannot reach";
 export const publicHttpUrl = z
-  .url("Give the server's full address, starting with https://")
+  .url("Give the connection's full address, starting with https://")
   .max(2000, "Keep the address under 2000 characters") // longer is no server's address, only a way to fill the table (F21)
   .refine((u) => /^https?:\/\//i.test(u), "Only http:// or https:// addresses can be connected")
   .refine((u) => { try { return !isPrivateHost(new URL(u).hostname); } catch { return false; } }, PRIVATE_ADDRESS);
@@ -38,7 +38,7 @@ export const NewConnection = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Give the server a name")
+    .min(1, "Give the connection a name")
     .max(40, "Keep the name under 40 characters")
     .regex(/^[A-Za-z0-9 _-]+$/, "Use letters, digits, spaces, - and _ only") // becomes the mcp__<key>__ prefix
     // "plan" and "outputs" are our own tool servers' keys: a connection with that key would replace them

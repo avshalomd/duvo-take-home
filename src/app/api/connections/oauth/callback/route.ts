@@ -30,7 +30,7 @@ async function land(req: NextRequest): Promise<NextResponse> {
 
   try {
     const { workspaceId, connectionId } = await completeOAuth({ code, state, redirectUri: callbackUri(req) });
-    const name = (await listConnections(workspaceId)).find((c) => c.id === connectionId)?.name ?? "the server";
+    const name = (await listConnections(workspaceId)).find((c) => c.id === connectionId)?.name ?? "the connection"; // shown in the toast: the one word for it (UX QA U29)
     return backToSettings(req, { signed_in: name });
   } catch (e) {
     if (e instanceof SignInError) {

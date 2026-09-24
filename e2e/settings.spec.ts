@@ -199,9 +199,9 @@ test("moving a connection to another server warns that the saved token stays beh
   await row.getByRole("button", { name: "Edit" }).click();
   const edit = page.getByRole("dialog");
   await edit.getByLabel("Address").fill("https://example.com/v2/mcp");
-  await expect(edit.getByText(/different address/)).toHaveCount(0); // the same server: nothing to warn about
+  await expect(edit.getByText(/another service/)).toHaveCount(0); // the same service: nothing to warn about
   await edit.getByLabel("Address").fill("https://attacker.example/mcp");
-  await expect(edit.getByText("This is a different address, so the saved token will not be sent to it. Paste a token for the new address.")).toBeVisible();
+  await expect(edit.getByText("This address belongs to another service, so the saved token will not be sent to it. Paste a token for the new one.")).toBeVisible();
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toBeHidden();
   await expect(row).toContainText("Needs a token before a run can use it"); // the status is the row's line while it needs something

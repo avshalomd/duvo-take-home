@@ -385,7 +385,8 @@ function ConnectionChips({ names }: { names: string[] }) {
         </Link>
       ) : (
         <>
-          <span>Using</span>
+          {/* the word Settings uses, as "No connections on" does (UX QA U29) */}
+          <span>Connections on</span>
           {/* one chip per connection: as plain words, two names ran together into one (Q147) */}
           {names.map((n) => (
             <Link

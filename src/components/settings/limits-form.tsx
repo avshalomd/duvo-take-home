@@ -92,7 +92,7 @@ export function LimitsForm({ limits, canEdit, resetsAt }: { limits: WorkspaceLim
           <SwitchRow
             disabled={!canEdit}
             name="strictConnections"
-            label="Block servers the plan did not name"
+            label="Block connections the plan did not name"
             detail="When off, the run only notes it. When on, the agent is stopped from using them."
             defaultChecked={limits.strictConnections}
           />

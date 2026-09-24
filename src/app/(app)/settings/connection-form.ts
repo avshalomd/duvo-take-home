@@ -30,7 +30,7 @@ export function parseConnectionForm(form: FormData, mode: "add" | "edit"): Conne
 
   const fieldErrors: Record<string, string[] | undefined> = parsed.success ? {} : z.flattenError(parsed.error).fieldErrors;
   // editing may leave the field empty to keep the saved token; adding has nothing saved to keep
-  if (mode === "add" && authType === "bearer" && !token) fieldErrors.token = ["Paste the token, or choose \"No sign-in\" if the server needs none."];
+  if (mode === "add" && authType === "bearer" && !token) fieldErrors.token = ["Paste the token, or choose \"No sign-in\" if the service needs none."];
 
   if (!parsed.success || fieldErrors.token) return { ok: false, fieldErrors, values };
   return { ok: true, input: parsed.data };
