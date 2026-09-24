@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Plan } from "@/contracts/run";
-import { threadSteps } from "./thread-steps";
+import { showsStepDoubts, threadSteps } from "./thread-steps";
 
 const plan = (statuses: Plan["steps"][number]["status"][], notes: (string | undefined)[] = []): Plan => ({
   intent: "",
@@ -30,6 +30,14 @@ describe("threadSteps - the plan as the thread draws it", () => {
     expect(steps[0].flag).toBe("This step may not have done what it says.");
     expect(steps[0].note).toBe("Selected 5 rounds");
     expect(steps[1].flag).toBeUndefined();
+  });
+
+  // qa-ux U22 (the owner's call): on a run that passed, a doubt about one step only worried the person; it is in
+  // Details there, with the checker's reason, and on the glance view only when the run did not pass.
+  it("leaves a doubted step unflagged when told the run passed", () => {
+    const doubted = [{ stepIndex: 0, onTrack: 0.3, note: "May not have done what it says: nothing shows the work being done." }];
+    expect(threadSteps(plan(["done"]), "succeeded", doubted, [], false)[0].flag).toBeUndefined();
+    expect(threadSteps(plan(["done"]), "succeeded", doubted, [], true)[0].flag).toBe("This step may not have done what it says.");
   });
 
   it("marks where a stopped or broken run stopped, instead of a step that is still being worked on", () => {
@@ -108,5 +116,23 @@ describe("threadSteps - fixing what the check found", () => {
       status: "skipped",
       note: "Stopped trying: the first fix did not get the result any closer to passing",
     });
+  });
+});
+
+// qa-ux U22 (the owner's call): step doubts on the glance view only when the run did not pass
+describe("showsStepDoubts", () => {
+  it("keeps doubts off the glance view of a run that passed, or ended in a neutral outcome", () => {
+    for (const headline of ["pass", "pass_with_notes", "cannot_do", "needs_answer"]) expect(showsStepDoubts("succeeded", headline), headline).toBe(false);
+  });
+
+  it("shows them on a run that did not pass, was not checked, failed or was stopped", () => {
+    expect(showsStepDoubts("succeeded", "fail")).toBe(true);
+    expect(showsStepDoubts("succeeded", "unknown")).toBe(true);
+    expect(showsStepDoubts("failed", null)).toBe(true);
+    expect(showsStepDoubts("cancelled", null)).toBe(true);
+  });
+
+  it("holds them back while the run works: it has not passed or failed yet", () => {
+    for (const status of ["queued", "running", "evaluating"]) expect(showsStepDoubts(status, null), status).toBe(false);
   });
 });
