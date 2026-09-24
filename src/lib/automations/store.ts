@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, gte, like, lt, ne, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { automations, runs } from "@/db/schema";
+import { isUniqueViolation } from "@/db/unique-violation";
 import {
   AutomationStatus,
   AutomationTemplate,
@@ -168,13 +169,14 @@ export const createAutomationDraft: CreateAutomationDraft = async (ctx, draft, f
 export const updateAutomation = (async (workspaceId: string, id: string, edit: AutomationEdit, { mayRenameApproved = false } = {}) => {
   const current = await mustGet(workspaceId, id);
   const renames = edit.command !== current.command;
-  if (renames) {
+  const refuseClash = async () => {
     const [clash] = await db
       .select({ name: automations.name })
       .from(automations)
       .where(and(eq(automations.workspaceId, workspaceId), eq(automations.command, edit.command), ne(automations.id, id)));
     if (clash) throw new AutomationError(`/${edit.command} is already used by "${clash.name}". Pick another command.`);
-  }
+  };
+  if (renames) await refuseClash();
   const neverApproved = and(
     eq(automations.status, "draft"),
     // hasBeenApproved in SQL: no example of an earlier version marked looks right, which an approval would have needed
@@ -201,7 +203,13 @@ export const updateAutomation = (async (workspaceId: string, id: string, edit: A
     })
     // read as the row is before this write: an edit that sends it back to draft in the same save does not open the rename
     .where(and(inWorkspace(workspaceId, id), renames && !mayRenameApproved ? neverApproved : undefined))
-    .returning();
+    .returning()
+    .catch(async (e) => {
+      // another rename to this command landed after the check above (F7): the index decides, the words stay ours
+      if (!isUniqueViolation(e, "automations_ws_command")) throw e;
+      await refuseClash();
+      throw new AutomationError(`/${edit.command} was just taken. Pick another command.`); // the winner was deleted since
+    });
   if (!row) {
     await mustGet(workspaceId, id); // deleted meanwhile: say that, not the rename rule
     throw new AutomationError(APPROVED_COMMAND_LOCKED);

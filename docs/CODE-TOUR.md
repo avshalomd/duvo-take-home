@@ -217,6 +217,10 @@ Per file: what it does and why it is built that way. Grows at every merge.
   inline script. It is left off `/api/runs/<id>/files/*` by a negative lookahead in its `source`: a config header
   replaces a route's header of the same name, which had stripped the inline chart's sandbox policy (F8);
   `e2e/headers.spec.ts` checks both on real responses.
+- `src/db/unique-violation.ts` - a check before a write cannot see a write racing it, so the unique index decides and
+  the store answers its refusal (Postgres 23505, looked for through Drizzle's wrapped cause) in its own words: a
+  connection's name key per workspace (`connections_ws_key`, an expression index on the key `connectionKey` makes,
+  F6) and an automation's command (`automations_ws_command`, F7).
 - `src/contracts/text.ts` `noNul` - one Zod rule for a NUL character, which Postgres refuses in text and which had
   surfaced as an empty 500 (F1); the run, follow-up, automation, judgment, connection and workspace schemas use it,
   and Better Auth's names are checked in its hooks (`src/lib/auth/names.ts`).
