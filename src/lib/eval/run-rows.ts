@@ -51,12 +51,23 @@ export function toEvents(rows: (typeof runEvents.$inferSelect)[]): RunEvent[] {
     .flatMap((r) => (r.success ? [r.data] : [])); // a row written by an older shape is skipped, not a 500
 }
 
+/** What the evaluator reads in place of a file the output scan held back for a credential. */
+export const HELD_BACK = "(held back: contains a credential)";
+
+/**
+ * One stored file as the evaluator gets it. A held-back file goes as the placeholder (security review S8): the judges
+ * are third-party services, and a credential the download keeps back must not reach them either.
+ */
+export function forEvaluator(file: { name: string; content: string; quarantined: boolean }): { name: string; content: string } {
+  return { name: file.name, content: file.quarantined ? HELD_BACK : file.content };
+}
+
 /**
  * Every file as stored, a spreadsheet as its base64: the checks read its zip signature from it (Q124), and the judge
  * and the reviewer are shown only its size (file-view.ts), so the models never see the base64.
  */
 export function toFiles(rows: (typeof files.$inferSelect)[]): { name: string; content: string }[] {
-  return rows.map((f) => ({ name: f.name, content: f.content }));
+  return rows.map(forEvaluator);
 }
 
 /**
