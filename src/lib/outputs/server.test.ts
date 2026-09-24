@@ -34,6 +34,6 @@ describe("createOutputsServer", () => {
     const { tools } = await (await connect("/tmp/runs/abc")).listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(["make_chart", "make_spreadsheet"]);
     const chart = tools.find((t) => t.name === "make_chart")!;
-    expect(Object.keys(chart.inputSchema.properties ?? {}).sort()).toEqual(["data", "file", "kind", "series", "title", "x", "y"]);
+    expect(Object.keys(chart.inputSchema.properties ?? {}).sort()).toEqual(["data", "file", "kind", "labels", "series", "title", "x", "y", "y_title"]);
   });
 });
