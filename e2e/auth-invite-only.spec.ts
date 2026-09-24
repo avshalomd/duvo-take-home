@@ -52,20 +52,20 @@ test("the API refuses an invited email's sign-up that did not come from the invi
   expect(signIn.status()).toBe(401); // no account was made
 });
 
-test("an invitation's link still leads to a sign-up form, and the new account joins the workspace", async ({ page }) => {
+test("an invitation's link still leads to a sign-up form, and the new account joins the workspace at once", async ({ page }) => {
   const invitee = e2eEmail("io-invitee");
   created.push(invitee);
   const invitationId = await inviteByRow(DEMO_EMAIL, invitee); // the demo user invites: nobody else can sign up here
 
   await page.goto(`/invite/${invitationId}`);
   await page.getByRole("link", { name: "Create an account" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/sign-up" && !url.searchParams.has("email")); // U26: not in the link
   await expect(page.getByLabel("Email")).toHaveValue(invitee);
   await page.getByLabel("Your name").fill("Iris Invitee");
   await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
 
-  await expect(page).toHaveURL((url) => url.pathname === `/invite/${invitationId}`);
-  await page.getByRole("button", { name: "Join Demo workspace" }).click();
+  // UX QA U26: no second press of Join; the account joins and opens the workspace
   await expect(page).toHaveURL((url) => url.pathname === "/");
   await expect(page.getByTestId("app-header")).toContainText("Demo workspace");
 });

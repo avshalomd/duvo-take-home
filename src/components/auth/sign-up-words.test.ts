@@ -9,11 +9,12 @@ describe("signUpWords - what the sign-up page says", () => {
     });
   });
 
-  // UX QA U4: reached from an invitation, the page promised a private workspace and never named the one they were joining
-  it("names the workspace and who invited them, to someone who came from an invitation", () => {
+  // UX QA U4: reached from an invitation, the page promised a private workspace and never named the one they were joining.
+  // U26: the account joins straight after sign-up, so the words promise that, not a second step
+  it("names the workspace and who invited them, and says the account joins it at once", () => {
     expect(signUpWords({ workspaceName: "Demo workspace", inviterName: "Olga Owner" })).toEqual({
       title: "Create an account to join Demo workspace",
-      description: "Olga Owner invited you to work together in Demo workspace. Create your account, then join.",
+      description: "Olga Owner invited you to work together in Demo workspace. Your account joins it as soon as it is made.",
     });
   });
 });
