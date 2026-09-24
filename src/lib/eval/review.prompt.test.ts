@@ -50,6 +50,17 @@ describe("reviewInput", () => {
     expect(text).not.toContain(input.files[0].content);
   });
 
+  // qa-ai F1: the reviewer read a spreadsheet as its size, and a chart as the first 500 characters of one SVG line.
+  it("shows the reviewer a spreadsheet's sheets and rows, and a chart's values", () => {
+    const spreadsheets = [{ file: "data.xlsx", sheets: [{ name: "Prices", columns: ["app", "eur"], rows: [["Teams", 5.6]] }] }];
+    const chart = `<svg xmlns="http://www.w3.org/2000/svg">${"<g>".repeat(50)}<path aria-label="quarter: Q2; Sales: 9550" role="graphics-symbol" aria-roledescription="bar" d="M0Z"/>${"</g>".repeat(50)}</svg>`;
+    const withBoth = { ...input, files: [...input.files, { name: "sales.svg", content: chart }], spreadsheets };
+    const text = reviewInput(withBoth, runChecks(withBoth));
+    expect(text).toContain('Sheet "Prices"');
+    expect(text).toContain("Teams,5.6");
+    expect(text).toContain("quarter: Q2; Sales: 9550");
+  });
+
   it("shows a text file's own lines", () => {
     expect(reviewInput(input, runChecks(input))).toContain("Prices are list prices.");
   });

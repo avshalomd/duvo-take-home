@@ -114,6 +114,25 @@ describe("judgeRun", () => {
     expect(files[0].head).toBe("(a spreadsheet file, 29 bytes)");
   });
 
+  // qa-ai F1: the SVG is one long line, and the judge read its first 300 characters: the <svg> tag and nothing drawn.
+  it("shows the judge what a chart holds: its title and each value, even on a chart written as one long line", async () => {
+    const bars = Array.from({ length: 4 }, (_, i) => `<path aria-label="quarter: Q${i + 1}; Sales: ${i === 1 ? 9550 : 100000 + i}" role="graphics-symbol" aria-roledescription="bar" d="M0,0h1v1Z"/>`);
+    const chart = `<svg xmlns="http://www.w3.org/2000/svg" width="724" height="463">${"<g>".repeat(20)}${bars.join("")}${"</g>".repeat(20)}<g role="graphics-symbol" aria-roledescription="title" aria-label="Title text 'Sales 2025'"><text>Sales 2025</text></g></svg>`;
+    await judgeRun({ ...input, files: [{ name: "sales.svg", content: chart }] });
+    const files = sent().state.files as { name: string; head: string }[];
+    expect(files[0].head).toContain("quarter: Q2; Sales: 9550");
+    expect(files[0].head).toContain("Sales 2025");
+  });
+
+  it("shows the judge a spreadsheet's sheets, headers and first rows, from what the spreadsheet tool was given", async () => {
+    const workbook = Buffer.from("PK\x03\x04 the rest of the workbook", "binary").toString("base64");
+    const spreadsheets = [{ file: "data.xlsx", sheets: [{ name: "Prices", columns: ["app", "eur"], rows: [["Teams", 5.6]] }] }];
+    await judgeRun({ ...input, files: [{ name: "data.xlsx", content: workbook }], spreadsheets });
+    const files = sent().state.files as { name: string; head: string }[];
+    expect(files[0].head).toContain('Sheet "Prices"');
+    expect(files[0].head).toContain("Teams,5.6");
+  });
+
   it("returns the three probabilities as the judgment", async () => {
     expect(await judgeRun(input)).toEqual({ answeredQuery: 0.9, followedPlan: 0.8, stayedInBounds: 0.95 });
   });
