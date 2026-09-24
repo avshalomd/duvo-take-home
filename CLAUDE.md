@@ -31,7 +31,7 @@ and why it is built that way; `docs/QA.md` is the log of every finding and its f
 | end to end | `npx playwright test` against :3000; invite-only sign-up needs a server with `SIGNUP_MODE=invite` (see the header of `e2e/auth-invite-only.spec.ts`) |
 | schema to the local database | `npm run db:push` |
 | SQL, local / production | `npm run sql -- "<statement>"` / `node .claude/scripts/handover-db.mjs npm run sql -- "<statement>"` |
-| deploy | push to `main` (Vercel deploys production; previews are off); `.claude/scripts/deploy.sh` deploys the committed HEAD without a push and runs the smoke |
+| deploy | `.claude/scripts/deploy.sh`: deploys the committed HEAD to production with the Vercel CLI and runs the read-only smoke. Deploys are manual: the Vercel project is not connected to GitHub, and `vercel.json` turns Git deploys off |
 | production settings | `node .claude/scripts/handover-env.mjs NAME=value`; a secret: he runs `.claude/scripts/set-secret.sh NAME` in his own terminal |
 
 ## Environments
@@ -88,7 +88,7 @@ and why it is built that way; `docs/QA.md` is the log of every finding and its f
 
 ## Git and secrets
 
-- Small commits with conventional messages. `main` is production: a push to it deploys. Stage named paths.
+- Small commits with conventional messages, pushed to `main` (a push does not deploy). Stage named paths.
   `.claude/worktrees/` and `.claude/run/` are ignored.
 - Never commit or print a secret: no `cat` of env files, no echo of keys; check a variable by name only
   (`grep -c '^NAME=' .env.local`). `.claude/hooks/guard-secrets.sh` blocks the common slips.

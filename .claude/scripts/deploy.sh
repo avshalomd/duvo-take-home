@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# A manual production deploy of Handover, with the read-only smoke that follows every deploy. The usual path is a push
-# to main: the Vercel project "handover" is connected to this GitHub repo and deploys main to production on its own
-# (previews are off). This script is for deploying without a push, e.g. to redeploy the same commit.
+# The production deploy of Handover, with the read-only smoke that follows every deploy. Deploys are manual: the Vercel
+# project "handover" is not connected to GitHub and vercel.json turns Git deploys off, so nothing ships on a push.
 #
 # Vercel builds it (a local build cannot be uploaded: the Hobby plan caps one uploaded file at 100 MB, and the agent's
 # Linux binary is ~240 MB). Runs execute in /api/runner/<id>, the only function that carries that binary
