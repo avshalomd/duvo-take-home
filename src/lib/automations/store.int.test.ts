@@ -3,7 +3,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { automations, runs } from "@/db/schema";
+import { automations, runs, workspaceSettings } from "@/db/schema";
 import type { AutomationDraft, AutomationEdit } from "@/contracts/automation";
 import { AutomationError } from "./errors";
 import {
@@ -67,6 +67,7 @@ async function approvedTrial(automationId: string, version: number): Promise<str
 afterAll(async () => {
   await db.delete(runs).where(inArray(runs.workspaceId, [WS, OTHER_WS]));
   await db.delete(automations).where(inArray(automations.workspaceId, [WS, OTHER_WS]));
+  await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OTHER_WS])); // runCommand's budget check makes the row (QA F22)
 });
 
 describe.skipIf(!process.env.DATABASE_URL)("automations store", () => {

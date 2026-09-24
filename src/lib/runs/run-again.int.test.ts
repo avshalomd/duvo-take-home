@@ -3,7 +3,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { jobs, runs } from "@/db/schema";
+import { jobs, runs, workspaceSettings } from "@/db/schema";
 import { followUpInstructions } from "@/lib/agent/follow-up-prompt";
 import { startRunAgain } from "./run-again";
 
@@ -26,6 +26,7 @@ afterAll(async () => {
   vi.unstubAllEnvs();
   await db.delete(jobs).where(inArray(jobs.runId, db.select({ id: runs.id }).from(runs).where(inArray(runs.workspaceId, [WS, OTHER_WS]))));
   await db.delete(runs).where(inArray(runs.workspaceId, [WS, OTHER_WS]));
+  await db.delete(workspaceSettings).where(inArray(workspaceSettings.workspaceId, [WS, OTHER_WS])); // a start's budget check makes the row (QA F22)
 });
 
 describe.skipIf(!process.env.DATABASE_URL)("startRunAgain", () => {
