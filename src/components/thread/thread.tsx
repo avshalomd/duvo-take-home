@@ -40,12 +40,15 @@ export function Thread({
   size = "full",
   className,
   label = "Plan",
+  planOnly = false,
 }: {
   steps: ThreadStep[];
   tone: ThreadTone;
   size?: "full" | "mini";
   className?: string;
   label?: string;
+  // the steps of a plan nobody has run (the gallery): a screen reader hears the steps, with no state for each (UX QA U13)
+  planOnly?: boolean;
 }) {
   const list = useRef<HTMLOListElement>(null);
   // The steps already done when the thread first appeared: they are drawn done, with no pop. Only a step that
@@ -142,6 +145,7 @@ export function Thread({
                     size={nodeSize}
                     mini={mini}
                     pop={!doneAtFirstPaint.has(step.key)}
+                    said={!planOnly}
                   />
                 </span>
               </span>
@@ -183,12 +187,14 @@ function Node({
   size,
   mini,
   pop,
+  said,
 }: {
   status: ThreadStep["status"];
   tone: (typeof TONE)[ThreadTone];
   size: string;
   mini: boolean;
   pop: boolean; // the step finished while the person was watching
+  said: boolean; // the state is read out after the node
 }) {
   if (status === "running") {
     return (
@@ -201,7 +207,7 @@ function Node({
         {/* the bead breathes slowly (opacity and scale, not a spin): work is happening here, calmly. CSS, so
             reduced motion simply switches it off, with nothing for the server and the browser to disagree on */}
         <span className="absolute inset-1 animate-[thread-breathe_1.6s_ease-in-out_infinite] rounded-full bg-saffron motion-reduce:animate-none" />
-        <span className="sr-only">In progress</span>
+        {said && <span className="sr-only">In progress</span>}
       </span>
     );
   }
@@ -215,7 +221,7 @@ function Node({
         className={cn("flex items-center justify-center rounded-full border-2", tone.node, size)}
       >
         {!mini && <Check aria-hidden strokeWidth={3.5} className="size-3" />}
-        <span className="sr-only">Done</span>
+        {said && <span className="sr-only">Done</span>}
       </motion.span>
     );
   }
@@ -228,13 +234,13 @@ function Node({
         )}
       >
         {!mini && <Minus aria-hidden strokeWidth={3} className="size-3" />}
-        <span className="sr-only">Skipped</span>
+        {said && <span className="sr-only">Skipped</span>}
       </span>
     );
   }
   return (
     <span className={cn("rounded-full border-2 border-hairline bg-paper", size)}>
-      <span className="sr-only">Not started</span>
+      {said && <span className="sr-only">Not started</span>}
     </span>
   );
 }
