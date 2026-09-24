@@ -1,4 +1,4 @@
-import { asc, desc, eq, and, gt, getTableColumns, sql } from "drizzle-orm";
+import { asc, desc, eq, and, gt, getTableColumns, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
 import { RunEvent, type GetFile, type GetRun, type ListRuns, type Run, type RunStatus } from "@/contracts/run";
@@ -63,15 +63,21 @@ export const listRuns: ListRuns = async (workspaceId) => {
 
 export const getRun: GetRun = async (workspaceId, id) => {
   if (!isUuid(id)) return null; // a non-uuid id would make Postgres throw, not return nothing
-  const [row] = await db.select().from(runs).where(and(eq(runs.id, id), eq(runs.workspaceId, workspaceId)));
+  // One request, not three one after another (every run opened waited for each): db.batch sends the reads together.
+  // The events and the files are read only through a run of this workspace, so another workspace's come back empty.
+  const own = and(eq(runs.id, id), eq(runs.workspaceId, workspaceId));
+  const ownRun = db.select({ id: runs.id }).from(runs).where(own);
+  const [[row], eventRows, fileRows] = await db.batch([
+    db.select().from(runs).where(own),
+    db.select().from(runEvents).where(and(eq(runEvents.runId, id), inArray(runEvents.runId, ownRun))).orderBy(asc(runEvents.seq)),
+    // metadata only: a file's content (a spreadsheet's base64 included) is read by getFile when it is opened
+    db
+      .select({ name: files.name, mime: files.mime, bytes: files.bytes, encoding: files.encoding, flags: files.flags, quarantined: files.quarantined })
+      .from(files)
+      .where(and(eq(files.runId, id), inArray(files.runId, ownRun)))
+      .orderBy(asc(files.name)),
+  ]);
   if (!row) return null;
-  const eventRows = await db.select().from(runEvents).where(eq(runEvents.runId, id)).orderBy(asc(runEvents.seq));
-  // metadata only: a file's content (a spreadsheet's base64 included) is read by getFile when it is opened
-  const fileRows = await db
-    .select({ name: files.name, mime: files.mime, bytes: files.bytes, encoding: files.encoding, flags: files.flags, quarantined: files.quarantined })
-    .from(files)
-    .where(eq(files.runId, id))
-    .orderBy(asc(files.name));
   // jsonb is only typed at compile time: parse each row against the contract and drop what does not fit,
   // so one odd row from an older shape cannot break the whole run page.
   const events = eventRows
@@ -107,9 +113,12 @@ export async function getRunSince(workspaceId: string, id: string, after: number
 export const getFile: GetFile = async (workspaceId, runId, name) => {
   if (!isUuid(runId)) return null;
   if (name.includes("\0")) return null; // Postgres text cannot hold a NUL, so no stored name has one: it threw (Q200)
-  const [owner] = await db.select({ id: runs.id }).from(runs).where(and(eq(runs.id, runId), eq(runs.workspaceId, workspaceId)));
-  if (!owner) return null;
-  const [row] = await db.select().from(files).where(and(eq(files.runId, runId), eq(files.name, name)));
+  // the file and the workspace check in one query: the file only through a run of this workspace
+  const [row] = await db
+    .select(getTableColumns(files))
+    .from(files)
+    .innerJoin(runs, eq(runs.id, files.runId))
+    .where(and(eq(files.runId, runId), eq(files.name, name), eq(runs.workspaceId, workspaceId)));
   if (!row) return null;
   const encoding = row.encoding === "base64" ? "base64" : "utf8";
   return { meta: { name: row.name, mime: row.mime, bytes: row.bytes, encoding, flags: row.flags ?? [], quarantined: row.quarantined }, content: row.content };
