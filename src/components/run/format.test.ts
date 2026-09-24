@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attemptCost, connectionName, formatCost, formatDuration, humanizeTools, relativeToRun, runFolders, toolKind, toolLabel, toolLine, turnsLine } from "./format";
+import { attemptCost, connectionName, elapsedLine, formatCost, formatDuration, humanizeTools, relativeToRun, runFolders, toolKind, toolLabel, toolLine, turnsLine } from "./format";
 
 const connections = [{ name: "DeepWiki" }, { name: "GitHub (read-only)" }];
 
@@ -166,5 +166,24 @@ describe("relativeToRun - paths in the run's own folder, as the run sees them", 
     expect(relativeToRun("Wrote chart.svg (bar chart, 5 points)", [folder])).toBe("Wrote chart.svg (bar chart, 5 points)");
     expect(relativeToRun(`ls ${folder}`, [folder])).toBe("ls .");
     expect(relativeToRun(`${folder}-other/x.csv`, [folder])).toBe(`${folder}-other/x.csv`);
+  });
+});
+
+// UX QA U9: a live run's header read "0.0 s so far", then "0.5 s so far", like a stopwatch
+describe("elapsedLine - a live run's clock, in words a person reads", () => {
+  it("says Just started for the first second, never tenths", () => {
+    expect(elapsedLine(0)).toBe("Just started");
+    expect(elapsedLine(500)).toBe("Just started");
+    expect(elapsedLine(999)).toBe("Just started");
+  });
+
+  it("then counts whole seconds, then minutes and seconds", () => {
+    expect(elapsedLine(1000)).toBe("1 s so far");
+    expect(elapsedLine(41_782)).toBe("41 s so far");
+    expect(elapsedLine(151_554)).toBe("2 m 31 s so far");
+  });
+
+  it("never goes below zero when the browser's clock is behind the server's", () => {
+    expect(elapsedLine(-3000)).toBe("Just started");
   });
 });
