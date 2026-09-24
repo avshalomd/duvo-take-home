@@ -37,7 +37,7 @@ export function GalleryTile({ automation: a }: { automation: Automation }) {
         </div>
       </div>
       <div className="min-w-0">
-        <Thread steps={steps} tone="done" size="mini" label={`Steps of /${a.command}`} />
+        <Thread steps={steps} tone="done" size="mini" label={`Steps of /${a.command}`} planOnly />
         {more > 0 && <p className={cn(SMALL, "mt-1.5 pl-8")}>and {more} more {more === 1 ? "step" : "steps"}</p>}
       </div>
     </Link>

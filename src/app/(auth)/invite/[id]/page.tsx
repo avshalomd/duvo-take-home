@@ -10,7 +10,7 @@ import { sessionFromHeaders } from "@/lib/auth/session";
 import { signupMode } from "@/lib/auth/signup-mode";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Invitation - Handover" };
+export const metadata: Metadata = { title: "Invitation" };
 
 const primary = cn(buttonVariants(), "h-11 w-full text-[15px]");
 const secondary = cn(buttonVariants({ variant: "outline" }), "h-11 w-full text-[15px]");

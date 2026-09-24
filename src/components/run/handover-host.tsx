@@ -4,8 +4,11 @@ import { createContext, use, useCallback, useMemo, useRef, useState } from "reac
 import { PendingSheet } from "./pending-sheet";
 
 type Handover = {
-  /** Puts up the new run's sheet with its title. Call it inside a transition; resolves once the sheet is on screen. */
-  begin: (title: string) => Promise<void>;
+  /**
+   * Puts up the new run's sheet with its title, and the connections its composer names. Call it inside a transition;
+   * resolves once the sheet is on screen.
+   */
+  begin: (title: string, connections: string[]) => Promise<void>;
   /** Takes the sheet down: the real run has replaced it, or the server refused the start. */
   end: () => void;
 };
@@ -23,17 +26,17 @@ export function useHandover(): Handover | null {
  * it stays mounted, hidden, so a refused start finds its composer - and what was typed - as it was.
  */
 export function HandoverHost({ children }: { children: React.ReactNode }) {
-  const [title, setTitle] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ title: string; connections: string[] } | null>(null);
   const shown = useRef<(() => void) | null>(null);
 
   const handover = useMemo<Handover>(
     () => ({
-      begin: (next) =>
+      begin: (title, connections) =>
         new Promise<void>((resolve) => {
           shown.current = resolve;
-          setTitle(next);
+          setPending({ title, connections });
         }),
-      end: () => setTitle(null),
+      end: () => setPending(null),
     }),
     [],
   );
@@ -41,8 +44,8 @@ export function HandoverHost({ children }: { children: React.ReactNode }) {
 
   return (
     <HandoverContext value={handover}>
-      <div className={title === null ? undefined : "hidden"}>{children}</div>
-      {title !== null && <PendingSheet title={title} onShown={onShown} />}
+      <div className={pending === null ? undefined : "hidden"}>{children}</div>
+      {pending !== null && <PendingSheet title={pending.title} connections={pending.connections} onShown={onShown} />}
     </HandoverContext>
   );
 }

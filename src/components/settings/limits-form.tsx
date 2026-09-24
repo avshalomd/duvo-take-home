@@ -7,6 +7,7 @@ import { updateLimitsAction } from "@/app/(app)/settings/actions";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { WorkspaceLimits } from "@/contracts/usage";
+import { cn } from "@/lib/utils";
 import { FOCUS_ROW, InsetGroup, rowLine } from "./grouped";
 import { Stepper } from "./stepper";
 import { submitKeepingValues } from "./submit-keeping-values";
@@ -73,12 +74,14 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
           footer="When the check finds a problem, the agent is told what failed and tries again, up to this many times."
         >
           <SwitchRow
+            disabled={!canEdit}
             name="stepChecks"
             label="Check each step as it finishes"
             detail="A quick automatic check after every step, so a run that drifts off track is flagged early."
             defaultChecked={limits.stepChecks}
           />
           <SwitchRow
+            disabled={!canEdit}
             name="strictConnections"
             label="Block servers the plan did not name"
             detail="When off, the run only notes it. When on, the agent is stopped from using them."
@@ -116,11 +119,11 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
               name="deniedDomains"
               aria-label="Blocked websites"
               rows={3}
-              placeholder="None yet. For example: pastebin.com"
+              placeholder={canEdit ? "None yet. For example: pastebin.com" : "None"} // an example invites typing
               defaultValue={limits.deniedDomains.join("\n")}
               aria-invalid={Boolean(errors?.deniedDomains)}
               aria-describedby={errors?.deniedDomains ? "deniedDomains-error" : undefined}
-              className="block min-h-24 w-full resize-y bg-transparent px-4 py-3 outline-none placeholder:text-slate/70 aria-invalid:text-crimson"
+              className="block min-h-24 w-full resize-y bg-transparent px-4 py-3 outline-none placeholder:text-slate/70 aria-invalid:text-crimson disabled:cursor-not-allowed disabled:resize-none disabled:text-slate"
             />
           </li>
         </InsetGroup>
@@ -131,15 +134,14 @@ export function LimitsForm({ limits, canEdit }: { limits: WorkspaceLimits; canEd
           {state.error}
         </p>
       )}
-      {canEdit ? (
+      {/* a member reads why at the top of the page (limits/page.tsx) */}
+      {canEdit && (
         <div className="flex justify-end">
           <Button type="submit" size="lg" disabled={pending} className="px-5">
             {pending && <LoaderCircle className="size-3.5 animate-spin" />}
             {pending ? "Saving..." : "Save limits"}
           </Button>
         </div>
-      ) : (
-        <p className="px-4 text-[13px] text-slate">Only an owner or an admin can change the limits.</p>
       )}
     </form>
   );
@@ -185,16 +187,17 @@ function StepperRow({
   );
 }
 
-function SwitchRow({ name, label, detail, defaultChecked }: { name: string; label: string; detail: string; defaultChecked: boolean }) {
+function SwitchRow({ name, label, detail, defaultChecked, disabled }: { name: string; label: string; detail: string; defaultChecked: boolean; disabled: boolean }) {
   return (
     <li className={rowLine()}>
       {/* the label wraps the switch, so the words are part of the click target and name it for a screen reader */}
-      <label className="flex min-h-[56px] cursor-pointer items-center gap-3 px-4 py-2.5">
+      <label className={cn("flex min-h-[56px] items-center gap-3 px-4 py-2.5", disabled ? "cursor-not-allowed" : "cursor-pointer")}>
         <span className="min-w-0 flex-1">
           <span className="block">{label}</span>
           <span className="block text-[13px] tracking-[0.01em] text-slate">{detail}</span>
         </span>
-        <Switch name={name} defaultChecked={defaultChecked} className="shrink-0 data-checked:bg-fern" />
+        {/* disabled said to the switch itself: Base UI's switch does not read the disabled fieldset around it */}
+        <Switch name={name} defaultChecked={defaultChecked} disabled={disabled} className="shrink-0 data-checked:bg-fern" />
       </label>
     </li>
   );

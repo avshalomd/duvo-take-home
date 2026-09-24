@@ -82,7 +82,7 @@ export function RunPanel({
       <section id="run" tabIndex={-1} aria-labelledby="run-title" data-testid="run-panel" className="outline-none">
         <header className={`${gutter} pt-6 min-[900px]:pt-9`}>
           <div className="flex min-h-9 items-center gap-2">
-            <span className="text-[13px] tracking-[0.01em] text-slate">{live ? <Elapsed since={run.createdAt} /> : <TimeAgo iso={run.createdAt} />}</span>
+            <span className="text-[13px] tracking-[0.01em] text-slate">{live ? <Elapsed since={run.createdAt} /> : <TimeAgo iso={run.createdAt} testId="run-when" />}</span>
             <div className="ml-auto flex items-center gap-1.5">
               {live && <StopButton runId={run.id} action={requestStop} pending={stopping} stopping={Boolean(run.cancelRequested)} />}
               <Button

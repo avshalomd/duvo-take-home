@@ -23,6 +23,25 @@ const QUESTION_ID = "brief-question"; // the first visit's heading, which names 
 const UNREACHABLE = "Could not reach the app, so no run was started. Check your connection and press Run again.";
 const SHOWN_WITHIN_MS = 600; // the sheet is up within a frame or two; never hold a start longer than the move itself
 
+// The capsule's look, shared with the stand-in the handover shows before the new run's page exists (ComposerStandIn).
+// 2 px at 45%: the app's 3 px focus ring reads as a heavy border around something this large. relative z-20: the
+// command list is placed against the capsule, above what follows it on the page. The ring is an outline, not a ring
+// utility: a ring is a box-shadow, and the style below sets box-shadow (Q143).
+const CAPSULE = "glass relative z-20 rounded-[26px] outline-ring/45 focus-within:outline-2";
+// glass sets its own box-shadow (the light top edge), which would cancel a shadow utility: the edge, a hairline and the
+// float are set together here, or the capsule has no outline at all on white paper
+const CAPSULE_STYLE = { boxShadow: "inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--hairline), var(--shadow-float)" };
+// Q203: no ring or border of the box's own when it is refused - a square inside a round capsule; the capsule draws
+// the refusal instead, in its own shape
+const BOX =
+  "relative col-start-1 row-start-1 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none placeholder:text-slate focus-visible:ring-0 aria-invalid:border-0 aria-invalid:ring-0 dark:bg-transparent dark:aria-invalid:ring-0";
+// One type size for the box, the hint behind it and the brief as it leaves (Q135). The md: sizes are needed: the
+// shadcn Textarea sets md:text-sm, which beats a plain size class on a desk and made the box 14 px.
+const SIZES = {
+  hero: { px: 19, type: "text-[19px] md:text-[19px] leading-7", pad: "px-5 pt-4 pb-3" },
+  floating: { px: 15, type: "text-[15px] md:text-[15px] leading-6", pad: "px-4 pt-3 pb-2.5" },
+};
+
 // The one box on Home: plain instructions start a new run; "/audit Acme Ltd" runs a saved automation on an input.
 // The server decides which is which (startRunAction). Glass, in two sizes: the hero under the first visit's
 // question, and a capsule floating at the bottom of an open run.
@@ -46,12 +65,11 @@ export function Composer({
   const [ghost, setGhost] = useState<{ title: string; width: number } | null>(null);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState<string | null>(null); // Escape hides the list until the text changes
-  const box = useRef<HTMLTextAreaElement>(null);
+  const box = useGrowingBox(text);
   // Q195: set on the press itself, synchronously. The Run button is only disabled once the start is pending, which
   // waits for the handover's move (up to SHOWN_WITHIN_MS): a second press or Cmd+Enter in between started a second run
   const starting = useRef(false);
   const hero = variant === "hero";
-  const shortcut = useShortcutName();
   const invalid = Boolean(state.error || state.fieldErrors?.prompt);
 
   const query = commandQuery(text);
@@ -64,15 +82,7 @@ export function Composer({
   // had opened while Home streamed in, and closed the menu: only when nobody else is using it (first-focus.ts)
   useEffect(() => {
     if (hero && mayTakeFocus(document)) box.current?.focus();
-  }, [hero]);
-
-  // the box grows with the brief instead of scrolling inside itself, up to a third of a phone's screen
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 280)}px`;
-  }, [text]);
+  }, [hero, box]);
 
   // Every change to the text, typed or picked from the list, drops a refusal: it was about the text as it was (Q202)
   function edit(next: string) {
@@ -105,7 +115,7 @@ export function Composer({
       //    pairs the two and the browser carries the words from here into the title (handover.css).
       startTransition(() => {
         setGhost(null);
-        shown = handover.begin(title);
+        shown = handover.begin(title, connections);
       });
     }
     // 3. Only then the server. A start begun in this same event would share the handover's transition lane, and
@@ -159,27 +169,19 @@ export function Composer({
     }
   }
 
-  // One type size for the box, the hint behind it and the brief as it leaves (Q135). The md: sizes are needed: the
-  // shadcn Textarea sets md:text-sm, which beats a plain size class on a desk and made the box 14 px.
-  const size = hero ? 19 : 15;
-  const type = hero ? "text-[19px] md:text-[19px] leading-7" : "text-[15px] md:text-[15px] leading-6";
+  const { px: size, type, pad } = SIZES[variant];
 
   return (
     <form onSubmit={onSubmit} className="w-full">
       <div
         data-testid="composer-capsule"
         data-invalid={invalid || undefined}
-        // the ring is an outline, not a ring utility: a ring is a box-shadow, and the style below sets box-shadow (Q143)
         className={cn(
-          // 2 px at 45%: the app's 3 px focus ring reads as a heavy border around something this large. relative z-20:
-          // the command list is placed against the capsule, above what follows it on the page
-          "glass relative z-20 rounded-[26px] outline-ring/45 focus-within:outline-2",
+          CAPSULE,
           invalid && "outline-2 outline-crimson/60", // refused: the capsule's own outline says so, whether focused or not
-          hero ? "px-5 pt-4 pb-3" : "px-4 pt-3 pb-2.5",
+          pad,
         )}
-        // glass sets its own box-shadow (the light top edge), which would cancel a shadow utility: the edge, a hairline
-        // and the float are set together here, or the capsule has no outline at all on white paper
-        style={{ boxShadow: "inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--hairline), var(--shadow-float)" }}
+        style={CAPSULE_STYLE}
       >
         {!hero && (
           <label htmlFor="prompt" className="sr-only">
@@ -215,9 +217,7 @@ export function Composer({
             aria-activedescendant={open && options.length ? optionId(options[highlighted].command) : undefined}
             aria-autocomplete="list"
             className={cn(
-              // Q203: no ring or border of the box's own when it is refused - a square inside a round capsule; the
-              // capsule draws the refusal instead, in its own shape
-              "relative col-start-1 row-start-1 min-h-0 resize-none rounded-none border-0 bg-transparent p-0 shadow-none placeholder:text-slate focus-visible:ring-0 aria-invalid:border-0 aria-invalid:ring-0 dark:bg-transparent dark:aria-invalid:ring-0",
+              BOX,
               type,
               ghost && "text-transparent caret-transparent", // the brief is leaving: its copy below is what moves
             )}
@@ -248,22 +248,7 @@ export function Composer({
           </p>
         )}
 
-        <div className="mt-2.5 flex items-center gap-2">
-          <ConnectionChips names={connections} />
-          <div className="ml-auto flex shrink-0 items-center gap-2.5">
-            {/* Q209: Enter makes a new line, so the key that runs is named beside Run, quietly and in the platform's
-                words; a phone has no such key, so it is not shown there. Screen readers get it from aria-keyshortcuts */}
-            {shortcut && (
-              <span data-testid="run-shortcut" aria-hidden className="text-[12px] tracking-[0.01em] text-slate max-[899px]:hidden">
-                {shortcut.label} Enter
-              </span>
-            )}
-            <Button type="submit" disabled={pending} aria-keyshortcuts={shortcut?.aria} className="h-9 px-4 max-[899px]:h-10">
-              {pending ? <LoaderCircle aria-hidden className="animate-spin" /> : <ArrowUp aria-hidden />}
-              {pending ? "Starting..." : "Run"}
-            </Button>
-          </div>
-        </div>
+        <ControlsRow connections={connections} pending={pending} />
 
         {/* anchored to the whole capsule, not the text: it opens past the Run button and the chips, never over them */}
         {open && (
@@ -297,6 +282,61 @@ export function Composer({
         </div>
       )}
     </form>
+  );
+}
+
+/**
+ * The floating composer as the new run's page will show it, for the sheet that stands in for the run until that page
+ * arrives (PendingSheet, UX QA U11): the same capsule, box, hint and row, so the swap changes nothing on screen. Inert:
+ * nothing in it can be pressed or typed into, and a screen reader passes over it.
+ */
+export function ComposerStandIn({ connections }: { connections: string[] }) {
+  const box = useGrowingBox("");
+  const { type, pad } = SIZES.floating;
+  return (
+    <div inert className="w-full">
+      <div data-testid="composer-capsule" className={cn(CAPSULE, pad)} style={CAPSULE_STYLE}>
+        <div className="relative grid">
+          <Textarea ref={box} rows={1} readOnly tabIndex={-1} placeholder={PLACEHOLDER} className={cn(BOX, type)} />
+        </div>
+        <ControlsRow connections={connections} pending={false} />
+      </div>
+    </div>
+  );
+}
+
+// the box grows with the brief instead of scrolling inside itself, up to a third of a phone's screen
+function useGrowingBox(text: string) {
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 280)}px`;
+  }, [text]);
+  return box;
+}
+
+// Under the box: the connections the run gets, and Run.
+function ControlsRow({ connections, pending }: { connections: string[]; pending: boolean }) {
+  const shortcut = useShortcutName();
+  return (
+    <div className="mt-2.5 flex items-center gap-2">
+      <ConnectionChips names={connections} />
+      <div className="ml-auto flex shrink-0 items-center gap-2.5">
+        {/* Q209: Enter makes a new line, so the key that runs is named beside Run, quietly and in the platform's
+            words; a phone has no such key, so it is not shown there. Screen readers get it from aria-keyshortcuts */}
+        {shortcut && (
+          <span data-testid="run-shortcut" aria-hidden className="text-[12px] tracking-[0.01em] text-slate max-[899px]:hidden">
+            {shortcut.label} Enter
+          </span>
+        )}
+        <Button type="submit" disabled={pending} aria-keyshortcuts={shortcut?.aria} className="h-9 px-4 max-[899px]:h-10">
+          {pending ? <LoaderCircle aria-hidden className="animate-spin" /> : <ArrowUp aria-hidden />}
+          {pending ? "Starting..." : "Run"}
+        </Button>
+      </div>
+    </div>
   );
 }
 

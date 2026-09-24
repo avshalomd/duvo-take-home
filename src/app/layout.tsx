@@ -9,8 +9,9 @@ const funnel = Funnel_Display({ variable: "--font-funnel", subsets: ["latin"] })
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 // The product name lives here rather than in lib/app.ts, which the stack kit ships as "App".
+// Every page names itself in the tab ("Automations - Handover"); a page without a title of its own reads "Handover".
 export const metadata: Metadata = {
-  title: "Handover",
+  title: { default: "Handover", template: "%s - Handover" },
   description: "Hand a task to an agent in plain words, watch it work, and keep what went well as a command.",
 };
 

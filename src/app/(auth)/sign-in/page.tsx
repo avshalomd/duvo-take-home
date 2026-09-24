@@ -12,7 +12,7 @@ import { googleConfigured } from "@/lib/auth/providers";
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { signupMode } from "@/lib/auth/signup-mode";
 
-export const metadata: Metadata = { title: "Sign in - Handover" };
+export const metadata: Metadata = { title: "Sign in" };
 
 export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   const { next, email, error } = await searchParams;

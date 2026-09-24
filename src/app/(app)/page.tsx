@@ -1,4 +1,5 @@
-import { Suspense } from "react";
+import type { Metadata } from "next";
+import { cache, Suspense } from "react";
 import { FirstVisit } from "@/components/run/first-visit";
 import { HandoverHost } from "@/components/run/handover-host";
 import { NotFoundSheet } from "@/components/run/not-found-sheet";
@@ -13,10 +14,24 @@ import { verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { composerProps, connectionsOf, fileFacts, readyAutomations, titles } from "@/components/run/home-data";
 import { runTag as runTagOf, runTitle as runTitleOf } from "@/components/run/rail";
+import { tabTitle } from "./tab-title";
 
 // The Run button's action may run the agent inside this page's function (the inline runner), so the page's own
 // budget is what bounds it: 300 s is Vercel's maximum, and the run's wall clock is set well under it (Q55).
 export const maxDuration = 300;
+
+// The open run, read once per request: the tab's title and the page both need it
+const readRun = cache(getRun);
+
+// The tab is titled by the open run, as the page is (UX QA U5): "<brief> - Handover"; Home on its own is "Handover".
+export async function generateMetadata({ searchParams }: PageProps<"/">): Promise<Metadata> {
+  const { run } = await searchParams;
+  if (typeof run !== "string") return {};
+  const { workspaceId } = await requireSession();
+  const [data, automations] = await Promise.all([readRun(workspaceId, run), readyAutomations(workspaceId)]);
+  if (!data) return { title: "Not found" };
+  return { title: tabTitle(runTitleOf(data.run, titles(automations.all).names)) };
+}
 
 // Home: the runs rail on the left; the main column holds either the first-visit question ("/") or the run named by
 // ?run=<id>, with the composer floating at the bottom of its sheet.
@@ -79,7 +94,7 @@ async function MainColumn({ workspaceId, userId, selectedId }: { workspaceId: st
   // connectionsOf are cached per request, so the composer's reads of them are the same ones)
   const [composer, data, automations, allConnections] = await Promise.all([
     composerProps(workspaceId),
-    selectedId ? getRun(workspaceId, selectedId) : null,
+    selectedId ? readRun(workspaceId, selectedId) : null,
     readyAutomations(workspaceId),
     connectionsOf(workspaceId),
   ]);

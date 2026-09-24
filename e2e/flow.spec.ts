@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { AUTOMATION, createHomeRuns, deleteHomeRuns, FAILED_ERROR, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
+import { AUTOMATION, createFreshRun, createHomeRuns, deleteHomeRuns, deleteRun, FAILED_ERROR, HEAL, READY, TITLES, type HomeRuns } from "./home-fixture";
 
 // The Home page: the rail, the first-visit question, the run sheet with its thread, the floating composer and the
 // Details panel. Runs against a dev server on the local database, signed in as the demo user:
@@ -23,6 +23,20 @@ async function openRun(page: Page, id: string) {
 }
 
 const composer = (page: Page) => page.getByRole("textbox", { name: /what should the agent do/i });
+
+/** Where a run sheet's parts sit, from the sheet's top: its title, its three headings, the composer and its end. */
+async function skeleton(sheet: Locator) {
+  const top = (await sheet.boundingBox())!.y;
+  const at = async (part: Locator) => (await part.boundingBox())!.y - top;
+  const box = (await sheet.boundingBox())!;
+  return {
+    title: await at(sheet.getByRole("heading", { level: 1 })),
+    plan: await at(sheet.getByRole("heading", { name: "The plan" })),
+    made: await at(sheet.getByRole("heading", { name: "What it made" })),
+    composer: await at(sheet.getByTestId("composer-capsule")),
+    height: box.height,
+  };
+}
 const rail = (page: Page) => page.getByRole("navigation", { name: "Runs" });
 
 test.describe("the frame", () => {
@@ -383,6 +397,45 @@ test.describe("the handover", () => {
     await expect(pending).toHaveCount(0);
   });
 
+  // UX QA U11: the stand-in had only the title and the first step; 0.75 s later the real page grew by 110 px, its
+  // composer popped in and the title moved. It now carries the live page's skeleton, so the swap changes only text.
+  // UX QA U9: its clock read "0.0 s so far", then tenths.
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    test(`the sheet that stands in for a new run is laid out as the run's own page, ${viewport.width} px wide`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const brief = "fresh: write a three-line haiku about a quiet office on Monday";
+      const fresh = await createFreshRun(brief);
+      try {
+        let release!: () => void;
+        const held = new Promise<void>((resolve) => (release = resolve));
+        await page.route("**/*", async (route) => {
+          const request = route.request();
+          if (request.method() === "POST" && request.headers()["next-action"]) {
+            await held;
+            await route.abort();
+          } else await route.continue();
+        });
+        await page.goto("/");
+        await composer(page).fill(`[e2e] home ${brief}`);
+        await page.getByRole("button", { name: "Run", exact: true }).click();
+        const pending = page.getByTestId("run-pending");
+        await expect(pending.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(pending.getByText("Just started")).toBeVisible();
+        await page.waitForTimeout(600); // the brief's move into the title is over
+        const standIn = await skeleton(pending);
+        release();
+        await expect(pending).toHaveCount(0);
+        await page.unroute("**/*");
+
+        await openRun(page, fresh);
+        const real = await skeleton(page.locator("article[data-sheet]"));
+        for (const [part, y] of Object.entries(standIn)) expect(Math.abs(y - real[part as keyof typeof real]), part).toBeLessThanOrEqual(1);
+      } finally {
+        await deleteRun(fresh);
+      }
+    });
+  }
+
   test("a start the server would refuse does not move at all", async ({ page }) => {
     await page.goto("/");
     await composer(page).fill("/nope-e2e Acme Ltd");
@@ -499,6 +552,44 @@ test.describe("a finished run", () => {
     await change.fill("ab");
     await panel.getByRole("button", { name: /send the change/i }).click();
     await expect(panel.getByText(/say what should change/i)).toBeVisible();
+  });
+
+  // UX QA U1: Send the change sat under the floating composer, and two boxes with different hints were stacked
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    test(`while a change is being asked for, the composer steps aside and Send is in reach, ${viewport.width} px wide`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const panel = await openRun(page, runs.followUp);
+      await expect(composer(page)).toBeVisible();
+      await panel.getByRole("button", { name: /ask for a change/i }).click();
+      await expect(panel.getByRole("textbox", { name: /ask for a change/i })).toBeFocused();
+      await expect(composer(page)).toBeHidden(); // one box to type in
+
+      const send = panel.getByRole("button", { name: /send the change/i });
+      await expect(send).toBeInViewport();
+      const box = (await send.boundingBox())!;
+      const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("button")?.textContent ?? null, [box.x + box.width / 2, box.y + box.height / 2]);
+      expect(hit).toContain("Send the change"); // nothing drawn over it
+
+      await panel.getByRole("button", { name: "Cancel" }).click(); // the change is dropped: the composer comes back
+      await expect(panel.getByRole("button", { name: /ask for a change/i })).toBeFocused();
+      await expect(composer(page)).toBeVisible();
+    });
+  }
+
+  // UX QA U8 and U19: the header's time read "1 d ago" beside a rail that said "Yesterday", and its tooltip was ISO
+  test("the time a run started is in words, and its tooltip is a readable date", async ({ page }) => {
+    const panel = await openRun(page, runs.followUp);
+    const when = panel.getByTestId("run-when");
+    await expect(when).toHaveText("4 min ago");
+    await expect(when).toHaveAttribute("title", /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) \d{1,2} \w+, \d{2}:\d{2}$/);
+  });
+
+  // UX QA U5
+  test("the browser tab is titled by the open run's brief", async ({ page }) => {
+    await openRun(page, runs.parent);
+    await expect(page).toHaveTitle(`${TITLES.parent} - Handover`);
+    await page.goto("/");
+    await expect(page).toHaveTitle("Handover");
   });
 
   test("Details slides in beside the run without covering it, lists every file and no built-in tool, and leaves on Escape", async ({ page }) => {

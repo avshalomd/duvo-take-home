@@ -45,6 +45,29 @@ describe("parseMarkdown", () => {
     expect(blocks[0]).toEqual({ kind: "paragraph", spans: [{ text: "I fetched 10 stories." }] });
   });
 
+  // UX QA U2: a haiku, an address or a signature came out as one line: single line breaks were joined with spaces
+  it("keeps a single line break inside a paragraph as a break", () => {
+    expect(parseMarkdown("Monday morning hush\nempty chairs, cold coffee steam\nsunlight on the keys")).toEqual([
+      {
+        kind: "paragraph",
+        spans: [
+          { text: "Monday morning hush" },
+          { text: "\n", br: true },
+          { text: "empty chairs, cold coffee steam" },
+          { text: "\n", br: true },
+          { text: "sunlight on the keys" },
+        ],
+      },
+    ]);
+  });
+
+  it("reads bold and links on each line of a broken paragraph", () => {
+    expect(parseMarkdown("**Acme Ltd**\n[site](https://acme.test)")[0]).toEqual({
+      kind: "paragraph",
+      spans: [{ text: "Acme Ltd", bold: true }, { text: "\n", br: true }, { text: "site", href: "https://acme.test" }],
+    });
+  });
+
   it("groups consecutive bullets into one list", () => {
     const blocks = parseMarkdown("Did:\n- searched the web\n- wrote output.csv");
     expect(blocks[0]).toEqual({ kind: "paragraph", spans: [{ text: "Did:" }] });

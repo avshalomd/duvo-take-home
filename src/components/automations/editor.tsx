@@ -1,13 +1,14 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
+import { useState } from "react";
 import type { EditState } from "@/app/(app)/automations/actions";
 import type { Automation } from "@/contracts/automation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { EditValues } from "@/lib/automations/form";
+import { changesWhatTheAgentIsTold, type EditValues } from "@/lib/automations/form";
 import { cn } from "@/lib/utils";
 import { describedBy, Field } from "./field";
 import { ListField } from "./list-field";
@@ -59,6 +60,12 @@ export function AutomationEditor({
 }) {
   const v = state.values ?? valuesOf(automation);
   const err = state.fieldErrors ?? {};
+  // whether saving now makes a new version: asked on every change, of the form as it stands (UX QA U17)
+  const [newVersion, setNewVersion] = useState(false);
+  function recheck(form: HTMLFormElement) {
+    // after the frame: a checkbox or a list's Add and Remove change the form in React's render, not in the event
+    requestAnimationFrame(() => setNewVersion(changesWhatTheAgentIsTold(automation, new FormData(form))));
+  }
 
   // the workspace's connections, plus any the template names that Settings no longer has, so none is dropped silently
   const choices: ConnectionChoice[] = [
@@ -67,7 +74,14 @@ export function AutomationEditor({
   ];
 
   return (
-    <form key={`${automation.updatedAt}:${JSON.stringify(state.values ?? null)}`} action={action} className="space-y-7" aria-label="Edit the automation">
+    <form
+      key={`${automation.updatedAt}:${JSON.stringify(state.values ?? null)}`}
+      action={action}
+      onChange={(e) => recheck(e.currentTarget)}
+      onClick={(e) => recheck(e.currentTarget)}
+      className="space-y-7"
+      aria-label="Edit the automation"
+    >
       <input type="hidden" name="id" value={automation.id} />
       <input type="hidden" name="version" value={automation.version} />
 
@@ -167,6 +181,12 @@ export function AutomationEditor({
         {!approver && automation.status === "active" && !state.error && !state.fieldErrors && (
           <p className="text-[13px] tracking-[0.01em] text-slate">
             Saving a change to the brief takes /{automation.command} out of use until an owner or an admin approves it.
+          </p>
+        )}
+        {/* an approver approves it again themselves, after a new example: said once the brief has changed (UX QA U17) */}
+        {approver && automation.status === "active" && newVersion && !state.error && !state.fieldErrors && (
+          <p className="text-[13px] tracking-[0.01em] text-slate">
+            Saving takes /{automation.command} out of use until a new example looks right.
           </p>
         )}
       </div>

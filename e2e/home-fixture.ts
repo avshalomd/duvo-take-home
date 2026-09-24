@@ -245,6 +245,26 @@ export async function createHomeRuns(): Promise<HomeRuns> {
   return { parent, followUp, live, stopped, failed, legacy, audit, automation, example, long, healing, healed, unfixed, stuck, carried, unchecked };
 }
 
+/**
+ * A run started a moment ago whose agent has not written its plan yet: what the page shows right after Run. Made by
+ * the one test that needs it and deleted by it, since a run in flight counts against the workspace's limits.
+ */
+export async function createFreshRun(prompt: string): Promise<string> {
+  const sql = client();
+  const [r] = await sql.query(
+    `insert into runs (workspace_id, created_by, purpose, prompt, status, model) values ($1, 'demo-user', 'adhoc', $2, 'running', $3) returning id`,
+    [WORKSPACE, `${PREFIX} ${prompt}`, MODEL],
+  );
+  await sql.query("insert into run_events (run_id, seq, kind, payload) values ($1, 1, 'started', $2::jsonb)", [r.id, JSON.stringify({ model: MODEL, tools: [], mcp_servers: [] })]);
+  return r.id as string;
+}
+
+export async function deleteRun(id: string): Promise<void> {
+  const sql = client();
+  await sql.query("delete from run_events where run_id = $1", [id]);
+  await sql.query("delete from runs where id = $1", [id]);
+}
+
 export async function deleteHomeRuns(): Promise<void> {
   const sql = client();
   const ids = `select id from runs where prompt like '${PREFIX}%'`; // the prefix is a constant, never user input

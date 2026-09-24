@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { authLink } from "@/components/auth/auth-field";
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { SignUpForm } from "@/components/auth/sign-up-form";
+import { signUpWords } from "@/components/auth/sign-up-words";
 import { INVITE_ONLY } from "@/lib/auth/errors";
 import { getInvitation } from "@/lib/auth/members";
 import { invitationIdFrom, safeNext, withNext } from "@/lib/auth/paths";
@@ -12,7 +13,7 @@ import { googleConfigured } from "@/lib/auth/providers";
 import { sessionFromHeaders } from "@/lib/auth/session";
 import { signupMode } from "@/lib/auth/signup-mode";
 
-export const metadata: Metadata = { title: "Create an account - Handover" };
+export const metadata: Metadata = { title: "Create an account" };
 
 export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">) {
   const { next, email } = await searchParams;
@@ -25,23 +26,26 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
     </Link>
   );
 
+  const invitation = await openInvitation(target);
   // Invite-only: the form is for someone who came from an open invitation's page. The server refuses everyone
   // else anyway (lib/auth/signup.ts); this only saves them a form that cannot work.
-  if (signupMode() === "invite" && !(await fromOpenInvitation(target))) {
+  if (signupMode() === "invite" && !invitation) {
     return (
       <AuthPanel title="Create an account" description={INVITE_ONLY} footer={<>Already have an account? {signInLink}</>} />
     );
   }
 
+  const words = signUpWords(invitation); // from an invitation: the workspace they are joining, and who asked them
   return (
-    <AuthPanel title="Create an account" description="You get a workspace of your own. Nobody else sees what you run in it." footer={<>Already have an account? {signInLink}</>}>
+    <AuthPanel title={words.title} description={words.description} footer={<>Already have an account? {signInLink}</>}>
       <SignUpForm next={target} google={googleConfigured()} email={typeof email === "string" ? email : undefined} />
     </AuthPanel>
   );
 }
 
-async function fromOpenInvitation(next: string): Promise<boolean> {
+/** The open invitation `next` leads back to, if it is one. */
+async function openInvitation(next: string): Promise<{ workspaceName: string; inviterName: string } | null> {
   const id = invitationIdFrom(next);
   const invitation = id ? await getInvitation(id) : null;
-  return Boolean(invitation?.open && !invitation.personal); // one to a personal workspace opens no account (S11)
+  return invitation?.open && !invitation.personal ? invitation : null; // one to a personal workspace opens no account (S11)
 }

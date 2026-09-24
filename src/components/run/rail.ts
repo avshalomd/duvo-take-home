@@ -8,12 +8,13 @@ export type DayGroup<T> = { label: string; runs: T[] };
 const DAY_MS = 86_400_000;
 
 /** "2026-09-23" for the calendar day the instant falls on in the given time zone. */
-function dayKey(date: Date, timeZone?: string): string {
+export function dayKey(date: Date, timeZone?: string): string {
   // en-CA formats as YYYY-MM-DD, which sorts and parses; the time zone decides where midnight is
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
-function dayLabel(key: string, todayKey: string): string {
+/** The rail's heading for a day: Today, Yesterday, a weekday in the last week, then the date. */
+export function dayLabel(key: string, todayKey: string): string {
   const days = Math.round((Date.parse(todayKey) - Date.parse(key)) / DAY_MS); // both keys parse as UTC midnights
   if (days <= 0) return "Today"; // a clock a little ahead of ours still means today, not the future
   if (days === 1) return "Yesterday";

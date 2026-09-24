@@ -1,4 +1,5 @@
-import { AutomationEdit } from "@/contracts/automation";
+import { AutomationEdit, type AutomationTemplate } from "@/contracts/automation";
+import { changesThePrompt } from "./template";
 
 // The editor's form as it was typed, so a refused save can render every field again (React 19 resets the form).
 export type EditValues = {
@@ -67,4 +68,13 @@ export function parseEditForm(formData: FormData): ParsedEdit {
     fieldErrors[key] ??= issue.message; // the first message per field is the one to fix first
   }
   return { ok: false, fieldErrors, values };
+}
+
+/**
+ * Whether saving the editor's form as it stands would make a new version (UX QA U17): the same rule the save applies
+ * (changesThePrompt), asked of the parsed form. A form that cannot be saved says what to fix instead, so false.
+ */
+export function changesWhatTheAgentIsTold(saved: { name: string; inputLabel: string; template: AutomationTemplate }, formData: FormData): boolean {
+  const parsed = parseEditForm(formData);
+  return parsed.ok && changesThePrompt(saved, parsed.edit);
 }

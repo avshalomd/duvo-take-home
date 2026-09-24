@@ -86,6 +86,10 @@ and why it is built that way; `docs/QA.md` is the log of every finding and its f
   `AI_MODEL` and `AI_MODEL_FALLBACK` switch either in one variable; `AI_SIMULATE_DOWN=1` walks the model-down path.
 - **Next 16:** a `loading.tsx` streams the page before `notFound()` runs, so a missing record answers 200: use
   `<Suspense>` inside pages that can 404. `error.tsx` receives `{ error, retry }`.
+- **Next 16 dev log, "Set objects are not supported. {P, c, q, i, f, m: Set, ...}":** Next's own page payload, not
+  ours: `m` is app-render's `missingSlots` Set, made only on the dev server, and React's dev-only check reports it
+  once that Set no longer passes `instanceof Set` - seen on a long-running dev server after a full reload, never on a
+  fresh one (UX QA U16). Production never makes it. Restart the dev server; do not hunt for a Set in the app.
 
 ## Git and secrets
 

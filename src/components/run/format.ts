@@ -118,6 +118,17 @@ export function formatDuration(ms: number | null): string {
   return `${Math.floor(ms / 60_000)} m ${Math.round((ms % 60_000) / 1000)} s`;
 }
 
+/**
+ * A live run's clock (UX QA U9): "Just started" for its first second, then whole seconds counting up. Tenths read as
+ * a stopwatch; this only has to show that the page is not stuck.
+ */
+export function elapsedLine(ms: number): string {
+  const seconds = Math.floor(Math.max(0, ms) / 1000);
+  if (seconds < 1) return "Just started";
+  if (seconds < 60) return `${seconds} s so far`;
+  return `${Math.floor(seconds / 60)} m ${seconds % 60} s so far`;
+}
+
 export function formatCost(usd: number | null): string {
   if (usd === null || usd === undefined) return "-";
   return `$${usd.toFixed(3)}`; // three decimals: a run costs cents, and two would round most of them to $0.16
