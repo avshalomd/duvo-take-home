@@ -62,25 +62,29 @@ export function Thread({
   const mini = size === "mini";
 
   // Measure after layout: the line runs from the first node's centre to the last one's, and the fill to the
-  // reached node's. Re-measured when the steps change or the column is resized (a note wraps differently).
+  // reached node's. Re-measured when the plan's shape changes or the column is resized (a note wraps differently).
+  // The shape, not the array: a live run hands in a new array every second with the same steps in it.
+  const shape = planShape(steps);
+  const count = steps.length;
   useLayoutEffect(() => {
     const measure = () => {
       const host = list.current;
       const first = nodes.current[0];
-      const last = nodes.current[steps.length - 1];
+      const last = nodes.current[count - 1];
       if (!host || !first || !last) return;
       const base = host.getBoundingClientRect().top;
       const centre = (el: HTMLElement) => el.getBoundingClientRect().top + el.offsetHeight / 2 - base;
       const top = centre(first);
       const height = Math.max(0, centre(last) - top);
       const target = reached >= 0 ? nodes.current[reached] : null;
-      setTrack({ top, height, fill: target ? Math.max(0, centre(target) - top) : 0 });
+      const measured = { top, height, fill: target ? Math.max(0, centre(target) - top) : 0 };
+      setTrack((current) => nextTrack(current, measured)); // the same track back: React skips the render
     };
     measure();
     const ro = new ResizeObserver(measure);
     if (list.current) ro.observe(list.current);
     return () => ro.disconnect();
-  }, [steps, reached]);
+  }, [shape, count, reached]);
 
   const t = TONE[tone];
   const gutter = mini ? "w-5" : "w-8";
@@ -244,6 +248,19 @@ export function lastReached(steps: Pick<ThreadStep, "status">[]): number {
     if (s.status === "done" || s.status === "skipped") last = i;
   });
   return last;
+}
+
+/** The plan as its steps' keys and statuses: what moves the line. Two arrays with the same steps read the same. */
+export function planShape(steps: Pick<ThreadStep, "key" | "status">[]): string {
+  return steps.map((s) => `${s.key}:${s.status}`).join("|");
+}
+
+type Track = { top: number; height: number; fill: number };
+
+/** The track to keep after a measure: the current one when nothing moved, so setting it causes no render. */
+export function nextTrack(current: Track, measured: Track): Track {
+  const same = current.top === measured.top && current.height === measured.height && current.fill === measured.fill;
+  return same ? current : measured;
 }
 
 /** The run-level colour of the thread from the run's status and outcome, for callers that hold a run. */
