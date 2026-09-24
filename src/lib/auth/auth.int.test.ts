@@ -9,6 +9,7 @@ import { INVITATION_COOKIE } from "./invitation-cookie";
 import type { SessionCtx } from "@/contracts/auth";
 import { MemberChangeError } from "./member-rules";
 import { changeMemberRole, createInvite, getInvitation, listInvitations, listMembers, listWorkspaces, removeFromWorkspace, revokeInvite } from "./members";
+import { countDbRequests } from "@/test/db-requests";
 import { resolveSession, sessionFromHeaders } from "./session";
 import { workspaceSlug } from "./workspace-name";
 
@@ -94,6 +95,16 @@ describe.skipIf(!process.env.DATABASE_URL)("sign-up and the personal workspace",
     expect(ctx?.workspaceId).toBe(workspace.id);
     const [row] = await db.select().from(session).where(eq(session.userId, userId));
     expect(row.activeOrganizationId).toBe(workspace.id); // and it is written back, so the next request agrees
+  });
+
+  // Speed: every page and every prefetch reads the session first. It was three round trips one after another: the
+  // session, then its user, then the memberships. Better Auth now reads the session with its user in one query.
+  it("reading who is signed in and where takes two requests to the database: the session with its user, then the memberships", async () => {
+    const { userId, headers } = await signUp("Inty Quick", email("quick"));
+    const { result, requests } = await countDbRequests(() => sessionFromHeaders(headers));
+    expect(result?.userId).toBe(userId);
+    expect(result?.userName).toBe("Inty Quick");
+    expect(requests).toBe(2);
   });
 
   it("no cookie means no session: sessionFromHeaders answers null, not an error", async () => {

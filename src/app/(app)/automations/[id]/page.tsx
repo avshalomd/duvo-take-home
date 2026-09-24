@@ -57,21 +57,28 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   const { id } = await params;
   const { approved } = await searchParams;
   const { workspaceId, role, userId } = await requireSession();
-  const automation = await readAutomation(workspaceId, id);
+  // Every read the page needs at once, not the automation first and the rest after it: each is a round trip, and
+  // each is scoped to the workspace, so for a missing automation the others simply find nothing.
+  const [automation, trials, allConnections, history] = await Promise.all([
+    readAutomation(workspaceId, id),
+    listTrials(workspaceId, id),
+    listConnections(workspaceId),
+    automationHistory(workspaceId, id),
+  ]);
   // not notFound(): the loading boundary above has already streamed a 200, so a plain message is what the reader gets anyway
   if (!automation) return <Missing />;
 
-  const [trials, allConnections, history] = await Promise.all([listTrials(workspaceId, id), listConnections(workspaceId), automationHistory(workspaceId, id)]);
   // the editor offers them by name, on or off: no address, sign-in or tool list goes to the browser, members' included
   const connections = allConnections.map((c) => ({ name: c.name, enabled: c.enabled }));
   const current = trials.filter((t) => t.version === automation.version);
   const older = trials.filter((t) => t.version !== automation.version);
-  // each judgment says who made it: "You said" to them, their name to everyone else (Q178)
-  const names = await judgeNames(trials.map((t) => t.humanVerdictBy));
+  // each judgment says who made it: "You said" to them, their name to everyone else (Q178); read beside the examples' runs
+  const shown = current.slice(0, SHOWN_EXAMPLES);
+  const [names, shownRuns] = await Promise.all([judgeNames(trials.map((t) => t.humanVerdictBy)), Promise.all(shown.map((t) => getRun(workspaceId, t.runId)))]);
   const said = (t: Trial) => (t.humanVerdict ? verdictWords(t.humanVerdict, judgeOf(t.humanVerdictBy, names), userId) : null);
   const changeLabel = (t: Trial) => verdictChangeLabel(judgeOf(t.humanVerdictBy, names), userId); // whose judgment a change replaces
   const judgedBy = (t: Trial) => judgeWho(judgeOf(t.humanVerdictBy, names), userId); // U30: the subject of "You marked it right; ..."
-  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said, changeLabel, judgedBy);
+  const examples = examplesOf(shown, shownRuns, said, changeLabel, judgedBy);
   const approval = canApprove(trials, automation.version);
   const isDraft = automation.status === "draft";
   // Q178: a member drafts, edits, tries and judges; approve, turn off, delete and the schedule read as who does them
@@ -231,15 +238,14 @@ function Schedule({ automation: a, governs }: { automation: Automation; governs:
   );
 }
 
-/** The current version's examples with what their cards show: the plan, the files and the verdict, read once here. */
-async function examplesOf(
-  workspaceId: string,
+/** The current version's examples with what their cards show: the plan, the files and the verdict of each one's run. */
+function examplesOf(
   trials: Trial[],
+  found: Awaited<ReturnType<typeof getRun>>[],
   said: (t: Trial) => string | null,
   changeLabel: (t: Trial) => string,
   judgedBy: (t: Trial) => string | null,
-): Promise<ExampleView[]> {
-  const found = await Promise.all(trials.map((t) => getRun(workspaceId, t.runId)));
+): ExampleView[] {
   return trials.flatMap((t, i) => {
     const data = found[i];
     if (!data) return [];

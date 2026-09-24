@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import { cache, Suspense } from "react";
+import { cache } from "react";
 import { FirstVisit } from "@/components/run/first-visit";
 import { HandoverHost } from "@/components/run/handover-host";
 import { NotFoundSheet } from "@/components/run/not-found-sheet";
-import { RailFallback, SheetSkeleton } from "@/components/run/panel-skeleton";
 import { RunSheet } from "@/components/run/run-sheet";
 import { RunsRail, type RailRun } from "@/components/run/runs-rail";
 import { RailSheet } from "@/components/run/rail-sheet";
@@ -14,7 +13,7 @@ import { judgeWho, verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { composerProps, connectionsOf, fileFacts, readyAutomations, titles } from "@/components/run/home-data";
 import { runTag as runTagOf, runTitle as runTitleOf } from "@/components/run/rail";
-import { tabTitle } from "./tab-title";
+import { tabTitle } from "../tab-title";
 
 // The Run button's action may run the agent inside this page's function (the inline runner), so the page's own
 // budget is what bounds it: 300 s is Vercel's maximum, and the run's wall clock is set well under it (Q55).
@@ -36,10 +35,12 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
 // Home: the runs rail on the left; the main column holds either the first-visit question ("/") or the run named by
 // ?run=<id>, with the composer floating at the bottom of its sheet.
 //
-// Two Suspense boundaries that stay mounted across navigations. When a run opens, the navigation is a React
-// transition: an already visible boundary keeps showing the old view until the new one is complete, so a new run
-// replaces the sheet that stood in for it (HandoverHost) in one commit, with nothing in between. A route-level
-// loading.tsx would show its skeleton first, so Home has none.
+// No Suspense boundary of its own, and no loading.tsx in (home): the boundary above Home is the app's (../loading.tsx),
+// keyed by this group rather than by the page and its ?run=. Opened from another page, it shows Home's shape at once
+// (it is prefetched). Opening a run is a React transition inside it: the visible boundary keeps the old view until
+// the new one is complete, so a new run replaces the sheet that stood in for it (HandoverHost) in one commit.
+// Boundaries in here would show their fallbacks again after that skeleton, and React holds a shown fallback for
+// 300 ms, so the page would arrive later than its data. The rail and the main column still render side by side.
 export default async function Home({ searchParams }: PageProps<"/">) {
   const { run } = await searchParams;
   const selectedId = typeof run === "string" ? run : undefined;
@@ -47,15 +48,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   return (
     <div className="flex w-full flex-1">
-      <Suspense fallback={<RailFallback />}>
-        <Rail workspaceId={workspaceId} selectedId={selectedId} />
-      </Suspense>
+      <Rail workspaceId={workspaceId} selectedId={selectedId} />
       <main className="min-w-0 flex-1 px-3 pt-3 pb-6 min-[900px]:px-8 min-[900px]:pt-6">
         {/* room for a run that does not exist yet: the sheet the brief moves into at the press of Run (Q138) */}
         <HandoverHost>
-          <Suspense fallback={<SheetSkeleton />}>
-            <MainColumn workspaceId={workspaceId} userId={userId} selectedId={selectedId} />
-          </Suspense>
+          <MainColumn workspaceId={workspaceId} userId={userId} selectedId={selectedId} />
         </HandoverHost>
       </main>
     </div>

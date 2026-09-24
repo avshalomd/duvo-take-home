@@ -14,7 +14,7 @@ const FILES = [
   ...sourcesIn("src/components/run"),
   ...sourcesIn("src/components/shell"),
   "src/app/(app)/actions.ts",
-  "src/app/(app)/page.tsx",
+  "src/app/(app)/(home)/page.tsx",
   "src/app/(app)/readable.ts",
 ];
 

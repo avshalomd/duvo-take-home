@@ -475,6 +475,8 @@ test.describe("changing roles and removing people", () => {
       const reason = page.getByTestId("limits-read-only");
       await expect(reason).toHaveText("Only an owner or an admin can change the limits.");
       const usage = page.getByTestId("usage");
+      // the page streams behind the app's loading boundary: its content is in the document, hidden, a moment before it shows
+      await expect(usage).toBeVisible();
       expect((await reason.boundingBox())!.y).toBeLessThan((await usage.boundingBox())!.y); // above everything it is about
       await expect(page.getByRole("button", { name: "Save limits" })).toHaveCount(0);
 

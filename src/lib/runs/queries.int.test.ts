@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { files, runEvents, runs } from "@/db/schema";
+import { countDbRequests } from "@/test/db-requests";
 import { getFile, getRun, getRunSince, listRuns } from "./queries";
 
 const WS_A = "int-a";
@@ -101,6 +102,42 @@ describe.skipIf(!process.env.DATABASE_URL)("run reads are scoped to the workspac
   it("a malformed run id answers null instead of a database error", async () => {
     await expect(getRun(WS_A, "not-a-uuid")).resolves.toBeNull();
     await expect(getFile(WS_A, "------------------------------------", FILE)).resolves.toBeNull();
+  });
+
+  // Speed (moving between pages felt slow): the run page read the run, then its events, then its files - three round
+  // trips one after another on every open. One request now, with each read still scoped to the workspace.
+  it("a run with its events and files is read in one request to the database", async () => {
+    const [run] = await db
+      .insert(runs)
+      .values({ workspaceId: WS_A, prompt: "[int] one request", status: "succeeded", model: "int-model" })
+      .returning({ id: runs.id });
+    created.push(run.id);
+    const at = new Date("2026-09-24T10:00:00.000Z");
+    await db.insert(runEvents).values([2, 1].map((seq) => ({ runId: run.id, seq, kind: "text", payload: { text: `[int] step ${seq}` }, at })));
+    await db.insert(files).values(["b.md", "a.md"].map((name) => ({ runId: run.id, name, mime: "text/markdown", bytes: 1, content: "x" })));
+    const { result, requests } = await countDbRequests(() => getRun(WS_A, run.id));
+    expect(result?.run.prompt).toBe("[int] one request");
+    expect(result?.events.map((e) => e.seq)).toEqual([1, 2]); // in order, as before
+    expect(result?.files.map((f) => f.name)).toEqual(["a.md", "b.md"]);
+    expect(requests).toBe(1);
+  });
+
+  it("another workspace's run is read in that one request too, and answers null with no events or files", async () => {
+    const [id] = created;
+    const { result, requests } = await countDbRequests(() => getRun(WS_B, id));
+    expect(result).toBeNull();
+    expect(requests).toBe(1);
+  });
+
+  // a CSV tile's facts read each file: the owner check and the file were two round trips one after the other
+  it("a file is read in one request to the database, and not at all for another workspace", async () => {
+    const [id] = created;
+    const own = await countDbRequests(() => getFile(WS_A, id, FILE));
+    expect(own.result?.content).toBe("hello");
+    expect(own.requests).toBe(1);
+    const other = await countDbRequests(() => getFile(WS_B, id, FILE));
+    expect(other.result).toBeNull();
+    expect(other.requests).toBe(1);
   });
 
   // Q200: /api/runs/<id>/files/%00 and notes.md%00.csv answered 500: Postgres text cannot hold a NUL byte.

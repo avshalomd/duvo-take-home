@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/auth/brand-mark";
 import { UserMenu } from "@/components/auth/user-menu";
+import { LinkPending } from "./link-pending";
 import { cn } from "@/lib/utils";
 
+// `section`: the addresses the page covers, for aria-current. Settings links straight to its first tab: /settings
+// only redirects there, which cost every visit a second round trip to the server.
 const PAGES = [
-  { href: "/", label: "Home" },
-  { href: "/automations", label: "Automations" },
-  { href: "/settings", label: "Settings" },
+  { href: "/", section: "/", label: "Home" },
+  { href: "/automations", section: "/automations", label: "Automations" },
+  { href: "/settings/connections", section: "/settings", label: "Settings" },
 ];
 
 // The id of the empty spot at the start of the bar where Home puts its "Runs" button on a phone: the bar belongs
@@ -22,7 +25,7 @@ export function TopBar({ userName, workspaceName }: { userName: string; workspac
   const path = usePathname();
   const search = useSearchParams();
   const runOpen = path === "/" && search.has("run"); // a first visit has no run to skip to
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const active = (section: string) => (section === "/" ? path === "/" : path.startsWith(section));
   return (
     <header data-testid="app-header" className="sticky top-0 z-30">
       {/* the first thing the keyboard reaches on Home: past the bar and the rail, straight to the open run (Q70) */}
@@ -55,15 +58,16 @@ export function TopBar({ userName, workspaceName }: { userName: string; workspac
             <Link
               key={p.href}
               href={p.href}
-              aria-current={active(p.href) ? "page" : undefined}
+              aria-current={active(p.section) ? "page" : undefined}
               className={cn(
                 // active:scale: the same small give under a press as every other control (Q143)
-                "rounded-full px-3 py-1.5 text-[14px] text-slate transition-[color,transform] duration-100 hover:text-graphite active:scale-[0.97] max-sm:px-2.5",
+                "relative isolate rounded-full px-3 py-1.5 text-[14px] text-slate transition-[color,transform] duration-100 hover:text-graphite active:scale-[0.97] max-sm:px-2.5",
                 "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-                active(p.href) && "bg-paper font-medium text-graphite shadow-tile",
+                active(p.section) && "bg-paper font-medium text-graphite shadow-tile",
               )}
             >
               {p.label}
+              <LinkPending />
             </Link>
           ))}
         </nav>

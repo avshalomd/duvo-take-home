@@ -31,6 +31,9 @@ export const auth = betterAuth({
   // transaction: false (the default, said out loud): `db` is the Neon HTTP driver, which cannot hold an
   // interactive transaction open, so Better Auth runs a multi-step write (sign-up: user, account, session) step by step.
   database: drizzleAdapter(db, { provider: "pg", schema, transaction: false }),
+  // Every page reads the session first: with joins it is one query (the session with its user, through the relations
+  // in db/auth-schema.ts) instead of two one after the other. Without them Better Auth reads the user separately.
+  advanced: { database: { joins: true } },
   // the same numbers the sign-up form asks before sending (password.ts, UX QA U27)
   emailAndPassword: { enabled: true, minPasswordLength: MIN_PASSWORD_LENGTH, maxPasswordLength: MAX_PASSWORD_LENGTH },
   socialProviders: googleConfigured()
