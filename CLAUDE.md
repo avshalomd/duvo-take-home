@@ -41,7 +41,7 @@ and why it is built that way; `docs/QA.md` is the log of every finding and its f
 - **Production:** the Vercel project `handover` and its own database. `.vercel/.env.production.local` (from
   `vercel pull --yes --environment production`, git-ignored) is what `handover-db.mjs` reads. `RUNNER=route`: each run
   executes in `/api/runner/<id>`, the only function that carries the agent's Linux binary (`next.config.ts`).
-- v1's Vercel project, `duvo-take-home`, is paused.
+- Handover is the only Vercel project of this repo; v1's (`duvo-take-home`) and the rehearsal projects are deleted.
 
 ## Production rules
 
