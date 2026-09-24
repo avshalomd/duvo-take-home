@@ -10,6 +10,14 @@ export const maxDuration = 300;
 const EVERY_MS = 1000;
 // Under maxDuration: the stream ends on its own with done=false and the client reconnects with ?after=<last seq>.
 const STREAM_MS = 280_000;
+// The session is checked again every this many reads (~15 s): someone removed from the workspace, or signed out
+// elsewhere, stops receiving the run then, not when the stream would end on its own.
+const RECHECK_EVERY = 15;
+
+/** Whether the request's session still names this workspace: read again from the cookie and the memberships. */
+async function stillIn(req: Request, workspaceId: string): Promise<boolean> {
+  return (await sessionFromHeaders(req.headers))?.workspaceId === workspaceId;
+}
 
 /** Wait between reads, cut short when the client goes away. The listener is removed each time, or 280 would pile up. */
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -27,7 +35,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 /**
  * The run as server-sent events: every second, the events after the client's cursor and the run as it is now, read
  * from the database like the polling route (/api/runs/<id> stays as the fallback). Ends with one last message once
- * the run is finished, and stops reading as soon as the client goes away.
+ * the run is finished, and stops reading as soon as the client goes away or the session no longer names the workspace.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await sessionFromHeaders(req.headers);
@@ -49,7 +57,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        while (!gone.signal.aborted && Date.now() < until) {
+        for (let reads = 0; !gone.signal.aborted && Date.now() < until; reads++) {
+          if (reads > 0 && reads % RECHECK_EVERY === 0 && !(await stillIn(req, workspaceId))) break; // the client's next try is refused
           // the run and only its new events: a long run is not read whole every second (files come with the done payload)
           let found = await getRunSince(workspaceId, id, after);
           if (gone.signal.aborted) break; // left during the read: there is nobody to send it to
