@@ -23,8 +23,9 @@ const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 /**
  * Stop a run of this workspace. A queued run is closed here and now, because no loop is watching it yet; a running
  * or evaluating one gets cancel_requested_at, which its loop reads every 2 s before it aborts the agent and closes
- * the run as cancelled with the files written so far. One whose loop is gone (past every runner's limit) is closed
- * as cancelled here.
+ * the run as cancelled with the files written so far - or, once the agent has sent its result, lets the check finish
+ * and closes the run with that answer, starting no fix attempt (qa-func F24). One whose loop is gone (past every
+ * runner's limit) is closed as cancelled here.
  */
 export const cancelRun: CancelRun = async (workspaceId, runId) => {
   if (!isUuid(runId)) throw new CancelError(NOT_FOUND, 404);
