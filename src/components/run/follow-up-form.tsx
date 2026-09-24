@@ -13,11 +13,13 @@ export function FollowUpForm({
   runId,
   suggestion,
   draft = null,
+  placeholder,
   onCancel,
 }: {
   runId: string;
   suggestion: string | null;
   draft?: string | null;
+  placeholder: string; // an example that fits what the run made (changePlaceholder, UX QA U25)
   onCancel: () => void;
 }) {
   const [state, action, pending] = useActionState(followUpAction, {});
@@ -60,7 +62,7 @@ export function FollowUpForm({
             onCancel(); // as Cancel does
           }
         }}
-        placeholder="What should change? For example: add a column with each source's country"
+        placeholder={placeholder}
         aria-invalid={Boolean(state.fieldErrors?.prompt)}
         className="min-h-16 resize-none rounded-[16px] border-0 bg-mist/70 px-4 py-3 text-[15px] shadow-none focus-visible:ring-[3px] dark:bg-mist/70"
       />

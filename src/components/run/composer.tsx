@@ -1,7 +1,6 @@
 "use client";
 
-import { ArrowUp, LoaderCircle, Plug } from "lucide-react";
-import Link from "next/link";
+import { ArrowUp, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useRef, useState, useSyncExternalStore, useTransition, ViewTransition } from "react";
 import { flushSync } from "react-dom";
@@ -12,6 +11,7 @@ import type { StartRefusal } from "@/lib/usage/budget-rule";
 import { cn } from "@/lib/utils";
 import { applyCommand, commandHint, commandQuery, filterAutomations } from "./command-query";
 import { COMMAND_LIST_ID, CommandList, optionId, type CommandOption } from "./command-list";
+import { ConnectionChips } from "./connection-chips";
 import { mayTakeFocus } from "./first-focus";
 import { useHandover } from "./handover-host";
 import { handoverTitle } from "./handover-title";
@@ -370,36 +370,5 @@ function useShortcutName(): typeof APPLE | null {
     noSubscribe,
     () => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? APPLE : OTHER),
     () => null,
-  );
-}
-
-// Which connections the next run gets: the ones switched on in Settings. Each one links there.
-function ConnectionChips({ names }: { names: string[] }) {
-  const focus = "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
-  return (
-    <div data-testid="composer-connections" className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px] tracking-[0.01em] text-slate">
-      <Plug aria-hidden className="size-3.5 shrink-0" />
-      {names.length === 0 ? (
-        <Link href="/settings/connections" className={cn("rounded-full underline-offset-2 hover:text-graphite hover:underline", focus)}>
-          No connections on
-        </Link>
-      ) : (
-        <>
-          <span>Using</span>
-          {/* one chip per connection: as plain words, two names ran together into one (Q147) */}
-          {names.map((n) => (
-            <Link
-              key={n}
-              data-testid="connection-chip"
-              href="/settings/connections"
-              title={`${n} is on - change it in Settings`}
-              className={cn("rounded-full bg-mist px-2 py-0.5 font-medium text-graphite transition-colors hover:bg-mist-deep", focus)}
-            >
-              {n}
-            </Link>
-          ))}
-        </>
-      )}
-    </div>
   );
 }

@@ -8,14 +8,14 @@ import type { Run } from "@/contracts/run";
 import { cn } from "@/lib/utils";
 import { FollowUpForm } from "./follow-up-form";
 import { RunAgainButton } from "./run-again-button";
-import { canMakeAutomation, changeSuggestion } from "./run-actions";
+import { canMakeAutomation, changePlaceholder, changeSuggestion } from "./run-actions";
 
 const quiet =
   "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[14px] font-medium text-graphite transition-[background-color,transform] duration-100 hover:bg-mist active:scale-[0.97] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none max-[899px]:h-10";
 
 // What the person can do with a finished run, as one quiet row at the end of it: turn it into an automation, ask
 // for a change, or run the same brief again (a failed run offers that in its banner instead).
-export function ActionsRow({ run, verdict, headline }: { run: Run; verdict: Verdict | null; headline: string | null }) {
+export function ActionsRow({ run, verdict, headline, files }: { run: Run; verdict: Verdict | null; headline: string | null; files: string[] }) {
   const [asking, setAsking] = useState(false);
   const askButton = useRef<HTMLButtonElement>(null);
   const suggestion = verdict?.review?.changeNeeded ?? null;
@@ -43,6 +43,7 @@ export function ActionsRow({ run, verdict, headline }: { run: Run; verdict: Verd
             runId={run.id}
             suggestion={suggestion}
             draft={draft}
+            placeholder={changePlaceholder(files)}
             onCancel={() => {
               setAsking(false);
               askButton.current?.focus(); // the keyboard goes back to where it was

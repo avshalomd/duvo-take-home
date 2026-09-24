@@ -26,6 +26,18 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** A .md or .txt file: its tile shows its first lines and says its size in lines (UX QA U21). */
+export function isTextFile(name: string): boolean {
+  const ext = name.toLowerCase().split(".").pop();
+  return ext === "md" || ext === "txt";
+}
+
+/** "3 lines", "1 line" or "Empty": a text file's size as a person reads it, instead of bytes (UX QA U21). */
+export function linesLine(lines: number): string {
+  if (lines === 0) return "Empty";
+  return `${lines} ${lines === 1 ? "line" : "lines"}`;
+}
+
 /** What the empty file area says, by the state of the run: files are collected when a run ends (Q100, Q122). */
 export function noFilesLine(status: string, hasReport: boolean): string {
   if (status === "queued" || status === "running" || status === "evaluating") return "Files appear here when the run finishes.";

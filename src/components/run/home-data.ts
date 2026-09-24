@@ -10,7 +10,8 @@ import { startRefusal, type StartRefusal } from "@/lib/usage/budget-rule";
 import type { CommandOption } from "./command-list";
 import { describeOutput } from "./command-query";
 import { csvSummary } from "./csv-summary";
-import { carriedSheets, type Sheet } from "./file-kind";
+import { carriedSheets, isTextFile, type Sheet } from "./file-kind";
+import { textSummary } from "./text-summary";
 
 // What Home reads besides its runs: the workspace's automations (for the command list, the tokens and the runs'
 // titles and tags), the connections that are on, and the facts on each CSV tile. Server only.
@@ -63,25 +64,31 @@ export async function composerProps(workspaceId: string): Promise<ComposerData> 
   };
 }
 
-/** A tile's facts, by file name: a CSV's rows and columns, or the sheets of a spreadsheet a follow-up carried over. */
-export type FileFacts = Record<string, { rows: number; columns: string[] } | { sheets: Sheet[] }>;
+/**
+ * A tile's facts, by file name: a CSV's rows and columns, a text file's lines of text and its first few (UX QA U21), or
+ * the sheets of a spreadsheet a follow-up carried over.
+ */
+export type FileFacts = Record<string, { rows: number; columns: string[] } | { lines: number; preview: string[] } | { sheets: Sheet[] }>;
 
 /** A run as Home has read it: enough to follow the chain of runs a follow-up continues. */
 type ReadRun = { run: Pick<Run, "parentRunId">; events: RunEvent[] };
 
 /**
- * What each tile says that the file's name cannot: the rows and columns of each CSV the run made, read once on the
- * server where the file is, and the sheets of each spreadsheet a follow-up carried over from the runs it continues
+ * What each tile says that the file's name cannot: the rows and columns of each CSV the run made and the first lines of
+ * each text file, read once on the server where the file is, and the sheets of each spreadsheet a follow-up carried over from the runs it continues
  * (Q205) - their events are on the server too, and the client only holds this run's. `parent` is the follow-up's
  * parent as Home already read it (for its title): it is not read a second time.
  */
 export async function fileFacts(workspaceId: string, run: Pick<Run, "id" | "parentRunId">, files: FileMeta[], parent: ReadRun | null): Promise<FileFacts> {
-  const csvs = files.filter((f) => f.name.toLowerCase().endsWith(".csv") && !f.quarantined); // a held-back file is not opened
-  const [read, earlier] = await Promise.all([Promise.all(csvs.map((f) => getFile(workspaceId, run.id, f.name))), earlierEvents(workspaceId, parent)]);
+  // a held-back file is not opened; a text file is read as text only when it was stored as text
+  const readable = files.filter((f) => !f.quarantined && (f.name.toLowerCase().endsWith(".csv") || (isTextFile(f.name) && f.encoding !== "base64")));
+  const [read, earlier] = await Promise.all([Promise.all(readable.map((f) => getFile(workspaceId, run.id, f.name))), earlierEvents(workspaceId, parent)]);
   const facts: FileFacts = {};
   read.forEach((file, i) => {
-    const summary = file ? csvSummary(file.content) : null;
-    if (summary) facts[csvs[i].name] = summary;
+    if (!file) return;
+    const name = readable[i].name;
+    const summary = isTextFile(name) ? textSummary(file.content, name) : csvSummary(file.content);
+    if (summary) facts[name] = summary;
   });
   for (const [name, sheets] of Object.entries(carriedSheets(files.map((f) => f.name), earlier))) facts[name] = { sheets };
   return facts;

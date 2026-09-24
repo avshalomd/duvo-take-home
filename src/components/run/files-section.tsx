@@ -1,7 +1,7 @@
 import { Download, FileSpreadsheet, FileText, Info, ShieldAlert, Table2 } from "lucide-react";
 import type { FileMeta, RunEvent } from "@/contracts/run";
 import { cn } from "@/lib/utils";
-import { csvLine, fileKind, flagLine, formatBytes, noFilesLine, sheetsLine, tileSheets } from "./file-kind";
+import { csvLine, fileKind, flagLine, formatBytes, linesLine, noFilesLine, sheetsLine, tileSheets } from "./file-kind";
 import type { FileFacts } from "./home-data";
 
 const pill =
@@ -41,10 +41,11 @@ export function FilesSection({
 
 function FileTile({ runId, file, events, facts }: { runId: string; file: FileMeta; events: RunEvent[]; facts: FileFacts }) {
   const url = `/api/runs/${runId}/files/${encodeURIComponent(file.name)}`;
-  const size = formatBytes(file.bytes);
   const kind = fileKind(file.name);
   const fact = facts[file.name];
   const csv = fact && "columns" in fact ? fact : null;
+  const text = fact && "preview" in fact ? fact : null;
+  const size = text ? linesLine(text.lines) : formatBytes(file.bytes); // UX QA U21: a text file's size in lines, not bytes
   // a spreadsheet's sheets come from the call that made it: this run's, or the run a follow-up carried it over from
   const sheets = kind === "spreadsheet" ? tileSheets(file.name, events, fact && "sheets" in fact ? fact.sheets : []) : [];
   const line = kind === "spreadsheet" ? sheetsLine(sheets) : kind === "chart" ? "Chart" : csv ? csvLine(csv) : null;
@@ -76,6 +77,21 @@ function FileTile({ runId, file, events, facts }: { runId: string; file: FileMet
           </a>
         )}
       </div>
+
+      {text && text.preview.length > 0 && (
+        // the first lines, as a page peeking out of the tile: each clipped to the tile's width, and the last one fades
+        // when the file goes on, so the preview never reads as the whole file (UX QA U21)
+        <div aria-label={`The first lines of ${file.name}`} role="group" className="rounded-[12px] bg-paper px-3.5 py-2.5">
+          {/* the fade is on the words, not the page they sit on, so the page keeps its edge */}
+          <div className={cn(text.lines > text.preview.length && "mask-b-from-45%")}>
+            {text.preview.map((line, i) => (
+              <p key={i} data-testid="text-preview" className="truncate text-[13px] leading-5 tracking-[0.01em] text-graphite/85">
+                {line}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {flags && (
         <p className="flex items-center gap-2 text-[13px] tracking-[0.01em] text-slate">

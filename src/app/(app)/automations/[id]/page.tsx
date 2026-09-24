@@ -29,7 +29,7 @@ import { listConnections } from "@/lib/connections/store";
 import { schedulerRunning } from "@/lib/runner/mode";
 import { judgeNames, judgeOf } from "@/lib/runs/judges";
 import { getRun } from "@/lib/runs/queries";
-import { verdictChangeLabel, verdictWords } from "@/lib/runs/verdict-words";
+import { judgeWho, verdictChangeLabel, verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { cn } from "@/lib/utils";
 
@@ -69,7 +69,8 @@ export default async function AutomationPage({ params, searchParams }: PageProps
   const names = await judgeNames(trials.map((t) => t.humanVerdictBy));
   const said = (t: Trial) => (t.humanVerdict ? verdictWords(t.humanVerdict, judgeOf(t.humanVerdictBy, names), userId) : null);
   const changeLabel = (t: Trial) => verdictChangeLabel(judgeOf(t.humanVerdictBy, names), userId); // whose judgment a change replaces
-  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said, changeLabel);
+  const judgedBy = (t: Trial) => judgeWho(judgeOf(t.humanVerdictBy, names), userId); // U30: the subject of "You marked it right; ..."
+  const examples = await examplesOf(workspaceId, current.slice(0, SHOWN_EXAMPLES), said, changeLabel, judgedBy);
   const approval = canApprove(trials, automation.version);
   const isDraft = automation.status === "draft";
   // Q178: a member drafts, edits, tries and judges; approve, turn off, delete and the schedule read as who does them
@@ -226,6 +227,7 @@ async function examplesOf(
   trials: Trial[],
   said: (t: Trial) => string | null,
   changeLabel: (t: Trial) => string,
+  judgedBy: (t: Trial) => string | null,
 ): Promise<ExampleView[]> {
   const found = await Promise.all(trials.map((t) => getRun(workspaceId, t.runId)));
   return trials.flatMap((t, i) => {
@@ -244,6 +246,7 @@ async function examplesOf(
         humanNote: t.humanNote,
         said: said(t),
         changeLabel: changeLabel(t),
+        judgedBy: judgedBy(t),
       },
     ];
   });

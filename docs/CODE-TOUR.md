@@ -407,3 +407,25 @@ Per file: what it does and why it is built that way. Grows at every merge.
   meter around the work adds them up, so the evaluator's layers did not need a cost parameter each. Outside metered work
   (a live run's own checks) a report does nothing. `model-prices.ts` prices tokens: Sonnet 5 at its list price, Jev at
   a stated guess, and any other model at Sonnet 4.6's price, so the day never reads low.
+
+### The owner's calls on the glance view (2026-09-24: UX QA U20, U21, U24, U25, U30)
+
+- `src/components/run/brief-title.tsx` - an open run's title. A brief cut to two lines becomes a real button
+  (`aria-expanded`) that opens it in place and closes it again; one that fits stays plain text. Measured in the browser
+  (scrollHeight counts the clamped lines) and again on every width change; the height moves as a CSS transition, so a
+  second press mid-way reverses it and reduced motion just changes it. The ellipsis returns once the close has finished
+  (U20). The pending sheet keeps `RunTitle`, the handover's landing spot.
+- `src/components/run/text-summary.ts` and `file-kind.ts` `linesLine` - a .md or .txt tile shows its first three lines
+  of text (markdown read as words: no `#`, `**` or link marks; bullets as "•") and "4 lines" instead of bytes. Read on
+  the server in `fileFacts`, as the CSV facts are; blank lines are not counted, so count and preview agree (U21).
+- `src/components/run/connection-chips.tsx` and `connections-line.ts` - the composer names one connection as a chip
+  linking to Settings; several are one chip, "DeepWiki and 3 more", that opens a small Base UI popover from itself with
+  the whole list and "Change in Settings". The row never wraps, so at 390 px the floating composer stays one line of
+  controls (U24).
+- `src/components/run/run-actions.ts` `changePlaceholder` - Ask for a change's example fits the run's files: a chart,
+  a CSV or a spreadsheet each get their own; a text file or no file gets the plain "What should change?" (U25).
+- `src/components/run/outcome.ts` `againstTheCheck` and `src/lib/runs/verdict-words.ts` `judgeWho` - when a person's
+  judgment and the automatic check disagree (right against a fail, not right against a pass), the outcome line says both
+  in one sentence, "You marked it right; the automatic check did not pass it.", on the run page and the example card.
+  The person's judgment sets the dot's colour, since it is the one approval counts; the note under the title then shows
+  only what the person wrote, if anything, so the judgment is not said twice (U30).

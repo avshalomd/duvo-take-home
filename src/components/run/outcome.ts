@@ -50,6 +50,28 @@ export function outcome(
 }
 
 /**
+ * The outcome line when a person's judgment and the automatic check disagree (UX QA U30, the owner's call): both, in
+ * one sentence, in place of outcome()'s label. Null when they agree, nobody judged it, or the check gave no pass or
+ * fail to disagree with. who is judgeWho(): "You", a colleague's name, or null when nobody was recorded. The person's
+ * judgment sets the colour, as it is the one that counts toward approving an automation.
+ */
+export function againstTheCheck(
+  runStatus: string,
+  verdict: string | null | undefined,
+  human: "approved" | "rejected" | null | undefined,
+  who: string | null,
+): { label: string; tone: Tone } | null {
+  if (runStatus !== "succeeded" || !human) return null;
+  const passed = verdict === "pass" || verdict === "pass_with_notes";
+  if (verdict !== "fail" && !passed) return null; // not checked, could not be done, needs an answer: nothing to disagree with
+  const right = human === "approved";
+  if (right === passed) return null;
+  const marked = `${who ? `${who} marked it` : "It was marked"} ${right ? "right" : "not right"}`;
+  const check = verdict === "fail" ? "did not pass it" : verdict === "pass_with_notes" ? "passed it with notes" : "passed it";
+  return { label: `${marked}; the automatic check ${check}.`, tone: right ? "warn" : "bad" };
+}
+
+/**
  * The sentence beside Check again on the glance view, for a finished run nobody checked (qa-ux U7): the checker was
  * down (Q208), or the run was never checked at all. Null when there is nothing to check again.
  */

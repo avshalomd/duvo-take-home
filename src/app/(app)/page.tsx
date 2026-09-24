@@ -10,7 +10,7 @@ import { RailSheet } from "@/components/run/rail-sheet";
 import { requireSession } from "@/lib/auth/session";
 import { judgeNames, judgeOf } from "@/lib/runs/judges";
 import { getRun, listRuns } from "@/lib/runs/queries";
-import { verdictWords } from "@/lib/runs/verdict-words";
+import { judgeWho, verdictWords } from "@/lib/runs/verdict-words";
 import { deriveState } from "@/lib/runs/state";
 import { composerProps, connectionsOf, fileFacts, readyAutomations, titles } from "@/components/run/home-data";
 import { runTag as runTagOf, runTitle as runTitleOf } from "@/components/run/rail";
@@ -107,7 +107,8 @@ async function MainColumn({ workspaceId, userId, selectedId }: { workspaceId: st
   const connections = allConnections.map((c) => ({ name: c.name })); // names only: no url, no token state
   // the person's mark, as who made it: "You said" only to them (Q178)
   const [judges, facts] = await Promise.all([judgeNames([run.humanVerdictBy]), fileFacts(workspaceId, run, data.files, parent)]);
-  const verdictLine = run.humanVerdict ? verdictWords(run.humanVerdict, judgeOf(run.humanVerdictBy, judges), userId) : null;
+  const judge = judgeOf(run.humanVerdictBy, judges);
+  const verdictLine = run.humanVerdict ? verdictWords(run.humanVerdict, judge, userId) : null;
 
   return (
     <RunSheet
@@ -117,6 +118,7 @@ async function MainColumn({ workspaceId, userId, selectedId }: { workspaceId: st
       parentTitle={parent ? runTitleOf(parent.run, names) : null}
       automationName={run.automationId ? (names[run.automationId] ?? null) : null}
       verdictLine={verdictLine}
+      judgedBy={judgeWho(judge, userId)}
       facts={facts}
       connections={connections}
       composer={composer}

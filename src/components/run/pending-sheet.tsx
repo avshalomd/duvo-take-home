@@ -46,8 +46,8 @@ export function PendingSheet({ title, connections, onShown }: { title: string; c
         </div>
         <RunTitle title={title} brief={title} id="pending-title" handover />
         <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <p role="status" className="flex items-center gap-2.5 text-[15px]">
-            <StatusDot tone={status.tone} className="size-2.5" />
+          <p role="status" className="flex items-start gap-2.5 text-[15px]">
+            <StatusDot tone={status.tone} className="mt-1.5 size-2.5" />
             <span className="font-medium">{status.label}</span>
           </p>
         </div>

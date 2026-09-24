@@ -11,6 +11,12 @@ export function verdictWords(verdict: "approved" | "rejected", judge: Judge, vie
   return verdict === "approved" ? "Marked as looking right" : "Marked as not right";
 }
 
+/** Who judged it, as the subject of a sentence: "You", a colleague's name, or null when nobody was recorded (U30). */
+export function judgeWho(judge: Judge, viewerId: string): string | null {
+  if (judge && judge.id === viewerId) return "You";
+  return judge?.name ?? null;
+}
+
 /** The control that changes a judgment. The new one becomes the viewer's, so a colleague's is named as the one replaced. */
 export function verdictChangeLabel(judge: Judge, viewerId: string): string {
   if (judge && judge.id !== viewerId && judge.name) return `Replace ${judge.name}'s judgment`;
