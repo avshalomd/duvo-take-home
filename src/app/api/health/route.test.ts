@@ -32,6 +32,18 @@ describe("GET /api/health", () => {
     vi.unstubAllEnvs();
   });
 
+  it("names the deployed commit: a push to main carries Vercel's git sha, a CLI deploy its APP_COMMIT", async () => {
+    vi.stubEnv("APP_COMMIT", "");
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "589d372f0c1e9b2a7d4e6f8a0b1c2d3e4f5a6b7c");
+    expect((await (await GET(new Request("http://x/api/health"))).json()).commit).toBe("589d372");
+    vi.stubEnv("APP_COMMIT", "4327198");
+    expect((await (await GET(new Request("http://x/api/health"))).json()).commit).toBe("4327198");
+    vi.stubEnv("APP_COMMIT", "");
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "");
+    expect((await (await GET(new Request("http://x/api/health"))).json()).commit).toBe("local");
+    vi.unstubAllEnvs();
+  });
+
   it("reports a usable model on deep=1", async () => {
     model.current = scriptedModel(["ok"]);
     const body = await (await GET(new Request("http://x/api/health?deep=1"))).json();
