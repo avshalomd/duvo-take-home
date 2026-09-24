@@ -1,17 +1,32 @@
 import type { EvaluateInput, Judgment } from "@/contracts/eval";
-import { decide, noul } from "@/lib/llm/decide";
+import { decide, noul, stateTooLong } from "@/lib/llm/decide";
+import { clipMiddle, namesOf } from "./clip";
 import { forModel } from "./file-view";
 
 // Tier one of the judgment: three CLOSED questions answered by Jev in one request, with calibrated probabilities.
 // This is the judgment the app makes on every run, so it belongs in decide() and not in a prompt: it cannot
 // answer off-schema, it costs a fraction of an LLM call, and the probability is what the UI shows.
 
-const HEAD_LINES = 40; // Jev reads 32K tokens; the first 40 lines of a file show the shape and the first rows
+// Jev reads 32K tokens, and accuracy falls well before that, so the state is bounded (engine review #10): the first
+// 40 lines of a file show its shape and first rows, ten files are shown, a report is cut to its start and end. A
+// state still too long (many wide files) is built again smaller rather than refused by the provider.
+const HEAD_LINES = 40;
+const SHORT_HEAD_LINES = 10;
 const LINE_CHARS = 300;
+const MAX_FILES = 10;
+const REPORT_CHARS = 8_000;
+const SHORT_REPORT_CHARS = 3_000;
 const TIMEOUT_MS = 20_000;
 
 export function judgeState(input: EvaluateInput) {
+  const state = stateWith(input, HEAD_LINES, REPORT_CHARS);
+  return stateTooLong(state) ? stateWith(input, SHORT_HEAD_LINES, SHORT_REPORT_CHARS) : state;
+}
+
+function stateWith(input: EvaluateInput, headLines: number, reportChars: number) {
   const t = input.template;
+  const shown = input.files.slice(0, MAX_FILES);
+  const rest = input.files.slice(MAX_FILES);
   return {
     instructions: input.prompt,
     today: input.today,
@@ -19,11 +34,12 @@ export function judgeState(input: EvaluateInput) {
     // A run of a saved automation is judged against what the person approved, not only against the plan the agent
     // wrote for itself: a run that planned less than the automation asks for could still "follow its own plan".
     ...(t ? { automation: { intent: t.intent, expectedOutputs: t.expectedOutputs, outputFormat: t.outputFormat, steps: t.steps } } : {}),
-    report: input.report ?? "(the run wrote no report)",
-    files: input.files.map((f) => {
+    report: clipMiddle(input.report ?? "(the run wrote no report)", reportChars),
+    files: shown.map((f) => {
       const text = forModel(f); // a spreadsheet is shown as what it is and its size, never as base64
-      return { name: f.name, head: text.split("\n").slice(0, HEAD_LINES).map((l) => l.slice(0, LINE_CHARS)).join("\n"), lines: text.split("\n").length };
+      return { name: f.name, head: text.split("\n").slice(0, headLines).map((l) => l.slice(0, LINE_CHARS)).join("\n"), lines: text.split("\n").length };
     }),
+    ...(rest.length ? { filesNotShown: namesOf(rest) } : {}), // named, so the judge knows they exist
   };
 }
 
