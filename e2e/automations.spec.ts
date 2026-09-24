@@ -61,7 +61,7 @@ test("a finished run becomes a draft automation that can be edited and cannot be
   await expect(page.getByText("Saved.")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByText(name)).toBeVisible();
+  await expect(page.getByRole("heading", { name })).toBeVisible(); // the tab title carries the name too
 
   // no example has run, so approval is disabled and the bar says why
   await expect(page.getByRole("button", { name: "Approve and save" })).toBeDisabled();

@@ -29,7 +29,7 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
   const invitation = await openInvitation(target);
   // Invite-only: the form is for someone who came from an open invitation's page. The server refuses everyone
   // else anyway (lib/auth/signup.ts); this only saves them a form that cannot work.
-  if (signupMode() === "invite" && !invitation) {
+  if (signupMode() === "invite" && (!invitation || invitation.personal)) { // one to a personal workspace opens no account (S11)
     return (
       <AuthPanel title="Create an account" description={INVITE_ONLY} footer={<>Already have an account? {signInLink}</>} />
     );
@@ -44,8 +44,8 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
 }
 
 /** The open invitation `next` leads back to, if it is one. */
-async function openInvitation(next: string): Promise<{ workspaceName: string; inviterName: string } | null> {
+async function openInvitation(next: string): Promise<{ workspaceName: string; inviterName: string; personal: boolean } | null> {
   const id = invitationIdFrom(next);
   const invitation = id ? await getInvitation(id) : null;
-  return invitation?.open && !invitation.personal ? invitation : null; // one to a personal workspace opens no account (S11)
+  return invitation?.open ? invitation : null;
 }

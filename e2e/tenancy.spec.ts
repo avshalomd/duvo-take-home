@@ -34,7 +34,7 @@ test("a new user opening a demo workspace run sees 'not found', and the API answ
   await signUpThroughUi(page, "Tess Stranger", email);
 
   await page.goto(`/?run=${run.id}`);
-  await expect(page.getByText(/not found/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /not found/i })).toBeVisible(); // the tab title says it too
   await expect(page.getByText(run.prompt, { exact: true })).toHaveCount(0);
 
   const api = await page.request.get(`/api/runs/${run.id}`);
