@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { draftFromRunAction } from "@/app/(app)/automations/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { followDraft, type DraftResult } from "./follow-draft";
 import { LINK, SHEET } from "./surfaces";
 
 // The drafting page's body. The draft is a Server Action started once the page is on screen - not a render side
@@ -18,15 +19,13 @@ export function Drafting({ runId, prompt }: { runId: string; prompt: string }) {
   const reduce = useReducedMotion();
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const started = useRef<number | null>(null);
+  const started = useRef<{ attempt: number; draft: Promise<DraftResult> } | null>(null);
 
   useEffect(() => {
-    if (started.current === attempt) return; // React runs effects twice in development: one draft per attempt, not two
-    started.current = attempt;
-    draftFromRunAction(runId).then(
-      (r) => (r.id ? router.replace(`/automations/${r.id}`) : setError(r.error ?? "The draft could not be made.")),
-      () => setError("The draft could not be made. Check your connection and try again."), // the request itself failed
-    );
+    // React runs effects twice in development: one draft per attempt, not two, and the second run follows the first's
+    if (started.current?.attempt !== attempt) started.current = { attempt, draft: draftFromRunAction(runId) };
+    // leaving the page (or a new attempt) stops following it: nobody is pulled onto the draft later
+    return followDraft(started.current.draft, { open: (id) => router.replace(`/automations/${id}`), fail: setError });
   }, [attempt, runId, router]);
 
   if (error)
