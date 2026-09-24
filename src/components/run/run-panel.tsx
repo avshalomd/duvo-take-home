@@ -191,7 +191,14 @@ export function RunPanel({
         )}
       </section>
 
-      <DetailsPanel open={detailsOpen} onClose={closeDetails} view={view} storedOutcome={run.outcome ?? null} connections={connections} />
+      <DetailsPanel
+        open={detailsOpen}
+        onClose={closeDetails}
+        view={view}
+        storedOutcome={run.outcome ?? null}
+        connections={connections}
+        returnFocus={detailsButton}
+      />
     </>
   );
 }
