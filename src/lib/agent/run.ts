@@ -25,6 +25,7 @@ import { checkStep } from "@/lib/eval/step-check";
 import { collectFiles } from "@/lib/outputs/collect";
 import { createOutputsServer, OUTPUTS_SERVER_KEY } from "@/lib/outputs/server";
 import { runnerMode } from "@/lib/runner/mode";
+import { withoutTestTag } from "@/lib/runs/test-tag";
 import { getLimits, healBudgetStop } from "@/lib/usage/budget";
 import { AUTOMATION_GONE, automationRunRefusal } from "./automation-check";
 import { watchCancel } from "./cancel-watch";
@@ -107,8 +108,8 @@ export const runAutomation: RunAutomation = async (runId) => {
   let limits: Awaited<ReturnType<typeof getLimits>>;
   let systemPrompt = SYSTEM_PROMPT;
   let template: AutomationTemplate | null = null;
-  let prompt = run.prompt; // what the agent is sent
-  let instructions = run.prompt; // what the step checks and the evaluator judge the result against
+  let prompt = withoutTestTag(run.prompt); // what the agent is sent: never QA's "[e2e]" tag (qa-ai F13)
+  let instructions = prompt; // what the step checks and the evaluator judge the result against
   let resume: Awaited<ReturnType<typeof resumeOptions>> = null;
   let costBase = 0; // a resumed follow-up's SDK total starts from its parent's: only the rest is this run's cost
   try {

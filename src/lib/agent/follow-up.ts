@@ -5,6 +5,7 @@ import { files, runEvents, runs } from "@/db/schema";
 import { Verdict } from "@/contracts/eval";
 import { Plan } from "@/contracts/run";
 import { feedbackForAgent } from "@/lib/eval/feedback";
+import { withoutTestTag } from "@/lib/runs/test-tag";
 import { carryOverPrompt, followUpInstructions, type ParentRun } from "./follow-up-prompt";
 import { restoreFiles } from "./restore-files";
 import { resumeOptions } from "./session";
@@ -56,7 +57,10 @@ export async function prepareFollowUp(run: RunRow, dir: string) {
   // A quarantined file holds a credential: it is not handed back to an agent that reads the open web.
   const restored = await restoreFiles(dir, stored.filter((f) => !f.quarantined));
 
-  const parentInstructions = await instructionsOf(parent, workspaceId);
+  // QA's "[e2e]" tag on the thread's first brief and on this change stays off what the agent reads (qa-ai F13);
+  // instructionsOf keeps it, because Run again stores what it returns and the clean-up looks for the tag there
+  const parentInstructions = withoutTestTag(await instructionsOf(parent, workspaceId));
+  const change = withoutTestTag(run.prompt);
   const verdict = Verdict.safeParse(parent.verdict);
   const context: ParentRun = {
     prompt: parentInstructions,
@@ -72,8 +76,8 @@ export async function prepareFollowUp(run: RunRow, dir: string) {
   // count the parent twice (measured on the 2026-09-23 follow-up). A fresh session starts from nothing.
   const costBase = resume ? ((await readSdkTotals(resume.resume, { waitMs: 0 }))?.costUsd ?? 0) : 0;
   return {
-    prompt: carryOverPrompt(context, run.prompt),
-    instructions: followUpInstructions(parentInstructions, run.prompt),
+    prompt: carryOverPrompt(context, change),
+    instructions: followUpInstructions(parentInstructions, change),
     resume,
     costBase,
   };

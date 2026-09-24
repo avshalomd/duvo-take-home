@@ -5,6 +5,7 @@ import type { Run, RunEvent } from "@/contracts/run";
 import { db, schema } from "@/db";
 import { instructionsOf } from "@/lib/agent/follow-up";
 import { LlmError } from "@/lib/llm/errors";
+import { withoutTestTag } from "@/lib/runs/test-tag";
 import { evaluateRun } from "./evaluate";
 import { templateOf, toEvaluateInput, toEvents, toFiles, toRun } from "./run-rows";
 
@@ -63,7 +64,8 @@ export async function loadRun(runId: string): Promise<LoadedRun | null> {
   // Q85: judge the brief the live run was judged on. A follow-up's own prompt is only the change ("Add a summary
   // column"); the thread's first instructions plus every change since are rebuilt by the engine's own function, so
   // the two can never disagree. For any other run instructionsOf() returns its prompt as it is.
-  const prompt = row.workspaceId ? await instructionsOf(row, row.workspaceId) : row.prompt;
+  // without QA's "[e2e]" tag, as the live run was judged (qa-ai F13)
+  const prompt = withoutTestTag(row.workspaceId ? await instructionsOf(row, row.workspaceId) : row.prompt);
   const stored = VerdictSchema.safeParse(row.verdict); // jsonb is typed only at compile time
   return {
     run: { ...toRun(row), prompt },
