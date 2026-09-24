@@ -1,10 +1,11 @@
 import "server-only";
 import { experimental_evaluate as evaluate } from "ai";
+import { z } from "zod";
 import { LlmError } from "./errors";
 
 // Template 3: a typed decision. Jev (TypeSafe AI) reads a state and answers a fixed set of CLOSED questions with
-// calibrated probabilities. It writes no text, so there is nothing to parse and nothing to validate: the answer is
-// always one of the options this code listed. Use it for the judgment a workflow makes over and over - which
+// calibrated probabilities. It writes no text, so there is nothing to parse: the answer is one of the options this
+// code listed, and each answer is still checked for the shape its question promises before anything reads it. Use it for the judgment a workflow makes over and over - which
 // category, how severe, does this condition hold - and keep an LLM (extract.ts, agent.ts) for anything written.
 // When to reach for it and when not to: .claude/docs/models.md.
 //
@@ -118,6 +119,11 @@ async function decideOn<const Qs extends Record<string, Question>>(route: Route,
     // properties of undefined" in whatever code reads the answer, far from the cause.
     const missing = Object.keys(questions).filter((key) => !(raw.answers as Record<string, unknown>)[key]);
     if (missing.length) throw new LlmError(`The decision model left questions unanswered: ${missing.join(", ")}.`, "off-schema");
+    // And each answer must have the shape its question promises: a noul with no number read as NaN downstream.
+    const malformed = Object.entries(questions)
+      .filter(([key, q]) => !answerShape(q).safeParse((raw.answers as Record<string, unknown>)[key]).success)
+      .map(([key]) => key);
+    if (malformed.length) throw new LlmError(`The decision model answered in the wrong shape: ${malformed.join(", ")}.`, "off-schema");
     return raw as DecideResult<Qs>;
   } catch (e) {
     if (e instanceof LlmError) throw e;
@@ -127,6 +133,16 @@ async function decideOn<const Qs extends Record<string, Question>>(route: Route,
     }
     throw new LlmError(`The decision model failed: ${e instanceof Error ? e.message : String(e)}`, "unavailable", { cause: e });
   }
+}
+
+/** What an answer to this question must look like, after the gateway's dialect is translated: the fields code reads. */
+function answerShape(q: Question): z.ZodType {
+  const probability = z.number().min(0).max(1);
+  if (q.type === "noul") return z.object({ type: z.literal("noul"), noul: probability });
+  if (q.type === "choice") {
+    return z.object({ type: z.literal("choice"), choice: z.enum(Object.keys(q.criteria) as [string, ...string[]]), confidence: probability });
+  }
+  return z.object({ type: z.literal("score"), score: z.number().min(0).max(q.criteria.length - 1), confidence: probability });
 }
 
 // The AI SDK route. `experimental_evaluate` ships in `ai` itself, so this costs no new dependency - but it is
